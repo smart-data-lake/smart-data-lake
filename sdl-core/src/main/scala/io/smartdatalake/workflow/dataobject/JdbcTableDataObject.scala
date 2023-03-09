@@ -28,7 +28,7 @@ import io.smartdatalake.util.misc.{ProductUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.connection.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
