@@ -212,17 +212,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   val appVersion: String = AppUtil.getManifestVersion.map("v" + _).getOrElse("develop") + ", sdlb-build-version: " + BuildVersionInfo.readBuildVersionInfo.getOrElse("unknown")
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
-  /**
-   * Create a new SDL configuration.
-   *
-   * Could be used in the future to set default values.
-   *
-   * @return a new, initialized [[SmartDataLakeBuilderConfig]].
-   */
-  //TODO what is the idea behind this? Can probably be removed
-  def initConfigFromEnvironment: SmartDataLakeBuilderConfig = SmartDataLakeBuilderConfig()
-
-  /**
+   /**
    * InstanceRegistry instance
    */
   val instanceRegistry: InstanceRegistry = new InstanceRegistry()

@@ -19,6 +19,7 @@
 package io.smartdatalake.communication.statusinfo.websocket
 
 import io.smartdatalake.app.StateListener
+import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType, StatusUpdate}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -52,6 +53,6 @@ class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogg
         SDLMessage(SDLMessageType.EndConnection, Some(StatusUpdate(None, None, context.phase, state.finalState)))
       }
 
-    activeSockets.foreach(socket => socket.getRemote.sendString(writePretty(updateJSON)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase))))
+    activeSockets.foreach(socket => socket.getRemote.sendString(writePretty(updateJSON)(AgentClient.messageFormat)))
   }
 }

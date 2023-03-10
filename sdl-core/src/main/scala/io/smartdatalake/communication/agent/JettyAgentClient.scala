@@ -37,7 +37,7 @@ case class JettyAgentClient() extends AgentClient with SmartDataLakeLogger {
     client.start()
 
     val session = client.connect(socket, uri).get
-    val messageStr = writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase))
+    val messageStr = writePretty(message)(AgentClient.messageFormat)
     logger.info("Sending " + messageStr)
     session.getRemote.sendString(messageStr)
     val instructionId = message.agentInstruction.get.instructionId

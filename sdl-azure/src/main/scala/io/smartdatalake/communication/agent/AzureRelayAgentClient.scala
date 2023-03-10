@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,16 +23,14 @@ import com.microsoft.azure.relay.{HybridConnectionClient, RelayConnectionStringB
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.agent.Agent
-import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.json4s.Formats
-import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
 
 import java.net.URI
 import java.nio.ByteBuffer
 
 case class AzureRelayAgentClient() extends AgentClient with SmartDataLakeLogger {
-  implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
+  implicit val format: Formats = AgentClient.messageFormat
 
   override def sendSDLMessage(message: SDLMessage, agent: Agent): Option[SDLMessage] = {
     val connectionParams = new RelayConnectionStringBuilder(agent.url)
@@ -40,21 +38,26 @@ case class AzureRelayAgentClient() extends AgentClient with SmartDataLakeLogger 
     val client = new HybridConnectionClient(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
 
     val connection = client.createConnectionAsync.get
-    val messageStr = writePretty(message)(ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase))
+    val messageStr = writePretty(message)(AgentClient.messageFormat)
     logger.info("Sending " + messageStr)
     connection.writeAsync(ByteBuffer.wrap(messageStr.getBytes)).join()
     val byteBuffer = connection.readAsync.get
     // If the read operation is still pending when connection closes, the read result returns null.
     val response = if (byteBuffer != null) {
-        val response = new String(byteBuffer.array, byteBuffer.arrayOffset, byteBuffer.remaining)
-        logger.info("Received " + response)
+      val response = new String(byteBuffer.array, byteBuffer.arrayOffset, byteBuffer.remaining)
+      logger.info("Received " + response)
+      try {
         val sdlMessage = read[SDLMessage](response)
         require(sdlMessage.msgType == SDLMessageType.AgentResult, "AgentServer must respond with AgentResult")
         Some(sdlMessage)
+      } catch {
+        case e: RuntimeException => logger.error("Response from AgentServer is not parseable. It probably died. Response={}", response)
+          throw e
       }
-      else {
-        Option.empty[SDLMessage]
-      }
+    }
+    else {
+      Option.empty[SDLMessage]
+    }
     connection.closeAsync.join
     response
   }

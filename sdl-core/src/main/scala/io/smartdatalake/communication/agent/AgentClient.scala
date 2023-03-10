@@ -22,10 +22,13 @@ package io.smartdatalake.communication.agent
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
 import io.smartdatalake.communication.message.{AgentInstruction, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
+import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
+import org.json4s.Formats
+import org.json4s.ext.EnumNameSerializer
 
 import scala.collection.JavaConverters._
 
@@ -62,6 +65,7 @@ object AgentClient {
 
     SDLMessage(msgType = SDLMessageType.AgentInstruction, agentInstruction = Some(AgentInstruction(instructionId, executionPhase, hoconString)))
   }
+  def messageFormat: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
 }
 
 trait AgentClient {

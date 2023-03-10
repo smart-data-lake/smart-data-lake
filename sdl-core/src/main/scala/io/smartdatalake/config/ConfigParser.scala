@@ -184,7 +184,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     parseConfigObject[A](config, Some(getIdWithClassNamePrefixed[A](id)), Map("id" -> id))
   }
 
-  def parseActionWithId(id: String, config: Config)(implicit registry: InstanceRegistry): Action = {
+  private def parseActionWithId(id: String, config: Config)(implicit registry: InstanceRegistry): Action = {
     val parsedAction = parseConfigObjectWithId[Action](id, config)
     if (parsedAction.agentId.isDefined) {
       val agent = registry.get[Agent](parsedAction.agentId.get)

@@ -32,7 +32,7 @@ import java.net.URI
 import java.nio.ByteBuffer
 
 object AzureRelayAgentServer extends SmartDataLakeLogger {
-  implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
+  implicit val format: Formats = AgentClient.messageFormat
 
   def start(config: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
     val connectionParams = new RelayConnectionStringBuilder(config.azureRelayURL.get + System.getenv("SharedAccessKey"))
@@ -57,7 +57,12 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
             logger.info("Received " + message)
             val sdlMessage = read[SDLMessage](message)
             val responseMessageOpt = agentController.handle(sdlMessage, config)
-            if (responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get, connection)
+            if (responseMessageOpt.isDefined) {
+              sendSDLMessage(responseMessageOpt.get, connection)
+              if(responseMessageOpt.get.agentResult.get.exception.isDefined){
+                throw(responseMessageOpt.get.agentResult.get.exception.get)
+              }
+            }
             else closeConnection(connection)
           }
         }

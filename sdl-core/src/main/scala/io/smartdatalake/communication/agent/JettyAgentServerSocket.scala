@@ -24,7 +24,7 @@ import org.json4s.jackson.Serialization.{read, writePretty}
 
 
 class JettyAgentServerSocket(config: LocalJettyAgentSmartDataLakeBuilderConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
-  implicit val format: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
+  implicit val format: Formats = AgentClient.messageFormat
 
   override def onWebSocketConnect(sess: Session): Unit = {
 

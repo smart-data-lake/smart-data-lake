@@ -35,6 +35,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.StructType
 
+/**
+ * Allows to execute the action defined by @wrappedAction on a remote agent defined by @agent.
+ * If the execution of @wrappedAction is successful, the ProxyAction will return an empty SparkSubFeed by the correct schema.
+ *
+ */
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
 
   override def factory: FromConfigFactory[Action] = wrappedAction.factory

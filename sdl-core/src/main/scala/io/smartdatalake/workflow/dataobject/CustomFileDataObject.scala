@@ -29,7 +29,6 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileCreatorConfig
 
-
 case class CustomFileDataObject(override val id: DataObjectId,
                                 creator: CustomFileCreatorConfig,
                                 override val metadata: Option[DataObjectMetadata] = None

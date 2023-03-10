@@ -65,7 +65,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
     logger.info(s"Starting Program $appType $appVersion")
 
     // Set defaults from environment variables
-    val config = initConfigFromEnvironment.copy(
+    val config = SmartDataLakeBuilderConfig().copy(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
       username = sys.env.get("SDL_KERBEROS_USER"),
