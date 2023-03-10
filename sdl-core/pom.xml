@@ -43,8 +43,6 @@
     </dependencyManagement>
 
     <dependencies>
-
-
         <dependency>
             <groupId>com.databricks</groupId>
             <artifactId>dbutils-api_${scala.minor.version}</artifactId>

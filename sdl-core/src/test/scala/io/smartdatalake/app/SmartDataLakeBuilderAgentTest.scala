@@ -107,6 +107,3 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
     assert(Paths.get(System.getProperty("user.dir"), "target", "jetty_dummy_cloud_connection", "cloud-file2").toFile.exists())
   }
 }
-
-
-
