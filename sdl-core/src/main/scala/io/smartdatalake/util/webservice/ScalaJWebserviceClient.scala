@@ -107,7 +107,7 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
       request.optionally(authMode, (v:AuthMode, request:HttpRequest) => {
         v match {
           case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
-          case basicAuth: BasicAuthMode => request.auth(basicAuth.user, basicAuth.password)
+          case basicAuth: BasicAuthMode => request.auth(basicAuth.userSecret.resolve(), basicAuth.passwordSecret.resolve())
           case x => throw ConfigurationException(s"authentication mode $x is not supported by ScalaJWebserviceClient")
         }
       })

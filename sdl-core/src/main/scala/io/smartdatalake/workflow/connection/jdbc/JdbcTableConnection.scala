@@ -131,14 +131,14 @@ case class JdbcTableConnection(override val id: ConnectionId,
   private def getConnection: SqlConnection = {
     Class.forName(driver)
     if (authMode.isDefined) authMode.get match {
-      case m: BasicAuthMode => DriverManager.getConnection(url, m.user, m.password)
+      case m: BasicAuthMode => DriverManager.getConnection(url, m.userSecret.resolve(), m.passwordSecret.resolve())
       case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     } else DriverManager.getConnection(url)
   }
 
   def getAuthModeSparkOptions: Map[String,String] = {
     if (authMode.isDefined) authMode.get match {
-      case m: BasicAuthMode => Map( "user" -> m.user, "password" -> m.password )
+      case m: BasicAuthMode => Map( "user" -> m.userSecret.resolve(), "password" -> m.passwordSecret.resolve())
       case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     } else Map()
   }

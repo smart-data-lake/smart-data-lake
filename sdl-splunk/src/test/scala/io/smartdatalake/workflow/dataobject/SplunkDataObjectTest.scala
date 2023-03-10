@@ -20,16 +20,16 @@ package io.smartdatalake.workflow.dataobject
 
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalDateTime}
-
 import com.splunk.{JobExportArgs, Service}
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.{SplunkConnection, SplunkConnectionService}
 import org.apache.spark.sql.Row
-import org.scalatest.{Assertions, FlatSpec, Matchers}
+import org.scalatest.Assertions
 
 class SplunkDataObjectTest extends DataObjectTestSuite {
 
@@ -50,8 +50,8 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
          |   port = 8080
          |   auth-mode = {
          |        type = BasicAuthMode
-         |        user-variable = "CLEAR#testuser"
-         |        password-variable = "CLEAR#secret"
+         |        user = "testuser"
+         |        password = "secret"
          |    }
          | }
          |}
@@ -73,7 +73,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
          |""".stripMargin).resolve
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val registry2 = new InstanceRegistry()
-    registry2.register(SplunkConnection("con123","test.host", 8080, BasicAuthMode("CLEAR#testuser", "CLEAR#secret")))
+    registry2.register(SplunkConnection("con123","test.host", 8080, BasicAuthMode(Some(StringOrSecret("testuser")), Some(StringOrSecret("secret")))))
     registry.getDataObjects.head shouldBe SplunkDataObject(
       id = "123",
       connectionId = "con123",
@@ -150,7 +150,7 @@ class SplunkDataObjectTest extends DataObjectTestSuite {
   }
 
   private def createDO(query: String = "TEST_PURPOSES_ONLY", columnNames: String = "TEST_PURPOSES_ONLY") = {
-    instanceRegistry.register(SplunkConnection( "con1", "splunk.test.com", 8888, BasicAuthMode("CLEAR#REPLACEME", "CLEAR#REPLACEME")))
+    instanceRegistry.register(SplunkConnection( "con1", "splunk.test.com", 8888, BasicAuthMode(Some(StringOrSecret("REPLACEME")), Some(StringOrSecret("REPLACEME")))))
     val config = ConfigFactory.parseString(
       s"""
          |{
