@@ -26,16 +26,20 @@ import org.apache.spark.sql.SparkSession
 /**
  * An interface for accessing SDLB objects for interactive use (lab, development of transformation)
  *
- * @param session Spark session to use
- * @param configuration One or multiple configuration files or directories containing configuration files, separated by comma.
+ * @param session                  Spark session to use
+ * @param configuration            One or multiple configuration files or directories containing configuration files, separated by comma.
  * @param dataObjectCatalogFactory A method to create a data object catalog instance to be used by this SmartDataLakeBuilderLab.
  *                                 Note that this is normally an instance from a class created by LabCatalogGenerator in a second compile phase.
+ * @param userClassLoader          when working in notebooks and loading dependencies through the notebook metadata configuration,
+ *                                 it might be needed to pass the ClassLoader of the notebook, otherwise SDLB might not be able to load classes referenced in the configuration.
  */
 case class SmartDataLakeBuilderLab[T](
-                        private val session: SparkSession,
-                        private val configuration: Seq[String],
-                        private val dataObjectCatalogFactory: (InstanceRegistry, ActionPipelineContext) => T) {
-  @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration)
+                                       private val session: SparkSession,
+                                       private val configuration: Seq[String],
+                                       private val dataObjectCatalogFactory: (InstanceRegistry, ActionPipelineContext) => T,
+                                       private val userClassLoader: Option[ClassLoader] = None
+                                     ) {
+  @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader)
   @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
   @transient val data: T = dataObjectCatalogFactory(registry, context)
 }
