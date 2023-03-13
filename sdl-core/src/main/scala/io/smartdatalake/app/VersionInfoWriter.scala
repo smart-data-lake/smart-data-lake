@@ -106,7 +106,7 @@ object BuildVersionInfo extends SmartDataLakeLogger {
    * Read the SDLB version info properties from the corresponding classpath resource.
    * @return: version, user, date
    */
-  private[smartdatalake] def readBuildVersionInfo: Option[BuildVersionInfo] = {
+  def readBuildVersionInfo: Option[BuildVersionInfo] = {
     val resourceStream = Thread.currentThread().getContextClassLoader.getResourceAsStream(buildVersionInfoFilename)
     if (resourceStream == null) {
       logger.warn(s"Could not find resource $buildVersionInfoFilename")

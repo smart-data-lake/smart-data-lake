@@ -32,7 +32,7 @@ import scala.util.Try
 /**
  * Utilities and conventions to name and validate command line parameters
  */
-private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
+object AppUtil extends SmartDataLakeLogger {
 
   // Kerberos Authentication...
   def authenticate(keytab: String, userAtRealm: String): Unit = {
