@@ -31,9 +31,10 @@ import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -330,7 +331,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       connection.dropTable(tmpTable.fullName)
     }
     // create & write to temp-table
-    connection.createTableFromSchema(tmpTable.fullName, df.schema, options)
+    val tmpSchema = connection.catalog.getSchemaFromTable(table.fullName)
+    connection.createTableFromSchema(tmpTable.fullName, tmpSchema, options)
     writeDataFrameInternalWithAppend(df, tmpTable.fullName)
   }
 
