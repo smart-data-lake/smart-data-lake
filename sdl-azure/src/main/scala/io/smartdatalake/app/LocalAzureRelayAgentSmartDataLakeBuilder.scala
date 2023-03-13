@@ -35,9 +35,9 @@ import java.io.File
  */
 
 case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
-                                                          override val applicationName: Option[String] = None,
+                                                          override val applicationName: Option[String] = Some("AgentApp"),
                                                           override val configuration: Option[Seq[String]] = None,
-                                                          override val master: Option[String] = None,
+                                                          override val master: Option[String] = Some("local[*]"),
                                                           override val deployMode: Option[String] = None,
                                                           override val username: Option[String] = None,
                                                           override val kerberosDomain: Option[String] = None,
@@ -92,8 +92,8 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       opt[String]('u', "url")
         .required
         .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
-        .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to")
-    )
+        .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to"),
+      )
   }
 
   /**

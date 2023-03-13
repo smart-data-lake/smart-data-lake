@@ -204,7 +204,17 @@
                 </plugins>
             </build>
         </profile>
-
+        <profile>
+            <id>spark-hive</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.spark</groupId>
+                    <artifactId>spark-hive_${scala.minor.version}</artifactId>
+                    <version>${spark.version}</version>
+                    <scope>${spark.deps.scope}</scope>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 
     <properties>

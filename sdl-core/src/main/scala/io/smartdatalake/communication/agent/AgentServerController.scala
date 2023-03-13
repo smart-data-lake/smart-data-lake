@@ -66,11 +66,12 @@ case class AgentServerController(
             val resultingSubfeeds = sdlb.agentExec(appConfig = sdlConfig, phase = agentInstruction.phase)(instanceRegistryImplicit)
 
             //TODO support other subfeed types than SparkSubFeed
+            //TODO when Initsubfeed is returned because of no data, this information should be propagated
             val resultingDataObjectIdToSchema = resultingSubfeeds.map(subFeed => DataObjectId(subFeed.dataObjectId.id) -> subFeed.asInstanceOf[SparkSubFeed].dataFrame.get.inner.schema.toDDL).toMap
 
             Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = resultingDataObjectIdToSchema))))
           } catch {
-            case e: RuntimeException => logger.error("Run failed, sending error message to AgentClient.")
+            case e: Exception => logger.error("Run failed, sending error message to AgentClient.")
               Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = Map(), exception = Some(e)))))
           }
       }

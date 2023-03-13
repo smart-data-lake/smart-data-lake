@@ -51,8 +51,8 @@ case class AzureRelayAgentClient() extends AgentClient with SmartDataLakeLogger 
         require(sdlMessage.msgType == SDLMessageType.AgentResult, "AgentServer must respond with AgentResult")
         Some(sdlMessage)
       } catch {
-        case e: RuntimeException => logger.error("Response from AgentServer is not parseable. It probably died. Response={}", response)
-          throw e
+        case e: Exception =>
+          throw new RuntimeException("Response from AgentServer is not parseable. It probably died. Response=" +  response)
       }
     }
     else {
