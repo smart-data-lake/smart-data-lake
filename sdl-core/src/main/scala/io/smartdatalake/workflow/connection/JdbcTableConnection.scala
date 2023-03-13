@@ -31,8 +31,8 @@ import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.execution.datasources.jdbc.{JdbcOptionsInWrite, JdbcUtils}
-import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.jdbc.JdbcDialects
+import org.apache.spark.sql.types.StructType
 
 import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnection}
 
@@ -179,8 +179,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
     execJdbcStatement(sql)
   }
 
-  def dropTable(tableName: String, logging: Boolean = true): Boolean = {
-    execJdbcStatement(s"drop table if exists $tableName", logging = logging)
+  def dropTable(tableName: String, logging: Boolean = true): Unit = {
+    if (catalog.isTableExisting(tableName)) {
+      execJdbcStatement(s"drop table $tableName", logging = logging)
+    }
   }
 
   // setup connection pool

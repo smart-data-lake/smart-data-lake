@@ -85,7 +85,8 @@ private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnectio
   }
 
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
-  def isTableExisting(tableName: String)(implicit session: SparkSession): Boolean = {
+
+  def isTableExisting(tableName: String): Boolean = {
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
     try {
       connection.execJdbcStatement(tableExistsQuery, logging = false)
