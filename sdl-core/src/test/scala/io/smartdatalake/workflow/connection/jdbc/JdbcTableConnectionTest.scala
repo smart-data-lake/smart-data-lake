@@ -23,10 +23,18 @@ import org.scalatest.FunSuite
 
 class JdbcTableConnectionTest extends FunSuite {
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
-    "org.hsqldb.jdbcDriver", connectionInitSql = Some("SET AUTOCOMMIT FALSE"))
-
   test("turn off autocommit with connectionInitSql") {
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
+      "org.hsqldb.jdbcDriver", connectionInitSql = Some("SET AUTOCOMMIT FALSE"))
+
+    val autoCommitEnabled = jdbcConnection.execWithJdbcConnection(_.getAutoCommit)
+    assert(!autoCommitEnabled)
+  }
+
+  test("turn off autocommit with autoCommit flag") {
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
+      "org.hsqldb.jdbcDriver", autoCommit = Some(false))
+
     val autoCommitEnabled = jdbcConnection.execWithJdbcConnection(_.getAutoCommit)
     assert(!autoCommitEnabled)
   }
