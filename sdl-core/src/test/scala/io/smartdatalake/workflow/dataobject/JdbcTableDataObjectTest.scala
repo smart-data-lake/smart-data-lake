@@ -277,4 +277,17 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
     targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
   }
+
+  test("write to jdbc table with different order of columns") {
+    instanceRegistry.register(jdbcConnection)
+    val table = Table(Some("public"), "table1")
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1")
+    dataObject.dropTable
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val dfColumnsSwitched = df.select("type", "rating", "firstname", "lastname")
+    dataObject.initSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(dfColumnsSwitched, Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())
+    assert(dfRead.symmetricDifference(df).isEmpty)
+  }
 }
