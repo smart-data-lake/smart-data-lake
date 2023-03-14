@@ -69,6 +69,7 @@ case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, 
 }
 case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)
+  def toStringTuple: (String,String) = (dataObjectId.id, state)
 }
 
 private[smartdatalake] object ActionDAGRunState {

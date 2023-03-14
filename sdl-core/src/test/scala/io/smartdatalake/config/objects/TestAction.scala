@@ -24,7 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 import org.apache.spark.sql.SparkSession
 
@@ -51,9 +51,9 @@ case class TestAction(override val id: ActionId,
   override def exec(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
 
   private[config] val input = instanceRegistry.get[DataObject with CanCreateDataFrame](inputId)
-  private[config] val output = instanceRegistry.get[TransactionalSparkTableDataObject](outputId)
+  private[config] val output = instanceRegistry.get[TransactionalTableDataObject](outputId)
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+  override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
   override val recursiveInputs:Seq[DataObject with CanCreateDataFrame] = Seq()
 
   override def factory: FromConfigFactory[Action] = TestAction

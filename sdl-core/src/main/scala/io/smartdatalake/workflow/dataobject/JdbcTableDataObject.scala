@@ -107,7 +107,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                incrementalOutputExpr: Option[String] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
+  extends TransactionalTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
     with CanCreateIncrementalOutput with ExpectationValidation {
 
   /**

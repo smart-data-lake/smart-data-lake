@@ -55,7 +55,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        override val housekeepingMode: Option[HousekeepingMode] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with ExpectationValidation {
+  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location

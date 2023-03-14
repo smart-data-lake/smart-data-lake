@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
 
@@ -118,7 +118,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def validateConfig(): Unit = {
     recursiveInputs.foreach { input =>
       if (outputs.exists(_.id == input.id)) {
-        assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is listed in outputIds but is not a TransactionalSparkTableDataObject.")
+        assert(input.isInstanceOf[TransactionalTableDataObject], s"($id) Recursive input ${input.id} is listed in outputIds but is not a TransactionalTableDataObject.")
       } else if (Environment.globalConfig.allowAsRecursiveInput.contains(input.id)) {
         logger.info(s"($id) Using ${input.id} as recursive input even though it is not listed in outputIds of the same Action, but in globalConfig.allowAsRecursiveInput")
       } else {

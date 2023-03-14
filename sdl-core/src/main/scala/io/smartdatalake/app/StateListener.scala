@@ -52,7 +52,7 @@ trait StateListener {
   /**
    * Called on initialization to check environment
    */
-  def init(): Unit = Unit
+  def init(context: ActionPipelineContext): Unit = Unit
 
   /**
    * notifyState is called whenever an action is finished (succeeded or failed) and at the end of the DAG execution (success or failure).

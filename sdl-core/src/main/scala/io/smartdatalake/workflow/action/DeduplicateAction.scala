@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -45,7 +45,7 @@ import scala.reflect.runtime.universe.Type
  * DeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.
  * This creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.
  *
- * DeduplicateAction needs a transactional table (e.g. [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
+ * DeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]]) as output with defined primary keys.
  * If output implements [[CanMergeDataFrame]], saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.
  *
  * @param inputId inputs DataObject
@@ -88,9 +88,9 @@ case class DeduplicateAction(override val id: ActionId,
 )(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
-  override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
+  override val output: TransactionalTableDataObject = getOutputDataObject[TransactionalTableDataObject](outputId)
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+  override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   private val mergeModeAdditionalJoinPredicateExpr: Option[Column] = try {
     mergeModeAdditionalJoinPredicate.map(expr)
@@ -114,7 +114,7 @@ case class DeduplicateAction(override val id: ActionId,
   private var checkRecordChangedColumns: Seq[String] = Seq()
 
   // If mergeModeEnabled=false, output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
-  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
+  override val recursiveInputs: Seq[TransactionalTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
 

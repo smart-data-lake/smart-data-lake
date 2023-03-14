@@ -684,7 +684,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateListener with SmartDataLakeLogger {
   var srcDO: CsvFileDataObject = _
   private var dfWritten = false
-  override def init(): Unit = {
+  override def init(context: ActionPipelineContext): Unit = {
     srcDO = Environment.instanceRegistry.get[CsvFileDataObject](DataObjectId("src1"))
   }
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
