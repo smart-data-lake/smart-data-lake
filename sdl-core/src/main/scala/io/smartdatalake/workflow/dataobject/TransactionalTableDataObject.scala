@@ -19,11 +19,9 @@
 package io.smartdatalake.workflow.dataobject
 
 /**
- * Currently empty trait. Used in [[io.smartdatalake.workflow.action.HistorizeAction]]
- * and [[io.smartdatalake.workflow.action.DeduplicateAction]] which need any kind
- * of transactional util table
+ * Trait to mark DataObjects that support transactional writes.
  */
-trait TransactionalSparkTableDataObject extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
+trait TransactionalTableDataObject extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 

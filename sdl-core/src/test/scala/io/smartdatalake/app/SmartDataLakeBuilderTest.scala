@@ -764,15 +764,14 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
 
-  test("sdlb run with external state file using FinalStateWriter and Environment setting override from config") {
+  test("sdlb run with state file using FinalStateWriter and FinalMetricsWriter and Environment setting override from config") {
 
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
-    val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")
+    val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     dummySrcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
 
@@ -791,8 +790,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(Environment.dagGraphLogMaxLineLength == 100)
 
     // check result
-    val fileResult = filesystem.exists(new Path("ext-state/state-test"))
-    assert(fileResult)
+    assert(filesystem.exists(new Path("ext-state/state-test")))
+    val dfActionLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("actionLog")).getSparkDataFrame()
+    assert(dfActionLog.select($"run_id", $"action_id", $"attempt_id",$"state").as[(Long,String,Int,String)].collect().toSet == Set((1L,"act",1,"SUCCEEDED")))
+    val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("metricsLog")).getSparkDataFrame()
+    assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long,String,String,Long)].collect().toSet == Set((1L,"act","tgt",1L)))
   }
 }
 

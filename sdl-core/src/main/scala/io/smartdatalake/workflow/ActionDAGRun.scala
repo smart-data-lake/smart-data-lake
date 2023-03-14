@@ -122,7 +122,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   def init(implicit context: ActionPipelineContext): Seq[SubFeed] = {
     context.phase = ExecutionPhase.Init
     // initialize state listeners
-    stateListeners.foreach(_.init())
+    stateListeners.foreach(_.init(context))
     // run init for every node
     val t = run[SubFeed](context.phase) {
       case (node: InitDAGNode, _) =>

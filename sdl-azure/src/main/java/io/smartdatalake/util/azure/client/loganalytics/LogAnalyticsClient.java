@@ -53,8 +53,7 @@ public class LogAnalyticsClient implements Closeable {
     private static final String DEFAULT_URL_SUFFIX = "ods.opinsights.azure.com";
     private static final String DEFAULT_API_VERSION = "2016-04-01";
     private static final String URL_FORMAT = "https://%s.%s/api/logs?api-version=%s";
-    private static final String RESOURCE_ID =
-        "/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s";
+    private static final String RESOURCE_ID = "/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s";
 
     @Override
     public void close() throws IOException {
@@ -230,8 +229,7 @@ public class LogAnalyticsClient implements Closeable {
     }
 
     /**
-     * Gets the value of a System.getenv call or null if it is not set or
-     * if the length is 0.
+     * Gets the value of a System.getenv call or null if it is not set or if the length is 0.
      * @param key System environment variable.
      * @return value of System.getenv(key) or null.
      */
