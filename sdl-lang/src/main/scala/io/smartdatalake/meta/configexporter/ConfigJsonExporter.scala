@@ -47,7 +47,9 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
 
         // write file
         logger.info(s"Writing config json to file ${exporterConfig.filename}")
-        Files.write(Paths.get(exporterConfig.filename), configAsJson.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        val path = Paths.get(exporterConfig.filename)
+        Files.createDirectories(path.getParent)
+        Files.write(path, configAsJson.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
 
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))

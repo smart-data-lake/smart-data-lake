@@ -19,11 +19,10 @@
 
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.util.spark.DataFrameUtil.{normalizeToAscii, removeNonStandardSQLNameChars, strCamelCase2LowerCaseWithUnderscores}
+import io.smartdatalake.util.spark.DataFrameUtil.{normalizeToAscii, removeNonStandardSQLNameChars, strCamelCase2LowerCaseWithUnderscores, strToLowerCamelCase}
 import org.scalatest.FunSuite
 
 class DataFrameUtilTest extends FunSuite {
-
 
   test("camelCase to lower_case_with_underscore") {
     assert(strCamelCase2LowerCaseWithUnderscores("abc0") == "abc0")
@@ -34,6 +33,14 @@ class DataFrameUtilTest extends FunSuite {
     assert(strCamelCase2LowerCaseWithUnderscores("__abcABc_aBC0") == "__abc_abc_a_bc0")
   }
 
+  test("string to lowerCamelCase") {
+    assert(strToLowerCamelCase("abc0") == "abc0")
+    assert(strToLowerCamelCase("aBc_d0") == "aBcD0")
+    assert(strToLowerCamelCase("aBC0") == "aBC0")
+    assert(strToLowerCamelCase("Abc-ABc_aBC0") == "abcABcABC0")
+    assert(strToLowerCamelCase("_AbcABc aBC0") == "abcABcABC0")
+  }
+
   test("normalize UTF8 to ASCII") {
     assert(normalizeToAscii("Äöü_éà") == "Aeoeue_ea")
   }
@@ -41,5 +48,4 @@ class DataFrameUtilTest extends FunSuite {
   test("remove non standard SQL name chars") {
     assert(removeNonStandardSQLNameChars("a-!$* A") == "aa")
   }
-
 }

@@ -179,7 +179,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
           context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
         // process subfeed
-        if (phase==ExecutionPhase.Exec) {
+        if (phase==ExecutionPhase.Exec || context.simulation) {
           // check if dataFrame must be created
           if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
             // validate partition values existing for input
@@ -294,9 +294,9 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     WriteSubFeedResult(outputSubFeed, noData)
     // get expectations metrics and check violations
     output match {
-      case evDataObject: DataObject with ExpectationValidation =>
+      case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
-        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, subFeed.partitionValues, scopeJobExpectationMetrics)
+        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
         WriteSubFeedResult(outputSubFeed, noData, Some(metrics))
       case _ =>
         WriteSubFeedResult(outputSubFeed, noData)

@@ -29,28 +29,35 @@ import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTran
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkException
 import org.apache.spark.sql.functions.{lit, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path => NioPath}
 
 class CopyActionTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
+  private var tempDir: NioPath = _
+  private var tempPath: String = _
+
   before {
     instanceRegistry.clear()
+    tempDir = Files.createTempDirectory("test")
+    tempPath = tempDir.toAbsolutePath.toString
+  }
+
+  after {
+    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
   test("copy load with custom transformation class and incremental move mode (delete)") {
@@ -185,6 +192,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
         SQLFractionExpectation("pctBob", countConditionExpression = "firstname = 'bob'", expectation = Some("= 0")), // because we only select Rob and not Bob...
         CountExpectation(name = "countPerPartition", expectation = Some(">= 1"), scope = ExpectationScope.JobPartition),
         CountExpectation(name = "countAll", expectation = Some(">= 1"), scope = ExpectationScope.All),
+        SQLQueryExpectation(name = "countOfPartitionsWith1Record", code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)", scope = ExpectationScope.All)
       )
     )
     tgtDO.dropTable
@@ -197,8 +205,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
-    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
+    assert(tgtSubFeed1.dataObjectId == tgtDO.id)
 
     // check result
     val r1 = session.table(s"${tgtTable.fullName}")
@@ -207,8 +215,18 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(r1 == Seq("jonson")) // only one record has rating 5 (see where condition)
 
     // check expectation value in metrics
-    val metrics = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
-    assert(metrics == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "countAll" -> 1))
+    val metrics1 = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
+    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "countAll" -> 1, "countOfPartitionsWith1Record" -> 1))
+
+    // add another record & process
+    val l2 = Seq(("dau", "peter", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l2, Seq())
+    action1.reset
+    action1.exec(Seq(srcSubFeed))(contextExec).head
+
+    // check expectation value in metrics - countAll should be 2 now, but count should stay 1
+    val metrics2 = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
+    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#dau" -> 1, "countAll" -> 2, "countOfPartitionsWith1Record" -> 2))
 
     // fail constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,

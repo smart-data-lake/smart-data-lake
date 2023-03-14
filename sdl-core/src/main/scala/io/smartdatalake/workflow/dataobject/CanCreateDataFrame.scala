@@ -24,7 +24,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.Type
 
-private[smartdatalake] trait CanCreateDataFrame {
+trait CanCreateDataFrame {
 
   /**
    * Get a Spark DataFrame for given partition values

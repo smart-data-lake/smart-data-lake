@@ -1,0 +1,64 @@
+# Smart Data Lake - Build your data lake the smart way.
+#
+# Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+Configuration:
+  name: SDLB
+
+  appenders:
+    Console:
+      name: STDOUT
+      target: SYSTEM_OUT
+      PatternLayout:
+        Pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1} - %m [%t]%n"
+
+  Loggers:
+
+    # default is WARN
+    Root:
+      level: WARN
+      AppenderRef:
+        ref: STDOUT
+
+    logger:
+
+      # INFO:
+      - name: io.smartdatalake
+        level: INFO
+
+      # ERROR:
+      - name: org.reflections.Reflections
+        level: ERROR
+      - name: org.apache.hadoop.hive.conf.HiveConf
+        level: ERROR
+      - name: org.apache.spark.sql.catalyst.analysis.SimpleFunctionRegistry
+        level: ERROR
+      - name: org.apache.spark.sql.catalyst.util.package
+        level: ERROR
+      - name: org.apache.spark.sql.catalyst.csv.CSVHeaderChecker
+        level: ERROR
+      - name: org.apache.spark.sql.execution.streaming.ResolveWriteToStream
+        level: ERROR
+      - name: org.apache.spark.sql.execution.streaming.ProcessingTimeExecutor
+        level: ERROR
+      - name: org.apache.spark.executor.ProcfsMetricsGetter
+        level: ERROR
+      - name: org.apache.hadoop.hive.metastore.ObjectStore
+        level: ERROR
+      - name: org.apache.hadoop.hive.ql.session.SessionState
+        level: ERROR
+      - name: org.apache.hadoop.util.NativeCodeLoader
+        level: ERROR

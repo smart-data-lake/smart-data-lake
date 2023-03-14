@@ -23,7 +23,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.definitions.SaveModeMergeOptions
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.connection.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession

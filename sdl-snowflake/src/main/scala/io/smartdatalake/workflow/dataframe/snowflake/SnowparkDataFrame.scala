@@ -97,7 +97,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     loggerFunc(msg)
     inner.show()
   }
-  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, Observation) = {
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     // Snowpark has no method to observe metrics. They need to be calculated.
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.

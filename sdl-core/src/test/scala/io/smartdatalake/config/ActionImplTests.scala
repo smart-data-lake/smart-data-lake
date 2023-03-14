@@ -209,7 +209,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |}
         |""".stripMargin).withFallback(dataObjectConfig).resolve
 
-    val thrown = the [ConfigException] thrownBy  ConfigParser.parse(config)
+    val thrown = the [ConfigurationException] thrownBy ConfigParser.parse(config)
 
     thrown.getMessage should include ("123")
     thrown.getMessage should include ("tdo1")

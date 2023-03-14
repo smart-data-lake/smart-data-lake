@@ -139,7 +139,13 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     Try(factoryMethod.invoke(configSubstituted, registry, mirror)).recoverWith {
       case e =>
         logger.debug(s"Failed to invoke '$factoryMethod' with '$config'.", e)
-        throw Option(e.getCause).getOrElse(e)
+        Option(e.getCause).getOrElse(e) match {
+          case e: ConfigException =>
+            // replace with suppressed exception if configuration path in message is empty
+            if (e.getMessage.startsWith("[]") && e.getSuppressed.nonEmpty) throw e.getSuppressed.head
+            else throw e
+          case e => throw e
+        }
     }.get
 
   } catch {
@@ -173,7 +179,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   private def enrichExceptionMessageConfigPath(e: Exception, configPath: Option[String]): Exception = {
     if (configPath.isDefined && !e.getMessage.contains(configPath.get)) e match {
       case c: ConfigurationException => c.copy(message = s"(${configPath.get}) ${c.getMessage}")
-      case e => ConfigurationException(s"(${configPath.get}) ${e.getMessage}", configPath, e)
+      case e => ConfigurationException(s"(${configPath.get}) ${e.getMessage.stripPrefix("[]").trim}", configPath, e)
     } else e
   }
 

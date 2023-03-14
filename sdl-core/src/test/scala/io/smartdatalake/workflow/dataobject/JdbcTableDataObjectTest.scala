@@ -22,7 +22,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.connection.{DefaultJdbcCatalog, JdbcTableConnection}
+import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {

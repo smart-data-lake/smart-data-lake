@@ -58,7 +58,7 @@ private[smartdatalake] object CustomCodeUtil {
   def getClassInstanceByName[T](classname:String): T = {
     val clazz = Environment.classLoader.loadClass(classname)
     assert(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
-    clazz.getDeclaredConstructor().newInstance().asInstanceOf[T]
+    clazz.getConstructor().newInstance().asInstanceOf[T]
   }
 
   def readResourceFile( filename:String ) : String = {

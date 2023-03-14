@@ -49,33 +49,33 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with SmartDataLake
   /**
    * Called in prepare phase to validate execution mode configuration
    */
-  private[smartdatalake] def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
+  def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     // validate apply conditions
     applyConditionsDef.foreach(_.syntaxCheck[DefaultExecutionModeExpressionData](actionId, Some("applyCondition")))
   }
   /**
    * Called in init phase before initialization. Can be used to initialize dataObjectsState, e.g. for DataObjectStateIncrementalMode
    */
-  private[smartdatalake] def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = Unit
+  def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = Unit
   /**
    * Called in init phase to apply execution mode. Result is stored and re-used in execution phase.
    */
-  private[smartdatalake] def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                    , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                   (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = None
   /**
    * Called in execution phase after writing subfeed. Can be used to implement incremental processing , e.g. deleteDataAfterRead.
    */
-  private[smartdatalake] def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = Unit
-  private[smartdatalake] def mainInputOutputNeeded: Boolean = false
-  private[smartdatalake] val applyConditionsDef: Seq[Condition] = Seq()
-  private[smartdatalake] val failConditionsDef: Seq[Condition] = Seq()
+  def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = Unit
+  def mainInputOutputNeeded: Boolean = false
+  val applyConditionsDef: Seq[Condition] = Seq()
+  val failConditionsDef: Seq[Condition] = Seq()
 
   /**
    * Evaluate apply conditions.
    * @return Some(true) if any apply conditions evaluates to true (or-logic), None if there are no apply conditions
    */
-  private[smartdatalake] final def evaluateApplyConditions(actionId: ActionId, subFeed: SubFeed)(implicit context: ActionPipelineContext): Option[Boolean] = {
+  final def evaluateApplyConditions(actionId: ActionId, subFeed: SubFeed)(implicit context: ActionPipelineContext): Option[Boolean] = {
     val data = DefaultExecutionModeExpressionData.from(context).copy(givenPartitionValues = subFeed.partitionValues.map(_.getMapString), isStartNode = subFeed.isDAGStart)
     if (applyConditionsDef.nonEmpty) Option(applyConditionsDef.map(_.evaluate(actionId, Some("applyCondition"), data)).max)
     else None
@@ -85,7 +85,7 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with SmartDataLake
    * Evaluate fail conditions.
    * @throws ExecutionModeFailedException if any fail condition evaluates to true
    */
-  private[smartdatalake] final def evaluateFailConditions[T<:Product:TypeTag](actionId: ActionId, data: T)(implicit context: ActionPipelineContext): Unit = {
+  final def evaluateFailConditions[T<:Product:TypeTag](actionId: ActionId, data: T)(implicit context: ActionPipelineContext): Unit = {
     failConditionsDef.foreach(c =>
       if (c.evaluate(actionId, Some("failCondition"), data)) {
         val descriptionText = c.description.map( d => s""""$d" """).getOrElse("")
@@ -97,10 +97,10 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with SmartDataLake
   /**
    * If this execution mode should be run as asynchronous streaming process
    */
-  private[smartdatalake] def isAsynchronous: Boolean = false
+  def isAsynchronous: Boolean = false
 }
 
-private[smartdatalake] trait ExecutionModeWithMainInputOutput {
+trait ExecutionModeWithMainInputOutput {
   def alternativeOutputId: Option[DataObjectId] = None
   def alternativeOutput(implicit context: ActionPipelineContext): Option[DataObject] = {
     alternativeOutputId.map(context.instanceRegistry.get[DataObject](_))
@@ -112,7 +112,7 @@ private[smartdatalake] trait ExecutionModeWithMainInputOutput {
  * Note: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes.
  */
 case class FailIfNoPartitionValuesMode() extends ExecutionMode {
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     // check if partition values present
@@ -134,7 +134,7 @@ object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
  * An execution mode which forces processing all data from it's inputs.
  */
 case class ProcessAllMode() extends ExecutionMode {
-  private[smartdatalake] override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                             , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
                                            (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     // return: reset given partition values and filter
@@ -166,14 +166,14 @@ case class DefaultExecutionModeExpressionData( feed: String, application: String
                                              , givenPartitionValues: Seq[Map[String,String]], isStartNode: Boolean) {
   override def toString: String = ProductUtil.formatObj(this)
 }
-private[smartdatalake] object DefaultExecutionModeExpressionData {
+object DefaultExecutionModeExpressionData {
   def from(context: ActionPipelineContext): DefaultExecutionModeExpressionData = {
     DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), isStartNode = false)
   }
 }
 
-private[smartdatalake] case class ExecutionModeFailedException(id: NodeId, phase: ExecutionPhase, msg: String) extends DAGException(msg) {
+case class ExecutionModeFailedException(id: NodeId, phase: ExecutionPhase, msg: String) extends DAGException(msg) {
   // don't fail in init phase, but skip action to continue with exec phase
   override val severity: ExceptionSeverity = if (phase == ExecutionPhase.Init) ExceptionSeverity.FAILED_DONT_STOP else ExceptionSeverity.FAILED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
