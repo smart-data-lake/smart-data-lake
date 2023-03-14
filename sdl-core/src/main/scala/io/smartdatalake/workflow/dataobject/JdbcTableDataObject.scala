@@ -34,7 +34,6 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
