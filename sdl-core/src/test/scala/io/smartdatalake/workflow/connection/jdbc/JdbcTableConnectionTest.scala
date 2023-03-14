@@ -17,7 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.workflow.connection
+package io.smartdatalake.workflow.connection.jdbc
 
 import org.scalatest.FunSuite
 
