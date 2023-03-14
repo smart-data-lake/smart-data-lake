@@ -50,8 +50,10 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
  *                               used by SDL for validating metadata or pre/postSQL.
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
  * @param enableCommit whether to enable commits for transactional behaviour in SDL
-                       Note that most JDBC drivers use auto-commit per default which is not recommended when [[enableCommit]] is true.
-                       Auto-commit can be disabled in [[connectionInitSql]].
+ *                     Note that most JDBC drivers use auto-commit per default which is not recommended when [[enableCommit]] is true.
+ *                     To disable auto-commit see [[autoCommit]].
+ * @param autoCommit flag to enable or disable the auto-commit behaviour of the JDBC driver
+ *                   If not set, the default auto-commit mode of the JDBC driver is used.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
  */
 case class JdbcTableConnection(override val id: ConnectionId,
@@ -63,6 +65,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                connectionPoolMaxIdleTimeSec: Int = 3,
                                override val metadata: Option[ConnectionMetadata] = None,
                                enableCommit: Boolean = true,
+                               autoCommit: Option[Boolean] = None,
                                connectionInitSql: Option[String] = None
                                ) extends Connection with SmartDataLakeLogger {
 
@@ -212,6 +215,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
           if (stmt != null) stmt.close()
         }
       })
+      autoCommit.foreach(connection.setAutoCommit)
       connection
     }
 
