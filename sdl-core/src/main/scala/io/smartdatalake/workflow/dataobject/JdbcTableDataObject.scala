@@ -305,7 +305,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         else deleteAllData(doCommit = false)
         try {
           // create & write to temp-table
-          writeToTempTable(df)
+          val tableSchema = connection.catalog.getSchemaFromTable(table.fullName)
+          writeToTempTable(df, tableSchema)
           // append into final table in one step, then commit
           connection.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable", doCommit = true)
         } finally {
@@ -323,16 +324,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
+  private def writeToTempTable(df: DataFrame, tempTableSchema: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     // cleanup temp table if existing
     if(connection.catalog.isTableExisting(tmpTable.fullName)) {
-      logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
+      logger.error(s"($id) Temporary table ${tmpTable.fullName} already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
       connection.dropTable(tmpTable.fullName)
     }
     // create & write to temp-table
-    val tmpSchema = connection.catalog.getSchemaFromTable(table.fullName)
-    connection.createTableFromSchema(tmpTable.fullName, tmpSchema, options)
+    connection.createTableFromSchema(tmpTable.fullName, tempTableSchema, options)
     writeDataFrameInternalWithAppend(df, tmpTable.fullName)
   }
 
@@ -347,7 +347,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     try {
       // write data to temp table
-      writeToTempTable(df)
+      writeToTempTable(df, df.schema)
       // prepare SQL merge statement
       val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
       val joinConditionStr = table.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
