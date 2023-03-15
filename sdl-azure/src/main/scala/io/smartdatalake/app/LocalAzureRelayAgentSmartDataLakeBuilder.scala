@@ -27,8 +27,6 @@ import java.io.File
 
 /**
  * Smart Data Lake Builder application for agent mode.
- * Please make sure you deactivated the profile spark-hive when compiling you application as spark-hive.
- * See the end of the file sdl-core/pom.xml for more information.
  *
  * Sets master to local[*] and deployMode to client by default.
  */
