@@ -1,8 +1,8 @@
 package org.apache.spark.metrics.sink.loganalytics
 
 import com.codahale.metrics.MetricRegistry
-import org.apache.spark.metrics.sink.Sink
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.metrics.sink.Sink
 
 import java.util.Properties
 

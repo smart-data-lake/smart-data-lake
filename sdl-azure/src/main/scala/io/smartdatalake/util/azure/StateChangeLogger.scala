@@ -19,16 +19,15 @@
 
 package io.smartdatalake.util.azure
 
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase}
-import io.smartdatalake.workflow.action.ResultRuntimeInfo
-import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
-import io.smartdatalake.app.StateListener
 import com.google.gson.Gson
-import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
-import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.workflow.action.RuntimeInfo
+import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeInfo}
+import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 
 import java.time.LocalDateTime
 

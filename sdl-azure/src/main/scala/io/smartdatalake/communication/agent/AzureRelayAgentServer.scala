@@ -21,11 +21,9 @@ package io.smartdatalake.communication.agent
 
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
 import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilderConfig
-import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
+import io.smartdatalake.communication.message.SDLMessage
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
 import org.json4s.Formats
-import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization.{read, writePretty}
 
 import java.net.URI

@@ -23,7 +23,7 @@
     <parent>
         <groupId>io.smartdatalake</groupId>
         <artifactId>sdl-parent</artifactId>
-        <version>2.5.0-SNAPSHOT</version>
+		<version>2.5.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -81,6 +81,12 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.minor.version}</artifactId>
         </dependency>
+
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-hive_${scala.minor.version}</artifactId>
+		</dependency>
+
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
@@ -257,11 +263,6 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
             <version>${fasterxml.jackson.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.microsoft.azure</groupId>
-            <artifactId>azure-relay</artifactId>
-            <version>0.0.4</version>
         </dependency>
 
         <!-- TEST dependencies -->
@@ -484,51 +485,4 @@
 
         </plugins>
     </build>
-    <profiles>
-        <profile>
-            <!--This profile allows to remove dependency spark-hive in case it creates problems with other dependencies
-             One known problem arises when using RemoteActions with com.microsoft.azure:azure-relay because of a clash of dependencies.
-             It's a Dependency Problem between org.apache:spark-hive → hive-common and com.microsoft.azure:azure-relay.
-             If you have this problem, but still require spark-hive, you can also try to import spark-hive but exclude the problematic
-             dependency by adding this exclusion
-
-            <exclusions>
-                <exclusion>
-                    <artifactId>json</artifactId>
-                    <groupId>com.tdunning</groupId>
-                </exclusion>
-            </exclusions>
-
-            To see if you are affected, look for this warning in maven compiler output:
-            com.tdunning:json-1.8.jar, org.json:json-20180813.jar define 7 overlapping classes:
-            - org.json.JSONArray
-            - org.json.JSONException
-            - org.json.JSONObject
-            - org.json.JSONObject$1
-            - org.json.JSONString
-            - org.json.JSONStringer
-            - org.json.JSONTokener
-
-            More Information about this problem:
-            Basically there are two different JSON SerDe-libraries that implement classes with exactly the same name:
-            https://github.com/stleary/JSON-java/tree/20180813 used by com.microsoft.azure:azure-relay and
-            https://github.com/tdunning/open-json/tree/json-1.8 used by spark-hive.
-            The one from azure seems to offer more features. For azure-relay-service to work we need to exclude the json implementation from tdunning.
-            It is unclear which functionality of spark-hive->hive-common may stop working if it suddenly has a different JSON Serializer Implementation.
-            Even newer versions of hive-common still use the JSON Implementation if tdunning: https://github.com/apache/hive/blob/master/common/pom.xml#L246.
-             -->
-            <id>spark-hive</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.spark</groupId>
-                    <artifactId>spark-hive_${scala.minor.version}</artifactId>
-                    <version>${spark.version}</version>
-                    <scope>${spark.deps.scope}</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 </project>

@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.app.{SmartDataLakeBuilder, SmartDataLakeBuilderConfigTrait, TestMode}
 import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -93,7 +92,7 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .required
         .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
         .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to"),
-      )
+    )
   }
 
   /**

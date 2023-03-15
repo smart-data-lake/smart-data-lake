@@ -58,6 +58,13 @@
             <scope>${sdl-core.scope}</scope>
         </dependency>
 
+        <!-- Azure Relay Service for Remote Agent Communication -->
+        <dependency>
+            <groupId>com.microsoft.azure</groupId>
+            <artifactId>azure-relay</artifactId>
+            <version>0.0.4</version>
+        </dependency>
+
         <!-- hadoop classes for azure -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>

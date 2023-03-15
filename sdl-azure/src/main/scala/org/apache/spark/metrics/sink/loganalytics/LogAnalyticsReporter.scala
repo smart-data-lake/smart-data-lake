@@ -19,13 +19,13 @@
 
 package org.apache.spark.metrics.sink.loganalytics
 
-import com.codahale.metrics.{Timer, _}
 import com.codahale.metrics.json.MetricsModule
+import com.codahale.metrics._
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.smartdatalake.util.azure.client.loganalytics.{LogAnalyticsClient, LogAnalyticsSendBufferClient}
-import org.apache.spark.metrics.sink.SparkInformation
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.metrics.sink.SparkInformation
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
