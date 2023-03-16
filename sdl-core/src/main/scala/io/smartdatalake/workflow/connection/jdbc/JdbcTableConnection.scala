@@ -50,6 +50,12 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
+ * @param enableCommit whether to enable commits for transactional behaviour in SDL
+ *                     Note that most JDBC drivers use auto-commit per default which is not recommended when [[enableCommit]] is true.
+ *                     Default is enableCommit = true. To disable auto-commit see [[autoCommit]].
+ * @param autoCommit flag to enable or disable the auto-commit behaviour of the JDBC driver
+ *                   If not set, the default auto-commit mode of the JDBC driver is used.
+ * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
  */
 case class JdbcTableConnection(override val id: ConnectionId,
                                url: String,
@@ -58,7 +64,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                db: Option[String] = None,
                                maxParallelConnections: Int = 1,
                                connectionPoolMaxIdleTimeSec: Int = 3,
-                               override val metadata: Option[ConnectionMetadata] = None
+                               override val metadata: Option[ConnectionMetadata] = None,
+                               enableCommit: Boolean = true,
+                               autoCommit: Option[Boolean] = None,
+                               connectionInitSql: Option[String] = None
                                ) extends Connection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
@@ -86,7 +95,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
       try {
         stmt = conn.createStatement
         val result = func(stmt)
-        if (doCommit) conn.commit()
+        if (doCommit && enableCommit) conn.commit()
         result
       } finally {
         if (stmt != null) stmt.close()
@@ -180,8 +189,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
     execJdbcStatement(sql)
   }
 
-  def dropTable(tableName: String, logging: Boolean = true): Boolean = {
-    execJdbcStatement(s"drop table if exists $tableName", logging = logging)
+  def dropTable(tableName: String, logging: Boolean = true): Unit = {
+    if (catalog.isTableExisting(tableName)) {
+      execJdbcStatement(s"drop table $tableName", logging = logging)
+    }
   }
 
   // setup connection pool
@@ -190,7 +201,25 @@ case class JdbcTableConnection(override val id: ConnectionId,
   pool.setMaxIdle(1) // keep max one idle jdbc connection
   pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close jdbc connection if not in use
   private class JdbcClientPoolFactory extends BasePooledObjectFactory[SqlConnection] {
-    override def create(): SqlConnection = getConnection
+    override def create(): SqlConnection = {
+      val connection = getConnection
+      initConnection(connection)
+    }
+
+    private def initConnection(connection: SqlConnection): SqlConnection = {
+      connectionInitSql.foreach(initSql => {
+        var stmt: Statement = null
+        try {
+          stmt = connection.createStatement()
+          stmt.execute(initSql)
+        } finally {
+          if (stmt != null) stmt.close()
+        }
+      })
+      autoCommit.foreach(connection.setAutoCommit)
+      connection
+    }
+
     override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
     override def destroyObject(p: PooledObject[SqlConnection]): Unit = p.getObject.close()
   }
