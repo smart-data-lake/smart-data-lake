@@ -52,7 +52,7 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
  * @param enableCommit whether to enable commits for transactional behaviour in SDL
  *                     Note that most JDBC drivers use auto-commit per default which is not recommended when [[enableCommit]] is true.
- *                     To disable auto-commit see [[autoCommit]].
+ *                     Default is enableCommit = true. To disable auto-commit see [[autoCommit]].
  * @param autoCommit flag to enable or disable the auto-commit behaviour of the JDBC driver
  *                   If not set, the default auto-commit mode of the JDBC driver is used.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
