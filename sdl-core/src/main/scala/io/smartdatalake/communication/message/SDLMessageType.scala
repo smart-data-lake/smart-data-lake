@@ -17,13 +17,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.communication.message
 
 object SDLMessageType extends Enumeration {
   type SDLMessageType = Value
 
-  val Log: Value = Value("Log")
   val StatusUpdate: Value = Value("StatusUpdate")
+  val StartConnection: Value = Value("StartConnection")
   val EndConnection: Value = Value("EndConnection")
-
+  val AgentInstruction: Value = Value("AgentInstruction")
+  val AgentResult: Value = Value("AgentResult")
 }

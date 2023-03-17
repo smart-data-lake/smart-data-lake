@@ -30,8 +30,6 @@ import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
-
 class DataObjectImplTests extends FlatSpec with Matchers {
 
   "AvroFileDataObject" should "be parsable" in {

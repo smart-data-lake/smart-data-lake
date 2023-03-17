@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, SdlConfigObject}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericDataFrame

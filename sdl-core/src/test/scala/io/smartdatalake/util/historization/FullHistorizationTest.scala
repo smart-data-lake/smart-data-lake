@@ -25,9 +25,9 @@ import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.functions.{col, lit, to_timestamp, when}
+import org.apache.spark.sql.functions.{col, lit, to_timestamp}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 /**

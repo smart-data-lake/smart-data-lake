@@ -20,12 +20,8 @@
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.fasterxml.jackson.core.JsonParseException
-import ScalaNotebookSparkDfTransformer.{compileCode, downloadNotebook, parseNotebook, prepareFunction}
+import io.smartdatalake.workflow.action.spark.transformer.ScalaNotebookSparkDfTransformer.{compileCode, parseNotebook, prepareFunction}
 import org.scalatest.FunSuite
-import scalaj.http.Http
-
-import java.net.URLConnection
-import scala.io.Source
 
 class ScalaNotebookSparkDfTransformerTest extends FunSuite {
 

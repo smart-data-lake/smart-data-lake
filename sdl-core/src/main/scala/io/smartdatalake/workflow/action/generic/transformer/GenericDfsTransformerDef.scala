@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.ParsableFromConfig
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -73,7 +73,7 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
 /**
  * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
  */
-trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromConfig[GenericDfsTransformer]
+trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromConfig[GenericDfsTransformer] with ConfigHolder
 
 trait SparkDfsTransformer extends GenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.

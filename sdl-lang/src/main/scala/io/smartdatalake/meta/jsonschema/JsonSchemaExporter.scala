@@ -1,6 +1,6 @@
 package io.smartdatalake.meta.jsonschema
 
-import io.smartdatalake.config.{ConfigLoader, ConfigToolbox, ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.json4s.jackson.JsonMethods.pretty
 import scopt.OptionParser

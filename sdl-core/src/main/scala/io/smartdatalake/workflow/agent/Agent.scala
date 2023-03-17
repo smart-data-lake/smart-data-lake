@@ -17,11 +17,29 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.workflow.agent
 
-import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.RuntimeInfo
+import io.smartdatalake.communication.agent.AgentClient
+import io.smartdatalake.config.SdlConfigObject.AgentId
+import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.workflow.AtlasExportable
+import io.smartdatalake.workflow.connection.Connection
 
-case class StatusUpdate(actionId: Option[String], runtimeInfo: Option[RuntimeInfo], phase: ExecutionPhase, finalState: Option[RuntimeEventState])
+private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConfig[Agent] with AtlasExportable {
+  /**
+   * A unique identifier for this instance.
+   */
+  override val id: AgentId
 
+  val url: String
+
+  val connections: Map[String, Connection]
+
+  val agentClientClassName : String
+
+  def toStringShort: String = {
+    s"$id[${this.getClass.getSimpleName}]"
+  }
+
+  override def atlasName: String = id.id
+}

@@ -20,10 +20,9 @@
 package io.smartdatalake.workflow.action.script
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 
@@ -55,4 +54,4 @@ trait ScriptDef {
   def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String,String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): Stream[String]
 }
 
-trait ParsableScriptDef extends ScriptDef with ParsableFromConfig[ParsableScriptDef]
+trait ParsableScriptDef extends ScriptDef with ParsableFromConfig[ParsableScriptDef] with ConfigHolder

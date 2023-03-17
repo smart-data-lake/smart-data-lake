@@ -19,10 +19,10 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
-import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericField, SchemaConverter}
-import io.smartdatalake.workflow.dataframe.spark.{SparkArrayDataType, SparkDataType, SparkField, SparkMapDataType, SparkSimpleDataType, SparkStructDataType, SparkSubFeed}
-import org.apache.spark.sql.{types => spark}
 import com.snowflake.snowpark.{types => snowpark}
+import io.smartdatalake.workflow.dataframe.spark._
+import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericField, SchemaConverter}
+import org.apache.spark.sql.{types => spark}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 

@@ -21,15 +21,10 @@ package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.types._
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
-import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.{DataFrameSubFeed, SubFeed}
-import io.smartdatalake.workflow.connection.SnowflakeConnection
-import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkColumn, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
 import org.scalatest.Matchers.intercept
 
-import scala.reflect.runtime.universe.typeOf
 
 /**
  * This is an integration test to check implementations of Snowpark.
@@ -45,7 +40,6 @@ object SnowparkIT extends App {
   instanceRegistry.register(testDO)
 
   val sfSession = testDO.snowparkSession
-  import sfSession.implicits._
 
   // convert Snowpark struct to SQL data type is not possible
   val struct1 = StructType( Seq(

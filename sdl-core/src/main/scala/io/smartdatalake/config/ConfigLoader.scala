@@ -141,7 +141,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
    * @param configs a list of [[Config]]s sorted according to their priority
-   * @return        a merged [[Config]].
+   * @return a merged [[Config]].
    */
   private def mergeConfigs(configs: Seq[Config]): Config = {
     configs.reduceLeft((c1, c2) => c1.withFallback(c2))

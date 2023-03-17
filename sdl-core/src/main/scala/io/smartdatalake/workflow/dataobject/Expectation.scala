@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{ConfigHolder, ConfigurationException, FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.SparkExpressionUtil
@@ -39,7 +39,7 @@ import org.apache.spark.sql.Column
  * Expectations are checks based on aggregates over all rows of a dataset.
  * Through setting the scope of an expectation, it can be controlled if the aggregate is evaluated per job, partition or the whole content of the table.
  */
-trait Expectation extends ParsableFromConfig[Expectation] with SmartDataLakeLogger {
+trait Expectation extends ParsableFromConfig[Expectation] with ConfigHolder with SmartDataLakeLogger {
   /**
    * The name of the expectation
    */

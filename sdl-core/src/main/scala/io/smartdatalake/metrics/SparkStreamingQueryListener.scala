@@ -22,9 +22,8 @@ package io.smartdatalake.metrics
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.{RuntimeEventState, DataFrameActionImpl, SparkStreamingExecutionId}
+import io.smartdatalake.workflow.action.{DataFrameActionImpl, RuntimeEventState, SparkStreamingExecutionId}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, GenericMetrics, InitSubFeed}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.StreamingQueryListener
 
 import java.time.temporal.ChronoUnit

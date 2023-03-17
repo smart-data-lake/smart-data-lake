@@ -26,11 +26,9 @@ import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.script.CmdScript
 import org.apache.spark.sql.types.DataType
-import org.json4s.JsonAST.JArray
 import org.json4s.{Formats, JObject, JString}
 
 import java.nio.file.Files
-import java.nio.file.attribute.BasicFileAttributes
 import scala.collection.mutable
 
 class AirbyteDataObjectTest extends DataObjectTestSuite {

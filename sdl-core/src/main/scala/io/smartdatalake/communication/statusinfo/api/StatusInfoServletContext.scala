@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.statusinfo.api
+package io.smartdatalake.communication.statusinfo.api
 
 import org.eclipse.jetty.server.handler.ContextHandler
 
@@ -24,8 +24,8 @@ import javax.servlet.ServletContext
 
 /**
  * Singleton Object that provides the "glue" between :
- * - the Jetty API used on io.smartdatalake.statusinfo.server.StatusInfoMethods
- * - the class holding the information to display, io.smartdatalake.statusinfo.StatusInfoListener
+ * - the Jetty API used on io.smartdatalake.communication.statusinfo.server.StatusInfoMethods
+ * - the class holding the information to display, io.smartdatalake.communication.statusinfo.StatusInfoListener
  */
 object StatusInfoServletContext {
 
