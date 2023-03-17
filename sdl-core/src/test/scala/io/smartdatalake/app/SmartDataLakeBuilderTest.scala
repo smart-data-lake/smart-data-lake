@@ -27,6 +27,7 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer}
@@ -822,7 +823,7 @@ class ExecNoDataTransformer extends CustomDfTransformer {
   }
 }
 
-class TestStateListener(options: Map[String,String]) extends StateListener {
+class TestStateListener(options: Map[String,StringOrSecret]) extends StateListener {
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
