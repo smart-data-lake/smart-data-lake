@@ -1318,7 +1318,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1328,18 +1328,9 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -1347,10 +1338,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1392,7 +1383,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
+                    "const" : "SQLQueryExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1402,9 +1393,18 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -1412,10 +1412,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1837,7 +1837,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1847,18 +1847,9 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -1866,10 +1857,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1911,7 +1902,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
+                    "const" : "SQLQueryExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1921,9 +1912,18 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -1931,10 +1931,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2168,7 +2168,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -2178,18 +2178,9 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -2197,10 +2188,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2242,7 +2233,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
+                    "const" : "SQLQueryExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -2252,9 +2243,18 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -2262,10 +2262,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3248,7 +3248,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3258,18 +3258,9 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3277,10 +3268,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3322,7 +3313,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
+                    "const" : "SQLQueryExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3332,9 +3323,18 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3342,10 +3342,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3576,7 +3576,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3586,18 +3586,9 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3605,10 +3596,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3650,7 +3641,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
+                    "const" : "SQLQueryExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3660,9 +3651,18 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All ", "JobPartition ", "Job " ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3670,10 +3670,10 @@
                     "enum" : [ "Warn ", "Error " ]
                   }
                 },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -5231,7 +5231,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5241,18 +5241,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5824,7 +5824,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5834,18 +5834,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -6290,6 +6290,9 @@
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ActionMetadata"
+          },
+          "agentId" : {
+            "type" : "string"
           }
         },
         "title" : "CopyAction",
@@ -7089,6 +7092,950 @@
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "This[[Action]]historizes data between an input and output DataObject using DataFrames.\nHistorization creates a technical history of data by creating valid-from/to columns.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nHistorizeAction needs a transactional table (e.g. implementation of[[TransactionalSparkTableDataObject]]) as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports[[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective."
+      },
+      "ProxyAction" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "ProxyAction"
+          },
+          "wrappedAction" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/Action/CopyAction"
+            }, {
+              "$ref" : "#/definitions/Action/CustomScriptAction"
+            }, {
+              "$ref" : "#/definitions/Action/DeduplicateAction"
+            }, {
+              "$ref" : "#/definitions/Action/FileTransferAction"
+            }, {
+              "$ref" : "#/definitions/Action/HistorizeAction"
+            } ]
+          },
+          "agent" : {
+            "oneOf" : [ {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AzureRelayAgent"
+                },
+                "url" : {
+                  "type" : "string"
+                },
+                "connections" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "oneOf" : [ {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HiveTableConnection"
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "hive db"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "optional schema, authority and base path for tables directory on hadoop."
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HiveTableConnection",
+                      "required" : [ "db", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for hive tables"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HadoopFileConnection"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for accessing files on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HadoopFileConnection",
+                      "required" : [ "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for files on hadoop"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SftpFileRefConnection"
+                        },
+                        "host" : {
+                          "type" : "string",
+                          "description" : "sftp host"
+                        },
+                        "port" : {
+                          "type" : "integer",
+                          "description" : "port of sftp service, default is 22"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported."
+                        },
+                        "ignoreHostKeyVerification" : {
+                          "type" : "string",
+                          "description" : "do not validate host key if true, default is false"
+                        },
+                        "maxParallelConnections" : {
+                          "type" : "integer",
+                          "description" : "number of parallel sftp connections created by an instance of this connection"
+                        },
+                        "connectionPoolMaxIdleTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout to close unused connections in the pool"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SftpFileRefConnection",
+                      "required" : [ "host", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "SFTP Connection information"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "KafkaConnection"
+                        },
+                        "brokers" : {
+                          "type" : "string",
+                          "description" : "comma separated list of kafka bootstrap server incl. port, e.g. \\\"host1:9092,host2:9092:"
+                        },
+                        "schemaRegistry" : {
+                          "type" : "string",
+                          "description" : "url of schema registry service, e.g. \\\"https://host2\\\""
+                        },
+                        "options" : {
+                          "type" : "object",
+                          "additionalProperties" : {
+                            "type" : "string"
+                          },
+                          "description" : "Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ]
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "KafkaConnection",
+                      "required" : [ "brokers", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for kafka"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "DeltaLakeTableConnection"
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "hive db"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for tables directory on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "checkDeltaLakeSparkOptions" : {
+                          "type" : "string"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "DeltaLakeTableConnection",
+                      "required" : [ "db", "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for DeltaLake tables"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "JdbcTableConnection"
+                        },
+                        "url" : {
+                          "type" : "string",
+                          "description" : "jdbc connection url"
+                        },
+                        "driver" : {
+                          "type" : "string",
+                          "description" : "class name of jdbc driver"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "optional authentication information: for now BasicAuthMode is supported."
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "jdbc database"
+                        },
+                        "maxParallelConnections" : {
+                          "type" : "integer",
+                          "description" : "number of parallel jdbc connections created by an instance of this connection\nNote that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection\nused by SDL for validating metadata or pre/postSQL."
+                        },
+                        "connectionPoolMaxIdleTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout to close unused connections in the pool"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        },
+                        "enableCommit" : {
+                          "type" : "string",
+                          "description" : "whether to enable commits for transactional behaviour in SDL\nNote that most JDBC drivers use auto-commit per default which is not recommended when[[enableCommit]]is true.\nDefault is enableCommit = true. To disable auto-commit see[[autoCommit]] ."
+                        },
+                        "autoCommit" : {
+                          "type" : "string",
+                          "description" : "flag to enable or disable the auto-commit behaviour of the JDBC driver\nIf not set, the default auto-commit mode of the JDBC driver is used."
+                        },
+                        "connectionInitSql" : {
+                          "type" : "string",
+                          "description" : "SQL statement to be executed every time a new connection is created, for example to set session parameters"
+                        }
+                      },
+                      "title" : "JdbcTableConnection",
+                      "required" : [ "url", "driver", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for jdbc tables.\nIf authentication is needed, user and password must be provided."
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SnowflakeConnection"
+                        },
+                        "url" : {
+                          "type" : "string",
+                          "description" : "snowflake connection url"
+                        },
+                        "warehouse" : {
+                          "type" : "string",
+                          "description" : "Snowflake namespace"
+                        },
+                        "database" : {
+                          "type" : "string",
+                          "description" : "Snowflake database"
+                        },
+                        "role" : {
+                          "type" : "string",
+                          "description" : "Snowflake role"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "optional authentication information: for now BasicAuthMode is supported."
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SnowflakeConnection",
+                      "required" : [ "url", "warehouse", "database", "role", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for Snowflake databases.\nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SplunkConnection"
+                        },
+                        "host" : {
+                          "type" : "string",
+                          "description" : ""
+                        },
+                        "port" : {
+                          "type" : "integer",
+                          "description" : ""
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : ""
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SplunkConnection",
+                      "required" : [ "host", "port", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for splunk queries"
+                    } ]
+                  }
+                }
+              },
+              "title" : "AzureRelayAgent",
+              "required" : [ "url", "connections", "type" ],
+              "additionalProperties" : false
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "JettyAgent"
+                },
+                "url" : {
+                  "type" : "string"
+                },
+                "connections" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "oneOf" : [ {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HiveTableConnection"
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "hive db"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "optional schema, authority and base path for tables directory on hadoop."
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HiveTableConnection",
+                      "required" : [ "db", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for hive tables"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HadoopFileConnection"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for accessing files on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HadoopFileConnection",
+                      "required" : [ "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for files on hadoop"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SftpFileRefConnection"
+                        },
+                        "host" : {
+                          "type" : "string",
+                          "description" : "sftp host"
+                        },
+                        "port" : {
+                          "type" : "integer",
+                          "description" : "port of sftp service, default is 22"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported."
+                        },
+                        "ignoreHostKeyVerification" : {
+                          "type" : "string",
+                          "description" : "do not validate host key if true, default is false"
+                        },
+                        "maxParallelConnections" : {
+                          "type" : "integer",
+                          "description" : "number of parallel sftp connections created by an instance of this connection"
+                        },
+                        "connectionPoolMaxIdleTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout to close unused connections in the pool"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SftpFileRefConnection",
+                      "required" : [ "host", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "SFTP Connection information"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "KafkaConnection"
+                        },
+                        "brokers" : {
+                          "type" : "string",
+                          "description" : "comma separated list of kafka bootstrap server incl. port, e.g. \\\"host1:9092,host2:9092:"
+                        },
+                        "schemaRegistry" : {
+                          "type" : "string",
+                          "description" : "url of schema registry service, e.g. \\\"https://host2\\\""
+                        },
+                        "options" : {
+                          "type" : "object",
+                          "additionalProperties" : {
+                            "type" : "string"
+                          },
+                          "description" : "Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ]
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "KafkaConnection",
+                      "required" : [ "brokers", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for kafka"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "DeltaLakeTableConnection"
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "hive db"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for tables directory on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "checkDeltaLakeSparkOptions" : {
+                          "type" : "string"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "DeltaLakeTableConnection",
+                      "required" : [ "db", "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for DeltaLake tables"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "JdbcTableConnection"
+                        },
+                        "url" : {
+                          "type" : "string",
+                          "description" : "jdbc connection url"
+                        },
+                        "driver" : {
+                          "type" : "string",
+                          "description" : "class name of jdbc driver"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "optional authentication information: for now BasicAuthMode is supported."
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "jdbc database"
+                        },
+                        "maxParallelConnections" : {
+                          "type" : "integer",
+                          "description" : "number of parallel jdbc connections created by an instance of this connection\nNote that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection\nused by SDL for validating metadata or pre/postSQL."
+                        },
+                        "connectionPoolMaxIdleTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout to close unused connections in the pool"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        },
+                        "enableCommit" : {
+                          "type" : "string",
+                          "description" : "whether to enable commits for transactional behaviour in SDL\nNote that most JDBC drivers use auto-commit per default which is not recommended when[[enableCommit]]is true.\nDefault is enableCommit = true. To disable auto-commit see[[autoCommit]] ."
+                        },
+                        "autoCommit" : {
+                          "type" : "string",
+                          "description" : "flag to enable or disable the auto-commit behaviour of the JDBC driver\nIf not set, the default auto-commit mode of the JDBC driver is used."
+                        },
+                        "connectionInitSql" : {
+                          "type" : "string",
+                          "description" : "SQL statement to be executed every time a new connection is created, for example to set session parameters"
+                        }
+                      },
+                      "title" : "JdbcTableConnection",
+                      "required" : [ "url", "driver", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for jdbc tables.\nIf authentication is needed, user and password must be provided."
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SnowflakeConnection"
+                        },
+                        "url" : {
+                          "type" : "string",
+                          "description" : "snowflake connection url"
+                        },
+                        "warehouse" : {
+                          "type" : "string",
+                          "description" : "Snowflake namespace"
+                        },
+                        "database" : {
+                          "type" : "string",
+                          "description" : "Snowflake database"
+                        },
+                        "role" : {
+                          "type" : "string",
+                          "description" : "Snowflake role"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "optional authentication information: for now BasicAuthMode is supported."
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SnowflakeConnection",
+                      "required" : [ "url", "warehouse", "database", "role", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for Snowflake databases.\nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SplunkConnection"
+                        },
+                        "host" : {
+                          "type" : "string",
+                          "description" : ""
+                        },
+                        "port" : {
+                          "type" : "integer",
+                          "description" : ""
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : ""
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SplunkConnection",
+                      "required" : [ "host", "port", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for splunk queries"
+                    } ]
+                  }
+                }
+              },
+              "title" : "JettyAgent",
+              "required" : [ "url", "connections", "type" ],
+              "additionalProperties" : false
+            } ]
+          }
+        },
+        "title" : "ProxyAction",
+        "required" : [ "type", "wrappedAction", "agent" ],
+        "additionalProperties" : false,
+        "description" : "Allows to execute the action defined by\n\nOTHERTAG: on a remote agent defined by\n\nOTHERTAG: .\nIf the execution of\n\nOTHERTAG: is successful, the ProxyAction will return an empty SparkSubFeed by the correct schema."
       }
     }
   },
@@ -7382,6 +8329,8 @@
           "$ref" : "#/definitions/Action/FileTransferAction"
         }, {
           "$ref" : "#/definitions/Action/HistorizeAction"
+        }, {
+          "$ref" : "#/definitions/Action/ProxyAction"
         } ],
         "description" : "Map of Action name and definition"
       }
