@@ -110,7 +110,7 @@ trait EncryptDecrypt {
 case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      encryptColumns: Seq[String],
-                                     private val keyVariable: Option[String] = None,
+                                     @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
                                      private val key: Option[StringOrSecret],
                                     )
   extends SparkDfTransformer with EncryptDecrypt {
@@ -145,7 +145,7 @@ object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer]
 case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      decryptColumns: Seq[String],
-                                     private val keyVariable: Option[String] = None,
+                                     @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
                                      private val key: Option[StringOrSecret],
                                      algorithm: String = "AES/CBC/PKCS5Padding"
                                     )

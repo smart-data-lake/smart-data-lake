@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{ConfigException, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
@@ -30,8 +30,6 @@ import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
 
 class DataObjectImplTests extends FlatSpec with Matchers {
 

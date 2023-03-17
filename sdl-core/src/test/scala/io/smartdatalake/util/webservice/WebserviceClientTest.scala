@@ -106,8 +106,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
   }
 }
 
-
-class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
+private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
   var additionalHeaders: Map[String, StringOrSecret] = _
   override def prepare(options: Map[String, StringOrSecret]): Unit = {
     // add options as headers

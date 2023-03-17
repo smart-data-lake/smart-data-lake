@@ -1,7 +1,7 @@
 package io.smartdatalake.meta
 
-import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
 import io.smartdatalake.definitions.{AuthMode, SaveModeOptions}
+import io.smartdatalake.meta.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
@@ -10,10 +10,10 @@ import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
 import org.reflections.Reflections
-import scaladoc.{Markup, Tag}
+import scaladoc.Tag
 
 import scala.collection.JavaConverters._
-import scala.reflect.runtime.universe.{Annotation, AssignOrNamedArg, MethodSymbol, TermSymbol, Type, typeOf}
+import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
 
 
 /**
@@ -115,63 +115,13 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     else tpe
   }
 
-  private def formatScaladocTag(tag: Tag): Option[String] = {
-    tag match {
-      case x: Tag.Description => Some(s"${formatScaladocMarkup(x.makrup)}")
-      case x: Tag.Constructor => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Param => Some(s"${x.getClass.getSimpleName.toUpperCase} ${x.name}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.TypeParam => Some(s"${x.getClass.getSimpleName.toUpperCase} [${x.name}]: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Returns => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Throws => Some(s"${x.getClass.getSimpleName.toUpperCase} ${x.exceptionType}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.See => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Note => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Example => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.UseCase => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Todo => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Deprecated => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Migration => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.OtherTag => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.Author => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocString(x.text)}")
-      case x: Tag.Version => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocString(x.text)}")
-      case x: Tag.Since => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocString(x.text)}")
-      case x: Tag.Group => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${x.id}")
-      case x: Tag.GroupName => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${x.value}")
-      case x: Tag.GroupDescription => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${formatScaladocMarkup(x.markup)}")
-      case x: Tag.GroupPriority => Some(s"${x.getClass.getSimpleName.toUpperCase}: ${x.value}")
-      case Tag.Documentable => None
-      case Tag.InheritDoc => None
-    }
-  }
-
-  private def formatScaladocString(str: String) = {
-    str.replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
-      .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
-      .trim // remove leading and trailing line separators
-  }
-
-  private def formatScaladocMarkup(markup: Markup) = {
-    formatScaladocString(markup.trimmed.plainString)
-      .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
-      .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
-  }
-
-  private def formatScaladoc(doc: scaladoc.Scaladoc, filter: scaladoc.Tag => Boolean = _ => true): String = {
-    doc.tags.filter(filter).flatMap(formatScaladocTag).mkString("\n\n")
-  }
-
-  private def extractScalaDoc(annotations: Seq[Annotation]) = {
-    val rawScaladoc = annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
-      .flatMap(_.tree.children.collectFirst{ case x: AssignOrNamedArg => x.rhs.toString })
-    rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
-  }
-
   def typeDefForClass(tpe: Type, interestingSuperTypes: Seq[Type] = Seq(), baseType: Option[Type] = None): GenericTypeDef = {
     val parentTypes = if (interestingSuperTypes.nonEmpty)
       tpe.baseClasses.map(_.asType.toType).filter(baseType => interestingSuperTypes.contains(baseType) && baseType != tpe)
     else Seq()
     val name = tpe.typeSymbol.name.toString
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
-    val description = scaladoc.map(formatScaladoc(_, !_.isInstanceOf[Tag.Param]))
+    val description = scaladoc.map(formatScaladocWithTags(_, !_.isInstanceOf[Tag.Param]))
     val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
     GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
   }
@@ -207,7 +157,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
       val description = paramDescriptions.get(p.name.toString)
-        .orElse(overriddenMethods.map(m => extractScalaDoc(m.annotations).map(formatScaladoc(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
+        .orElse(overriddenMethods.map(m => extractScalaDoc(m.annotations).map(formatScaladocWithTags(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
       GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
     })
   }

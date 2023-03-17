@@ -20,9 +20,11 @@
 package io.smartdatalake.util.secrets
 
 /**
- * @param secret is either the secret in plaintext or it contains the id of the provider and the
- *                       name of the secret in the format ###<PROVIDERID>#<SECRETNAME>###,
- *                       e.g. ###ENV#<ENV_VARIABLE_NAME>### to get a secret from an environment variable.
+ * A String wrapper for secrets. String values in the configuration will automatically be converted to [[StringOrSecret]].
+ *
+ * @param secret The value can be provided in plaintext or with the id of a secret provider and the
+ *               name of the secret in the format {{{###<PROVIDERID>#<SECRETNAME>###}}},
+ *               e.g. {{{###ENV#<ENV_VARIABLE_NAME>###}}} to get a secret from an environment variable.
  */
 case class StringOrSecret(private val secret: String) {
 

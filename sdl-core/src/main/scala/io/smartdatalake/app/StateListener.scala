@@ -24,6 +24,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
  * Configuration to notify interested parties about action results & metric
@@ -31,7 +32,7 @@ import io.smartdatalake.definitions.Environment
  * @param className fully qualified class name of class implementing StateListener interface. The class needs a constructor with one parameter `options: Map[String,String]`.
  * @param options Options are passed to StateListener constructor.
  */
-case class StateListenerConfig(className: String, options: Option[Map[String,String]] = None) {
+case class StateListenerConfig(className: String, options: Option[Map[String,StringOrSecret]] = None) {
   // instantiate listener
   private[smartdatalake] val listener: StateListener = try {
     val clazz = Environment.classLoader.loadClass(className)
