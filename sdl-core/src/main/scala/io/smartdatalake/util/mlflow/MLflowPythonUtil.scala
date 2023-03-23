@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package io.smartdatalake.util.mlflow
 
 import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
@@ -109,7 +110,7 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
 
 private[smartdatalake] class MLflowPythonSparkEntryPoint(
                                                           override val session: SparkSession,
-                                                          options: Map[String, String],
+                                                          options: Map[String, String] = Map(),
                                                           var experimentId: Option[String] = None,
                                                           var latestRunId: Option[String] = None,
                                                           var modelUri: Option[String] = None

@@ -20,22 +20,26 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ ActionId, DataObjectId }
-import io.smartdatalake.config.{ FromConfigFactory, InstanceRegistry }
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
+import io.smartdatalake.util.mlflow.{MLflowPythonSparkEntryPoint, MLflowPythonUtil}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{ GenericDfsTransformer, GenericDfsTransformerDef }
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef}
 import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfsTransformer
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.{ ActionPipelineContext, DataFrameSubFeed, ExecutionPhase }
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 
-import scala.reflect.runtime.universe.{ Type, typeOf }
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * @param mlflowId id of the MLflow DataObject
  * @param outputId id of an DataObject that contains the predictions
  * @param inputIds input DataObjects
- * @param predictIdSelector id of the DataObject that will be used for prediction
+ * @param predictIdSelector optional id of the DataObject/SubFeed that will be used for prediction.
+ *                          This is only needed if multiple input DataObjects are configured, to decide which DataFrame the model is applied on.
+ *                          Note that with multiple input DataObjects normally a transformation has to be defined to combine them.
+ *                          In that case the predictIdSelector can also be the name of an output of a transformation.
  * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
  * @param resultType expected result type of the prediction
@@ -62,6 +66,10 @@ case class MLflowPredictAction(
   // handle MLflow in and output data object
   val mlflow = getInputDataObject[MLflowDataObject](mlflowId)
   val prediction = getOutputDataObject[DataObject with CanWriteDataFrame with CanCreateDataFrame](outputId)
+
+  // used for python interop
+  var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
+  var pythonMLflowClient: Option[MLflowPythonUtil] = None
 
   // handle data in- and outputs
   override val inputs: Seq[DataObject with CanCreateDataFrame] =
@@ -91,7 +99,7 @@ case class MLflowPredictAction(
   validateConfig()
 
   private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfsTransformerDef] = {
-    mlflow.pythonMLflowApi.get.setLatest(mlflow.experimentId.get)
+    pythonMLflowClient.get.setLatest(mlflow.experimentId.get)
 
     val getPredictionIdPython =
       f"""
@@ -128,13 +136,13 @@ case class MLflowPredictAction(
              |mlflow.set_tracking_uri("${mlflow.trackingURI}")
              |# set experiment name
              |mlflow.set_experiment("${mlflow.experimentName}")
-             |# get predict dataframe from SDL
+             |# get predict dataframe name from SDL
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {predict_id}")
-             |df = inputDfs[f"{predict_id}"]
-             |# add predictions; TODO: get correct type according to input
-             |df_predict = df.withColumn("predictions", lit(None).cast(StringType()))
-             |df_predict.show()
+             |df = inputDfs[predict_id]
+             |# add predictions
+             |df_predict = df.withColumn("predictions", lit(None).cast("${resultType.getOrElse("string")}"))
+             |# df_predict.show()
              |# generate output dict
              |outDfs={}
              |outDfs["${outputId.id}"] = df_predict
@@ -153,6 +161,8 @@ case class MLflowPredictAction(
           s"""
              |import mlflow
              |import json
+             |import atexit
+             |import shutil
              |from pyspark.sql.types import StringType
              |from pyspark.sql.functions import lit
              |
@@ -162,16 +172,14 @@ case class MLflowPredictAction(
              |# get predict dataframe from SDL
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {predict_id}")
-             |df_predict = inputDfs[f"{predict_id}"]
+             |df_predict = inputDfs[predict_id]
              |from pyspark.sql.functions import struct, col
              |# Load model as a Spark UDF. Override result_type if the model does not return double values.
-             |print("${mlflow.pythonMLflowApi.get.entryPoint.modelUri}")
-             |loaded_model = mlflow.pyfunc.spark_udf(session, model_uri="${mlflow.pythonMLflowApi.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
-             |print(loaded_model)
+             |print("loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
+             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
              |# Predict on a Spark DataFrame.
-             |df_final = df_predict.withColumn('predictions', loaded_model(struct(*map(col, df_predict.columns))))
-             |df_final.show(5)
-             |print(type(df_final))
+             |df_final = df_predict.withColumn('predictions', udf_predict(struct(*map(col, df_predict.columns))))
+             |atexit.unregister(shutil.rmtree) # disable deleting downloaded model tmp directory at exit, so it is still available in later py4j sessions
              |# generate output dict
              |outDfs={}
              |outDfs["${outputId.id}"] = df_final
@@ -200,6 +208,9 @@ case class MLflowPredictAction(
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     transformerDefs.foreach(_.prepare(id))
+    entryPoint = Some(new MLflowPythonSparkEntryPoint(context.sparkSession))
+    logger.info("Created MLflowPythonSparkEntryPoint")
+    pythonMLflowClient = mlflow.getPythonMLflowClient(entryPoint, mlflow.trackingURI)
   }
 
   override def factory: FromConfigFactory[Action] = MLflowPredictAction

@@ -20,13 +20,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ FromConfigFactory, InstanceRegistry }
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import com.typesafe.config.Config
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.mlflow.{ MLflowPythonSparkEntryPoint, MLflowPythonUtil }
+import io.smartdatalake.util.mlflow.{MLflowPythonSparkEntryPoint, MLflowPythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{ DataFrame }
+import org.apache.spark.sql.{DataFrame}
 
 // TODO: model according to experiment definition
 case class MLflowExperiment(experimentName: String)
@@ -55,27 +55,23 @@ case class MLflowDataObject(
     with CanCreateSparkDataFrame
     with SmartDataLakeLogger {
 
-  // entry point for accessing dynamically Java objects living inside the JVM
-  var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
-  var pythonMLflowApi: Option[MLflowPythonUtil] = None
-
-  //
   var experimentId: Option[String] = None
 
-  override def prepare(implicit context: ActionPipelineContext): Unit = {
-    super.prepare
+  def getPythonMLflowClient(entryPoint: Option[MLflowPythonSparkEntryPoint], mlflowURI: String): Option[MLflowPythonUtil] = {
+    var pythonMLflowClient: Option[MLflowPythonUtil] = None
     // create entry point
-    entryPoint = Some(new MLflowPythonSparkEntryPoint(context.sparkSession, options))
     if (entryPoint.isEmpty) {
       throw MLflowException("Creation of MLflowPythonSparkEntryPoint was not successful")
     } else {
-      logger.info("Created MLflowPythonSparkEntryPoint")
-      pythonMLflowApi = Some(MLflowPythonUtil(entryPoint.get, trackingURI))
-      experimentId = pythonMLflowApi
+      pythonMLflowClient = Some(MLflowPythonUtil(entryPoint.get, mlflowURI))
+      experimentId = pythonMLflowClient
         .getOrElse(throw MLflowException("PythonUtil for MLflow not ready"))
         .getOrCreateExperimentID(experimentName)
       logger.info(s"Working with MLflow experiment $experimentName with ID $experimentId")
     }
+
+    // return
+    pythonMLflowClient
 
   }
 
@@ -87,6 +83,7 @@ case class MLflowDataObject(
 
     // TODO: fetch latest run information and return as DataFrame
     val df: DataFrame = Seq.empty[MLflowExperiment].toDF()
+
     // return
     df
   }

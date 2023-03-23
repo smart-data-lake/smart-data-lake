@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.mlflow.{MLflowPythonSparkEntryPoint, MLflowPythonUtil}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef}
 import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfsTransformer
@@ -78,6 +79,10 @@ case class MLflowTrainAction(
   // handle MLflow in and output data object
   val mlflow = getInputDataObject[MLflowDataObject](mlflowId)
   val mlflowRunInfo = getOutputDataObject[DataObject with CanWriteDataFrame with CanCreateDataFrame](runInfoId)
+
+  // used for python interop. mainly to access python objects from the jvm or to access scala objects from the python process
+  var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
+  var pythonMLflowClient: Option[MLflowPythonUtil] = None
 
   // if the user wants to transition the model, modelTransitionInfo has to be configured on the DataObject
   private var modelTransitionInfo: ModelTransitionInfo = ModelTransitionInfo("latest", "None", "None")
@@ -233,6 +238,9 @@ case class MLflowTrainAction(
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     transformerDefs.foreach(_.prepare(id))
+    entryPoint = Some(new MLflowPythonSparkEntryPoint(context.sparkSession))
+    logger.info("Created MLflowPythonSparkEntryPoint")
+    pythonMLflowClient = mlflow.getPythonMLflowClient(entryPoint, mlflow.trackingURI)
   }
 
   override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit
@@ -242,11 +250,11 @@ case class MLflowTrainAction(
     // TODO: check if this is only executed if there was no failure during EXEC phase
     if (registerModel) {
       // model has been logged during transform phase
-      val latestRunInfo = mlflow.pythonMLflowApi.get.setLatest(
+      val latestRunInfo = pythonMLflowClient.get.setLatest(
         mlflow.experimentId.getOrElse(throw MLflowException("No experimentId was set in the MLflowDataObject"))
       )
       // register Model does not wait until model is registered, so its not immediately visible within MLflow
-      mlflow.pythonMLflowApi.get.registerModel(latestRunInfo.modelUri, mlflow.modelName, mlflow.modelDescription.getOrElse(""))
+      pythonMLflowClient.get.registerModel(latestRunInfo.modelUri, mlflow.modelName, mlflow.modelDescription.getOrElse(""))
     }
 
     if(transitionModel){
@@ -254,7 +262,7 @@ case class MLflowTrainAction(
       val fromStage = modelTransitionInfo.fromStage
       val toStage = modelTransitionInfo.toStage
 
-      mlflow.pythonMLflowApi.get.transitionModel(mlflow.modelName, version, fromStage, toStage)
+      pythonMLflowClient.get.transitionModel(mlflow.modelName, version, fromStage, toStage)
     }
   }
 
