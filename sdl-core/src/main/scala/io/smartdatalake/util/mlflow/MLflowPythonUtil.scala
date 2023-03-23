@@ -21,11 +21,6 @@ package io.smartdatalake.util.mlflow
 import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import org.apache.spark.sql.SparkSession
 
-object ModelType extends Enumeration {
-  type ModelType = Value
-  val Sklearn, Tensorflow = Value
-}
-
 case class LatestRunInfo(experimentId: String, runId: String, modelUri: String)
 
 case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI: String) {
@@ -35,6 +30,8 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
        |import json
        |# config tracking server
        |mlflow.set_tracking_uri("${trackingURI}")
+       |# mlflow client
+       |client = mlflow.MlflowClient()
        |""".stripMargin
 
   def getOrCreateExperimentID(experimentName: String): Option[String] = {
@@ -56,13 +53,15 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
     val getLatestRunIdCode =
       s"""
          |from mlflow.entities import ViewType
-         |run = mlflow.search_runs(experiment_ids="$experimentId", filter_string="", run_view_type=ViewType.ACTIVE_ONLY,max_results=1, order_by=["start_time DESC"],output_format="list")[0]
-         |model_history_list = json.loads(run.data.tags["mlflow.log-model.history"])
-         |artifact_path = model_history_list[0]["artifact_path"]
-         |model_uri = f"runs:/{run.info.run_id}/{artifact_path}"
-         |run_id = run.info.run_id
-         |entryPoint.setLatestModelUri(model_uri)
-         |entryPoint.setLatestRunId(run_id)
+         |runs = mlflow.search_runs(experiment_ids="$experimentId", filter_string="", run_view_type=ViewType.ACTIVE_ONLY,max_results=1, order_by=["start_time DESC"], output_format="list")
+         |if runs:
+         |  run = runs[0]
+         |  model_history_list = json.loads(run.data.tags["mlflow.log-model.history"])
+         |  artifact_path = model_history_list[0]["artifact_path"]
+         |  model_uri = f"runs:/{run.info.run_id}/{artifact_path}"
+         |  run_id = run.info.run_id
+         |  entryPoint.setLatestModelUri(model_uri)
+         |  entryPoint.setLatestRunId(run_id)
          |""".stripMargin
     PythonUtil.execPythonSparkCode(entryPoint, mlflowBoilerplate + getLatestRunIdCode)
 
@@ -70,33 +69,40 @@ case class MLflowPythonUtil(entryPoint: MLflowPythonSparkEntryPoint, trackingURI
     LatestRunInfo(
       experimentId = entryPoint.experimentId.getOrElse(""),
       runId = entryPoint.latestRunId.getOrElse(""),
-      modelUri = entryPoint.latestRunId.getOrElse("")
+      modelUri = entryPoint.modelUri.getOrElse("")
     )
   }
 
   def registerModel(modelUri: String, modelName: String, description: String = "") = {
     val registerModelCode =
       s"""
-         |model_details = mlflow.register_model(model_uri=$modelUri, name=$modelName)
+         |model = client.search_registered_models(filter_string = "name = '$modelName'")
+         |if len(model) == 0:
+         |  registry_details = client.create_registered_model(name="$modelName", description="$description")
+         |  print(registry_details)
+         |model_details = mlflow.register_model(model_uri="$modelUri", name="$modelName")
          |print(model_details)
+         |
          |""".stripMargin
+    PythonUtil.execPythonSparkCode(entryPoint, mlflowBoilerplate + registerModelCode)
   }
 
-  def logSklearnModelBoilerplate(): String = {
-
-    val logModelCode =
+  def transitionModel(modelName: String, version: String, fromStage: String, toStage: String) = {
+    val transitionModelCode =
       s"""
-         |# log model to MLflow
-         |def log_sklearn_model(model: any, artifact_path: str,registered_model_name: str):
-         |    model_info = mlflow.sklearn.log_model(
-         |        sk_model=sk_model,
-         |        artifact_path=artifact_path,
-         |        registered_model_name=registered_model_name
-         |    )
-         |    entryPoint.setModelUri(modelmodel_uri)
+         |version = "$version"
+         |# get latest version if necessary
+         |if version == "latest":
+         |  model = client.get_latest_versions(name="$modelName", stages=["$fromStage"])[0]
+         |  version = model.version
+         |  print(model)
+         |
+         |# transition model accordingly
+         |new_model = client.transition_model_version_stage(name="$modelName", version=version, stage="$toStage")
+         |print(new_model)
+         |
          |""".stripMargin
-    //return
-    mlflowBoilerplate + logModelCode
+    PythonUtil.execPythonSparkCode(entryPoint, mlflowBoilerplate + transitionModelCode)
   }
 
 }

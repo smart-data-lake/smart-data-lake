@@ -20,24 +20,18 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ ActionId, DataObjectId }
-import io.smartdatalake.config.{ ConfigurationException, FromConfigFactory, InstanceRegistry }
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{ GenericDfsTransformer, GenericDfsTransformerDef }
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef}
 import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfsTransformer
-import io.smartdatalake.workflow.dataobject.{
-  CanCreateDataFrame,
-  CanWriteDataFrame,
-  DataObject,
-  MLflowDataObject,
-  MLflowException
-}
-import io.smartdatalake.workflow.{ ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed }
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, MLflowDataObject, MLflowException, ModelTransitionInfo}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed}
 import org.apache.hadoop.conf.Configuration
 
-import scala.reflect.runtime.universe.{ Type, typeOf }
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * @param mlflowId id of the MLflow DataObject
@@ -48,7 +42,7 @@ import scala.reflect.runtime.universe.{ Type, typeOf }
  *                     The transformations are applied according to the lists ordering.
  * @param pythonModelCode machine learning model provided directly as python code
  * @param pythonModelFile machine learning model provided as python file
- * @param registerModel register model in MLflow registry
+ * @param registerModel True to register model in MLflow registry. Default is false.
  */
 case class MLflowTrainAction(
                               override val id: ActionId,
@@ -60,6 +54,7 @@ case class MLflowTrainAction(
                               pythonModelCode: Option[String] = None,
                               pythonModelFile: Option[String] = None,
                               registerModel: Boolean = false,
+                              transitionModel: Boolean = false,
                               override val breakDataFrameLineage: Boolean = false,
                               override val persist: Boolean = false,
                               override val mainInputId: Option[DataObjectId] = None,
@@ -77,12 +72,18 @@ case class MLflowTrainAction(
     pythonModelFile
       .map(file => HdfsUtil.readHadoopFile(file))
       .orElse(pythonModelCode)
-      .getOrElse(throw ConfigurationException(s"ML model must either be provided as python file or code"))
+      .getOrElse(throw ConfigurationException(s"($id) ML model must either be provided as python file or code"))
   }
 
   // handle MLflow in and output data object
   val mlflow = getInputDataObject[MLflowDataObject](mlflowId)
   val mlflowRunInfo = getOutputDataObject[DataObject with CanWriteDataFrame with CanCreateDataFrame](runInfoId)
+
+  // if the user wants to transition the model, modelTransitionInfo has to be configured on the DataObject
+  private var modelTransitionInfo: ModelTransitionInfo = ModelTransitionInfo("latest", "None", "None")
+  if (transitionModel) {
+    modelTransitionInfo = mlflow.modelTransitionInfo.getOrElse(throw ConfigurationException(s"($id) if you want to transition the model, provide the necessary information in the $mlflowId DataObject"))
+  }
 
   // handle data in- and outputs
   override val inputs: Seq[DataObject with CanCreateDataFrame] =
@@ -170,11 +171,12 @@ case class MLflowTrainAction(
              |# set experiment name
              |mlflow.set_experiment("${mlflow.experimentName}")
              |# turn on autolog
+             |mlflow.spark.autolog(disable=True) # auto log for spark models doesn't work, because java cannot call back py4j again.
              |mlflow.autolog()
              |# start run and get status
              |mlflow.start_run()
              |run = mlflow.active_run()
-             |print("run_id: {}; status: {}".format(run.info.run_id, run.info.status))
+             |print("mlflow run started: run_id={}; status={}".format(run.info.run_id, run.info.status))
              |# get training dataframe from SDL
              |train_id = get_train_id("$trainIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {train_id}")
@@ -186,7 +188,7 @@ case class MLflowTrainAction(
              |# end run and get status
              |mlflow.end_run()
              |run = mlflow.get_run(run.info.run_id)
-             |print("run_id: {}; status: {}".format(run.info.run_id, run.info.status))
+             |print("mlflow run finished: run_id={}; status={}".format(run.info.run_id, run.info.status))
              |#print(run)
              |# create return dataframe
              |from datetime import datetime
@@ -210,8 +212,8 @@ case class MLflowTrainAction(
              |""".stripMargin
 
         val trainTransformer = PythonCodeDfsTransformer(
-          name = "modelTransformer",
-          description = Some("trains a sklearn model on the provided data"),
+          name = "modelTrainTransformer",
+          description = Some("trains a model on the provided data"),
           code = Some(pythonTrainPrefixBoilerPlate + pythonCode + pythonTrainPostfixBoilerPlate)
         )
         transformerDefs :+ trainTransformer
@@ -244,7 +246,15 @@ case class MLflowTrainAction(
         mlflow.experimentId.getOrElse(throw MLflowException("No experimentId was set in the MLflowDataObject"))
       )
       // register Model does not wait until model is registered, so its not immediately visible within MLflow
-      mlflow.pythonMLflowApi.get.registerModel(latestRunInfo.modelUri, mlflow.experimentName)
+      mlflow.pythonMLflowApi.get.registerModel(latestRunInfo.modelUri, mlflow.modelName, mlflow.modelDescription.getOrElse(""))
+    }
+
+    if(transitionModel){
+      val version = modelTransitionInfo.version
+      val fromStage = modelTransitionInfo.fromStage
+      val toStage = modelTransitionInfo.toStage
+
+      mlflow.pythonMLflowApi.get.transitionModel(mlflow.modelName, version, fromStage, toStage)
     }
   }
 

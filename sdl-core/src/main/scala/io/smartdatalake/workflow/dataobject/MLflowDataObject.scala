@@ -31,18 +31,24 @@ import org.apache.spark.sql.{ DataFrame }
 // TODO: model according to experiment definition
 case class MLflowExperiment(experimentName: String)
 
+case class ModelTransitionInfo(version: String, fromStage: String, toStage: String)
+
 /**
  * [[DataObject]] for interaction with MLflow
  *
  * @param trackingURI Uri of the MLflow server. Default is http://localhost:5000.
  * @param experimentName The name of the experiment stored in MLflow.
+ * @param modelName The name of the model stored in the MLflow model registry.
+ * @param modelDescription The description displayed in the MLflow model registry.
+ * @param modelTransitionInfo The information that must be provided if in the MLflowTrainAction a model transition is configured.
  */
 case class MLflowDataObject(
                              override val id: DataObjectId,
                              trackingURI: String,
                              experimentName: String,
-                             modelName: Option[String] = None,
+                             modelName: String = "Default",
                              modelDescription: Option[String] = None,
+                             modelTransitionInfo : Option[ModelTransitionInfo] = None,
                              override val metadata: Option[DataObjectMetadata] = None
                            )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject
