@@ -140,6 +140,9 @@ case class MLflowPredictAction(
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {predict_id}")
              |df = inputDfs[predict_id]
+             |# Load model
+             |print("loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
+             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
              |# add predictions
              |df_predict = df.withColumn("predictions", lit(None).cast("${resultType.getOrElse("string")}"))
              |# df_predict.show()
@@ -164,7 +167,7 @@ case class MLflowPredictAction(
              |import atexit
              |import shutil
              |from pyspark.sql.types import StringType
-             |from pyspark.sql.functions import lit
+             |from pyspark.sql.functions import lit, struct, col
              |
              |mlflow.set_tracking_uri("${mlflow.trackingURI}")
              |# set experiment name
@@ -173,7 +176,6 @@ case class MLflowPredictAction(
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"The following DataObjectId will be used for training: {predict_id}")
              |df_predict = inputDfs[predict_id]
-             |from pyspark.sql.functions import struct, col
              |# Load model as a Spark UDF. Override result_type if the model does not return double values.
              |print("loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
              |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
