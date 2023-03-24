@@ -28,7 +28,7 @@ import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
 import scala.reflect.runtime.universe.Type
 
-private[smartdatalake] trait CanWriteDataFrame {
+trait CanWriteDataFrame {
 
   // additional streaming options which can be overridden by the DataObject, e.g. Kafka topic to write to
   def streamingOptions: Map[String, String] = Map()

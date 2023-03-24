@@ -22,7 +22,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 
-private[smartdatalake] trait FileTransfer {
+trait FileTransfer {
 
   protected val srcDO: FileRefDataObject
   protected val tgtDO: FileRefDataObject

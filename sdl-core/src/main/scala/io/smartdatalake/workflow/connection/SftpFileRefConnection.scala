@@ -50,6 +50,9 @@ case class SftpFileRefConnection(override val id: ConnectionId,
                                  override val metadata: Option[ConnectionMetadata] = None
                                  ) extends Connection {
 
+  import java.net.Proxy
+  val proxy = new java.net.Proxy(Proxy.Type)
+
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[PublicKeyAuthMode])
   require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")

@@ -24,4 +24,4 @@ package io.smartdatalake.workflow.action
  *
  * @param message Message of Exception
  */
-private[smartdatalake] class TimeOrderLogicException(message: String) extends RuntimeException(message) {}
+class TimeOrderLogicException(message: String) extends RuntimeException(message) {}

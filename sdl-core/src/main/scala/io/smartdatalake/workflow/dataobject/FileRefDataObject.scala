@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 
 import java.nio.file.FileAlreadyExistsException
 
-private[smartdatalake] trait FileRefDataObject extends FileDataObject {
+trait FileRefDataObject extends FileDataObject {
 
   /**
    * Definition of partition layout
