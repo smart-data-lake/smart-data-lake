@@ -43,6 +43,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
  * @param resultType expected result type of the prediction
+ * @param modelStage Given the model name defined in the mlflowId DataObject, select the stage the model is to make your predictions.
  */
 case class MLflowPredictAction(
                                 override val id: ActionId,
@@ -52,6 +53,7 @@ case class MLflowPredictAction(
                                 predictIdSelector: Option[String] = None,
                                 transformers: Seq[GenericDfsTransformer] = Seq(),
                                 resultType: Option[String] = None,
+                                modelStage: String = "None",
                                 override val breakDataFrameLineage: Boolean = false,
                                 override val persist: Boolean = false,
                                 override val mainInputId: Option[DataObjectId] = None,
@@ -100,7 +102,11 @@ case class MLflowPredictAction(
 
   private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfsTransformerDef] = {
     pythonMLflowClient.get.setLatest(mlflow.experimentId.get)
-
+    val prefix =
+      f"""
+         |class NoModelAvailable(Exception):
+         |  pass
+         |""".stripMargin
     val getPredictionIdPython =
       f"""
          |import re
@@ -141,8 +147,17 @@ case class MLflowPredictAction(
              |print(f"$id: DataObject~{predict_id} will be used for prediction")
              |df = inputDfs[predict_id]
              |# Load model
-             |print("$id: Loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
-             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
+             |from mlflow.tracking.client import MlflowClient
+             |client = MlflowClient()
+             |models = client.get_latest_versions("${mlflow.modelName}", stages=["$modelStage"])
+             |model_version = ""
+             |if len(models) == 0:
+             |  raise NoModelAvailable(f"$id: There is no model named ${mlflow.modelName} in selected stage $modelStage. Check your MLflow instance running on ${mlflow.trackingURI}.")
+             |else:
+             |  model_version = models[0].version
+             |model_uri = "models:/${mlflow.modelName}/${modelStage}"
+             |print(f"$id: Loading model {model_uri}")
+             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type="${resultType.getOrElse("string")}")
              |# add predictions
              |df_predict = df.withColumn("predictions", lit(None).cast("${resultType.getOrElse("string")}"))
              |# df_predict.show()
@@ -154,7 +169,7 @@ case class MLflowPredictAction(
 
         val initMlflowTransformer = PythonCodeDfsTransformer(
           name = "pythonInitTransformer",
-          code = Some(getPredictionIdPython + initMakePredictionsPython)
+          code = Some(prefix + getPredictionIdPython + initMakePredictionsPython)
         )
         transformerDefs :+ initMlflowTransformer
 
@@ -176,9 +191,18 @@ case class MLflowPredictAction(
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
              |print(f"$id: DataObject~{predict_id} will be used for prediction")
              |df_predict = inputDfs[predict_id]
-             |# Load model as a Spark UDF. Override result_type if the model does not return double values.
-             |print("$id: Loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
-             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
+             |# Load model
+             |from mlflow.tracking.client import MlflowClient
+             |client = MlflowClient()
+             |models = client.get_latest_versions("${mlflow.modelName}", stages=["$modelStage"])
+             |model_version = ""
+             |if len(models) == 0:
+             |  raise NoModelAvailable(f"$id: There is no model named ${mlflow.modelName} in selected stage $modelStage. Check your MLflow instance running on ${mlflow.trackingURI}.")
+             |else:
+             |  model_version = models[0].version
+             |model_uri = "models:/${mlflow.modelName}/${modelStage}"
+             |print(f"$id: Loading model {model_uri}")
+             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type="${resultType.getOrElse("string")}")
              |# Predict on a Spark DataFrame.
              |df_final = df_predict.withColumn('predictions', udf_predict(struct(*map(col, df_predict.columns))))
              |atexit.unregister(shutil.rmtree) # disable deleting downloaded model tmp directory at exit, so it is still available in later py4j sessions
@@ -191,7 +215,7 @@ case class MLflowPredictAction(
         val predictionTransformer = PythonCodeDfsTransformer(
           name = "modelTransformer",
           description = Some("applies a sklearn model on the provided data"),
-          code = Some(getPredictionIdPython + makePredictionPython)
+          code = Some(prefix + getPredictionIdPython + makePredictionPython)
         )
         transformerDefs :+ predictionTransformer
     }
