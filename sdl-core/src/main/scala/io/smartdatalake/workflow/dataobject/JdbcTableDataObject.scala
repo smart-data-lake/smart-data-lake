@@ -334,8 +334,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val transaction = connection.beginTransaction()
     try {
       // cleanup existing data
-      if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsQuery(partitionValues))
-      else transaction.execJdbcStatement(deleteAllDataQuery)
+      if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsStatement(partitionValues))
+      else transaction.execJdbcStatement(deleteAllDataStatement)
       // append into final table in one step, then commit
       transaction.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable")
       transaction.commit()
@@ -450,12 +450,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     getExistingSchema.foreach(schema => validateSchema(SparkSchema(df.schema), SparkSchema(schema), "write"))
   }
 
-  private def deleteAllDataQuery: String = {
+  private def deleteAllDataStatement: String = {
      s"delete from ${table.fullName}"
   }
 
   def deleteAllData(): Unit = {
-    connection.execJdbcStatement(deleteAllDataQuery)
+    connection.execJdbcStatement(deleteAllDataStatement)
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
@@ -475,7 +475,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
-      connection.execJdbcStatement(deletePartitionsQuery(partitionValues))
+      connection.execJdbcStatement(deletePartitionsStatement(partitionValues))
     }
   }
 
@@ -483,7 +483,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Delete virtual partitions by "delete from" statement
    * @param partitionValues nonempty list of partition values
    */
-  private def deletePartitionsQuery(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): String = {
+  private def deletePartitionsStatement(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): String = {
     SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, quoteCaseSensitiveColumn(_))
   }
 
