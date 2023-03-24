@@ -138,10 +138,10 @@ case class MLflowPredictAction(
              |mlflow.set_experiment("${mlflow.experimentName}")
              |# get predict dataframe name from SDL
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
-             |print(f"The following DataObjectId will be used for training: {predict_id}")
+             |print(f"$id: DataObject~{predict_id} will be used for prediction")
              |df = inputDfs[predict_id]
              |# Load model
-             |print("loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
+             |print("$id: Loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
              |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
              |# add predictions
              |df_predict = df.withColumn("predictions", lit(None).cast("${resultType.getOrElse("string")}"))
@@ -174,10 +174,10 @@ case class MLflowPredictAction(
              |mlflow.set_experiment("${mlflow.experimentName}")
              |# get predict dataframe from SDL
              |predict_id = get_predict_id("$predictIdSelector", list(inputDfs.keys()))
-             |print(f"The following DataObjectId will be used for training: {predict_id}")
+             |print(f"$id: DataObject~{predict_id} will be used for prediction")
              |df_predict = inputDfs[predict_id]
              |# Load model as a Spark UDF. Override result_type if the model does not return double values.
-             |print("loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
+             |print("$id: Loading model ${pythonMLflowClient.get.entryPoint.modelUri.get}")
              |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri="${pythonMLflowClient.get.entryPoint.modelUri.get}", result_type="${resultType.getOrElse("string")}")
              |# Predict on a Spark DataFrame.
              |df_final = df_predict.withColumn('predictions', udf_predict(struct(*map(col, df_predict.columns))))
@@ -211,7 +211,7 @@ case class MLflowPredictAction(
     super.prepare
     transformerDefs.foreach(_.prepare(id))
     entryPoint = Some(new MLflowPythonSparkEntryPoint(context.sparkSession))
-    logger.info("Created MLflowPythonSparkEntryPoint")
+    logger.info(s"$id: Created MLflowPythonSparkEntryPoint")
     pythonMLflowClient = mlflow.getPythonMLflowClient(entryPoint, mlflow.trackingURI)
   }
 

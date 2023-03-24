@@ -26,7 +26,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.mlflow.{MLflowPythonSparkEntryPoint, MLflowPythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.{DataFrame}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 // TODO: model according to experiment definition
 case class MLflowExperiment(experimentName: String)
@@ -55,6 +55,12 @@ case class MLflowDataObject(
     with CanCreateSparkDataFrame
     with SmartDataLakeLogger {
 
+  // entry point for accessing dynamically Java objects living inside the JVM
+
+  //var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
+  //var pythonMLflowClient: Option[MLflowPythonUtil] = None
+
+  //
   var experimentId: Option[String] = None
 
   def getPythonMLflowClient(entryPoint: Option[MLflowPythonSparkEntryPoint], mlflowURI: String): Option[MLflowPythonUtil] = {
@@ -67,7 +73,7 @@ case class MLflowDataObject(
       experimentId = pythonMLflowClient
         .getOrElse(throw MLflowException("PythonUtil for MLflow not ready"))
         .getOrCreateExperimentID(experimentName)
-      logger.info(s"Working with MLflow experiment $experimentName with ID $experimentId")
+      logger.info(s"$id: MLflow using experiment $experimentName (id=$experimentId)")
     }
 
     // return
@@ -83,7 +89,6 @@ case class MLflowDataObject(
 
     // TODO: fetch latest run information and return as DataFrame
     val df: DataFrame = Seq.empty[MLflowExperiment].toDF()
-
     // return
     df
   }

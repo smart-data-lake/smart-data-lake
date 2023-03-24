@@ -80,7 +80,7 @@ case class MLflowTrainAction(
   val mlflow = getInputDataObject[MLflowDataObject](mlflowId)
   val mlflowRunInfo = getOutputDataObject[DataObject with CanWriteDataFrame with CanCreateDataFrame](runInfoId)
 
-  // used for python interop. mainly to access python objects from the jvm or to access scala objects from the python process
+  // used for python interop
   var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
   var pythonMLflowClient: Option[MLflowPythonUtil] = None
 
@@ -154,7 +154,7 @@ case class MLflowTrainAction(
              |run_info_df = session.createDataFrame([], run_info_schema)
              |# check input
              |train_id = get_train_id("$trainIdSelector", list(inputDfs.keys()))
-             |print(f"The following DataObjectId will be used for training: {train_id}")
+             |print(f"$id: DataObjectId~{train_id} will be used for training")
              |# generate output dict
              |outDfs = {}
              |outDfs["${runInfoId.id}"] = run_info_df
@@ -180,11 +180,12 @@ case class MLflowTrainAction(
              |mlflow.autolog()
              |# start run and get status
              |mlflow.start_run()
+             |print("$id: MLflow run started")
              |run = mlflow.active_run()
-             |print("mlflow run started: run_id={}; status={}".format(run.info.run_id, run.info.status))
+             |print("$id: MLflow run information (run_id={} | status={})".format(run.info.run_id, run.info.status))
              |# get training dataframe from SDL
              |train_id = get_train_id("$trainIdSelector", list(inputDfs.keys()))
-             |print(f"The following DataObjectId will be used for training: {train_id}")
+             |print(f"$id: DataObjectId~{train_id} will be used for training")
              |df = inputDfs[f"{train_id}"]
              |""".stripMargin
 
@@ -192,9 +193,9 @@ case class MLflowTrainAction(
           s"""
              |# end run and get status
              |mlflow.end_run()
+             |print("$id: MLflow run finished")
              |run = mlflow.get_run(run.info.run_id)
-             |print("mlflow run finished: run_id={}; status={}".format(run.info.run_id, run.info.status))
-             |#print(run)
+             |print("$id: MLflow run information (run_id={} | status={})".format(run.info.run_id, run.info.status))
              |# create return dataframe
              |from datetime import datetime
              |from zoneinfo import ZoneInfo
@@ -239,7 +240,7 @@ case class MLflowTrainAction(
     super.prepare
     transformerDefs.foreach(_.prepare(id))
     entryPoint = Some(new MLflowPythonSparkEntryPoint(context.sparkSession))
-    logger.info("Created MLflowPythonSparkEntryPoint")
+    logger.info(s"$id: Created MLflowPythonSparkEntryPoint")
     pythonMLflowClient = mlflow.getPythonMLflowClient(entryPoint, mlflow.trackingURI)
   }
 
