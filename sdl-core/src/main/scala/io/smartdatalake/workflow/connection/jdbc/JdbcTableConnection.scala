@@ -36,6 +36,7 @@ import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.types.StructType
 
 import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnection}
+import java.time.Duration
 
 /**
  * Connection information for jdbc tables.
@@ -50,11 +51,9 @@ import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnectio
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
- * @param enableCommit whether to enable commits for transactional behaviour in SDL
- *                     Note that most JDBC drivers use auto-commit per default which is not recommended when [[enableCommit]] is true.
- *                     Default is enableCommit = true. To disable auto-commit see [[autoCommit]].
- * @param autoCommit flag to enable or disable the auto-commit behaviour of the JDBC driver
- *                   If not set, the default auto-commit mode of the JDBC driver is used.
+ * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 60 seconds.
+ * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
+ *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
  */
 case class JdbcTableConnection(override val id: ConnectionId,
@@ -64,9 +63,9 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                db: Option[String] = None,
                                maxParallelConnections: Int = 1,
                                connectionPoolMaxIdleTimeSec: Int = 3,
+                               connectionPoolMaxWaitTimeSec: Int = 60,
                                override val metadata: Option[ConnectionMetadata] = None,
-                               enableCommit: Boolean = true,
-                               autoCommit: Option[Boolean] = None,
+                               @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None
                                ) extends Connection with SmartDataLakeLogger {
 
@@ -86,32 +85,26 @@ case class JdbcTableConnection(override val id: ConnectionId,
     }
   }
 
-  /**
-   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
-   */
-  def execWithJdbcStatement[A](doCommit: Boolean = false)(func: Statement => A ): A = {
-    execWithJdbcConnection { conn =>
-      var stmt: Statement = null
-      try {
-        stmt = conn.createStatement
-        val result = func(stmt)
-        if (doCommit && enableCommit) conn.commit()
-        result
-      } finally {
-        if (stmt != null) stmt.close()
-      }
+  private def execWithJdbcStatement[A](conn: SqlConnection, doCommit: Boolean)(func: Statement => A): A = {
+    var stmt: Statement = null
+    try {
+      stmt = conn.createStatement
+      val result = func(stmt)
+      if (doCommit && !autoCommit) conn.commit()
+      result
+    } finally {
+      if (stmt != null) stmt.close()
     }
   }
 
   /**
-   * Execute an SQL statement
-   * @return true if the first result is a ResultSet object; false if it is an update count or there are no results
+   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
    */
-  def execJdbcStatement(sql:String, logging: Boolean = true, doCommit: Boolean = false) : Boolean = {
-    execWithJdbcStatement(doCommit) { stmt =>
+  def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
+    execWithJdbcConnection(execWithJdbcStatement(_, doCommit = true) { stmt =>
       if (logging) logger.info(s"execJdbcStatement: $sql")
       stmt.execute(sql)
-    }
+    })
   }
 
   /**
@@ -121,7 +114,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
    * @return the evaluated result
    */
   def execJdbcQuery[A](sql:String, evalResultSet: ResultSet => A ) : A = {
-    execWithJdbcStatement() { stmt =>
+    execWithJdbcConnection(execWithJdbcStatement(_, doCommit = true) { stmt =>
       var rs: ResultSet = null
       try {
         logger.info(s"execJdbcQuery: $sql")
@@ -130,7 +123,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
       } finally {
         if (rs != null) rs.close()
       }
-    }
+    })
   }
 
   def test(): Unit = {
@@ -199,7 +192,9 @@ case class JdbcTableConnection(override val id: ConnectionId,
   val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMaxIdle(1) // keep max one idle jdbc connection
-  pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close jdbc connection if not in use
+  pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close jdbc connection if not in use
+  pool.setMaxWait(Duration.ofSeconds(connectionPoolMaxWaitTimeSec))
+
   private class JdbcClientPoolFactory extends BasePooledObjectFactory[SqlConnection] {
     override def create(): SqlConnection = {
       val connection = getConnection
@@ -216,12 +211,64 @@ case class JdbcTableConnection(override val id: ConnectionId,
           if (stmt != null) stmt.close()
         }
       })
-      autoCommit.foreach(connection.setAutoCommit)
+      connection.setAutoCommit(autoCommit)
       connection
     }
 
     override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
     override def destroyObject(p: PooledObject[SqlConnection]): Unit = p.getObject.close()
+  }
+
+  /**
+   * Begin database transaction. Note that depending on the isolation level of the database, changes from concurrent
+   * connections might not be available inside the transaction once it is started. So make sure that any required writes
+   * from Spark are finished before beginning a transaction.
+   */
+  def beginTransaction(): JdbcTransaction = {
+    new JdbcTransaction(this)
+  }
+
+  /**
+   * Class for handling database transactions. If all operations succeeded call [[commit]], otherwise [[rollback]].
+   */
+  class JdbcTransaction(connection: JdbcTableConnection) extends SmartDataLakeLogger {
+    logger.info(s"begin transaction [$id]")
+    private val jdbcConnection: SqlConnection = connection.pool.borrowObject()
+
+    def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
+      connection.execWithJdbcStatement(jdbcConnection, doCommit = false) { stmt =>
+        if (logging) logger.info(s"execJdbcStatement in transaction [$id]: $sql")
+        if (autoCommit) logger.warn("autoCommit is enabled, so statement will be committed immediately")
+        stmt.execute(sql)
+      }
+    }
+
+    def commit(): Unit = {
+      if (!connection.autoCommit) {
+        logger.info(s"commit transaction [$id]")
+        jdbcConnection.commit()
+      };
+      close()
+    }
+
+    def rollback(): Unit = {
+      try {
+        if (!connection.autoCommit) {
+          logger.info(s"roll back transaction [$id]")
+          jdbcConnection.rollback()
+        };
+      } finally {
+        close()
+      }
+    }
+
+    private def close(): Unit = {
+      connection.pool.returnObject(jdbcConnection)
+    }
+
+    private def id: Int = {
+      hashCode()
+    }
   }
 
   override def factory: FromConfigFactory[Connection] = JdbcTableConnection

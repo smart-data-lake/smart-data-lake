@@ -38,7 +38,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
-import java.sql.{ResultSet, ResultSetMetaData}
+import java.sql.{ResultSet, ResultSetMetaData, SQLException}
 import scala.util.Try
 
 /**
@@ -306,19 +306,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     finalSaveMode match {
 
       case SDLSaveMode.Overwrite =>
-        // cleanup existing data if saveMode=overwrite, commit is done after append
-        if (partitionValues.nonEmpty) deletePartitionsImpl(partitionValues, doCommit = false)
-        else deleteAllData(doCommit = false)
-        try {
-          // create & write to temp-table
-          val tableSchema = connection.catalog.getSchemaFromTable(table.fullName)
-          writeToTempTable(df, tableSchema)
-          // append into final table in one step, then commit
-          connection.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable", doCommit = true)
-        } finally {
-          // cleanup temp table
-          connection.dropTable(tmpTable.fullName)
-        }
+        overwriteTableWithDataframe(df, partitionValues)
 
       case SDLSaveMode.Merge =>
         // write to tmp-table and merge by primary key
@@ -327,6 +315,34 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       case SDLSaveMode.Append =>
         // write target table with SaveMode.Append
         writeDataFrameInternalWithAppend(df, table.fullName)
+    }
+  }
+
+  private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    try {
+      // create & write to temp-table
+      val tableSchema = connection.catalog.getSchemaFromTable(table.fullName)
+      writeToTempTable(df, tableSchema)
+      overwriteTableWithTempTableInTransaction(partitionValues)
+    } finally {
+      // cleanup temp table
+      connection.dropTable(tmpTable.fullName)
+    }
+  }
+
+  private def overwriteTableWithTempTableInTransaction(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    val transaction = connection.beginTransaction()
+    try {
+      // cleanup existing data
+      if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsQuery(partitionValues))
+      else transaction.execJdbcStatement(deleteAllDataQuery)
+      // append into final table in one step, then commit
+      transaction.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable")
+      transaction.commit()
+    } catch {
+      case e: SQLException =>
+        transaction.rollback()
+        throw e
     }
   }
 
@@ -359,7 +375,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       // execute
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       logger.debug(s"($id) merge statement: $mergeStmt")
-      connection.execJdbcStatement(mergeStmt, doCommit = true)
+      connection.execJdbcStatement(mergeStmt)
     } finally {
       // cleanup temp table
       connection.dropTable(tmpTable.fullName)
@@ -434,8 +450,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     getExistingSchema.foreach(schema => validateSchema(SparkSchema(df.schema), SparkSchema(schema), "write"))
   }
 
-  def deleteAllData(doCommit: Boolean = true): Unit = {
-    connection.execJdbcStatement(s"delete from ${table.fullName}", doCommit)
+  private def deleteAllDataQuery: String = {
+     s"delete from ${table.fullName}"
+  }
+
+  def deleteAllData(): Unit = {
+    connection.execJdbcStatement(deleteAllDataQuery)
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
@@ -459,6 +479,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   /**
    * Delete virtual partitions by "delete from" statement
+   * @param partitionValues nonempty list of partition values
    */
   def deletePartitionsImpl(partitionValues: Seq[PartitionValues], doCommit: Boolean = true)(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
