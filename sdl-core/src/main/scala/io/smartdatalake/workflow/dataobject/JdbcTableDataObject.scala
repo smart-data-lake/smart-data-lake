@@ -474,18 +474,17 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    deletePartitionsImpl(partitionValues)
+    if (partitionValues.nonEmpty) {
+      connection.execJdbcStatement(deletePartitionsQuery(partitionValues))
+    }
   }
 
   /**
    * Delete virtual partitions by "delete from" statement
    * @param partitionValues nonempty list of partition values
    */
-  def deletePartitionsImpl(partitionValues: Seq[PartitionValues], doCommit: Boolean = true)(implicit context: ActionPipelineContext): Unit = {
-    if (partitionValues.nonEmpty) {
-      val deletePartitionQuery = SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, quoteCaseSensitiveColumn(_))
-      connection.execJdbcStatement(deletePartitionQuery, doCommit)
-    }
+  private def deletePartitionsQuery(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): String = {
+    SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, quoteCaseSensitiveColumn(_))
   }
 
   // jdbc column metadata - exact column metadata needed to check schema with case-sensitive column names
