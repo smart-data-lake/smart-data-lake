@@ -19,6 +19,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
+import scopt.OParser
 
 /**
  * Databricks Smart Data Lake Command Line Application.
@@ -35,11 +36,11 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logger.info(s"Start programm $appType")
 
-    val config = initConfigFromEnvironment.copy (
+    val config = SmartDataLakeBuilderConfig().copy (
       overrideJars = Some(Seq("config-1.4.1.jar"))
     )
 
-    parseCommandLineArguments(args, config) match {
+    OParser.parse(parser, args, config) match {
       case Some(c) =>
 
         val jars = c.overrideJars.getOrElse (throw new ConfigurationException(s"override-jars option must be specified for $appType"))

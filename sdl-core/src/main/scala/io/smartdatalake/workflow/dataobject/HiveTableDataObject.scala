@@ -95,7 +95,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
   // prepare table
-  table = table.overrideDb(connection.map(_.db))
+  table = table.overrideCatalogAndDb(None, connection.map(_.db))
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection.")
 
   assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")

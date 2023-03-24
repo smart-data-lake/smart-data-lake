@@ -19,10 +19,10 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -34,10 +34,7 @@ import java.time.LocalDateTime
 class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
-  protected implicit val session : SparkSession = new DeltaLakeModulePlugin().additionalSparkProperties()
-    .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
-      case (builder, config) => builder.config(config._1, config._2)
-    }.getOrCreate()
+  protected implicit val session : SparkSession = DeltaLakeTestUtils.session
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -53,11 +50,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
   test("deduplicate 1st 2nd load mergeModeEnable") {
 
     // setup DataObjects
-    val feed = "deduplicate"
-    val srcTable = Table(Some("default"), "deduplicate_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"),  table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val srcDO = MockDataObject("src1").register
     val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
@@ -103,11 +96,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
   test("deduplicate 1st 2nd load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
 
     // setup DataObjects
-    val feed = "deduplicate"
-    val srcTable = Table(Some("default"), "deduplicate_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"),  table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val srcDO = MockDataObject("src1").register
     val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable

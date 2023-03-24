@@ -24,14 +24,14 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, SchemaUtil}
+import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions._
@@ -44,8 +44,15 @@ import scala.util.Try
 /**
  * [[DataObject]] of type JDBC.
  * Provides details for an action to read and write tables in a database through JDBC.
- * Note that writing into a table is done as one transaction. This is implemented by writing to a temporary-table with Spark,
- * then using a separate "insert into ... select" statement to copy data into the final table.
+ *
+ * Note that Sparks distributed processing can not directly write to a JDBC table in one transaction.
+ * JdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,
+ * then using a separate "insert into ... select" SQL statement to copy data into the final table.
+ *
+ * JdbcTableDataObject implements
+ * - [[CanMergeDataFrame]] by writing a temp table and using one SQL merge statement.
+ * - [[CanEvolveSchema]] by generating corresponding alter table DDL statements.
+ * - Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.
  *
  * @param id unique name of this data object
  * @param createSql DDL-statement to be executed in prepare phase, using output jdbc connection.
@@ -123,7 +130,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override val forceGenericObservation = true
 
   // prepare final table
-  table = table.overrideDb(connection.db)
+  table = table.overrideCatalogAndDb(None, connection.db)
   if(table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
   // prepare tmp table used for merge statement
@@ -300,11 +307,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
       case SDLSaveMode.Overwrite =>
         // cleanup existing data if saveMode=overwrite, commit is done after append
-        if (partitionValues.nonEmpty) deletePartitions(partitionValues, doCommit = false)
+        if (partitionValues.nonEmpty) deletePartitionsImpl(partitionValues, doCommit = false)
         else deleteAllData(doCommit = false)
         try {
           // create & write to temp-table
-          writeToTempTable(df)
+          val tableSchema = connection.catalog.getSchemaFromTable(table.fullName)
+          writeToTempTable(df, tableSchema)
           // append into final table in one step, then commit
           connection.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable", doCommit = true)
         } finally {
@@ -322,15 +330,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
+  private def writeToTempTable(df: DataFrame, tempTableSchema: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     // cleanup temp table if existing
     if(connection.catalog.isTableExisting(tmpTable.fullName)) {
-      logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
+      logger.error(s"($id) Temporary table ${tmpTable.fullName} already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
       connection.dropTable(tmpTable.fullName)
     }
     // create & write to temp-table
-    connection.createTableFromSchema(tmpTable.fullName, df.schema, options)
+    connection.createTableFromSchema(tmpTable.fullName, tempTableSchema, options)
     writeDataFrameInternalWithAppend(df, tmpTable.fullName)
   }
 
@@ -345,25 +353,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
     try {
       // write data to temp table
-      writeToTempTable(df)
+      writeToTempTable(df, df.schema)
       // prepare SQL merge statement
-      val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
-      val joinConditionStr = table.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
-      val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
-      val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
-      val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get)).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
-      val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
-      val insertSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(quoteCaseSensitiveColumn).reduce(_+", "+_)
-      val insertValueSpecStr = df.columns.diff(saveModeOptions.insertColumnsToIgnore).map(colName => saveModeOptions.insertValuesOverride.getOrElse(colName, s"new.${quoteCaseSensitiveColumn(colName)}")).reduce(_+", "+_)
-      val mergeStmt = s"""
-        | MERGE INTO ${table.fullName} as existing
-        | USING (SELECT * from ${tmpTable.fullName}) as new
-        | ON $joinConditionStr $additionalMergePredicateStr $deleteClauseStr
-        | WHEN MATCHED $updateConditionStr THEN UPDATE SET $updateSpecStr
-        | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
-        """.stripMargin
+      val mergeStmt = SQLUtil.createMergeStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       // execute
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
+      logger.debug(s"($id) merge statement: $mergeStmt")
       connection.execJdbcStatement(mergeStmt, doCommit = true)
     } finally {
       // cleanup temp table
@@ -459,23 +454,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    deletePartitions(partitionValues)
+    deletePartitionsImpl(partitionValues)
   }
 
   /**
    * Delete virtual partitions by "delete from" statement
    */
-  def deletePartitions(partitionValues: Seq[PartitionValues], doCommit: Boolean = true)(implicit context: ActionPipelineContext): Unit = {
+  def deletePartitionsImpl(partitionValues: Seq[PartitionValues], doCommit: Boolean = true)(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
-      val partitionsColss = partitionValues.map(_.keys).distinct
-      assert(partitionsColss.size == 1, "All partition values must have the same set of partition columns defined!")
-      val partitionCols = partitionsColss.head
-      val deletePartitionQuery = if (partitionCols.size == 1) {
-        s"delete from ${table.fullName} where ${quoteCaseSensitiveColumn(partitionCols.head)} in ('${partitionValues.map(pv => pv(partitionCols.head)).mkString("','")}')"
-      } else {
-        val partitionValuesStr = partitionValues.map(pv => s"(${partitionCols.map(c => s"'${pv(c).toString}'").mkString(",")})")
-        s"delete from ${table.fullName} where (${partitionCols.map(quoteCaseSensitiveColumn).mkString(",")}) in (${partitionValuesStr.mkString(",")})"
-      }
+      val deletePartitionQuery = SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, quoteCaseSensitiveColumn(_))
       connection.execJdbcStatement(deletePartitionQuery, doCommit)
     }
   }
@@ -528,7 +515,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         else column
       } else {
         // quote identifier if it contains special characters
-        if (JdbcTableDataObject.hasIdentifierSpecialChars(column)) connection.catalog.quoteIdentifier(column)
+        if (SQLUtil.hasIdentifierSpecialChars(column)) connection.catalog.quoteIdentifier(column)
         else column
       }
     }
@@ -547,12 +534,12 @@ private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: B
 private[smartdatalake] object JdbcColumn {
   def from(metadata: ResultSetMetaData, colIdx: Int): JdbcColumn = {
     val name = metadata.getColumnName(colIdx)
-    val isNameCaseSensitiv = name != name.toUpperCase || JdbcTableDataObject.hasIdentifierSpecialChars(name)
+    val isNameCaseSensitiv = name != name.toUpperCase || SQLUtil.hasIdentifierSpecialChars(name)
     JdbcColumn(name, isNameCaseSensitiv, Option(metadata.getColumnType(colIdx)), Option(metadata.getColumnTypeName(colIdx)), Option(metadata.getPrecision(colIdx)), Option(metadata.getScale(colIdx)), None)
   }
   def from(rs: ResultSet): JdbcColumn = {
     val name = rs.getString("COLUMN_NAME")
-    val isNameCaseSensitiv = name != name.toUpperCase || JdbcTableDataObject.hasIdentifierSpecialChars(name)
+    val isNameCaseSensitiv = name != name.toUpperCase || SQLUtil.hasIdentifierSpecialChars(name)
     JdbcColumn(name, isNameCaseSensitiv, None, Option(rs.getString("DATA_TYPE")), Option(rs.getInt("COLUMN_SIZE")), Option(rs.getInt("DECIMAL_DIGITS")), Some(rs.getInt("NULLABLE")>0))
   }
 }
@@ -560,8 +547,5 @@ private[smartdatalake] object JdbcColumn {
 object JdbcTableDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableDataObject = {
     extract[JdbcTableDataObject](config)
-  }
-  private[smartdatalake] def hasIdentifierSpecialChars(colName: String): Boolean = {
-    !colName.matches("[a-zA-Z][a-zA-Z0-9_]*")
   }
 }

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.spark.customlogic
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import CustomDfCreatorConfig.{fnExecType, fnSchemaType}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig.{fnExecType, fnSchemaType}
 import io.smartdatalake.workflow.dataobject.CustomDfDataObject
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types.StructType

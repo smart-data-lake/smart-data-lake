@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
@@ -104,6 +104,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 
+  def agentId: Option[AgentId] = None
+
   /**
    * Validate configuration.
    * Put validation logic here which will run on class instantiation. It has to be put into a separate method because like that
@@ -112,7 +114,7 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * This must be called by every Action in initialization code of the case class.
    */
   def validateConfig(): Unit = {
-    recursiveInputs.foreach{ input =>
+    recursiveInputs.foreach { input =>
       assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action.")
       assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is not a TransactionalSparkTableDataObjects.")
     }

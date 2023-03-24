@@ -20,7 +20,6 @@ package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.workflow.dataframe.GenericColumn
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
-import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.DataFrame
 
 import scala.util.matching.Regex

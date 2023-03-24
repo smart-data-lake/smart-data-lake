@@ -20,11 +20,11 @@
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -36,10 +36,7 @@ import java.time.LocalDateTime
  class DeltaLakeHistorizeWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
    // set additional spark options for delta lake
-   protected implicit val session: SparkSession =  new DeltaLakeModulePlugin().additionalSparkProperties()
-     .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
-       case (builder, config) => builder.config(config._1, config._2)
-     }.getOrCreate()
+   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
    import session.implicits._
 
    private val tempDir = Files.createTempDirectory("test")
@@ -56,10 +53,7 @@ import java.time.LocalDateTime
      val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
      // setup DataObjects
-     val srcTable = Table(Some("default"), "historize_input")
-     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable)
-     srcDO.dropTable(context)
-     instanceRegistry.register(srcDO)
+     val srcDO = MockDataObject("src1").register
      val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
      val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
      tgtDO.dropTable(context)
@@ -141,11 +135,7 @@ import java.time.LocalDateTime
      val context = TestUtil.getDefaultActionPipelineContext
 
      // setup DataObjects
-     val feed = "historize"
-     val srcTable = Table(Some("default"), "historize_input")
-     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable)
-     srcDO.dropTable(context)
-     instanceRegistry.register(srcDO)
+     val srcDO = MockDataObject("src1").register
      val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
      val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
      tgtDO.dropTable(context)

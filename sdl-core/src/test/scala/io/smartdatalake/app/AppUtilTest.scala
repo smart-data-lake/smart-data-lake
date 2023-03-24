@@ -20,10 +20,9 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.objects.TestAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata, CopyAction, CustomDataFrameAction}
-import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObjectMetadata, HiveTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObjectMetadata}
 import org.scalatest.FunSuite
 
 class AppUtilTest extends FunSuite {

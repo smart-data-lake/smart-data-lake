@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.statusinfo
+package io.smartdatalake.communication.statusinfo
 
 import io.smartdatalake.app.StatusInfoConfig
-import io.smartdatalake.statusinfo.api.{SnapshotStatusInfoListener, StatusInfoServletContext}
-import io.smartdatalake.statusinfo.websocket.{IncrementalStatusInfoListener, StatusInfoSocket}
+import io.smartdatalake.communication.statusinfo.api.{SnapshotStatusInfoListener, StatusInfoServletContext}
+import io.smartdatalake.communication.statusinfo.websocket.{IncrementalStatusInfoListener, StatusInfoSocket}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
@@ -54,7 +54,7 @@ object StatusInfoServer extends SmartDataLakeLogger {
     val jerseyContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
     jerseyContext.setContextPath("/api")
     val holder: ServletHolder = new ServletHolder(classOf[ServletContainer])
-    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.statusinfo.api")
+    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.communication.statusinfo.api")
     StatusInfoServletContext.setStateListener(jerseyContext, snapshotListener)
     jerseyContext.addServlet(holder, "/*")
     handlers.addHandler(jerseyContext)

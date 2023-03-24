@@ -28,7 +28,6 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileCreatorConfig
-import org.apache.spark.sql.{SaveMode, SparkSession}
 
 case class CustomFileDataObject(override val id: DataObjectId,
                                 creator: CustomFileCreatorConfig,

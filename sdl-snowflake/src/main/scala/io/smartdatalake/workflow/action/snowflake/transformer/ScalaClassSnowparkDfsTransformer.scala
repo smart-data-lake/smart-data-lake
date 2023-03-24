@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.snowflake.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData

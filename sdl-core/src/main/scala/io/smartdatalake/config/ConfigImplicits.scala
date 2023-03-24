@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.Expectation
@@ -140,6 +141,15 @@ trait ConfigImplicits {
   implicit val expectationReader: ConfigReader[Expectation] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[Expectation](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[Connection]] values inside [[Agent]].
+   * Note that Connection must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val connectionDefReader: ConfigReader[Connection] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[Connection](c.getConfig(p))
   }
 
   /**

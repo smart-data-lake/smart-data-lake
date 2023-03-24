@@ -36,10 +36,7 @@ import java.nio.file.Files
 class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
-  protected implicit val session : SparkSession = new DeltaLakeModulePlugin().additionalSparkProperties()
-    .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
-      case (builder, config) => builder.config(config._1, config._2)
-    }.getOrCreate()
+  protected implicit val session : SparkSession = DeltaLakeTestUtils.session
   import session.implicits._
 
   val tempDir = Files.createTempDirectory("tempHadoopDO")
@@ -140,18 +137,18 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
-    assert(resultat)
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
 
     // 2nd load: append all with different schema
     val df2 = Seq(("ext","doe","john",10,"test"),("ext","smith","peter",1,"test"))
       .toDF("type", "lastname", "firstname", "rating2", "test")
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
-    val resultat2: Boolean = actual2.count() == 2
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
-    assert(resultat2)
+    val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
+    if (!result2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
+    assert(result2)
   }
 
   test("SaveMode overwrite and delete partition") {

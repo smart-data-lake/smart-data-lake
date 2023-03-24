@@ -29,7 +29,7 @@ import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceive
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.concurrent.duration.Duration
 

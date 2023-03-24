@@ -20,8 +20,9 @@
 package org.apache.spark.metrics.sink.loganalytics
 
 import io.smartdatalake.util.azure.LogAnalyticsEnvironment
-import org.apache.spark.metrics.sink.LogAnalyticsConfiguration
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.metrics.sink.LogAnalyticsConfiguration
+
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 

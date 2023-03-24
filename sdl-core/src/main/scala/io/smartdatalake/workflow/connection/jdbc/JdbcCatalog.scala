@@ -23,7 +23,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.sql.ResultSet
 
@@ -86,7 +86,8 @@ private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnectio
   }
 
   def isDbExisting(db: String)(implicit session: SparkSession): Boolean
-  def isTableExisting(tableName: String)(implicit session: SparkSession): Boolean = {
+
+  def isTableExisting(tableName: String): Boolean = {
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
     try {
       connection.execJdbcStatement(tableExistsQuery, logging = false)
@@ -96,6 +97,11 @@ private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnectio
         logger.debug("No access on table or table does not exist: " +tableName)
         false
     }
+  }
+
+  def getSchemaFromTable(table: String): StructType = {
+    val schemaQuery = jdbcDialect.getSchemaQuery(table)
+    connection.execJdbcQuery(schemaQuery, JdbcUtils.getSchema(_, jdbcDialect))
   }
 
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {

@@ -17,16 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.communication.message
 
-import io.smartdatalake.statusinfo.websocket.SDLMessageType.SDLMessageType
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 
-/**
- * Represents a message that can be sent between a DAG Execution of SmartDataLakeBuilder and a web frontend, such as Airflow
- * @param msgType The type of the message. For message type Log, log must be filled.
- *                For message type StatusUpdate, statusUpdate must be filled.
- * @param statusUpdate Status update sent to the web frontend
- * @param log Log message sent to the web frontend
- */
-case class SDLMessage(msgType: SDLMessageType, statusUpdate: Option[StatusUpdate] = None, log: Option[ActionLog] = None)
+case class AgentResult(instructionId: String, phase: ExecutionPhase, dataObjectIdToSchema: Map[DataObjectId, String], exception: Option[Exception] = None)
 

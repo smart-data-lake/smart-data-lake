@@ -42,7 +42,7 @@ import java.time.LocalDateTime
 
    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
+   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
    private var tempDir: NioPath = _
    private var tempPath: String = _

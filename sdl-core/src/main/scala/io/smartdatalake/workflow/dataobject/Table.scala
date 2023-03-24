@@ -21,9 +21,11 @@ package io.smartdatalake.workflow.dataobject
 /**
  * Table attributes
  *
- * @param db database-schema to be used for this table. If there exists a connection for the DataObject,
- *           the contents of this field will be overwritten.
- *           Called db for backwards-compatibility because for hive tables, db and schema mean the same thing.
+ * @param catalog     Optional catalog to be used for this table. If null default catalog is used.
+ *                    If there exists a connection with catalog value for the DataObject and this field is not defined, it will be set to the connections catalog value.
+ * @param db          database-schema to be used for this table.
+                      If there exists a connection for the DataObject and this field is not defined, it will be set to the connections database value .
+ *                    Called db for backwards-compatibility because for hive tables, db and schema mean the same thing.
  * @param name        table name
  * @param query       optional select query
  * @param primaryKey  optional sequence of primary key columns
@@ -41,9 +43,7 @@ package io.smartdatalake.workflow.dataobject
  *           } 
  *         name = "OPTIONAL_key_name" 
  *       } 
- *     ] 
- * 
- * @param options
+ *     ]
  */
 case class Table(
                   db: Option[String],
@@ -51,13 +51,17 @@ case class Table(
                   query: Option[String] = None,
                   primaryKey: Option[Seq[String]] = None,
                   foreignKeys: Option[Seq[ForeignKey]] = None,
-                  options: Option[Map[String,String]] = None
+                  catalog: Option[String] = None
                 ) {
   override def toString: String = s"""$fullName${primaryKey.map(pks => "("+pks.mkString(",")+")").getOrElse("")}"""
 
-  def overrideDb(dbParam: Option[String]): Table = if (db.isEmpty) this.copy(db=dbParam) else this
+  def overrideCatalogAndDb(catalogParam: Option[String], dbParam: Option[String]): Table = {
+    this.copy(catalog = catalog.orElse(catalogParam), db = db.orElse(dbParam))
+  }
 
-  def fullName: String = db.map(_ + ".").getOrElse("") + name
+  def fullName: String = Seq(catalog,db,Some(name)).flatten.mkString(".")
+
+  def nameParts: Seq[String] = fullName.split('.').toSeq
 }
 
 /**

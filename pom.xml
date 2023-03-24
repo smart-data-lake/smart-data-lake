@@ -20,10 +20,10 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-	<groupId>io.smartdatalake</groupId>
-	<artifactId>sdl-parent</artifactId>
-	<version>2.5.0-SNAPSHOT</version>
-	<packaging>pom</packaging>
+    <groupId>io.smartdatalake</groupId>
+    <artifactId>sdl-parent</artifactId>
+    <version>2.5.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
     <modules>
         <module>sdl-core</module>
@@ -31,6 +31,7 @@
         <module>sdl-splunk</module>
         <module>sdl-jms</module>
         <module>sdl-deltalake</module>
+        <module>sdl-iceberg</module>
         <module>sdl-snowflake</module>
         <module>sdl-azure</module>
         <module>sdl-lang</module>
@@ -90,6 +91,9 @@
         </profile>
         <profile>
             <id>fat-jar-with-spark</id>
+            <properties>
+                <jetty.deps.scope>compile</jetty.deps.scope>
+            </properties>
             <build>
                 <plugins>
                     <!-- Builds executable fat-jar that includes all dependencies -->
@@ -224,12 +228,13 @@
         <orc.deps.scope>compile</orc.deps.scope>
         <parquet.deps.scope>compile</parquet.deps.scope>
         <parquet.test.deps.scope>test</parquet.test.deps.scope>
-
+        <jetty.deps.scope>provided</jetty.deps.scope>
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
         <spark.version>3.3.2</spark.version>
-        <spark-extensions.version>3.3.5</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark-extensions.version>3.3.5
+        </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.3</spark.minor.version> <!-- this is used in sdl-snowflake -->
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
@@ -363,6 +368,7 @@
         <snowflake-snowpark.version>1.6.2</snowflake-snowpark.version>
         <keycloak.version>20.0.1</keycloak.version>
         <delta.version>2.2.0</delta.version>
+        <iceberg.version>1.1.0</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
@@ -824,19 +830,19 @@
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-http</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-continuation</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-servlet</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
@@ -848,43 +854,43 @@
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-proxy</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-client</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-util</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-security</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-plus</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-server</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-webapp</artifactId>
                 <version>${jetty.version}</version>
-                <scope>provided</scope>
+                <scope>${jetty.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>com.google.guava</groupId>
