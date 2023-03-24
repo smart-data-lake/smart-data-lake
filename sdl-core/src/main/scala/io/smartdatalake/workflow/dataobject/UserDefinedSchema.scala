@@ -23,7 +23,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 /**
  * A [[DataObject]] that allows optional user-defined schema definition.
  */
-private[smartdatalake] trait UserDefinedSchema {
+trait UserDefinedSchema {
 
   /**
    * An optional [[DataObject]] user-defined schema definition.

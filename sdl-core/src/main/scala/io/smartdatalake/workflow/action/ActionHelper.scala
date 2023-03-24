@@ -38,7 +38,7 @@ import scala.reflect.runtime.universe.Type
 /**
  * Collection of helper functions for Actions
  */
-private[smartdatalake] object ActionHelper extends SmartDataLakeLogger {
+object ActionHelper extends SmartDataLakeLogger {
 
   /**
    * Removes all columns from a [[DataFrame]] except those specified in whitelist.

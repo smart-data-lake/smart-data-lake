@@ -30,7 +30,7 @@ import scala.util.Try
 /**
   * Functions for schema evolution
   */
-private[smartdatalake] object SchemaEvolution extends SmartDataLakeLogger {
+object SchemaEvolution extends SmartDataLakeLogger {
 
   /**
     * Converts column names to lowercase

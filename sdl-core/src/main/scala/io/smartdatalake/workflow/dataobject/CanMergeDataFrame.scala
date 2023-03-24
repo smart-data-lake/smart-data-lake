@@ -21,4 +21,4 @@ package io.smartdatalake.workflow.dataobject
 /**
  * Marker interface to let Actions know that a DataObject supports SDLSaveMode.Merge.
  */
-private[smartdatalake] trait CanMergeDataFrame
+trait CanMergeDataFrame

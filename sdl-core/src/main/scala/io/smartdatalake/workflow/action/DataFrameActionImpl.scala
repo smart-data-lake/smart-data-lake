@@ -43,7 +43,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Implementation of logic needed for Spark Actions.
  * This is a generic implementation that supports many input and output SubFeeds.
  */
-private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] {
+abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]

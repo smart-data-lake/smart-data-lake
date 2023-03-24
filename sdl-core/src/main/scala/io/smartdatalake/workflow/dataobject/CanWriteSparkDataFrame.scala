@@ -30,7 +30,7 @@ import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-private[smartdatalake] trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
+trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
 
   /**
    * Configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
