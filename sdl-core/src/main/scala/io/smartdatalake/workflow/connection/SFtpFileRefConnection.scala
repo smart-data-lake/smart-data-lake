@@ -53,7 +53,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
                                  connectionPoolMaxIdleTimeSec: Int = 3,
                                  override val metadata: Option[ConnectionMetadata] = None
                                  ) extends Connection {
-
+  require(maxParallelConnections > 0, s"maxParallelConnections must be greater than 0, but is $maxParallelConnections")
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[PublicKeyAuthMode])

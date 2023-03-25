@@ -166,6 +166,8 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
   }
 
+  override def recommendedParallelism: Option[Int] = Some(connection.maxParallelConnections)
+
   override def factory: FromConfigFactory[DataObject] = SFtpFileRefDataObject
 }
 
