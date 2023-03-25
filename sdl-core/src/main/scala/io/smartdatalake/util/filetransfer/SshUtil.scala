@@ -18,10 +18,6 @@
  */
 package io.smartdatalake.util.filetransfer
 
-import java.io.{InputStream, OutputStream}
-import java.util
-
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.{OpenMode, RemoteFile, SFTPClient, SFTPException}
@@ -29,14 +25,18 @@ import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.xfer.LocalDestFile
 import org.apache.hadoop.fs.FileSystem
 
+import java.io.{InputStream, OutputStream}
+import java.net.{InetAddress, Proxy, Socket}
+import java.util
+import javax.net.SocketFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
 
-  def connectWithUserPw(host: String, port: Int, user: String, password: String, ignoreHostKeyValidation: Boolean = false): SSHClient = {
-    val ssh = connect(host, port, ignoreHostKeyValidation)
+  def connectWithUserPw(host: String, port: Int, user: String, password: String, proxy: Option[Proxy] = None, ignoreHostKeyValidation: Boolean = false): SSHClient = {
+    val ssh = connect(host, port, proxy, ignoreHostKeyValidation)
     logger.info(s"host connected, trying to authenticate by user/password...")
     ssh.authPassword(user, password)
     logger.info(s"SSH authentication by user/password successful.")
@@ -44,8 +44,8 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     ssh
   }
 
-  def connectWithPublicKey(host: String, port: Int, user: String, ignoreHostKeyValidation: Boolean = false): SSHClient = {
-    val ssh = connect(host, port, ignoreHostKeyValidation)
+  def connectWithPublicKey(host: String, port: Int, user: String, proxy: Option[Proxy] = None, ignoreHostKeyValidation: Boolean = false): SSHClient = {
+    val ssh = connect(host, port, proxy, ignoreHostKeyValidation)
     logger.info(s"host connected, trying to authenticate by public key...")
     ssh.authPublickey(user)
     logger.info(s"SSH authentication by public key successful.")
@@ -53,13 +53,16 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     ssh
   }
 
-  private def connect(host: String, port: Int, ignoreHostKeyValidation: Boolean): SSHClient = {
+  private def connect(host: String, port: Int, proxy: Option[Proxy] = None, ignoreHostKeyValidation: Boolean): SSHClient = {
     val ssh = new SSHClient()
     // disable host key validation
-    if(ignoreHostKeyValidation) ssh.addHostKeyVerifier(new PromiscuousVerifier)
+    if (ignoreHostKeyValidation) ssh.addHostKeyVerifier(new PromiscuousVerifier)
     // or load them from known hosts file
     else ssh.loadKnownHosts()
-    logger.info(s"connecting to host $host by ssh")
+    // configure proxy if defined
+    proxy.foreach(p => ssh.setSocketFactory(new ProxySocketFactory(p)))
+    // connect
+    logger.info(s"connecting to host $host by ssh, proxy=$proxy")
     ssh.connect(host, port)
     // return
     ssh
@@ -122,9 +125,9 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
   }
 
   def getInputStream(path: String, onCloseFunc: () => Unit)(implicit sftp: SFTPClient): InputStream = {
-    import java.util
-
     import net.schmizz.sshj.sftp.{OpenMode, RemoteFile}
+
+    import java.util
     val stat = sftp.stat(path)
     val handle: RemoteFile = sftp.open(path, util.EnumSet.of(OpenMode.READ))
     new handle.RemoteFileInputStream() {
@@ -151,10 +154,10 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
 
   // Custom HDFS destination file implementation. This allows to write directly to HDFS Filesystem.
   private class HDFSFile(filename: String, copiedFiles: mutable.Buffer[String], overwrite: Boolean)(implicit hdfs: FileSystem) extends LocalDestFile {
-    import java.io.IOException
-
     import org.apache.hadoop.fs.Path
     import org.apache.hadoop.fs.permission.FsPermission
+
+    import java.io.IOException
 
     // prepare output stream
     val path = new Path(filename)
@@ -197,5 +200,16 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     def setLastModifiedTime(mtime: Long): Unit = hdfs.setTimes(path, mtime, mtime) // set access time the same as modification time
 
     def setPermissions(perms: Int): Unit = hdfs.setPermission(path, new FsPermission(perms.toShort))
+  }
+
+  /**
+   * Socket factory needed for using proxy with sshj
+   */
+  class ProxySocketFactory(proxy: Proxy) extends SocketFactory {
+    override def createSocket = new Socket(proxy)
+    override def createSocket(host: String, port: Int) = throw new RuntimeException("not implemented")
+    override def createSocket(address: InetAddress, port: Int) = throw new RuntimeException("not implemented")
+    override def createSocket(host: String, port: Int, clientAddress: InetAddress, clientPort: Int) = throw new RuntimeException("not implemented")
+    override def createSocket(address: InetAddress, port: Int, clientAddress: InetAddress, clientPort: Int) = throw new RuntimeException("not implemented")
   }
 }

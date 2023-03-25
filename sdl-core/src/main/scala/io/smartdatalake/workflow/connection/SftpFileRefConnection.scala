@@ -28,6 +28,8 @@ import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
 import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 
+import java.net.{InetSocketAddress, Proxy}
+
 /**
  * SFTP Connection information
  *
@@ -35,6 +37,7 @@ import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
  * @param host sftp host
  * @param port port of sftp service, default is 22
  * @param authMode authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported.
+ * @param proxy optional proxy configuration
  * @param ignoreHostKeyVerification do not validate host key if true, default is false
  * @param maxParallelConnections number of parallel sftp connections created by an instance of this connection
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
@@ -44,14 +47,13 @@ case class SftpFileRefConnection(override val id: ConnectionId,
                                  host: String,
                                  port: Int = 22,
                                  authMode: AuthMode,
+                                 proxy: Option[JavaNetProxyConfig] = None,
                                  ignoreHostKeyVerification: Boolean = false,
                                  maxParallelConnections: Int = 1,
                                  connectionPoolMaxIdleTimeSec: Int = 3,
                                  override val metadata: Option[ConnectionMetadata] = None
                                  ) extends Connection {
 
-  import java.net.Proxy
-  val proxy = new java.net.Proxy(Proxy.Type)
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[PublicKeyAuthMode])
@@ -76,8 +78,8 @@ case class SftpFileRefConnection(override val id: ConnectionId,
     override def create(): SFTPClient = {
       authMode match {
         case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port,
-          m.userSecret.resolve(), m.passwordSecret.resolve(), ignoreHostKeyVerification).newSFTPClient()
-        case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), ignoreHostKeyVerification).newSFTPClient()
+          m.userSecret.resolve(), m.passwordSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification).newSFTPClient()
+        case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification).newSFTPClient()
         case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
       }
     }
@@ -94,6 +96,17 @@ object SftpFileRefConnection extends FromConfigFactory[Connection] {
     extract[SftpFileRefConnection](config)
   }
 }
+
+/**
+ * Proxy configuration to create java.net.Proxy instance.
+ * @param host proxy host
+ * @param port proxy port
+ * @param proxyType Type of proxy: HTTP or SOCKS. Default is HTTP.
+ */
+case class JavaNetProxyConfig(host: String, port: Int, proxyType: Proxy.Type = Proxy.Type.HTTP) {
+  val instance: Proxy = new Proxy(proxyType, new InetSocketAddress(host, port))
+}
+
 
 
 
