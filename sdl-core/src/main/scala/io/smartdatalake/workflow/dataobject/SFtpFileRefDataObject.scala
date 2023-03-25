@@ -27,7 +27,7 @@ import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.SftpFileRefConnection
+import io.smartdatalake.workflow.connection.SFtpFileRefConnection
 import net.schmizz.sshj.sftp.SFTPException
 
 import java.io.{InputStream, OutputStream}
@@ -66,7 +66,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   /**
    * Connection defines host, port and credentials in central location
    */
-  private val connection = getConnection[SftpFileRefConnection](connectionId)
+  private val connection = getConnection[SFtpFileRefConnection](connectionId)
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[FileRef] = {
     connection.execWithSFtpClient {

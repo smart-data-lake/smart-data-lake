@@ -43,7 +43,7 @@ import java.net.{InetSocketAddress, Proxy}
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
  * @param metadata
  */
-case class SftpFileRefConnection(override val id: ConnectionId,
+case class SFtpFileRefConnection(override val id: ConnectionId,
                                  host: String,
                                  port: Int = 22,
                                  authMode: AuthMode,
@@ -70,11 +70,11 @@ case class SftpFileRefConnection(override val id: ConnectionId,
   }
 
   // setup connection pool
-  val pool = new GenericObjectPool[SFTPClient](new SftpClientPoolFactory)
+  val pool = new GenericObjectPool[SFTPClient](new SFtpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMaxIdle(1) // keep max one idle sftp connection
   pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close sftp connection if not in use
-  private class SftpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
+  private class SFtpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
     override def create(): SFTPClient = {
       authMode match {
         case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port,
@@ -88,12 +88,12 @@ case class SftpFileRefConnection(override val id: ConnectionId,
       p.getObject.close()
   }
 
-  override def factory: FromConfigFactory[Connection] = SftpFileRefConnection
+  override def factory: FromConfigFactory[Connection] = SFtpFileRefConnection
 }
 
-object SftpFileRefConnection extends FromConfigFactory[Connection] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SftpFileRefConnection = {
-    extract[SftpFileRefConnection](config)
+object SFtpFileRefConnection extends FromConfigFactory[Connection] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SFtpFileRefConnection = {
+    extract[SFtpFileRefConnection](config)
   }
 }
 

@@ -26,6 +26,7 @@ import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.connection.JavaNetProxyConfig
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
@@ -338,6 +339,42 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       url = "http://test",
       authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token",
         clientId = Some(StringOrSecret("foo")), clientSecret= Some(StringOrSecret("secret"))))
+    )
+  }
+
+  "SFtpFileRefDataObject" should "be parsable" in {
+    val config = ConfigFactory.parseString(
+      """
+        |connections = {
+        |  sftp {
+        |    type = SFtpFileRefConnection
+        |    host = localhost
+        |    authMode {
+        |      type = BasicAuthMode
+        |      userVariable = "CLEAR#foo"
+        |      passwordVariable = "CLEAR#pwd"
+        |    }
+        |    proxy {
+        |      host = localhost
+        |      port = 8080
+        |      proxyType = HTTP
+        |    }
+        |  }
+        |}
+        |dataObjects = {
+        | 123 = {
+        |  type = SFtpFileRefDataObject
+        |  path = abc
+        |  connectionId = sftp
+        | }
+        |}
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    registry.get[SFtpFileRefDataObject](DataObjectId("123")) shouldBe SFtpFileRefDataObject(
+      id = "123",
+      path = "abc",
+      connectionId = "sftp"
     )
   }
 
