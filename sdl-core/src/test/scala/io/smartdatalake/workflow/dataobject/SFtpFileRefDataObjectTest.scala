@@ -24,7 +24,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.SftpFileRefConnection
+import io.smartdatalake.workflow.connection.SFtpFileRefConnection
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.sshd.server.SshServer
@@ -55,7 +55,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
 
   override def beforeEach(): Unit = {
     registry.clear()
-    registry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshPwd))), ignoreHostKeyVerification = true))
+    registry.register(SFtpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshPwd))), ignoreHostKeyVerification = true))
     tempDir = Files.createTempDirectory("sftp-test")
   }
 
