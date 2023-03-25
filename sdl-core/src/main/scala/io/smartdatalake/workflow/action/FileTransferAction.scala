@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
-import io.smartdatalake.util.filetransfer.FileTransfer
+import io.smartdatalake.util.filetransfer.{FileTransfer, StreamFileTransfer}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
@@ -33,6 +33,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
+ * @param overwrite Allow existing output file to be overwritten. If false the action will fail if a file to be created already exists. Default is true.
+ * @param maxParallelism Set maximum of files to be transferred in parallel.
+ *                    Note that this information can also be set on DataObjects like SFtpFileRefDataObject, resp. its SFtpFileRefConnection.
+ *                    The FileTransferAction will then take the minimum parallelism of input, output and this attribute.
+ *                    If parallelism is not specified on input, output and this attribute, it is set to 1.
  * @param executionMode optional execution mode for this Action
  * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
@@ -44,6 +49,7 @@ case class FileTransferAction(override val id: ActionId,
                               inputId: DataObjectId,
                               outputId: DataObjectId,
                               overwrite: Boolean = true,
+                              maxParallelism: Option[Int] = None,
                               override val breakFileRefLineage: Boolean = false,
                               override val executionMode: Option[ExecutionMode] = None,
                               override val executionCondition: Option[Condition] = None,
@@ -58,7 +64,8 @@ case class FileTransferAction(override val id: ActionId,
   override val outputs: Seq[FileRefDataObject] = Seq(output)
 
   // initialize FileTransfer
-  private val fileTransfer = FileTransfer(input, output, overwrite)
+  private val parallelism = Seq(maxParallelism,input.recommendedParallelism,output.recommendedParallelism).flatten.sorted.headOption.getOrElse(1) // take minimum value
+  private val fileTransfer = new StreamFileTransfer(input, output, overwrite, parallelism)
 
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
@@ -86,7 +93,7 @@ case class FileTransferAction(override val id: ActionId,
           // exec only if output returned a sample file to create
           sampleFile.foreach {
             file =>
-              val sampleFileTransfer = FileTransfer(input, output, overwrite = true)
+              val sampleFileTransfer = new StreamFileTransfer(input, output, overwrite = true)
               sampleFileTransfer.exec(Seq(sampleFileRefMapping.copy(tgt = FileRef(file, output.getFilenameFromPath(file), PartitionValues(Map())))))
           }
       }

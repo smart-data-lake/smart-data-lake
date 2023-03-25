@@ -25,17 +25,19 @@ import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutp
 import org.apache.spark.sql.SparkSession
 
 import scala.annotation.tailrec
+import scala.collection.GenSeqLike
 import scala.util.{Failure, Success, Try}
 
 /**
   * Copy data of each file from Input- to OutputStream of DataObject's
   */
-private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataObject with CanCreateInputStream, override val tgtDO: FileRefDataObject with CanCreateOutputStream, overwrite: Boolean = true)
+private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataObject with CanCreateInputStream, override val tgtDO: FileRefDataObject with CanCreateOutputStream, overwrite: Boolean = true, parallelism: Int = 1)
   extends FileTransfer with SmartDataLakeLogger {
+  assert(parallelism>0, "parallelism must be greater than 0")
 
   override def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit = {
     assert(fileRefPairs != null, "fileRefPairs is null - FileTransfer must be initialized first")
-    fileRefPairs.foreach { m =>
+    parallelize(fileRefPairs).foreach { m =>
       logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${m.tgt.toStringShort}")
       // get streams
       TryWithRessource.exec(srcDO.createInputStream(m.src.fullPath)) { is =>
@@ -48,6 +50,14 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
         }
       }
     }
+  }
+
+  private def parallelize(fileRefPairs: Seq[FileRefMapping]) = {
+    if (parallelism>1) {
+      val parFileList = fileRefPairs.par
+      parFileList.tasksupport = new scala.collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parallelism))
+      parFileList
+    } else fileRefPairs
   }
 
   private def copyStream( is: InputStream, os: OutputStream, bufferSize: Int = 4096 ): Unit = {

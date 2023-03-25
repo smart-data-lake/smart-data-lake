@@ -143,6 +143,13 @@ trait FileRefDataObject extends FileDataObject {
     }
   }
 
+  /**
+   * Define recommended number of files to be read or written in parallel for this DataObject.
+   * Actions using this DataObject are not forced to respect the parallelism given, but they can use the information to better control parallel operations.
+   * When set to None there is no special recommendation for parallelism.
+   * Note: this was implemented for FileTransferAction working with SFtpFileRefDataObject, to make use of SFtpFileRefConnection.maxParallelConnections.
+   */
+  def recommendedParallelism: Option[Int] = None
 
   /**
    * Delete all data. This is used to implement SaveMode.Overwrite.

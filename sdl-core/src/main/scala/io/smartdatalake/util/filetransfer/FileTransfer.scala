@@ -43,16 +43,3 @@ trait FileTransfer {
   def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit
 
 }
-
-/**
- * Factory for FileTransfer's.
- * For now we can do everything with the StreamFileTransfer.
- */
-private[smartdatalake] object FileTransfer {
-  def apply( srcDO: DataObject, tgtDO: DataObject, overwrite: Boolean): FileTransfer = {
-    (srcDO, tgtDO) match {
-      case (inputDO: FileRefDataObject with CanCreateInputStream, outputDO: FileRefDataObject with CanCreateOutputStream) => new StreamFileTransfer(inputDO, outputDO, overwrite)
-      case x => throw new IllegalStateException(s"Unmatched case $x")
-    }
-  }
-}
