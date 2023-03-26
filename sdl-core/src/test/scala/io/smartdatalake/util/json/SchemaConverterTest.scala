@@ -19,7 +19,7 @@
 
 package io.smartdatalake.util.json
 
-import io.smartdatalake.util.misc.TryWithRessource
+import io.smartdatalake.util.misc.WithResource
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
@@ -461,7 +461,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
 
   def getTestResourceContent(relativePath: String): String = {
     Option(getClass.getResource(relativePath)) match {
-      case Some(relPath) => TryWithRessource.exec(Source.fromURL(relPath))(_.mkString)
+      case Some(relPath) => WithResource.exec(Source.fromURL(relPath))(_.mkString)
       case None => throw new IllegalArgumentException(s"Path can not be reached: $relativePath")
     }
   }

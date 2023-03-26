@@ -19,7 +19,7 @@
 package io.smartdatalake.util.filetransfer
 
 import java.io.{InputStream, OutputStream}
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResource}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
 import org.apache.spark.sql.SparkSession
@@ -40,8 +40,8 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
     parallelize(fileRefPairs).foreach { m =>
       logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${m.tgt.toStringShort}")
       // get streams
-      TryWithRessource.exec(srcDO.createInputStream(m.src.fullPath)) { is =>
-        TryWithRessource.exec( tgtDO.createOutputStream(m.tgt.fullPath, overwrite)) { os =>
+      WithResource.exec(srcDO.createInputStream(m.src.fullPath)) { is =>
+        WithResource.exec( tgtDO.createOutputStream(m.tgt.fullPath, overwrite)) { os =>
           // transfer data
           Try(copyStream(is, os)) match {
             case Success(r) => r
