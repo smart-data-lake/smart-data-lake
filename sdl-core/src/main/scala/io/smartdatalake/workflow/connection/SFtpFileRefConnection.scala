@@ -24,11 +24,13 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.misc.TryWithResourcePool
+import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
 import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 
 import java.net.{InetSocketAddress, Proxy}
+import java.time.Duration
 
 /**
  * SFTP Connection information
@@ -59,6 +61,14 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[PublicKeyAuthMode])
   require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
+  private val createSshClient: SSHClient = {
+    authMode match {
+      case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port, m.userSecret.resolve(), m.passwordSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification)
+      case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification)
+      case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
+    }
+  }
+
   def execWithSFtpClient[A]( func: SFTPClient => A ): A = {
     TryWithResourcePool.exec(pool){
       sftp => func(sftp)
@@ -73,16 +83,9 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   val pool = new GenericObjectPool[SFTPClient](new SFtpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMaxIdle(1) // keep max one idle sftp connection
-  pool.setMinEvictableIdleTimeMillis(connectionPoolMaxIdleTimeSec * 1000) // timeout to close sftp connection if not in use
+  pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
   private class SFtpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
-    override def create(): SFTPClient = {
-      authMode match {
-        case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port,
-          m.userSecret.resolve(), m.passwordSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification).newSFTPClient()
-        case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification).newSFTPClient()
-        case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
-      }
-    }
+    override def create(): SFTPClient = createSshClient.newSFTPClient()
     override def wrap(sftp: SFTPClient): PooledObject[SFTPClient] = new DefaultPooledObject(sftp)
     override def destroyObject(p: PooledObject[SFTPClient]): Unit =
       p.getObject.close()

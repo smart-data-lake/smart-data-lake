@@ -24,6 +24,7 @@ import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 
 import java.nio.file.FileAlreadyExistsException
+import scala.util.matching.Regex
 
 trait FileRefDataObject extends FileDataObject {
 
@@ -67,14 +68,22 @@ trait FileRefDataObject extends FileDataObject {
 
   /**
    * Given some [[FileRef]] for another [[DataObject]], translate the paths to the root path of this [[DataObject]]
+   * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
+   *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
+   *                               Default is None which keeps the whole filename (without path).
    */
-  def translateFileRefs(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
+  def translateFileRefs(fileRefs: Seq[FileRef], filenameExtractorRegex: Option[Regex] = None)(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
     assert(!partitionLayout().exists(_.contains("*")), s"Cannot translate FileRef if partition layout contains * (${partitionLayout()})")
     fileRefs.map {
       f =>
-        // make fileName match this DataObjects FileName pattern.
-        val newFileName = if (f.fileName.matches(this.fileName.replace("*",".*"))) f.fileName
-        else f.fileName + this.fileName.replace("*","")
+        // extract part of source filename to use
+        var newFileName = filenameExtractorRegex.flatMap(regex => regex.findFirstMatchIn(f.fileName))
+          .map(m => if (m.groupCount>0) m.group(1) else m.matched)
+          .getOrElse(f.fileName)
+        // make filename match this DataObjects FileName pattern.
+        if (!newFileName.matches(this.fileName.replace("*",".*"))) {
+          newFileName += this.fileName.replace("*","")
+        }
         // prepend path and partition string before fileName
         val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
@@ -155,6 +164,12 @@ trait FileRefDataObject extends FileDataObject {
    * Delete all data. This is used to implement SaveMode.Overwrite.
    */
   def deleteAll(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteAll not implemented")
+
+  /**
+   * Create directories if not existing.
+   * If no implementation is given, it is assumed that directories will be created on the file when writing a file.
+   */
+  def mkDirs(path: String)(implicit context: ActionPipelineContext): Unit = Unit
 
   /**
    * Overwrite or Append new data.
