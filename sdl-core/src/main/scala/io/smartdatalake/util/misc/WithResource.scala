@@ -24,14 +24,13 @@ import org.apache.commons.pool2.impl.GenericObjectPool
 
 import scala.io.Source
 
-private[smartdatalake] object TryWithRessource {
+private[smartdatalake] object WithResource {
   /**
    * tries executing some function and closes the resource afterward also on exceptions
    */
   def exec[A <: Closeable, B](resource: A)(func: A => B): B = {
     try {
       val result = func(resource)
-      resource.close()
       result
     } finally {
       resource.close()
@@ -44,7 +43,6 @@ private[smartdatalake] object TryWithRessource {
   def execSource[A <: Source, B](resource: A)(func: A => B): B = {
     try {
       val result = func(resource)
-      resource.close()
       result
     } finally {
       resource.close()
@@ -52,7 +50,7 @@ private[smartdatalake] object TryWithRessource {
   }
 }
 
-private[smartdatalake] object TryWithResourcePool {
+private[smartdatalake] object WithResourcePool {
   /**
    * tries executing some function and returns the ressource afterwards to the pool
    */

@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import io.smartdatalake.util.filetransfer.SshUtil
-import io.smartdatalake.util.misc.TryWithResourcePool
+import io.smartdatalake.util.misc.WithResourcePool
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
@@ -70,13 +70,13 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   }
 
   def execWithSFtpClient[A]( func: SFTPClient => A ): A = {
-    TryWithResourcePool.exec(pool){
+    WithResourcePool.exec(pool){
       sftp => func(sftp)
     }
   }
 
   def test(): Unit = {
-    TryWithResourcePool.exec(pool){ sftp => Unit } // no operation
+    WithResourcePool.exec(pool){ sftp => Unit } // no operation
   }
 
   // setup connection pool
