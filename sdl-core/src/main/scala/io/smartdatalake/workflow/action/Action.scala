@@ -36,7 +36,6 @@ import org.apache.spark.sql.functions.expr
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 /**
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
@@ -61,9 +60,12 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def inputs: Seq[DataObject]
 
   /**
-   * Recursive Inputs are DataObjects that are used as Output and Input in the same action.
+   * Recursive Inputs are DataObjects that are used as Output and Input in the same or different action.
    * This is usually prohibited as it creates loops in the DAG.
    * In special cases this makes sense, i.e. when building a complex comparision/update logic.
+   * Recursive inputs are allowed in the same Action if the DataObject implement TransactionalSparkTableDataObject.
+   * For special cases this is to restrictive. To allow special DataObjects for recursive use within two different actions,
+   * see also [[GlobalConfig.allowAsRecursiveInput]].
    *
    * Usage: add DataObjects used as Output and Input as outputIds and recursiveInputIds, but not as inputIds.
    */
@@ -115,8 +117,13 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   def validateConfig(): Unit = {
     recursiveInputs.foreach { input =>
-      assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action.")
-      assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is not a TransactionalSparkTableDataObjects.")
+      if (outputs.exists(_.id == input.id)) {
+        assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is listed in outputIds but is not a TransactionalSparkTableDataObjects.")
+      } else if (Environment.globalConfig.allowAsRecursiveInput.contains(input.id)) {
+        logger.info(s"($id) Using ${input.id} as recursive input even though it is not listed in outputIds of the same Action, but in globalConfig.allowAsRecursiveInput")
+      } else {
+        assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action. If you're sure about this, mark it as exception in globalConfig.allowAsRecursiveInput.")
+      }
     }
   }
 
