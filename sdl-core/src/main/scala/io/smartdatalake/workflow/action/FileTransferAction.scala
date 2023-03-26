@@ -35,9 +35,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
  * @param outputId output DataObject
  * @param overwrite Allow existing output file to be overwritten. If false the action will fail if a file to be created already exists. Default is true.
  * @param maxParallelism Set maximum of files to be transferred in parallel.
- *                    Note that this information can also be set on DataObjects like SFtpFileRefDataObject, resp. its SFtpFileRefConnection.
- *                    The FileTransferAction will then take the minimum parallelism of input, output and this attribute.
- *                    If parallelism is not specified on input, output and this attribute, it is set to 1.
+ *                       Note that this information can also be set on DataObjects like SFtpFileRefDataObject, resp. its SFtpFileRefConnection.
+ *                       The FileTransferAction will then take the minimum parallelism of input, output and this attribute.
+ *                       If parallelism is not specified on input, output and this attribute, it is set to 1.
+ * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
+ *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
+ *                               Default is None which keeps the whole filename (without path).
  * @param executionMode optional execution mode for this Action
  * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
  * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
@@ -50,6 +53,7 @@ case class FileTransferAction(override val id: ActionId,
                               outputId: DataObjectId,
                               overwrite: Boolean = true,
                               maxParallelism: Option[Int] = None,
+                              filenameExtractorRegex: Option[String] = None,
                               override val breakFileRefLineage: Boolean = false,
                               override val executionMode: Option[ExecutionMode] = None,
                               override val executionCondition: Option[Condition] = None,
@@ -70,7 +74,7 @@ case class FileTransferAction(override val id: ActionId,
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
-    outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs)))
+    outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))))
   }
 
   override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[FileSubFeed] = {

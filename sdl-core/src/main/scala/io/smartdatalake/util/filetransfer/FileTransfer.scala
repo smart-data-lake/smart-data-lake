@@ -22,6 +22,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 
+import scala.util.matching.Regex
+
 trait FileTransfer {
 
   protected val srcDO: FileRefDataObject
@@ -32,8 +34,8 @@ trait FileTransfer {
    * @param fileRefs files to be transferred
    * @return target files which will be created when file transfer is executed
    */
-  def getFileRefMapping(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
-    tgtDO.translateFileRefs(fileRefs)
+  def getFileRefMapping(fileRefs: Seq[FileRef], filenameExtractorRegex: Option[Regex] = None)(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
+    tgtDO.translateFileRefs(fileRefs, filenameExtractorRegex)
   }
 
   /**
