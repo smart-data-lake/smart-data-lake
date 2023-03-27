@@ -74,6 +74,7 @@ case class FileTransferAction(override val id: ActionId,
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
+    logger.info(s"($id) got ${inputFileRefs.size} files to copy")
     outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))))
   }
 
