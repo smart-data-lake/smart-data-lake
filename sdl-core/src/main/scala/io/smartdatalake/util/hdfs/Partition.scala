@@ -171,7 +171,7 @@ object PartitionValues {
 /**
  * Helper methods to handle partition layout string
  */
-private[smartdatalake] object PartitionLayout {
+object PartitionLayout {
   private[hdfs] val delimiter = "%"
   private val tokenRegex = s"$delimiter([0-9a-zA-Z_]+)(:(.*?))?$delimiter".r.unanchored
 
