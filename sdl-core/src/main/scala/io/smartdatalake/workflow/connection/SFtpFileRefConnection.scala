@@ -61,7 +61,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[PublicKeyAuthMode])
   require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
-  private val createSshClient: SSHClient = {
+  private def createSshClient: SSHClient = {
     authMode match {
       case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port, m.userSecret.resolve(), m.passwordSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification)
       case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification)
