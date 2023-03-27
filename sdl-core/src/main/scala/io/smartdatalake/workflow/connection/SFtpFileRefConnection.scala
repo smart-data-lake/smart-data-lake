@@ -82,14 +82,12 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   // setup connection pool
   val pool = new GenericObjectPool[SFTPClient](new SFtpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
-  pool.setMaxIdle(1) // keep max one idle sftp connection
   pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
   private class SFtpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
     override def create(): SFTPClient = createSshClient.newSFTPClient()
     override def wrap(sftp: SFTPClient): PooledObject[SFTPClient] = new DefaultPooledObject(sftp)
-    override def destroyObject(p: PooledObject[SFTPClient]): Unit =
-      p.getObject.close()
-  }
+    override def destroyObject(p: PooledObject[SFTPClient]): Unit = p.getObject.close()
+}
 
   override def factory: FromConfigFactory[Connection] = SFtpFileRefConnection
 }
