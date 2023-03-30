@@ -140,8 +140,8 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     }
   }
 
-  def getOutputStream(path: String, onCloseFunc: () => Unit)(implicit sftp: SFTPClient): OutputStream = {
-    val handle: RemoteFile = sftp.open(path, util.EnumSet.of(OpenMode.WRITE, OpenMode.CREAT))
+  def getOutputStream(path: String, overwrite: Boolean, onCloseFunc: () => Unit)(implicit sftp: SFTPClient): OutputStream = {
+    val handle: RemoteFile = sftp.open(path, util.EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, if (overwrite) OpenMode.TRUNC else OpenMode.APPEND))
     new handle.RemoteFileOutputStream() {
       override def close(): Unit = try {
         super.close()

@@ -196,7 +196,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   override def createOutputStream(path: String, overwrite: Boolean)(implicit context: ActionPipelineContext): OutputStream = {
     Try {
       implicit val sftp = connection.pool.borrowObject
-      SshUtil.getOutputStream(path, () => Try(connection.pool.returnObject(sftp)))
+      SshUtil.getOutputStream(path, overwrite, () => Try(connection.pool.returnObject(sftp)))
     } match {
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
