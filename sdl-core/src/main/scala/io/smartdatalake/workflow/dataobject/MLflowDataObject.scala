@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import com.typesafe.config.Config
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -49,19 +49,19 @@ case class MLflowDataObject(
                              modelName: String = "Default",
                              modelDescription: Option[String] = None,
                              modelTransitionInfo : Option[ModelTransitionInfo] = None,
+                             envManager: String = "conda",
                              override val metadata: Option[DataObjectMetadata] = None
                            )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject
     with CanCreateSparkDataFrame
     with SmartDataLakeLogger {
 
-  // entry point for accessing dynamically Java objects living inside the JVM
 
-  //var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
-  //var pythonMLflowClient: Option[MLflowPythonUtil] = None
-
-  //
   var experimentId: Option[String] = None
+  private val allowedEnvManager = Seq("conda","virtualenv","local")
+  if (!allowedEnvManager.contains(envManager)){
+    throw ConfigurationException(s"($id) envManager must be one of (${allowedEnvManager.mkString(",")})")
+  }
 
   def getPythonMLflowClient(entryPoint: Option[MLflowPythonSparkEntryPoint], mlflowURI: String): Option[MLflowPythonUtil] = {
     var pythonMLflowClient: Option[MLflowPythonUtil] = None

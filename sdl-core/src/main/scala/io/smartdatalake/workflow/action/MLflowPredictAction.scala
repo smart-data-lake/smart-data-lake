@@ -157,7 +157,7 @@ case class MLflowPredictAction(
              |  model_version = models[0].version
              |model_uri = "models:/${mlflow.modelName}/${modelStage}"
              |print(f"$id: Loading model {model_uri}")
-             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type="${resultType.getOrElse("string")}")
+             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type="${resultType.getOrElse("string")}",env_manager="${mlflow.envManager}")
              |# add predictions
              |df_predict = df.withColumn("predictions", lit(None).cast("${resultType.getOrElse("string")}"))
              |# df_predict.show()
