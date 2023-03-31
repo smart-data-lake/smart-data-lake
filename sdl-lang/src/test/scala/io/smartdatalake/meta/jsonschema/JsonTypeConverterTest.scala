@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import org.reflections.Reflections
 import org.scalatest.FunSuite
 
-import scala.reflect.runtime.universe.typeOf
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 class JsonTypeConverterTest extends FunSuite {
   private val registry = new DefinitionRegistry
@@ -39,8 +39,7 @@ class JsonTypeConverterTest extends FunSuite {
   case class TestCaseClass(name: String, age: Option[Int]) extends BaseType
 
   test("convert types to json types") {
-    val attributes = attributesForCaseClass(typeOf[TestCaseClass], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestCaseClass], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestCaseClass])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -50,8 +49,7 @@ class JsonTypeConverterTest extends FunSuite {
   }
 
   test("required type attribute is added if base type is present") {
-    val attributes = attributesForCaseClass(typeOf[TestCaseClass], Map())
-    val typeDef = GenericTypeDef("testTypeDef", Some(typeOf[BaseType]), typeOf[TestCaseClass], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestCaseClass], Some(typeOf[BaseType]))
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -60,8 +58,7 @@ class JsonTypeConverterTest extends FunSuite {
   }
 
   test("type attribute is not added without base type") {
-    val attributes = attributesForCaseClass(typeOf[TestCaseClass], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestCaseClass], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestCaseClass])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -71,8 +68,7 @@ class JsonTypeConverterTest extends FunSuite {
 
   case class TestConfigObjectWithId(id: ConfigObjectId) extends SdlConfigObject
   test("do not add id in subtype of SdlConfigObject to json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestConfigObjectWithId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestConfigObjectWithId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestConfigObjectWithId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -81,8 +77,7 @@ class JsonTypeConverterTest extends FunSuite {
 
   case class TestConfigObjectWithActionId(id: ActionId) extends SdlConfigObject
   test("do not add id of type ActionId in subtype of SdlConfigObject to json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestConfigObjectWithActionId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestConfigObjectWithActionId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestConfigObjectWithActionId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -94,8 +89,7 @@ class JsonTypeConverterTest extends FunSuite {
     override def factory: FromConfigFactory[DataObject] = null
   }
   test("do not add id in subtype of DataObject to json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestDataObjectWithDataObjectId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestDataObjectWithDataObjectId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestDataObjectWithDataObjectId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -107,8 +101,7 @@ class JsonTypeConverterTest extends FunSuite {
     override def factory: FromConfigFactory[Connection] = null
   }
   test("do not add id in subtype of ConnectionId to json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestConnectionWithConnectionId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestConnectionWithConnectionId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestConnectionWithConnectionId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -117,8 +110,7 @@ class JsonTypeConverterTest extends FunSuite {
 
   case class TestClassWithStringId(id: String)
   test("show id of type String in json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestClassWithStringId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestClassWithStringId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithStringId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -127,8 +119,7 @@ class JsonTypeConverterTest extends FunSuite {
 
   case class TestClassWithIntId(id: Int)
   test("show id of type Int in json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestClassWithIntId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestClassWithIntId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithIntId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
@@ -137,12 +128,26 @@ class JsonTypeConverterTest extends FunSuite {
 
   case class TestClassWithReferenceToId(id: ConfigObjectId, referenceId: ConfigObjectId) extends SdlConfigObject
   test("show reference to id in subtype of SdlConfigObject in json schema") {
-    val attributes = attributesForCaseClass(typeOf[TestClassWithReferenceToId], Map())
-    val typeDef = GenericTypeDef("testTypeDef", None, typeOf[TestClassWithReferenceToId], None, true, Set(), attributes)
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithReferenceToId])
 
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
     assert(!jsonTypeDef.properties.contains("id"))
     assert(jsonTypeDef.properties.contains("referenceId"))
+  }
+
+  case class TestClassWithBoolean(flag: Boolean)
+  test("Boolean case class attributes are converted to boolean in JSON schema") {
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithBoolean])
+
+    val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
+
+    assert(jsonTypeDef.properties.contains("flag"))
+    assert(jsonTypeDef.properties("flag").isInstanceOf[JsonBooleanDef])
+  }
+
+  private def getGenericTypeDef(tpe: Type, baseType: Option[Type] = None): GenericTypeDef = {
+    val attributes = attributesForCaseClass(tpe, Map())
+    GenericTypeDef("testTypeDef", baseType, tpe, None, true, Set(), attributes)
   }
 }
