@@ -54,6 +54,7 @@ case class MLflowPredictAction(
                                 transformers: Seq[GenericDfsTransformer] = Seq(),
                                 resultType: Option[String] = None,
                                 modelStage: String = "None",
+                                loadModelInit: Boolean = false,
                                 override val breakDataFrameLineage: Boolean = false,
                                 override val persist: Boolean = false,
                                 override val mainInputId: Option[DataObjectId] = None,
@@ -68,6 +69,9 @@ case class MLflowPredictAction(
   // handle MLflow in and output data object
   val mlflow = getInputDataObject[MLflowDataObject](mlflowId)
   val prediction = getOutputDataObject[DataObject with CanWriteDataFrame with CanCreateDataFrame](outputId)
+
+  // load model in init phase
+  private val loadModel = if (loadModelInit) "True" else "False"
 
   // used for python interop
   var entryPoint: Option[MLflowPythonSparkEntryPoint] = None
@@ -156,8 +160,11 @@ case class MLflowPredictAction(
              |else:
              |  model_version = models[0].version
              |model_uri = "models:/${mlflow.modelName}/${modelStage}"
-             |print(f"$id: Loading model {model_uri}")
-             |udf_predict = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type="${resultType.getOrElse("string")}",env_manager="${mlflow.envManager}")
+             |if ${loadModel}:
+             |  print(f"$id: Loading model {model_uri}")
+             |  udf_predict = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type="${resultType.getOrElse("string")}",env_manager="${mlflow.envManager}")
+             |else:
+             |  print(f"$id: Model not loaded during init")
              |# add predictions
              |df_predict = df.withColumn("predictions", lit(None).cast("${resultType.getOrElse("string")}"))
              |# df_predict.show()
