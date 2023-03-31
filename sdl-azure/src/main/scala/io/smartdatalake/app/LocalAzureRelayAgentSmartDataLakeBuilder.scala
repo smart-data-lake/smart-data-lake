@@ -81,17 +81,6 @@ case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: 
 
 object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser: OParser[_, LocalAzureRelayAgentSmartDataLakeBuilderConfig] = {
-    val builder = OParser.builder[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
-    import builder._
-    OParser.sequence(
-      parserGeneric(feedSelRequired = false),
-      opt[String]('u', "url")
-        .required
-        .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
-        .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to"),
-    )
-  }
 
   /**
    * Entry-Point of the application.
@@ -101,11 +90,5 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logger.info(s"Starting Program $appType v$appVersion")
 
-    OParser.parse(agentParser, args, LocalAzureRelayAgentSmartDataLakeBuilderConfig()) match {
-      case Some(agentServerConfig) =>
-        val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
-        AzureRelayAgentServer.start(agentServerConfig, agentController)
-      case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
-    }
   }
 }

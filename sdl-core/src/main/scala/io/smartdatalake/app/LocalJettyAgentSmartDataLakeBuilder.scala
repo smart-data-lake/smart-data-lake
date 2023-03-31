@@ -26,49 +26,9 @@ import scopt.OParser
 
 import java.io.File
 
-/**
- * Smart Data Lake Builder application for agent mode using simple, unsecure websocket communication with Jetty.
- * This is recommended for development use only.
- *
- */
-object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
-    val builder = OParser.builder[LocalJettyAgentSmartDataLakeBuilderConfig]
-    import builder._
-    OParser.sequence(
-    parserGeneric(false),
-      opt[Int]('p', "port")
-      .action((arg, config) => config.copy(port = arg))
-      .text(s"Port that this agent listens to. Default is ${JettyAgentServerConfig.DefaultPort}")
-    )
-  }
 
-   /**
-   * Entry-Point of the application.
-   *
-   * @param args Command-line arguments.
-   */
-  def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType v$appVersion")
 
-    val envconfig = LocalJettyAgentSmartDataLakeBuilderConfig(
-      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
-      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
-      parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
-      statePath = sys.env.get("SDL_STATE_PATH"),
-      applicationName = Some("AgentServer")
-    )
-
-    OParser.parse(agentParser, args, envconfig) match {
-      case Some(agentServerConfig) =>
-        val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
-        JettyAgentServer.start(agentServerConfig, agentController)
-      case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
-    }
-  }
-}
 case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
                                                      override val applicationName: Option[String] = None,
                                                      override val configuration: Option[Seq[String]] = None,

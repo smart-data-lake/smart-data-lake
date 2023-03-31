@@ -30,7 +30,7 @@ import java.io.File
  * Sets master to local[*] and deployMode to client by default.
  */
 object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
-  val localParser: OParser[_, SmartDataLakeBuilderConfig] = {
+  /*val localParser: OParser[_, SmartDataLakeBuilderConfig] = {
     val builder = OParser.builder[SmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
@@ -53,7 +53,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .action((arg, config) => config.copy(keytabPath = Some(arg)))
         .text("Path to the Kerberos keytab file for authentication in local mode.")
     )
-  }
+  }*/
 
 
   /**
@@ -64,7 +64,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logger.info(s"Starting Program $appType $appVersion")
 
-    // Set defaults from environment variables
+    /*// Set defaults from environment variables
     val config = SmartDataLakeBuilderConfig().copy(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
@@ -99,6 +99,6 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         logger.info(s"$appType finished successfully: $stats")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
-    }
+    }*/
   }
 }

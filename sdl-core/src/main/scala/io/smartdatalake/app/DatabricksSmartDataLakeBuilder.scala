@@ -40,7 +40,7 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
       overrideJars = Some(Seq("config-1.4.1.jar"))
     )
 
-    OParser.parse(parser, args, config) match {
+/*    OParser.parse(parser, args, config) match {
       case Some(c) =>
 
         val jars = c.overrideJars.getOrElse (throw new ConfigurationException(s"override-jars option must be specified for $appType"))
@@ -57,6 +57,6 @@ object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
         runMethod.invoke(smartDataLakeBuilder, args, Boolean.box (true) )
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
-    }
+    }*/
   }
 }

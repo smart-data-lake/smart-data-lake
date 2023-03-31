@@ -1,10 +1,11 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="SmartDataLakeBuilder" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="15" />
+    <option name="ALTERNATIVE_JRE_PATH" value="11" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="INCLUDE_PROVIDED_SCOPE" value="true" />
     <option name="MAIN_CLASS_NAME" value="io.smartdatalake.app.DefaultSmartDataLakeBuilder" />
-    <module name="sdl-core" />
+    <module name="sdl-core_2.12" />
+    <option name="PROGRAM_PARAMETERS" value="-f .* -c &quot;C:\Users\tbb\WORK\sdl\smart-data-lake\sdl-core\src\test\resources\configAgents\application-jettyagent.conf&quot;" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
     <method v="2">
       <option name="Make" enabled="true" />

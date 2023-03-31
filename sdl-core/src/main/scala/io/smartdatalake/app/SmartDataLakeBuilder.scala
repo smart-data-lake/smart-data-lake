@@ -36,7 +36,7 @@ import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInf
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
-import scopt.{OParser, OParserBuilder}
+import scopt.{OParser, OptionParser}
 
 import java.io.File
 import java.time.{Duration, LocalDateTime}
@@ -124,23 +124,22 @@ trait SmartDataLakeBuilderConfigTrait[R] {
  *                        - "config": validate configuration
  *                        - "dry-run": execute "prepare" and "init" phase to check environment
  */
-case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
-                                      override val applicationName: Option[String] = None,
-                                      override val configuration: Option[Seq[String]] = None,
-                                      override val master: Option[String] = None,
-                                      override val deployMode: Option[String] = None,
-                                      override val username: Option[String] = None,
-                                      override val kerberosDomain: Option[String] = None,
-                                      override val keytabPath: Option[File] = None,
-                                      override val partitionValues: Option[Seq[PartitionValues]] = None,
-                                      override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                      override val parallelism: Int = 1,
-                                      override val statePath: Option[String] = None,
-                                      override val overrideJars: Option[Seq[String]] = None,
-                                      override val test: Option[TestMode.Value] = None,
-                                      override val streaming: Boolean = false
-                                     ) extends SmartDataLakeBuilderConfigTrait[SmartDataLakeBuilderConfig] {
-
+case class SmartDataLakeBuilderConfig(feedSel: String = null,
+                                      applicationName: Option[String] = None,
+                                      configuration: Option[Seq[String]] = None,
+                                      master: Option[String] = None,
+                                      deployMode: Option[String] = None,
+                                      username: Option[String] = None,
+                                      kerberosDomain: Option[String] = None,
+                                      keytabPath: Option[File] = None,
+                                      partitionValues: Option[Seq[PartitionValues]] = None,
+                                      multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                      parallelism: Int = 1,
+                                      statePath: Option[String] = None,
+                                      overrideJars: Option[Seq[String]] = None,
+                                      test: Option[TestMode.Value] = None,
+                                      streaming: Boolean = false
+                                ) {
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains({
       HadoopFileActionDAGRunStateStore.fileNamePartSeparator
@@ -156,35 +155,6 @@ case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
   val appName: String = applicationName.getOrElse(feedSel)
 
   def isDryRun: Boolean = test.contains(TestMode.DryRun)
-  override def withfeedSel(value: String): SmartDataLakeBuilderConfig = copy(feedSel = value)
-
-  override def withapplicationName(value: Option[String]): SmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): SmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): SmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): SmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): SmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): SmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): SmartDataLakeBuilderConfig = copy(keytabPath = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): SmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): SmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): SmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): SmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): SmartDataLakeBuilderConfig = copy(streaming = value)
 }
 
 object TestMode extends Enumeration {
@@ -212,6 +182,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   val appVersion: String = AppUtil.getManifestVersion.map("v" + _).getOrElse("develop") + ", sdlb-build-version: " + BuildVersionInfo.readBuildVersionInfo.getOrElse("unknown")
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
+  /**
+   * Create a new SDL configuration.
+   *
+   * Could be used in the future to set default values.
+   *
+   * @return a new, initialized [[SmartDataLakeBuilderConfig]].
+   */
+  def initConfigFromEnvironment: SmartDataLakeBuilderConfig = SmartDataLakeBuilderConfig()
+
    /**
    * InstanceRegistry instance
    */
@@ -222,88 +201,82 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
 
-  protected def parserGeneric[R <: SmartDataLakeBuilderConfigTrait[R]](feedSelRequired: Boolean = true): OParser[_, R] = {
-    val builder: OParserBuilder[R] = OParser.builder[R]
-    import builder._
+  protected val parser: OptionParser[SmartDataLakeBuilderConfig] = new OptionParser[SmartDataLakeBuilderConfig](appType) {
+    override def showUsageOnError: Option[Boolean] = Some(true)
 
-    val nonRequiredFeedselParser =
-      opt[String]('f', "feed-sel")
-        .action((arg, config) => config.withfeedSel(arg))
-        .valueName("<operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]")
-        .text(
-          """Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
-            |Operations:
-            |- pipe symbol (|): the two sets are combined by union operation (default)
-            |- ampersand symbol (&): the two sets are combined by intersection operation
-            |- minus symbol (-): the second set is subtracted from the first set
-            |Prefixes:
-            |- 'feeds': select actions where metadata.feed is matched by regex pattern (default)
-            |- 'names': select actions where metadata.name is matched by regex pattern
-            |- 'ids': select actions where id is matched by regex pattern
-            |- 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
-            |- 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
-            |- 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
-            |- 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
-            |- 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
-            |All matching is done case-insensitive.
-            |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"""".stripMargin)
-
-    val requiredFeedselParser = nonRequiredFeedselParser.required()
-
-    OParser.sequence(
-      head(appType, s"$appVersion"),
-      if(feedSelRequired) requiredFeedselParser else nonRequiredFeedselParser,
-      opt[String]('n', "name")
-        .action((arg, config) => config.withapplicationName(Some(arg)))
-        .text("Optional name of the application. If not specified feed-sel is used."),
-      opt[Seq[String]]('c', "config")
-        .action((arg, config) => config.withconfiguration(Some(arg)))
-        .valueName("<file1>[,<file2>...]")
-        .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."),
-      opt[String]("partition-values")
-        .action((arg, config) => config.withpartitionValues(Some(PartitionValues.parseSingleColArg(arg))))
-        .valueName(PartitionValues.singleColFormat)
-        .text(s"Partition values to process for one single partition column."),
-      opt[String]("multi-partition-values")
-        .action((arg, config) => config.withpartitionValues(Some(PartitionValues.parseMultiColArg(arg))))
-        .valueName(PartitionValues.multiColFormat)
-        .text(s"Partition values to process for multiple partition columns."),
-      opt[Unit]('s', "streaming")
-        .action((_, config) => config.withstreaming(true))
-        .text(s"Enable streaming mode for continuous processing."),
-      opt[Int]("parallelism")
-        .action((arg, config) => config.withparallelism(arg))
-        .valueName("<int>")
-        .text(s"Parallelism for DAG run."),
-      opt[String]("state-path")
-        .action((arg, config) => config.withstatePath(Some(arg)))
-        .valueName("<path>")
-        .text(s"Path to save run state files. Must be set to enable recovery in case of failures."),
-      opt[Seq[String]]("override-jars")
-        .action((arg, config) => config.withoverrideJars(Some(arg)))
-        .valueName("<jar1>[,<jar2>...]")
-        .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath."),
-      opt[String]("test")
-        .action((arg, config) => config.withtest(Some(TestMode.withName(arg))))
-        .valueName("<config|dry-run>")
-        .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage"),
-      help("help").text("Display the help text."),
-      version("version").text("Display version information.")
-    )
-
+    head(appType, s"$appVersion")
+    opt[String]('f', "feed-sel")
+      .required
+      .action((arg, config) => config.copy(feedSel = arg))
+      .valueName("<operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]")
+      .text(
+        """Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
+          |Operations:
+          |- pipe symbol (|): the two sets are combined by union operation (default)
+          |- ampersand symbol (&): the two sets are combined by intersection operation
+          |- minus symbol (-): the second set is subtracted from the first set
+          |Prefixes:
+          |- 'feeds': select actions where metadata.feed is matched by regex pattern (default)
+          |- 'names': select actions where metadata.name is matched by regex pattern
+          |- 'ids': select actions where id is matched by regex pattern
+          |- 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
+          |- 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
+          |- 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
+          |- 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
+          |- 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
+          |All matching is done case-insensitive.
+          |Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"""".stripMargin)
+    opt[String]('n', "name")
+      .action((arg, config) => config.copy(applicationName = Some(arg)))
+      .text("Optional name of the application. If not specified feed-sel is used.")
+    opt[Seq[String]]('c', "config")
+      .action((arg, config) => config.copy(configuration = Some(arg)))
+      .valueName("<file1>[,<file2>...]")
+      .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry.")
+    opt[String]("partition-values")
+      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseSingleColArg(arg))))
+      .valueName(PartitionValues.singleColFormat)
+      .text(s"Partition values to process for one single partition column.")
+    opt[String]("multi-partition-values")
+      .action((arg, config) => config.copy(partitionValues = Some(PartitionValues.parseMultiColArg(arg))))
+      .valueName(PartitionValues.multiColFormat)
+      .text(s"Partition values to process for multiple partitoin columns.")
+    opt[Unit]('s', "streaming")
+      .action((_, config) => config.copy(streaming = true))
+      .text(s"Enable streaming mode for continuous processing.")
+    opt[Int]("parallelism")
+      .action((arg, config) => config.copy(parallelism = arg))
+      .valueName("<int>")
+      .text(s"Parallelism for DAG run.")
+    opt[String]("state-path")
+      .action((arg, config) => config.copy(statePath = Some(arg)))
+      .valueName("<path>")
+      .text(s"Path to save run state files. Must be set to enable recovery in case of failures.")
+    opt[Seq[String]]("override-jars")
+      .action((arg, config) => config.copy(overrideJars = Some(arg)))
+      .valueName("<jar1>[,<jar2>...]")
+      .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.")
+    opt[String]("test")
+      .action((arg, config) => config.copy(test = Some(TestMode.withName(arg))))
+      .valueName("<config|dry-run>")
+      .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage")
+    help("help").text("Display the help text.")
+    version("version").text("Display version information.")
   }
 
-  protected val parser: OParser[_, SmartDataLakeBuilderConfig] = {
+  //protected val parser: OParser[_, SmartDataLakeBuilderConfig] = null
 
-    val builder = OParser.builder[SmartDataLakeBuilderConfig]
-
-    import builder._
-
-    OParser.sequence(
-      programName(appType),
-      head(appType, s"$appVersion"),
-      parserGeneric()
-    )
+  /**
+   * Parses the supplied (command line) arguments.
+   *
+   * This method parses command line arguments and creates the corresponding [[SmartDataLakeBuilderConfig]]
+   *
+   * @param args an Array of command line arguments.
+   * @param config a configuration initialized with default values.
+   * @return a new configuration with default values overwritten from the supplied command line arguments.
+   */
+  def parseCommandLineArguments(args: Array[String], config: SmartDataLakeBuilderConfig): Option[SmartDataLakeBuilderConfig] = {
+    parser.parse(args, config)
   }
 
   /**
