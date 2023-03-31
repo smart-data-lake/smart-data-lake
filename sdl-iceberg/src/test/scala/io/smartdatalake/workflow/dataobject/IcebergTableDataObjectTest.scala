@@ -58,6 +58,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
+    targetDO.prepare
 
     // prepare & start load
     val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
