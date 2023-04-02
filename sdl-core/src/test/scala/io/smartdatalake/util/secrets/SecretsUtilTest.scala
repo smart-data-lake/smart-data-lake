@@ -25,9 +25,29 @@ import org.scalatest.FunSuite
 class SecretsUtilTest extends FunSuite {
 
   test("register custom config provider and get secret") {
-    val providerConfig = new SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map("option1" -> "1")))
+    val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map("option1" -> "1")))
     SecretsUtil.registerProvider("TEST", providerConfig.provider)
-    assert(SecretsUtil.getSecret("TEST#test") == "test1")
+    assert(SecretsUtil.resolveSecret("###TEST#test###") == "test1")
+  }
+
+  test("custom config provider and get secret with hashtag") {
+    val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map("option1" -> "1")))
+    SecretsUtil.registerProvider("TEST", providerConfig.provider)
+    assert(SecretsUtil.resolveSecret("###TEST#te#st###") == "te#st1")
+  }
+
+  test("resolve plaintext secret") {
+    assert(SecretsUtil.resolveSecret("somesecret") == "somesecret")
+  }
+
+  test("resolve plaintext secret with hashtag") {
+    assert(SecretsUtil.resolveSecret("some#secret") == "some#secret")
+  }
+
+  test("resolve legacy secret") {
+    val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map("option1" -> "1")))
+    SecretsUtil.registerProvider("TEST", providerConfig.provider)
+    assert(SecretsUtil.convertSecretVariableToStringOrSecret("TEST#test").resolve() == "test1")
   }
 
 }

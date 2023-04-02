@@ -24,7 +24,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.SchemaProviderType.SchemaProviderType
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.secrets.SecretProviderConfig
+import io.smartdatalake.util.secrets.{SecretProviderConfig, StringOrSecret}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
@@ -160,4 +160,9 @@ trait ConfigImplicits {
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ExecutionMode](c.getConfig(p))
   }
+
+  /**
+   * A reader that reads [[StringOrSecret]] values.
+   */
+  implicit val stringOrSecretReader: ConfigReader[StringOrSecret] = ConfigReader.fromTry { (c, p) => StringOrSecret(c.getString(p)) }
 }

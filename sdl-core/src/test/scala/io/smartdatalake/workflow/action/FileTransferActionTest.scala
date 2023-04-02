@@ -23,6 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{BasicAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.executionMode.FileIncrementalMoveMode
 import io.smartdatalake.workflow.connection.SftpFileRefConnection
 import io.smartdatalake.workflow.dataobject._
@@ -54,7 +55,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode("CLEAR#"+sshUser, "CLEAR#"+sshPwd), ignoreHostKeyVerification = true))
+    instanceRegistry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshUser))), ignoreHostKeyVerification = true))
   }
 
   test("copy file from sftp to hadoop without partitions") {
