@@ -574,7 +574,7 @@
                             </manifest>
                         </archive>
                         <excludes>
-                            <exclude>log4j.properties</exclude> <!-- Logging configuration should be left to user. -->
+                            <exclude>log4j2.*</exclude> <!-- Logging configuration should be left to user. -->
                             <exclude>${project.artifactId}*.jar
                             </exclude> <!-- avoid "Error assembling JAR" because of already existing artifact jar -->
                         </excludes>
@@ -594,12 +594,6 @@
                             </goals>
                         </execution>
                     </executions>
-                    <configuration>
-                        <excludes>
-                            <exclude>log4j.properties
-                            </exclude> <!-- Logging configuration source should not be distributed. -->
-                        </excludes>
-                    </configuration>
                 </plugin>
 
                 <!-- Builds executable fat-jar that includes all dependencies -->
