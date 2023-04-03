@@ -72,8 +72,9 @@ case class SftpFileRefConnection(override val id: ConnectionId,
   private class SftpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
     override def create(): SFTPClient = {
       authMode match {
-        case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port, m.user, m.password, ignoreHostKeyVerification).newSFTPClient()
-        case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.user, ignoreHostKeyVerification).newSFTPClient()
+        case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port,
+          m.userSecret.resolve(), m.passwordSecret.resolve(), ignoreHostKeyVerification).newSFTPClient()
+        case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), ignoreHostKeyVerification).newSFTPClient()
         case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
       }
     }

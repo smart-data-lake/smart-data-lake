@@ -38,15 +38,25 @@ object SecretsUtil extends SmartDataLakeLogger {
   registerProvider("ENV", EnvironmentVariableSecretProvider)
   registerProvider("FILE", GenericFileSecretProvider)
 
+  private val SECRET_WITH_PROVIDER_REGEX = "^###([^#]*)#(.*)###$".r
+
+  private[smartdatalake] def convertSecretVariableToStringOrSecret(secretVariable: String): StringOrSecret = {
+    StringOrSecret(s"###$secretVariable###")
+  }
+
   /**
-   * Parses the secret config value to know what provider to use and the secret name to query.
-   * @param secretConfigValue contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
-   *                          e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable.
+   * Parses the secret to retrieve the secret value from the secret provider if necessary.
+   * @param secret is either the secret in plaintext or it contains the id of the provider and the
+   *                       name of the secret in the format ###<PROVIDERID>#<SECRETNAME>###,
+   *                       e.g. ###ENV#<ENV_VARIABLE_NAME>### to get a secret from an environment variable.
    */
-  def getSecret(secretConfigValue: String): String = {
-    logger.debug(s"getting secret $secretConfigValue")
-    val (providerId, secretName) = ConfigUtil.parseProviderConfigValue(secretConfigValue)
-    val provider = providers.getOrElse(providerId, throw new ConfigurationException(s"There is no registered secret provider with id ${providerId}"))
-    provider.getSecret(secretName)
+  private[secrets] def resolveSecret(secret: String): String = {
+    secret match {
+      case SECRET_WITH_PROVIDER_REGEX(providerId, secretName) =>
+        logger.debug(s"getting secret ${secret}")
+        val provider = providers.getOrElse(providerId, throw new ConfigurationException(s"There is no registered secret provider with id ${providerId}"))
+        provider.getSecret(secretName)
+      case _ => secret
+    }
   }
 }

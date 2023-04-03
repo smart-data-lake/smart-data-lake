@@ -19,7 +19,7 @@
 package io.smartdatalake.definitions
 
 import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.util.webservice.KeycloakUtil
 import org.keycloak.admin.client.{Keycloak, KeycloakBuilder}
 
@@ -54,19 +54,28 @@ sealed trait AuthMode {
 /**
  * Connect by basic authentication
  */
-case class BasicAuthMode(userVariable: String, passwordVariable: String) extends AuthMode {
-  private[smartdatalake] val user: String = SecretsUtil.getSecret(userVariable)
-  private[smartdatalake] val password: String = SecretsUtil.getSecret(passwordVariable)
+case class BasicAuthMode(private val user: Option[StringOrSecret],
+                         private val password: Option[StringOrSecret],
+                         @Deprecated @deprecated("Use `user` instead", "2.5.0") private val userVariable: Option[String] = None,
+                         @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None) extends AuthMode {
+  private val _user: StringOrSecret = user.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(userVariable.get))
+  private val _password: StringOrSecret = password.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(passwordVariable.get))
+
+  def userSecret: StringOrSecret = _user
+  def passwordSecret: StringOrSecret = _password
 }
 
 /**
  * Connect by token
  * For HTTP Connection this is used as Bearer token in Authorization header.
  */
-case class TokenAuthMode(tokenVariable: String) extends AuthMode with HttpHeaderAuth {
-  private[smartdatalake] val token: String = SecretsUtil.getSecret(tokenVariable)
-  private[smartdatalake] override def getHeaders: Map[String,String] = {
-    Map("Authorization" -> s"Bearer $token")
+case class TokenAuthMode(@Deprecated @deprecated("Use `token` instead", "2.5.0") private val tokenVariable: Option[String] = None,
+                         private val token: Option[StringOrSecret]) extends AuthMode with HttpHeaderAuth {
+  private val _token =  token.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(tokenVariable.get))
+
+  private[smartdatalake] val tokenSecret: StringOrSecret = _token
+  private[smartdatalake] override def getHeaders: Map[String, String] = {
+    Map("Authorization" -> s"Bearer ${tokenSecret.resolve()}")
   }
 }
 
@@ -74,18 +83,33 @@ case class TokenAuthMode(tokenVariable: String) extends AuthMode with HttpHeader
 /**
  * Connect by custom authorization header
  */
-case class AuthHeaderMode(headerName: String = "Authorization", secretVariable: String) extends AuthMode with HttpHeaderAuth {
-  private[smartdatalake] val secret: String = SecretsUtil.getSecret(secretVariable)
-  private[smartdatalake] override def getHeaders: Map[String,String] = Map(headerName -> secret)
+case class AuthHeaderMode(
+                           headerName: String = "Authorization",
+                           private val secret: Option[StringOrSecret],
+                           @Deprecated @deprecated("Use `secret` instead", "2.5.0") private val secretVariable: Option[String] = None
+                         ) extends AuthMode with HttpHeaderAuth {
+  private val _secret = secret.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(secretVariable.get))
+  private[smartdatalake] val stringOrSecret: StringOrSecret = _secret
+  private[smartdatalake] override def getHeaders: Map[String,String] = Map(headerName -> stringOrSecret.resolve())
 }
 
 /**
  * Connect by using Keycloak to manage token and token refresh giving clientId/secret as information.
  * For HTTP Connection this is used as Bearer token in Authorization header.
  */
-case class KeycloakClientSecretAuthMode(ssoServer: String, ssoRealm: String, ssoGrantType: String, clientIdVariable: String, clientSecretVariable: String) extends AuthMode with HttpHeaderAuth {
-  private[smartdatalake] val clientId: String = SecretsUtil.getSecret(clientIdVariable)
-  private[smartdatalake] val clientSecret: String = SecretsUtil.getSecret(clientSecretVariable)
+case class KeycloakClientSecretAuthMode(
+                                         ssoServer: String,
+                                         ssoRealm: String,
+                                         ssoGrantType: String,
+                                         @Deprecated @deprecated("Use `clientId` instead", "2.5.0") private val clientIdVariable: Option[String] = None,
+                                         private val clientId: Option[StringOrSecret],
+                                         @Deprecated @deprecated("Use `clientSecret` instead", "2.5.0") private val clientSecretVariable: Option[String] = None,
+                                         private val clientSecret: Option[StringOrSecret],
+                                       ) extends AuthMode with HttpHeaderAuth {
+
+  private val _clientId: StringOrSecret = clientId.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(clientIdVariable.get))
+  private val _clientSecret: StringOrSecret = clientSecret.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(clientSecretVariable.get))
+
   private var keycloakClient: Keycloak = _
   private[smartdatalake] override def prepare(): Unit = {
     if (keycloakClient==null) {
@@ -94,8 +118,8 @@ case class KeycloakClientSecretAuthMode(ssoServer: String, ssoRealm: String, sso
         .serverUrl(ssoServer)
         .realm(ssoRealm)
         .grantType(ssoGrantType)
-        .clientId(clientId)
-        .clientSecret(clientSecret)
+        .clientId(_clientId.resolve())
+        .clientSecret(_clientSecret.resolve())
         .build
     }
     // check connection
@@ -108,7 +132,7 @@ case class KeycloakClientSecretAuthMode(ssoServer: String, ssoRealm: String, sso
   }
   private[smartdatalake] override def close(): Unit = {
     if (keycloakClient!=null) {
-      KeycloakUtil.logout(ssoServer, ssoRealm, clientId, clientSecret, keycloakClient)
+      KeycloakUtil.logout(ssoServer, ssoRealm, _clientId.resolve(), _clientSecret.resolve(), keycloakClient)
       keycloakClient.close
       keycloakClient = null
     }
@@ -118,23 +142,25 @@ case class KeycloakClientSecretAuthMode(ssoServer: String, ssoRealm: String, sso
 /**
  * Connect with custom HTTP authentication
  * @param className class name implementing trait [[CustomHttpAuthModeLogic]]
- * @param options Options to pass to the custom auth mode logc in prepare function
+ * @param options Options to pass to the custom auth mode logic in prepare function.
  */
-case class CustomHttpAuthMode(className: String, options: Map[String,String]) extends AuthMode with HttpHeaderAuth {
+case class CustomHttpAuthMode(className: String, options: Map[String,StringOrSecret]) extends AuthMode with HttpHeaderAuth {
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomHttpAuthModeLogic](className)
   private[smartdatalake] override def prepare(): Unit = impl.prepare(options)
   private[smartdatalake] override def getHeaders: Map[String, String] = impl.getHeaders
 }
 trait CustomHttpAuthModeLogic extends HttpHeaderAuth {
-  def prepare(options: Map[String,String]): Unit = Unit
+  def prepare(options: Map[String,StringOrSecret]): Unit = Unit
 }
 
 /**
  * Validate by user and private/public key
  * Private key is read from .ssh
  */
-case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
-  private[smartdatalake] val user: String = SecretsUtil.getSecret(userVariable)
+case class PublicKeyAuthMode(@Deprecated @deprecated("Use `user` instead", "2.5.0") private val userVariable: Option[String] = None,
+                             private val user: Option[StringOrSecret]) extends AuthMode {
+  private val _user: StringOrSecret = user.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(userVariable.get))
+  private[smartdatalake] val userSecret: StringOrSecret = _user
 }
 
 /**
@@ -144,13 +170,18 @@ case class PublicKeyAuthMode(userVariable: String) extends AuthMode {
 case class SSLCertsAuthMode (
                             keystorePath: String,
                             keystoreType: Option[String],
-                            keystorePassVariable: String,
+                            @Deprecated @deprecated("Use `keystorePass` instead", "2.5.0") private val keystorePassVariable: Option[String] = None,
+                            private val keystorePass: Option[StringOrSecret],
                             truststorePath: String,
                             truststoreType: Option[String],
-                            truststorePassVariable: String
+                            @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
+                            private val truststorePass: Option[StringOrSecret]
                            ) extends AuthMode {
-  private[smartdatalake] val truststorePass: String = SecretsUtil.getSecret(truststorePassVariable)
-  private[smartdatalake] val keystorePass: String = SecretsUtil.getSecret(keystorePassVariable)
+  private val _keystorePass = keystorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keystorePassVariable.get))
+  private val _truststorePass = truststorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(truststorePassVariable.get))
+
+  private[smartdatalake] val truststorePassSecret: StringOrSecret = _keystorePass
+  private[smartdatalake] val keystorePassSecret: StringOrSecret = _truststorePass
 }
 
 /**
@@ -158,14 +189,19 @@ case class SSLCertsAuthMode (
  */
 case class SASLSCRAMAuthMode (
                                  username: String,
-                                 passwordVariable: String,
+                                 @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None,
+                                 private val password: Option[StringOrSecret],
                                  sslMechanism: String,
                                  truststorePath: String,
                                  truststoreType: Option[String],
-                                 truststorePassVariable: String
+                                 @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
+                                 private val truststorePass: Option[StringOrSecret],
                                ) extends AuthMode {
-  private[smartdatalake] val password: String = SecretsUtil.getSecret(passwordVariable)
-  private[smartdatalake] val truststorePass: String = SecretsUtil.getSecret(truststorePassVariable)
+  private val _password: StringOrSecret = password.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(passwordVariable.get))
+  private val _truststorePass = truststorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(truststorePassVariable.get))
+
+  private[smartdatalake] val passwordSecret: StringOrSecret = _password
+  private[smartdatalake] val truststorePassSecret: StringOrSecret  = _truststorePass
 }
 
 

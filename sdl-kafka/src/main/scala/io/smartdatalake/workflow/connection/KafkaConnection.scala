@@ -67,19 +67,19 @@ case class KafkaConnection(override val id: ConnectionId,
       case Some(m: SSLCertsAuthMode) => {
         props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSSLSecurityProtocol)
         props.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, m.keystorePath)
-        props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, m.keystorePass)
+        props.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, m.keystorePassSecret)
         props.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.keystoreType.getOrElse(SslConfigs.DEFAULT_SSL_KEYSTORE_TYPE))
         props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
-        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
+        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePassSecret)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
      case Some(m: SASLSCRAMAuthMode) => {
         props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSASLSSLSecurityProtocol)
         props.put("sasl.mechanism", m.sslMechanism)
         props.put("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\""
-          + m.username + "\" password=\"" + m.password + "\";")
+          + m.username + "\" password=\"" + m.passwordSecret + "\";")
         props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
-        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePass)
+        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePassSecret)
         props.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
       case Some(m) => throw ConfigurationException(s"${m.getClass.getSimpleName} is not supported for ${getClass.getSimpleName}")

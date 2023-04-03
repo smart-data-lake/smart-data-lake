@@ -18,12 +18,13 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{ConfigException, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataobject._
@@ -324,8 +325,8 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          |    ssoServer = server
          |    ssoRealm = realm
          |    ssoGrantType = client_token
-         |    clientIdVariable = "CLEAR#foo"
-         |    clientSecretVariable = "CLEAR#secret"
+         |    clientId = "foo"
+         |    clientSecret = "secret"
          |  }
          | }
          |}
@@ -335,7 +336,8 @@ class DataObjectImplTests extends FlatSpec with Matchers {
     registry.instances.values.head shouldBe WebserviceFileDataObject(
       id = "123",
       url = "http://test",
-      authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token", clientIdVariable = "CLEAR#foo", clientSecretVariable = "CLEAR#secret"))
+      authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token",
+        clientId = Some(StringOrSecret("foo")), clientSecret= Some(StringOrSecret("secret"))))
     )
   }
 

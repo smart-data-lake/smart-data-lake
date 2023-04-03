@@ -23,9 +23,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.workflow.ActionPipelineContext
-
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
@@ -36,7 +35,7 @@ import javax.crypto.{Cipher, SecretKey}
 import org.apache.spark.sql.functions.{col, udf}
 
 trait EncryptDecrypt {
-  def key: Array[Byte]
+  def keyAsBytes: Array[Byte]
 
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
   private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
@@ -58,7 +57,7 @@ trait EncryptDecrypt {
   }
 
   def encrypt(message: String): String = {
-    val aesKey: SecretKey = generateAesKey(key)
+    val aesKey: SecretKey = generateAesKey(keyAsBytes)
     val gcmParameterSpec = generateGcmParameterSpec()
 
     val cipher = Cipher.getInstance(ALGORITHM_STRING)
@@ -69,7 +68,7 @@ trait EncryptDecrypt {
   }
 
   def decrypt(encryptedDataString: String): String = {
-    val aesKey: SecretKey = generateAesKey(key)
+    val aesKey: SecretKey = generateAesKey(keyAsBytes)
     val (gcmParameterSpec, encryptedMessage) = decodeData(encryptedDataString)
 
     val cipher = Cipher.getInstance(ALGORITHM_STRING)
@@ -111,12 +110,13 @@ trait EncryptDecrypt {
 case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      encryptColumns: Seq[String],
-                                     keyVariable: String,
+                                     @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
+                                     private val key: Option[StringOrSecret],
                                     )
   extends SparkDfTransformer with EncryptDecrypt {
-  private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
+  private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
 
-  override def key: Array[Byte] = cur_key.getBytes
+  override def keyAsBytes: Array[Byte] = cur_key.resolve().getBytes
 
   override val cryptUDF: UserDefinedFunction = udf(encrypt _)
 
@@ -145,13 +145,14 @@ object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer]
 case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      decryptColumns: Seq[String],
-                                     keyVariable: String,
+                                     @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
+                                     private val key: Option[StringOrSecret],
                                      algorithm: String = "AES/CBC/PKCS5Padding"
                                     )
   extends SparkDfTransformer with EncryptDecrypt {
-  private[smartdatalake] val cur_key: String = SecretsUtil.getSecret(keyVariable)
+  private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
 
-  override def key: Array[Byte] = cur_key.getBytes
+  override def keyAsBytes: Array[Byte] = cur_key.resolve().getBytes
 
   override val cryptUDF: UserDefinedFunction = udf(decrypt _)
 

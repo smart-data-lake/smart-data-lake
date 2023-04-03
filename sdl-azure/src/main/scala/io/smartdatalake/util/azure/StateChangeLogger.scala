@@ -24,7 +24,7 @@ import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeInfo}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
@@ -42,16 +42,16 @@ import java.time.LocalDateTime
  *                        logType : "__yourLogType__"} }
  *        ]
  */
-class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
+class StateChangeLogger(options: Map[String,StringOrSecret]) extends StateListener with SmartDataLakeLogger {
 
   assert(options.contains("workspaceID"))
   assert(options.contains("logAnalyticsKey"))
 
-  val logType : String = options.getOrElse("logType", "StateChange")
+  val logType : String = options.get("logType").map(_.resolve()).getOrElse("StateChange")
   val maxDocumentsNumber = 100   // azure log analytics' limit
 
-  lazy private val logAnalyticsKey: String = SecretsUtil.getSecret(options("logAnalyticsKey"))
-  lazy private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), logAnalyticsKey)
+  lazy private val logAnalyticsKey: String = options("logAnalyticsKey").resolve()
+  lazy private val azureLogClient = new LogAnalyticsClient(options("workspaceID").resolve(), logAnalyticsKey)
 
   override def init(): Unit = {
     logger.debug(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
