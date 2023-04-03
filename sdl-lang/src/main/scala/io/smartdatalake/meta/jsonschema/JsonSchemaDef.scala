@@ -113,7 +113,7 @@ private[smartdatalake] case class JsonBooleanDef(
                            default: Option[Boolean] = None,
                            deprecated: Option[Boolean] = None
                          ) extends JsonTypeDef {
-  override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.String)
+  override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Boolean)
 }
 
 /**
