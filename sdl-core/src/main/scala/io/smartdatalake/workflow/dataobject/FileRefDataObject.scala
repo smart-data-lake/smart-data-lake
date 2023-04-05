@@ -167,7 +167,7 @@ trait FileRefDataObject extends FileDataObject {
 
   /**
    * Create directories if not existing.
-   * If no implementation is given, it is assumed that directories will be created on the file when writing a file.
+   * If no implementation is given, it is assumed that directories will be created on-the-fly when writing a file.
    */
   def mkDirs(path: String)(implicit context: ActionPipelineContext): Unit = Unit
 

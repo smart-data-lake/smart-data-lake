@@ -171,7 +171,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         s"($id) Iceberg spark properties are missing. Please set spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions and org.apache.iceberg.spark.SparkSessionCatalog")
     }
     if(!isDbExisting) {
-      // DB (schema) is created automatically by iceberg when creatig tables. But we would like to keep the same behaviour as done by spark_catalog, where only default DB is existing, and others must be created manually.
+      // DB (schema) is created automatically by iceberg when creating tables. But we would like to keep the same behaviour as done by spark_catalog, where only default DB is existing, and others must be created manually.
       require(table.db.contains("default"), s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
     }
     if (!isTableExisting) {

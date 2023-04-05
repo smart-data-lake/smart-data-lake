@@ -63,11 +63,11 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Recursive Inputs are DataObjects that are used as Output and Input in the same or different action.
    * This is usually prohibited as it creates loops in the DAG.
    * In special cases this makes sense, i.e. when building a complex comparision/update logic.
-   * Recursive inputs are allowed in the same Action if the DataObject implement TransactionalSparkTableDataObject.
+   * Recursive inputs are allowed in the same Action if the DataObject implements TransactionalSparkTableDataObject.
    * For special cases this is to restrictive. To allow special DataObjects for recursive use within two different actions,
    * see also [[GlobalConfig.allowAsRecursiveInput]].
    *
-   * Usage: add DataObjects used as Output and Input as outputIds and recursiveInputIds, but not as inputIds.
+   * Usage: add DataObjects that are used both as Output and Input as outputIds and recursiveInputIds, but do not add them as inputIds.
    */
   def recursiveInputs: Seq[DataObject] = Seq()
 
@@ -118,7 +118,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def validateConfig(): Unit = {
     recursiveInputs.foreach { input =>
       if (outputs.exists(_.id == input.id)) {
-        assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is listed in outputIds but is not a TransactionalSparkTableDataObjects.")
+        assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is listed in outputIds but is not a TransactionalSparkTableDataObject.")
       } else if (Environment.globalConfig.allowAsRecursiveInput.contains(input.id)) {
         logger.info(s"($id) Using ${input.id} as recursive input even though it is not listed in outputIds of the same Action, but in globalConfig.allowAsRecursiveInput")
       } else {
