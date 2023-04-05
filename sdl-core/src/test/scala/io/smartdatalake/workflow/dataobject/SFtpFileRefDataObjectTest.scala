@@ -236,7 +236,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     tgtDO.startWritingOutputStreams(fileRefPairs1.map(_.tgt.partitionValues))
     filetransfer1.exec(fileRefPairs1)
     val tgtFileRefs1 = tgtDO.getFileRefs(Seq())
-    assert(tgtFileRefs1.toSet == fileRefPairs1.map(_.tgt).toSet)
+    assert(tgtFileRefs1.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("AB_NYC_2019.csv1"))
 
     // src2 file transfer overwriting partition 2022
     val filetransfer2 = new StreamFileTransfer(srcDO2, tgtDO)
@@ -246,7 +246,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     tgtDO.startWritingOutputStreams(fileRefPairs2.map(_.tgt.partitionValues))
     filetransfer2.exec(fileRefPairs2)
     val tgtFileRefs2 = tgtDO.getFileRefs(Seq())
-    assert(tgtFileRefs2.toSet == fileRefPairs2.map(_.tgt).toSet)
+    assert(tgtFileRefs2.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("AB_NYC_2019.csv2"))
   }
 
   test("overwrite directory based partition") {
@@ -273,7 +273,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     tgtDO.startWritingOutputStreams(fileRefPairs1.map(_.tgt.partitionValues))
     filetransfer1.exec(fileRefPairs1)
     val tgtFileRefs1 = tgtDO.getFileRefs(Seq())
-    assert(tgtFileRefs1.toSet == fileRefPairs1.map(_.tgt).toSet)
+    assert(tgtFileRefs1.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("2022/AB_NYC_2019.csv1"))
 
     // src2 file transfer overwriting partition 2022
     val filetransfer2 = new StreamFileTransfer(srcDO2, tgtDO)
@@ -283,7 +283,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     tgtDO.startWritingOutputStreams(fileRefPairs2.map(_.tgt.partitionValues))
     filetransfer2.exec(fileRefPairs2)
     val tgtFileRefs2 = tgtDO.getFileRefs(Seq())
-    assert(tgtFileRefs2.toSet == fileRefPairs2.map(_.tgt).toSet)
+    assert(tgtFileRefs2.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("2022/AB_NYC_2019.csv2"))
   }
 
   test("overwrite directory and filename based partition") {
@@ -305,15 +305,15 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     // src1 file transfer
     val filetransfer1 = new StreamFileTransfer(srcDO1, tgtDO)
     val srcFileRefs1 = srcDO1.getFileRefs(Seq())
-    assert(srcFileRefs1.size==1)
+    assert(srcFileRefs1.map(f => srcDO1.relativizePath(f.fullPath)).toSet==Set("20220101/AB_NYC_2019.csv2"))
     val tgtFileRefs1 = tgtDO.getFileRefs(Seq())
-    assert(tgtFileRefs1.size==3)
+    assert(tgtFileRefs1.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("20220101/AB_BN_2019.csv","20220101/AB_NYC_2019.csv1","20220201/AB_NYC_2019.csv"))
     val fileRefPairs1 = tgtDO.translateFileRefs(srcFileRefs1, Some("\\.csv.*".r)) // keep only filetype from source filename, the rest is handled as partition values...
     tgtDO.startWritingOutputStreams(fileRefPairs1.map(_.tgt.partitionValues))
     filetransfer1.exec(fileRefPairs1)
     val tgtFileRefs1after = tgtDO.getFileRefs(Seq(PartitionValues(Map("date"->"20220101","town"->"NYC","year"->"2019"))))
-    assert(tgtFileRefs1after.toSet == fileRefPairs1.map(_.tgt).toSet)
+    assert(tgtFileRefs1after.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("20220101/AB_NYC_2019.csv2"))
     val tgtFileRefsFinal = tgtDO.getFileRefs(Seq())
-    assert(tgtFileRefsFinal.size == 3)
+    assert(tgtFileRefsFinal.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("20220101/AB_BN_2019.csv","20220101/AB_NYC_2019.csv2","20220201/AB_NYC_2019.csv"))
   }
 }
