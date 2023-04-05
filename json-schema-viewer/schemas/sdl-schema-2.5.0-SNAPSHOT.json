@@ -205,7 +205,7 @@
             "description" : "optional expression to define or refine the list of selected output partitions. Define a spark sql expression working with the attributes of[[PartitionDiffModeExpressionData]] returning a list<map<string,string>>.\nDefault is to return the originally selected output partitions found in attribute selectedOutputPartitionValues."
           },
           "applyPartitionValuesTransform" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If true applies the partition values transform of custom transformations on input partition values before comparison with output partition values.\nIf enabled input and output partition columns can be different. Default is to disable the transformation of partition values."
           },
           "selectAdditionalInputExpression" : {
@@ -355,7 +355,7 @@
             "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
           },
           "checkDeltaLakeSparkOptions" : {
-            "type" : "string"
+            "type" : "boolean"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
@@ -534,11 +534,11 @@
             "$ref" : "#/definitions/Others/ConnectionMetadata"
           },
           "enableCommit" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "whether to enable commits for transactional behaviour in SDL\nNote that most JDBC drivers use auto-commit per default which is not recommended when[[enableCommit]]is true.\nDefault is enableCommit = true. To disable auto-commit see[[autoCommit]] ."
           },
           "autoCommit" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "flag to enable or disable the auto-commit behaviour of the JDBC driver\nIf not set, the default auto-commit mode of the JDBC driver is used."
           },
           "connectionInitSql" : {
@@ -636,7 +636,7 @@
             "description" : "authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported."
           },
           "ignoreHostKeyVerification" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "do not validate host key if true, default is false"
           },
           "maxParallelConnections" : {
@@ -1333,6 +1333,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -1366,34 +1394,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1526,7 +1526,7 @@
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "allowSchemaEvolution" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error."
           },
           "retentionPeriod" : {
@@ -1630,15 +1630,15 @@
                 "description" : "Optional limit of the number of rows being returned on read.\nThis is applied after`numLinesToSkip` ."
               },
               "useHeader" : {
-                "type" : "string",
+                "type" : "boolean",
                 "description" : "If`true` , the first row of the excel sheet specifies the column names (default: true)."
               },
               "treatEmptyValuesAsNulls" : {
-                "type" : "string",
+                "type" : "boolean",
                 "description" : "Empty cells are parsed as`null` values (default: true)."
               },
               "inferSchema" : {
-                "type" : "string",
+                "type" : "boolean",
                 "description" : "Infer the schema of the excel sheet automatically (default: true)."
               },
               "timestampFormat" : {
@@ -1798,7 +1798,7 @@
             "description" : "partition columns for this data object"
           },
           "analyzeTableAfterWrite" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "enable compute statistics after writing data (default=false)"
           },
           "dateColumnType" : {
@@ -1852,6 +1852,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -1885,34 +1913,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2183,6 +2183,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -2216,34 +2244,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2380,7 +2380,7 @@
             "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
           },
           "allowSchemaEvolution" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error."
           },
           "connectionId" : {
@@ -2557,7 +2557,7 @@
             "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file."
           },
           "stringify" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Set the data type for all values to string."
           },
           "acl" : {
@@ -2659,7 +2659,7 @@
             "description" : "An optional schema for parsing the value column. This has to be specified if valueType = Json or Avro to parse the corresponding content.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
           },
           "allowSchemaEvolution" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true schema evolution within schema registry will automatically occur when writing to this DataObject with different key or value schema, otherwise SDL will stop with error.\nThis only applies if keyType or valueType is set to Json/AvroSchemaRegistry.\nKafka Schema Evolution implementation will update schema if existing records with old schema can be read with new schema (backward compatible). Otherwise an IncompatibleSchemaException is thrown."
           },
           "selectCols" : {
@@ -2689,7 +2689,7 @@
                 "description" : "time zone used for date logic. If not specified, java system default is used."
               },
               "includeCurrentPartition" : {
-                "type" : "string",
+                "type" : "boolean",
                 "description" : "If the current partition should be included. Default is to list only completed partitions.\nAttention: including the current partition might result in data loss if there is more data arriving.\nBut it might be useful to export all data before a scheduled maintenance."
               }
             },
@@ -2699,7 +2699,7 @@
             "description" : "Definition of date partition column to extract formatted time into column."
           },
           "batchReadConsecutivePartitionsAsRanges" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)"
           },
           "batchReadMaxOffsetsPerTask" : {
@@ -2734,7 +2734,7 @@
             "description" : ": The config value can point to a configuration file or a directory containing configuration files."
           },
           "flattenOutput" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : ": if true, key and data column are converted from type map<k,v> to string (default)."
           },
           "metadata" : {
@@ -3065,11 +3065,11 @@
             "enum" : [ "Default ", "String ", "Date " ]
           },
           "treatMissingColumnsAsCorrupt" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true records from files with missing columns in its header are treated as corrupt (default=false).\nCorrupt records are handled according to options.mode (default=permissive)."
           },
           "treatSuperfluousColumnsAsCorrupt" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true records from files with superfluous columns in its header are treated as corrupt (default=false).\nCorrupt records are handled according to options.mode (default=permissive)."
           },
           "saveMode" : {
@@ -3269,6 +3269,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -3302,34 +3330,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3545,7 +3545,7 @@
             "description" : "Definition of partition columns"
           },
           "analyzeTableAfterWrite" : {
-            "type" : "string"
+            "type" : "boolean"
           },
           "dateColumnType" : {
             "type" : "string",
@@ -3597,6 +3597,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLExpectation"
                   },
                   "name" : {
@@ -3630,34 +3658,6 @@
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3927,7 +3927,7 @@
             "additionalProperties" : false
           },
           "followRedirects" : {
-            "type" : "string"
+            "type" : "boolean"
           },
           "partitionDefs" : {
             "type" : "array",
@@ -4036,7 +4036,7 @@
             "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file."
           },
           "flatten" : {
-            "type" : "string"
+            "type" : "boolean"
           },
           "acl" : {
             "type" : "object",
@@ -4996,15 +4996,15 @@
             "description" : "Optional description of the transformer"
           },
           "camelCaseToLower" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest\nOtherwise converts just to lower case."
           },
           "normalizeToAscii" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily"
           },
           "removeNonStandardSQLNameChars" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
           }
         },
@@ -5318,15 +5318,15 @@
                   "description" : "Optional description of the transformer"
                 },
                 "camelCaseToLower" : {
-                  "type" : "string",
+                  "type" : "boolean",
                   "description" : "If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest\nOtherwise converts just to lower case."
                 },
                 "normalizeToAscii" : {
-                  "type" : "string",
+                  "type" : "boolean",
                   "description" : "If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily"
                 },
                 "removeNonStandardSQLNameChars" : {
-                  "type" : "string",
+                  "type" : "boolean",
                   "description" : "Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
                 }
               },
@@ -5707,45 +5707,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "ScalaClassSnowparkDfTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "className" : {
-                  "type" : "string",
-                  "description" : "class name implementing trait[[CustomSnowparkDfTransformer]]"
-                },
-                "options" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string",
-                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                  },
-                  "description" : "Options to pass to the transformation\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string",
-                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                  },
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                }
-              },
-              "title" : "ScalaClassSnowparkDfTransformer",
-              "required" : [ "className", "type" ],
-              "additionalProperties" : false,
-              "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomSnowparkDfTransformer]] ."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "ScalaNotebookSparkDfTransformer"
                 },
                 "name" : {
@@ -5805,6 +5766,45 @@
               "required" : [ "url", "functionName", "type" ],
               "additionalProperties" : false,
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nThe code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame\nand a map of options and has to return a DataFrame, see also ([[fnTransformType]] ).\nNotebook-cells starting with \\\"//!IGNORE\\\" will be ignored."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "ScalaClassSnowparkDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "className" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomSnowparkDfTransformer]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                  },
+                  "description" : "Options to pass to the transformation\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                  },
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "ScalaClassSnowparkDfTransformer",
+              "required" : [ "className", "type" ],
+              "additionalProperties" : false,
+              "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomSnowparkDfTransformer]] ."
             }, {
               "type" : "object",
               "properties" : {
@@ -5882,6 +5882,17 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5905,17 +5916,6 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -6197,19 +6197,19 @@
             "enum" : [ "DataObjectOrdering ", "DataObjectId " ]
           },
           "strictInputValidation" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Enforce that the number of input dataobjects must be the same as the number of input datasets. False by default,\nbecause when chaining multiple transformations in the same action, you may not need all output Data objects of the previous transformations.\nHowever, having more input parameters in your transform method than Dataobjects will always fail."
           },
           "inputColumnAutoSelect" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Determine if the input-datasets should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default."
           },
           "outputColumnAutoSelect" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Determine if the output-dataset should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default."
           },
           "addPartitionValuesToOutput" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true and if one partition-value is processed at a time, the partition-columns will be added to the output-dataset\nIf more than one partition-value is processed simultaneously, the transformation will fail because it cannot\ndetermine which row should get which partition-value. False by default."
           },
           "outputDatasetId" : {
@@ -6283,7 +6283,7 @@
             "description" : "output DataObject"
           },
           "deleteDataAfterRead" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "a flag to enable deletion of input partitions after copying."
           },
           "transformer" : {
@@ -6378,11 +6378,11 @@
             "description" : "optional list of transformations to apply. See[[spark.transformer]] for a list of included Transformers.\nThe transformations are applied according to the lists ordering."
           },
           "breakDataFrameLineage" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "executionMode" : {
@@ -6536,11 +6536,11 @@
             "description" : "list of transformations to apply. See[[spark.transformer]] for a list of included Transformers.\nThe transformations are applied according to the ordering of the list.\nNote that all outputs of previous transformers are kept as input for next transformer,\nbut in the end only outputs of the last transformer are mapped to output DataObjects."
           },
           "breakDataFrameLineage" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "mainInputId" : {
@@ -6666,7 +6666,7 @@
             "description" : "number of files per Spark partition"
           },
           "breakFileRefLineage" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed\\'s partitionValue.\nThis is needed to reprocess all files of a path/partition instead of the FileRef\\'s passed from the previous Action."
           },
           "executionMode" : {
@@ -6886,19 +6886,19 @@
             "description" : "optional list of transformations to apply before deduplication. See[[sparktransformer]] for a list of included Transformers.\nThe transformations are applied according to the lists ordering."
           },
           "ignoreOldDeletedColumns" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "if true, remove no longer existing columns in Schema Evolution"
           },
           "ignoreOldDeletedNestedColumns" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "if true, remove no longer existing columns from nested data types in Schema Evolution.\nKeeping deleted columns in complex data types has performance impact as all new data\nin the future has to be converted by a complex function."
           },
           "updateCapturedColumnOnlyWhenChanged" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Set to true to enable update Column[[TechnicalTableColumn.captured]] only if Record has changed in the source, instead of updating it with every execution (default=false).\nThis results in much less records updated with saveMode.Merge."
           },
           "mergeModeEnable" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Set to true to use saveMode.Merge for much better performance. Output DataObject must implement[[CanMergeDataFrame]] if enabled (default = false)."
           },
           "mergeModeAdditionalJoinPredicate" : {
@@ -6906,11 +6906,11 @@
             "description" : "To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.\nSpecify a condition to select existing data to be used in transformation as Spark SQL expression.\nUse table alias \\'existing\\' to reference columns of the existing table data."
           },
           "breakDataFrameLineage" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "executionMode" : {
@@ -6982,10 +6982,10 @@
             "description" : "output DataObject"
           },
           "overwrite" : {
-            "type" : "string"
+            "type" : "boolean"
           },
           "breakFileRefLineage" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "If set to true, file references passed on from previous action are ignored by this action.\nThe action will detect on its own what files it is going to process."
           },
           "executionMode" : {
@@ -7166,15 +7166,15 @@
             "description" : "optional final list of columns to use when comparing two records in historization. Can not be used together with[[historizeBlacklist]] ."
           },
           "ignoreOldDeletedColumns" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "if true, remove no longer existing columns in Schema Evolution"
           },
           "ignoreOldDeletedNestedColumns" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "if true, remove no longer existing columns from nested data types in Schema Evolution.\nKeeping deleted columns in complex data types has performance impact as all new data\nin the future has to be converted by a complex function."
           },
           "mergeModeEnable" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Set to true to use saveMode.Merge for much better performance by using incremental historization.\nOutput DataObject must implement[[CanMergeDataFrame]] if enabled (default = false).\nIncremental historization will add an additional \\\"dl_hash\\\" column which is used for change detection between\nexisting and new data.\nNote that enabling mergeMode on an existing HistorizeAction will create a new version for every\nnew record in the output table, as \\\"dl_hash\\\" column is initially null."
           },
           "mergeModeAdditionalJoinPredicate" : {
@@ -7190,11 +7190,11 @@
             "description" : "Optional value of mergeModeCDCColumn that marks a record as deleted."
           },
           "breakDataFrameLineage" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.\nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.\nThe new DataFrame will be initialized according to the SubFeed\\'s partitionValues."
           },
           "persist" : {
-            "type" : "string",
+            "type" : "boolean",
             "description" : "Force persisting input DataFrame\\'s on Disk.\nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task get\\'s lost.\nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
           },
           "executionMode" : {
@@ -7264,6 +7264,10 @@
               "$ref" : "#/definitions/Action/CustomDataFrameAction"
             }, {
               "$ref" : "#/definitions/Action/CustomFileAction"
+            }, {
+              "$ref" : "#/definitions/Action/CustomScriptAction"
+            }, {
+              "$ref" : "#/definitions/Action/DeduplicateAction"
             }, {
               "$ref" : "#/definitions/Action/FileTransferAction"
             }, {
@@ -7354,7 +7358,7 @@
               "description" : ": If port is already in use, we will increment port by one and try with that new port.\nmaxPortRetries describes how many times this should be attempted. If set to 0 it will not be attempted.\nValues below 0 are not allowed."
             },
             "stopOnEnd" : {
-              "type" : "string",
+              "type" : "boolean",
               "description" : ": Set to false if the Server should remain online even after SDL has finished its execution.\nIn that case, the Application needs to be stopped manually. Useful for debugging."
             }
           },
@@ -7363,7 +7367,7 @@
           "description" : "Configuration for the Server that provides live status info of the current DAG Execution"
         },
         "enableHive" : {
-          "type" : "string",
+          "type" : "boolean",
           "description" : "enable hive for spark session"
         },
         "memoryLogTimer" : {
@@ -7374,15 +7378,15 @@
               "description" : "interval in seconds between memory usage logs"
             },
             "logLinuxMem" : {
-              "type" : "string",
+              "type" : "boolean",
               "description" : "enable logging linux memory"
             },
             "logLinuxCGroupMem" : {
-              "type" : "string",
+              "type" : "boolean",
               "description" : "enable logging details about linux cgroup memory"
             },
             "logBuffers" : {
-              "type" : "string",
+              "type" : "boolean",
               "description" : "enable logging details about different jvm buffers"
             }
           },
@@ -7392,7 +7396,7 @@
           "description" : "Configuration for periodic memory usage logging"
         },
         "shutdownHookLogger" : {
-          "type" : "string",
+          "type" : "boolean",
           "description" : "enable shutdown hook logger to trace shutdown cause"
         },
         "stateListeners" : {
