@@ -1,2 +1,2 @@
 /*! JSON Schema Viewer v0.3.4 - For included libraries, see source for additional licensing info. | https://github.com/jlblcc/json-schema-viewer */
-!function(a){var b=window.location.hash,c=b.match(/v=([^\&]+)/);window.jsvInitPath=!!c&&c[1],window.location.hash=b.match(/#[^\?]+/)||""}(jQuery);
+!function(){var a=window.location.hash,n=a.match(/v=([^\&]+)/);window.jsvInitPath=!!n&&n[1],window.location.hash=a.match(/#[^\?]+/)||""}(jQuery);
