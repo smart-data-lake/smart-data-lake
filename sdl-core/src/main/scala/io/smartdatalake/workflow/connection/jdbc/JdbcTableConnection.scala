@@ -47,11 +47,11 @@ import java.time.Duration
  * @param driver class name of jdbc driver
  * @param authMode optional authentication information: for now BasicAuthMode is supported.
  * @param db jdbc database
- * @param maxParallelConnections number of parallel jdbc connections created by an instance of this connection
+ * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
- * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 60 seconds.
+ * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
  * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
  *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
@@ -61,9 +61,9 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                driver: String,
                                authMode: Option[AuthMode] = None,
                                db: Option[String] = None,
-                               maxParallelConnections: Int = 1,
+                               maxParallelConnections: Int = 3,
                                connectionPoolMaxIdleTimeSec: Int = 3,
-                               connectionPoolMaxWaitTimeSec: Int = 60,
+                               connectionPoolMaxWaitTimeSec: Int = 600,
                                override val metadata: Option[ConnectionMetadata] = None,
                                @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None
@@ -191,7 +191,6 @@ case class JdbcTableConnection(override val id: ConnectionId,
   // setup connection pool
   val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
-  pool.setMaxIdle(1) // keep max one idle jdbc connection
   pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close jdbc connection if not in use
   pool.setMaxWait(Duration.ofSeconds(connectionPoolMaxWaitTimeSec))
 

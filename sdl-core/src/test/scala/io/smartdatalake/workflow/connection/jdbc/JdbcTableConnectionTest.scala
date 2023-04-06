@@ -46,6 +46,7 @@ class JdbcTableConnectionTest extends FunSuite {
     val transaction1 = jdbcConnection.beginTransaction()
     transaction1.commit()
     val transaction2 = jdbcConnection.beginTransaction()
+    transaction2.commit();
 
     // check
     // no exception
@@ -60,6 +61,7 @@ class JdbcTableConnectionTest extends FunSuite {
     val transaction1 = jdbcConnection.beginTransaction()
     transaction1.rollback()
     val transaction2 = jdbcConnection.beginTransaction()
+    transaction2.commit();
 
     // check
     // no exception
@@ -73,6 +75,8 @@ class JdbcTableConnectionTest extends FunSuite {
     // run
     val transaction1 = jdbcConnection.beginTransaction()
     val transaction2 = jdbcConnection.beginTransaction()
+    transaction1.commit();
+    transaction2.commit();
 
     // check
     // no exception
