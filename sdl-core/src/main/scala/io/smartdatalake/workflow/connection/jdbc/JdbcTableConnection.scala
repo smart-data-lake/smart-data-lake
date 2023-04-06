@@ -232,12 +232,12 @@ case class JdbcTableConnection(override val id: ConnectionId,
    * Class for handling database transactions. If all operations succeeded call [[commit]], otherwise [[rollback]].
    */
   class JdbcTransaction(connection: JdbcTableConnection) extends SmartDataLakeLogger {
-    logger.info(s"begin transaction [$id]")
+    logger.info(s"($id) begin transaction")
     private val jdbcConnection: SqlConnection = connection.pool.borrowObject()
 
     def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
       connection.execWithJdbcStatement(jdbcConnection, doCommit = false) { stmt =>
-        if (logging) logger.info(s"execJdbcStatement in transaction [$id]: $sql")
+        if (logging) logger.info(s"($id) execJdbcStatement in transaction: $sql")
         if (autoCommit) logger.warn("autoCommit is enabled, so statement will be committed immediately")
         stmt.execute(sql)
       }
@@ -245,7 +245,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
 
     def commit(): Unit = {
       if (!connection.autoCommit) {
-        logger.info(s"commit transaction [$id]")
+        logger.info(s"($id) commit transaction")
         jdbcConnection.commit()
       };
       close()
@@ -254,7 +254,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
     def rollback(): Unit = {
       try {
         if (!connection.autoCommit) {
-          logger.info(s"roll back transaction [$id]")
+          logger.info(s"($id) roll back transaction")
           jdbcConnection.rollback()
         };
       } finally {
