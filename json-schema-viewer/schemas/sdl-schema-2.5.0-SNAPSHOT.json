@@ -601,11 +601,11 @@
         "additionalProperties" : false,
         "description" : "Connection information for kafka"
       },
-      "SftpFileRefConnection" : {
+      "SFtpFileRefConnection" : {
         "type" : "object",
         "properties" : {
           "type" : {
-            "const" : "SftpFileRefConnection"
+            "const" : "SFtpFileRefConnection"
           },
           "host" : {
             "type" : "string",
@@ -635,6 +635,28 @@
             } ],
             "description" : "authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported."
           },
+          "proxy" : {
+            "type" : "object",
+            "properties" : {
+              "host" : {
+                "type" : "string",
+                "description" : "proxy host"
+              },
+              "port" : {
+                "type" : "integer",
+                "description" : "proxy port"
+              },
+              "proxyType" : {
+                "type" : "string",
+                "description" : "Type of proxy: HTTP or SOCKS. Default is HTTP.",
+                "enum" : [ "DIRECT", "HTTP", "SOCKS" ]
+              }
+            },
+            "title" : "JavaNetProxyConfig",
+            "required" : [ "host", "port" ],
+            "additionalProperties" : false,
+            "description" : "Proxy configuration to create java.net.Proxy instance."
+          },
           "ignoreHostKeyVerification" : {
             "type" : "boolean",
             "description" : "do not validate host key if true, default is false"
@@ -651,7 +673,7 @@
             "$ref" : "#/definitions/Others/ConnectionMetadata"
           }
         },
-        "title" : "SftpFileRefConnection",
+        "title" : "SFtpFileRefConnection",
         "required" : [ "type", "host", "authMode" ],
         "additionalProperties" : false,
         "description" : "SFTP Connection information"
@@ -3197,7 +3219,7 @@
           },
           "partitionLayout" : {
             "type" : "string",
-            "description" : "partition layout defines how partition values can be extracted from the path.\nUse \\\"%<colname>%\\\" as token to extract the value for a partition column.\nWith \\\"%<colname:regex>%\\\" a regex can be given to limit search. This is especially useful\nif there is no char to delimit the last token from the rest of the path or also between\ntwo tokens."
+            "description" : "partition layout defines how partition values can be extracted from the path.\nUse \\\"%<colname>%\\\" as token to extract the value for a partition column.\nAs partition layout extracts partition from the path of individual files, it can also be used to extract partitions from the file name.\nWith \\\"%<colname:regex>%\\\" a regex can be given to limit search. This is especially useful\nif there is no char to delimit the last token from the rest of the path or also between\ntwo tokens.\nBe careful that for directory based partition values extraction, the final path separator must be part\nof the partition layout to extract the last token correctly, e.g. \\\"%year%/\\\" for partitioning with yearly directories."
           },
           "saveMode" : {
             "type" : "string",
@@ -5882,17 +5904,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5916,6 +5927,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -6982,7 +7004,16 @@
             "description" : "output DataObject"
           },
           "overwrite" : {
-            "type" : "boolean"
+            "type" : "boolean",
+            "description" : "Allow existing output file to be overwritten. If false the action will fail if a file to be created already exists. Default is true."
+          },
+          "maxParallelism" : {
+            "type" : "integer",
+            "description" : "Set maximum of files to be transferred in parallel.\nNote that this information can also be set on DataObjects like SFtpFileRefDataObject, resp. its SFtpFileRefConnection.\nThe FileTransferAction will then take the minimum parallelism of input, output and this attribute.\nIf parallelism is not specified on input, output and this attribute, it is set to 1."
+          },
+          "filenameExtractorRegex" : {
+            "type" : "string",
+            "description" : "A regex to extract a part of the filename to keep in the translated FileRef.\nIf the regex contains group definitions, the first group is taken, otherwise the whole regex match.\nDefault is None which keeps the whole filename (without path)."
           },
           "breakFileRefLineage" : {
             "type" : "boolean",
@@ -7258,21 +7289,7 @@
             "const" : "ProxyAction"
           },
           "wrappedAction" : {
-            "oneOf" : [ {
-              "$ref" : "#/definitions/Action/CopyAction"
-            }, {
-              "$ref" : "#/definitions/Action/CustomDataFrameAction"
-            }, {
-              "$ref" : "#/definitions/Action/CustomFileAction"
-            }, {
-              "$ref" : "#/definitions/Action/CustomScriptAction"
-            }, {
-              "$ref" : "#/definitions/Action/DeduplicateAction"
-            }, {
-              "$ref" : "#/definitions/Action/FileTransferAction"
-            }, {
-              "$ref" : "#/definitions/Action/HistorizeAction"
-            } ]
+            "$ref" : "#/definitions/Action/CopyAction"
           },
           "agent" : {
             "oneOf" : [ {
@@ -7455,6 +7472,13 @@
           },
           "description" : "Configure a list of exceptions for partitioned DataObject id\\'s,\nwhich are allowed to overwrite the all partitions of a table if no partition values are set.\nThis is used to override/avoid a protective error when using SDLSaveMode.OverwriteOptimized|OverwritePreserveDirectories.\nDefine it as a list of DataObject id\\'s."
         },
+        "allowAsRecursiveInput" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          },
+          "description" : "List of DataObjects for which the validation rules for Action.recursiveInputIds are *not* checked.\nThe validation rules are\n1) that recursive input DataObjects must also be listed in output DataObjects of the same action\n2) the DataObject must implement TransactionalSparkTableDataObject interface\nListing a DataObject in allowAsRecursiveInput can be used for well thought exceptions, but should be avoided in general.\nNote that if 1) is true, also 2) must be fullfilled for Spark to work properly (because Spark can\\'t read/write the same storage location in the same job),\nbut there might be cases with recursions with different Actions involved, that dont need to fullfill 2)."
+        },
         "synchronousStreamingTriggerIntervalSec" : {
           "type" : "integer",
           "description" : "Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)\nThe synchronous actions of the DAG will be executed with this interval if possile.\nNote that for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval."
@@ -7486,7 +7510,7 @@
         }, {
           "$ref" : "#/definitions/Connection/KafkaConnection"
         }, {
-          "$ref" : "#/definitions/Connection/SftpFileRefConnection"
+          "$ref" : "#/definitions/Connection/SFtpFileRefConnection"
         }, {
           "$ref" : "#/definitions/Connection/SnowflakeConnection"
         }, {
