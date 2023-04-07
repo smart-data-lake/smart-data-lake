@@ -24,16 +24,14 @@ import com.azure.identity.DefaultAzureCredentialBuilder
 import com.azure.monitor.ingestion.LogsIngestionClientBuilder
 import com.azure.monitor.ingestion.models.LogsUploadOptions
 import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
-import org.apache.logging.log4j.core.{Layout, LogEvent}
-import org.apache.logging.log4j.layout.template.json.JsonTemplateLayout
 import reactor.core.publisher.Mono
 
 import java.io.{InputStream, OutputStream}
 import scala.collection.JavaConverters._
 import scala.reflect.{ClassTag, classTag}
 
-trait LogAnalyticsBackend {
-  def send(events: Seq[LogEvent])
+trait LogAnalyticsBackend[A] {
+  def send(events: Seq[A])
   def batchSize: Int
 }
 
@@ -43,15 +41,15 @@ trait LogAnalyticsBackend {
  * @param workspaceId the id of the LogAnalytics workspace
  * @param workspaceKey the shared secret to access the LogAnalytics workspace
  * @param logType log type parameter submitted to LogAnalytics. LogAnalytics appends "_CL" to create the custom table name.
- * @param layout custom Log4j2 layout using [[JsonTemplateLayout]]. See also https://logging.apache.org/log4j/2.x/manual/json-template-layout.html.
+ * @param serialize a function to serialize the Log object to a Json String
  */
-class LogAnalyticsHttpCollectorBackend(workspaceId: String, workspaceKey: String, logType: String, layout: JsonTemplateLayout) extends LogAnalyticsBackend {
+class LogAnalyticsHttpCollectorBackend[A](workspaceId: String, workspaceKey: String, logType: String, serialize: A => String) extends LogAnalyticsBackend[A] {
   lazy private val client = new LogAnalyticsClient(workspaceId, workspaceKey)
 
   override val batchSize = 100 // azure log analytics' limit
 
-  override def send(events: Seq[LogEvent]): Unit = {
-    val body = "["+events.map(layout.toSerializable).mkString(",")+"]"
+  override def send(events: Seq[A]): Unit = {
+    val body = "["+events.map(serialize).mkString(",")+"]"
     client.send(body, logType)
   }
 }
@@ -62,16 +60,17 @@ class LogAnalyticsHttpCollectorBackend(workspaceId: String, workspaceKey: String
  * @param endpoint Azure Monitor Data Collector Endpoint URI
  * @param ruleId Azure Monitor Data Collection Rule ID
  * @param tableName LogAnalytics table name configure in Data Collection Rule. The name normally ends with '_CL' as it is a Custom Log table.
+ * @param serialize a function to serialize the Log object to a Json String.
  */
-class LogAnalyticsIngestionBackend(endpoint: String, ruleId: String, tableName: String, layout: JsonTemplateLayout, override val batchSize: Int) extends LogAnalyticsBackend {
+class LogAnalyticsIngestionBackend[A: ClassTag](endpoint: String, ruleId: String, tableName: String, override val batchSize: Int, serialize: A => String) extends LogAnalyticsBackend[A] {
   private val azureCredentialBuilder = new DefaultAzureCredentialBuilder
   private val credential = azureCredentialBuilder.build
   private val client = new LogsIngestionClientBuilder().endpoint(endpoint).credential(credential).buildClient()
   private val uploadOptions = new LogsUploadOptions()
     .setLogsUploadErrorConsumer(err => println("ERROR LogAnalyticsIngestionBackend: "+err.getResponseException)) // don't log this to avoid loops
-    .setObjectSerializer(new Log4jLayoutSerializer(layout))
+    .setObjectSerializer(new Log4jLayoutSerializer[A](serialize))
 
-  override def send(events: Seq[LogEvent]): Unit = {
+  override def send(events: Seq[A]): Unit = {
     client.upload(ruleId, tableName, events.asInstanceOf[Seq[Object]].asJava, uploadOptions)
   }
 }
@@ -79,7 +78,9 @@ class LogAnalyticsIngestionBackend(endpoint: String, ruleId: String, tableName: 
 /**
  * Implementation of Serializer for LogsIngestionClient using a Log4j2 layout.
  */
-class Log4jLayoutSerializer(layout: Layout[_]) extends ObjectSerializer {
+class Log4jLayoutSerializer[A: ClassTag](serialize: A => String) extends ObjectSerializer {
+  private val classNameA = classTag[A].runtimeClass.getSimpleName
+
   override def deserialize[T](stream: InputStream, typeReference: TypeReference[T]): T = {
     throw new NotImplementedError("deserialize is not implemented")
   }
@@ -90,8 +91,8 @@ class Log4jLayoutSerializer(layout: Layout[_]) extends ObjectSerializer {
 
   override def serialize(stream: OutputStream, value: Any): Unit = {
     value match {
-      case event: LogEvent => stream.write(layout.toByteArray(event))
-      case x => throw new IllegalStateException(s"value must be instance of LogEvent, but is a ${x.getClass.getSimpleName}")
+      case event: A => stream.write(serialize(event).getBytes)
+      case x => throw new IllegalStateException(s"value must be instance of $classNameA, but is a ${x.getClass.getSimpleName}")
     }
   }
 
