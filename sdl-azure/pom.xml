@@ -50,6 +50,25 @@
         <sdl-core.scope>compile</sdl-core.scope>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.azure</groupId>
+                <artifactId>azure-sdk-bom</artifactId>
+                <version>1.2.11</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>io.smartdatalake</groupId>
@@ -74,29 +93,31 @@
         </dependency>
 
         <!-- querying azure active directory -->
-        <dependency>
+        <!--dependency>
             <groupId>com.microsoft.azure</groupId>
             <artifactId>msal4j</artifactId>
             <version>1.11.0</version>
-        </dependency>
+        </dependency-->
 
         <!-- azure key vault -->
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-security-keyvault-secrets</artifactId>
-            <version>4.3.4</version>
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-identity</artifactId>
-            <version>1.4.0</version>
         </dependency>
 
-        <!-- logging to azure application insights -->
+        <!-- logging to azure log analytics with log4j2 -->
         <dependency>
-            <groupId>com.microsoft.azure</groupId>
-            <artifactId>applicationinsights-logging-log4j2</artifactId>
-            <version>2.6.4</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-layout-template-json</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-monitor-ingestion</artifactId>
         </dependency>
 
         <dependency>
@@ -151,6 +172,11 @@
             <version>${project.parent.version}</version>
             <classifier>test-jar</classifier>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.minor.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -220,6 +246,16 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
+                <executions>
+                    <!-- special case, that scala sources need to be compiled before java sources because of opposite dependencies -->
+                    <execution>
+                        <id>scala-compile-first</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- rewrite pom for compiling with different scala version profiles -->
@@ -253,10 +289,10 @@
             </plugin>
 
             <!-- Executes units tests with scalatest  -->
-            <!--plugin>
+            <plugin>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
-            </plugin-->
+            </plugin>
 
             <!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
             <plugin>
