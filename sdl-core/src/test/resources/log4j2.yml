@@ -31,7 +31,7 @@ Configuration:
     Root:
       level: WARN
       AppenderRef:
-        ref: STDOUT
+        - ref: STDOUT
 
     logger:
 
