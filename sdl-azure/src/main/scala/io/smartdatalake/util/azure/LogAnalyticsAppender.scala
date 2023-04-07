@@ -34,7 +34,7 @@ import scala.concurrent.duration.FiniteDuration
  * @param filter optional log event filter definition.
  * @param layout custom Log4j2 layout using [[JsonTemplateLayout]]. See also https://logging.apache.org/log4j/2.x/manual/json-template-layout.html.
  **/
-class LogAnalyticsAppender(name: String, backend: LogAnalyticsBackend, layout: JsonTemplateLayout, filter: Option[Filter] = None, maxDelayMillis: Option[Int] = None)
+class LogAnalyticsAppender(name: String, backend: LogAnalyticsBackend[LogEvent], layout: JsonTemplateLayout, filter: Option[Filter] = None, maxDelayMillis: Option[Int] = None)
   extends AbstractAppender(name, filter.orNull, layout, /*ignoreExceptions*/ false, Array()) {
 
   private val msgBuffer = collection.mutable.Buffer[LogEvent]()
@@ -78,7 +78,7 @@ object LogAnalyticsAppender {
     assert(logType != null, s"logType is not defined for ${getClass.getSimpleName}")
     assert(layout != null && layout.isInstanceOf[JsonTemplateLayout], "layout must be an instance of JsonTemplateLayout")
     val jsonLayout = layout.asInstanceOf[JsonTemplateLayout]
-    val backend = new LogAnalyticsHttpCollectorBackend(workspaceId, workspaceKey, logType, jsonLayout)
+    val backend = new LogAnalyticsHttpCollectorBackend[LogEvent](workspaceId, workspaceKey, logType, jsonLayout.toSerializable)
     new LogAnalyticsAppender(name, backend, layout.asInstanceOf[JsonTemplateLayout], Option(filter), Option(maxDelayMillis).map(_.toInt))
   }
   def createIngestionAppender(name: String, endpoint: String, ruleId: String, tableName: String, maxDelayMillis: Integer, batchSize: Integer, layout: Layout[_], filter: Filter): LogAnalyticsAppender = {
@@ -89,7 +89,7 @@ object LogAnalyticsAppender {
     assert(batchSize != null, s"batchSize is not defined for ${getClass.getSimpleName}")
     assert(layout != null && layout.isInstanceOf[JsonTemplateLayout], "layout must be an instance of JsonTemplateLayout")
     val jsonLayout = layout.asInstanceOf[JsonTemplateLayout]
-    val backend = new LogAnalyticsIngestionBackend(endpoint, ruleId, tableName, jsonLayout, batchSize)
+    val backend = new LogAnalyticsIngestionBackend[LogEvent](endpoint, ruleId, tableName, batchSize, jsonLayout.toSerializable)
     new LogAnalyticsAppender(name, backend, jsonLayout, Option(filter), Option(maxDelayMillis).map(_.toInt))
   }
 }

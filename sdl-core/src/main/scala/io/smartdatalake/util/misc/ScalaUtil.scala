@@ -75,9 +75,14 @@ object ScalaUtil {
   }
 
   /**
+   * Return None if given Seq is empty, otherwise Some(seq).
+   */
+  def optionalizeSeq[S <: Seq[_]](s: S): Option[S] = if (s.isEmpty) None else Some(s)
+
+  /**
    * Return None if given Map is empty, otherwise Some(map). 
    */
-  def optionalizeMap(m: Map[String,String]): Option[Map[String,String]] = if (m.isEmpty) None else Some(m)
+  def optionalizeMap[M <: Map[_,_]](m: M): Option[M] = if (m.isEmpty) None else Some(m)
 
   def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr == null) Seq() else arr.toSeq
 
