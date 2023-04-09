@@ -20,13 +20,16 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.workflow.action.Action
 import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.util.ChildFirstURLClassLoader
+import org.slf4j.MDC
 
 import java.net.{URL, URLClassLoader}
+import java.time.LocalDateTime
 import scala.annotation.tailrec
 import scala.util.Try
 
@@ -54,7 +57,7 @@ object AppUtil extends SmartDataLakeLogger {
     val sessionBuilder = SparkSession.builder()
       .optionalMaster(masterOpt)
       .appName(name)
-      .config("hive.exec.dynamic.partition", true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
+      .config("hive.exec.dynamic.partition", value = true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .optionalConfig( "deploy-mode", deployModeOpt)
@@ -211,5 +214,19 @@ object AppUtil extends SmartDataLakeLogger {
    */
   def getManifestVersion: Option[String] = {
     Option(getClass.getPackage.getImplementationVersion)
+  }
+
+  /**
+   * Set MDC context for logger.
+   * MDC (Mapped Diagnostic Context) allows to make available additional context information to logger layouts.
+   */
+  def setLoggerContext(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId, runStartTime: LocalDateTime): Unit = {
+    MDC.put("app", appConfig.appName)
+    MDC.put("runId", executionId.runId.toString)
+    MDC.put("attemptId", executionId.attemptId.toString)
+    MDC.put("startTime", runStartTime.toString)
+  }
+  def setLoggerContext(context: ActionPipelineContext): Unit = {
+    setLoggerContext(context.appConfig, context.executionId, context.runStartTime)
   }
 }
