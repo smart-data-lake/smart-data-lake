@@ -82,6 +82,7 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , allowAsRecursiveInput: Seq[DataObjectId] = Seq()
                         , synchronousStreamingTriggerIntervalSec: Int = 60
                         , environment: Map[String, String] = Map()
+                        , pluginOptions: Map[String, StringOrSecret] = Map()
                        )
 extends SmartDataLakeLogger {
 
@@ -98,6 +99,9 @@ extends SmartDataLakeLogger {
   secretProviders.getOrElse(Map()).foreach { case (id, providerConfig) =>
     SecretsUtil.registerProvider(id, providerConfig.provider)
   }
+
+  // configure SDLPlugin
+  Environment.sdlPlugin.foreach(_.configure(pluginOptions))
 
   /**
    * Get Hadoop configuration as Spark would see it.

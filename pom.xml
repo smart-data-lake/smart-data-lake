@@ -650,24 +650,30 @@
                                     </transformer>
                                     <transformer
                                             implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                        <mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+                                        <manifestEntries>
+                                            <Implementation-Version>${project.version}</Implementation-Version>
+                                            <!-- this is needed for Log4j2 plugins to work properly, e.g. JsonTemplateLayout  -->
+                                            <Multi-Release>true</Multi-Release>
+                                        </manifestEntries>
                                     </transformer>
                                     <transformer
                                             implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
                                     </transformer>
+                                    <transformer
+                                            implementation="io.github.edwgiz.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
+                                    </transformer>
                                 </transformers>
-                                <!-- the following archive tag might show as error in IntelliJ, but it's ok for maven and works! -->
-                                <archive>
-                                    <compress>false</compress>
-                                    <manifest>
-                                        <mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
-                                    </manifest>
-                                    <manifestEntries>
-                                        <Implementation-Version>${project.version}</Implementation-Version>
-                                    </manifestEntries>
-                                </archive>
                             </configuration>
                         </execution>
                     </executions>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.github.edwgiz</groupId>
+                            <artifactId>log4j-maven-shade-plugin-extensions</artifactId>
+                            <version>${log4j.version}</version>
+                        </dependency>
+                    </dependencies>
                 </plugin>
 
                 <!-- Executes units tests with scalatest  -->

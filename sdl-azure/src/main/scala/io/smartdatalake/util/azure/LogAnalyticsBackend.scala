@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.azure
 
+import com.azure.core.credential.TokenCredential
 import com.azure.core.util.serializer.{ObjectSerializer, TypeReference}
 import com.azure.identity.DefaultAzureCredentialBuilder
 import com.azure.monitor.ingestion.LogsIngestionClientBuilder
@@ -61,11 +62,11 @@ class LogAnalyticsHttpCollectorBackend[A](workspaceId: String, workspaceKey: Str
  * @param ruleId Azure Monitor Data Collection Rule ID
  * @param tableName LogAnalytics table name configure in Data Collection Rule. The name normally ends with '_CL' as it is a Custom Log table.
  * @param serialize a function to serialize the Log object to a Json String.
+ * @param credential optional TokenCredential object to authenticate against Azure AD. Default is to use DefaultAzureCredentialBuilder.
  */
-class LogAnalyticsIngestionBackend[A: ClassTag](endpoint: String, ruleId: String, tableName: String, override val batchSize: Int, serialize: A => String) extends LogAnalyticsBackend[A] {
-  private val azureCredentialBuilder = new DefaultAzureCredentialBuilder
-  private val credential = azureCredentialBuilder.build
-  private val client = new LogsIngestionClientBuilder().endpoint(endpoint).credential(credential).buildClient()
+class LogAnalyticsIngestionBackend[A: ClassTag](endpoint: String, ruleId: String, tableName: String, override val batchSize: Int, serialize: A => String, credential: Option[TokenCredential] = None) extends LogAnalyticsBackend[A] {
+  private val credentialPrep = credential.getOrElse(new DefaultAzureCredentialBuilder().build())
+  private val client = new LogsIngestionClientBuilder().endpoint(endpoint).credential(credentialPrep).buildClient()
   private val uploadOptions = new LogsUploadOptions()
     .setLogsUploadErrorConsumer(err => println("ERROR LogAnalyticsIngestionBackend: "+err.getResponseException)) // don't log this to avoid loops
     .setObjectSerializer(new Log4jLayoutSerializer[A](serialize))

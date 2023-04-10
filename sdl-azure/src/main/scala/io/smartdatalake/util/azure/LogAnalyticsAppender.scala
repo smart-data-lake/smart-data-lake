@@ -30,14 +30,24 @@ import scala.concurrent.duration.FiniteDuration
  * Custom Log4j2 Appender to write log messages to LogAnalytics.
  * This Appender sends batches of max 100 log messages to a LogAnalytics workspace.
  *
+ * @param name name of the appender
+ * @param backend LogAnalytics backend to send logs to. Can be empty and set later, see also [[updateBackend]].
  * @param maxDelayMillis The maximum number of milliseconds to wait for a complete batch.
  * @param filter optional log event filter definition.
  * @param layout custom Log4j2 layout using [[JsonTemplateLayout]]. See also https://logging.apache.org/log4j/2.x/manual/json-template-layout.html.
  **/
-class LogAnalyticsAppender(name: String, backend: LogAnalyticsBackend[LogEvent], layout: JsonTemplateLayout, filter: Option[Filter] = None, maxDelayMillis: Option[Int] = None)
+class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend[LogEvent]], layout: JsonTemplateLayout, filter: Option[Filter] = None, maxDelayMillis: Option[Int] = None)
   extends AbstractAppender(name, filter.orNull, layout, /*ignoreExceptions*/ false, Array()) {
 
   private val msgBuffer = collection.mutable.Buffer[LogEvent]()
+
+  /**
+   * Method to set backend later. This is useful if backend configuration is not available from the start, but logging should already collect events.
+   */
+  def updateBackend(backend: LogAnalyticsBackend[LogEvent]): Unit = {
+    assert(this.backend.isEmpty)
+    this.backend = Some(backend)
+  }
 
   override def append(event: LogEvent): Unit = {
     assert(isStarted)
@@ -45,12 +55,12 @@ class LogAnalyticsAppender(name: String, backend: LogAnalyticsBackend[LogEvent],
     if (event.getLoggerName.startsWith("org.apache.http")) return
     synchronized {
       msgBuffer.append(event.toImmutable)
-      if (msgBuffer.size >= backend.batchSize) flush()
+      if (backend.isDefined && msgBuffer.size >= backend.get.batchSize) flush()
     }
   }
   private def flush(): Unit = synchronized {
-    if (msgBuffer.nonEmpty) {
-      backend.send(msgBuffer)
+    if (msgBuffer.nonEmpty && backend.isDefined) {
+      backend.get.send(msgBuffer)
       msgBuffer.clear()
     }
   }
@@ -79,7 +89,7 @@ object LogAnalyticsAppender {
     assert(layout != null && layout.isInstanceOf[JsonTemplateLayout], "layout must be an instance of JsonTemplateLayout")
     val jsonLayout = layout.asInstanceOf[JsonTemplateLayout]
     val backend = new LogAnalyticsHttpCollectorBackend[LogEvent](workspaceId, workspaceKey, logType, jsonLayout.toSerializable)
-    new LogAnalyticsAppender(name, backend, layout.asInstanceOf[JsonTemplateLayout], Option(filter), Option(maxDelayMillis).map(_.toInt))
+    new LogAnalyticsAppender(name, Some(backend), layout.asInstanceOf[JsonTemplateLayout], Option(filter), Option(maxDelayMillis).map(_.toInt))
   }
   def createIngestionAppender(name: String, endpoint: String, ruleId: String, tableName: String, maxDelayMillis: Integer, batchSize: Integer, layout: Layout[_], filter: Filter): LogAnalyticsAppender = {
     assert(name != null, s"name is not defined for ${getClass.getSimpleName}")
@@ -90,6 +100,6 @@ object LogAnalyticsAppender {
     assert(layout != null && layout.isInstanceOf[JsonTemplateLayout], "layout must be an instance of JsonTemplateLayout")
     val jsonLayout = layout.asInstanceOf[JsonTemplateLayout]
     val backend = new LogAnalyticsIngestionBackend[LogEvent](endpoint, ruleId, tableName, batchSize, jsonLayout.toSerializable)
-    new LogAnalyticsAppender(name, backend, jsonLayout, Option(filter), Option(maxDelayMillis).map(_.toInt))
+    new LogAnalyticsAppender(name, Some(backend), jsonLayout, Option(filter), Option(maxDelayMillis).map(_.toInt))
   }
 }
