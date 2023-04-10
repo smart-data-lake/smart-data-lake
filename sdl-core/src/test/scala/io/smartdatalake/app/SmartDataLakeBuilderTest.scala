@@ -162,6 +162,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // test and reset SDLPlugin config
     assert(TestSDLPlugin.startupCalled)
+    assert(TestSDLPlugin.configureCalled)
     assert(TestSDLPlugin.shutdownCalled)
     Environment._sdlPlugin = None
   }
@@ -847,10 +848,12 @@ class TestUDFAddXCreator() extends SparkUDFCreator {
 
 class TestSDLPlugin extends SDLPlugin {
   override def startup(): Unit = { TestSDLPlugin.startupCalled = true }
+  override def configure(options: Map[String, StringOrSecret]): Unit = { TestSDLPlugin.configureCalled = true }
   override def shutdown(): Unit = { TestSDLPlugin.shutdownCalled = true }
 }
 object TestSDLPlugin {
   var startupCalled = false
+  var configureCalled = false
   var shutdownCalled = false
 }
 

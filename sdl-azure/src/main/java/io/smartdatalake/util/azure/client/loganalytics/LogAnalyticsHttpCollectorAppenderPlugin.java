@@ -38,7 +38,7 @@ import java.io.Serializable;
  * The schema of the table is handled through automatically created custom fields.
  *
  * It seems that "HTTP Data Collector API" is no longer very well supported, as they become "Legacy Custom Logs" in LogAnalytics.
- * See [[LogAnalyticsIngestionAppenderPlugin]] for the potential successor.
+ * See [[LogAnalyticsIngestionAppenderPlugin]] for the potential successor and the following blog post: https://devblogs.microsoft.com/azure-sdk/out-with-the-rest-azure-monitor-ingestion-libraries-appear/.
  *
  * Implementing this in Java is needed as there is no static method in scala that can be annotated for Log4j2 with @PluginBuilderFactory.
  * The implementation is a wrapper around LogAnalyticsAppender implemented in Scala.

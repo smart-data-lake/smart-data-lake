@@ -19,6 +19,7 @@
 
 package io.smartdatalake.app
 
+import io.smartdatalake.util.secrets.StringOrSecret
 import org.apache.spark.annotation.DeveloperApi
 
 /**
@@ -34,6 +35,11 @@ trait SDLPlugin {
    * Use cases are dynamic log configuration or setup of credentials
    */
   def startup(): Unit = Unit
+
+  /**
+   * Configure is called from SDL when GlobalConfig is parsed passing GlobalConfig.pluginOptions as parameter.
+   */
+  def configure(options: Map[String,StringOrSecret]): Unit = Unit
 
   /**
    * Shutdown is called from SDL as late as possible on ordinary exit of an SDL run.
