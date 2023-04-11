@@ -5329,6 +5329,32 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "BlacklistTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "columnBlacklist" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "List of columns to exclude from DataFrame"
+                }
+              },
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
+              "additionalProperties" : false,
+              "description" : "Apply a column blacklist to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "StandardizeColNamesTransformer"
                 },
                 "name" : {
@@ -5356,32 +5382,6 @@
               "required" : [ "type" ],
               "additionalProperties" : false,
               "description" : "Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).\nParameters below can be used to disable specific rules if needed."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "WhitelistTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "columnWhitelist" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "string"
-                  },
-                  "description" : "List of columns to keep from DataFrame"
-                }
-              },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
-              "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5593,25 +5593,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5643,6 +5624,25 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5729,6 +5729,45 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "ScalaClassSnowparkDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "className" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomSnowparkDfTransformer]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                  },
+                  "description" : "Options to pass to the transformation\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                  },
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "ScalaClassSnowparkDfTransformer",
+              "required" : [ "className", "type" ],
+              "additionalProperties" : false,
+              "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomSnowparkDfTransformer]] ."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "ScalaNotebookSparkDfTransformer"
                 },
                 "name" : {
@@ -5788,45 +5827,6 @@
               "required" : [ "url", "functionName", "type" ],
               "additionalProperties" : false,
               "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nThe code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame\nand a map of options and has to return a DataFrame, see also ([[fnTransformType]] ).\nNotebook-cells starting with \\\"//!IGNORE\\\" will be ignored."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "ScalaClassSnowparkDfTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "className" : {
-                  "type" : "string",
-                  "description" : "class name implementing trait[[CustomSnowparkDfTransformer]]"
-                },
-                "options" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string",
-                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                  },
-                  "description" : "Options to pass to the transformation\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string",
-                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                  },
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] .\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
-                }
-              },
-              "title" : "ScalaClassSnowparkDfTransformer",
-              "required" : [ "className", "type" ],
-              "additionalProperties" : false,
-              "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomSnowparkDfTransformer]] ."
             }, {
               "type" : "object",
               "properties" : {
@@ -5981,7 +5981,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5991,18 +5991,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -7290,13 +7290,11 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/Action/CopyAction"
-            }, {
               "$ref" : "#/definitions/Action/CustomDataFrameAction"
             }, {
               "$ref" : "#/definitions/Action/CustomFileAction"
             }, {
-              "$ref" : "#/definitions/Action/CustomScriptAction"
+              "$ref" : "#/definitions/Action/HistorizeAction"
             } ]
           },
           "agent" : {
