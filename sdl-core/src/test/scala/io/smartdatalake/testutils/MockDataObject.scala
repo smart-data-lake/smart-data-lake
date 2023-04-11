@@ -19,6 +19,7 @@
 
 package io.smartdatalake.testutils
 
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
@@ -94,6 +95,13 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
 
   private implicit val subFeedCompanion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
 
-  override def factory: FromConfigFactory[DataObject] = null
+  override def factory: FromConfigFactory[DataObject] = MockDataObject
 
 }
+
+object MockDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MockDataObject = {
+    extract[MockDataObject](config)
+  }
+}
+
