@@ -172,7 +172,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
               val subTypeCls = t.typeArgs.head.typeSymbol.asClass
               JsonArrayDef(convertToJsonType(subTypeCls.toType), description, deprecated = isDeprecated)
             // map with key=String and value=StringOrSecret
-            case 2 if t.typeArgs.head.typeSymbol.asType.toType =:= typeOf[String] || t.typeArgs.last.typeSymbol.asType.toType =:= typeOf[StringOrSecret] =>
+            case 2 if t.typeArgs.head.typeSymbol.asType.toType =:= typeOf[String] && t.typeArgs.last.typeSymbol.asType.toType =:= typeOf[StringOrSecret] =>
               JsonMapDef(additionalProperties = convertToJsonType(typeOf[StringOrSecret]), description = Some(addSecretScaladocToDescription(description)), deprecated = isDeprecated)
             // map with key=String
             case 2 if t.typeArgs.head.typeSymbol.asType.toType =:= typeOf[String] || t.typeArgs.head.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] =>
