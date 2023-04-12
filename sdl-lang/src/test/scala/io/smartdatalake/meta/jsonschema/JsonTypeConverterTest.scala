@@ -21,7 +21,6 @@ package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.meta.GenericTypeDef
 import io.smartdatalake.meta.GenericTypeUtil.attributesForCaseClass
 import io.smartdatalake.util.secrets.StringOrSecret
