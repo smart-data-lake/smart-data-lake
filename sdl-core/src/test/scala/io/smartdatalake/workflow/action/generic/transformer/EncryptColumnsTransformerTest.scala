@@ -96,7 +96,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
     val globalConfig = GlobalConfig.from(config)
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val session: SparkSession = sparkSessionBuilder(withHive = true, globalConfig.resolvedSparkOptions.getOrElse(Map())).getOrCreate()
+    implicit val session: SparkSession = sparkSessionBuilder(withHive = true, globalConfig.sparkOptions.getOrElse(Map())).getOrCreate()
     import session.implicits._
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext

@@ -23,16 +23,30 @@ import io.smartdatalake.util.secrets.{SecretProvider, SecretProviderConfig, Stri
 import org.scalatest.FunSuite
 
 class GlobalConfigTest extends FunSuite {
-  test("sparkOptions secrets are resolved") {
+  test("sparkOptions secrets are resolved in Hadoop config") {
     // prepare
     val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map()))
 
     // execute
-    val globalConfig = GlobalConfig(sparkOptions = Some(Map("option" -> StringOrSecret("###TESTPROVIDER#secret###"))),
+    val globalConfig = GlobalConfig(sparkOptions = Some(Map("spark.hadoop.hadoop.security.authentication" -> StringOrSecret("###TESTPROVIDER#secret###"))),
       secretProviders = Some(Map("TESTPROVIDER" -> providerConfig)))
+    val hadoopConfig = globalConfig.getHadoopConfiguration
 
     // check
-    assert(globalConfig.resolvedSparkOptions.get("option") == "resolvedSecret")
+    assert(hadoopConfig.get("hadoop.security.authentication") == "resolvedSecret")
+  }
+
+  test("sparkOptions secrets are resolved in Spark session configuration") {
+    // prepare
+    val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map()))
+
+    // execute
+    val globalConfig = GlobalConfig(sparkOptions = Some(Map("spark.authenticate.secret" -> StringOrSecret("###TESTPROVIDER#secret###"))),
+      secretProviders = Some(Map("TESTPROVIDER" -> providerConfig)))
+    val sparkSession = globalConfig.sparkSession("test", Some("local"))
+
+    // check
+    assert(sparkSession.conf.get("spark.authenticate.secret") == "resolvedSecret")
   }
 }
 
