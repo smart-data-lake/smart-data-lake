@@ -199,7 +199,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
     }
     validateSchemaMin(SparkSchema(df.schema), "read")
-    df.colNamesLowercase
+    df
   }
 
   // Store incremental output state. It is stored as tuple of incrementalOutputExpr, lastHighWatermarkValue, dataType
@@ -425,7 +425,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = true).asInstanceOf[SparkSchema].inner)
+      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema].inner)
     }
     cachedExistingSchema
   }
