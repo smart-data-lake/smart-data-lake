@@ -31,7 +31,10 @@ case class StringOrSecret(private val secret: String) {
   /**
    * Resolves the secret, if necessary by retrieving it from a secret provider.
    */
-  def resolve(): String = {
-    SecretsUtil.resolveSecret(secret)
-  }
+  def resolve(): String = SecretsUtil.resolveSecret(secret)
+
+  /**
+   * Representation of the secret. Secrets from providers are not resolved.
+   */
+  override def toString: String = secret
 }

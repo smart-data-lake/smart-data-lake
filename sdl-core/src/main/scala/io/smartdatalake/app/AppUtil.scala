@@ -20,6 +20,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.Action
 import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark.sql.SparkSession
@@ -44,7 +45,7 @@ object AppUtil extends SmartDataLakeLogger {
   def createSparkSession(name:String, masterOpt: Option[String] = None,
                          deployModeOpt: Option[String] = None,
                          kryoClassNamesOpt: Option[Seq[String]] = None,
-                         sparkOptionsOpt: Map[String,String] = Map(),
+                         sparkOptionsOpt: Map[String,StringOrSecret] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
     logger.info(s"Creating spark session: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive")
@@ -124,11 +125,11 @@ object AppUtil extends SmartDataLakeLogger {
         builder.config(key, value.get)
       } else builder
     }
-    def optionalConfigs( options: Map[String,String] ): SparkSession.Builder = {
+    def optionalConfigs( options: Map[String,StringOrSecret] ): SparkSession.Builder = {
       if (options.nonEmpty) {
-        logger.info("Additional sparkOptions: " + options.map{ case (k,v) => createMaskedSecretsKVLog(k,v) }.mkString(", "))
+        logger.info("Additional sparkOptions: " + options.map{ case (k,v) => createMaskedSecretsKVLog(k,v.toString) }.mkString(", "))
         options.foldLeft( builder ){
-          case (sb,(key,value)) => sb.config(key,value)
+          case (sb,(key,value)) => sb.config(key,value.resolve())
         }
       } else builder
     }
