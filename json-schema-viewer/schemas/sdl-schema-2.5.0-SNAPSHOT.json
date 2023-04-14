@@ -524,22 +524,23 @@
           },
           "maxParallelConnections" : {
             "type" : "integer",
-            "description" : "number of parallel jdbc connections created by an instance of this connection\nNote that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection\nused by SDL for validating metadata or pre/postSQL."
+            "description" : "max number of parallel jdbc connections created by an instance of this connection, default is 3\nNote that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection\nused by SDL for validating metadata or pre/postSQL."
           },
           "connectionPoolMaxIdleTimeSec" : {
             "type" : "integer",
             "description" : "timeout to close unused connections in the pool"
           },
+          "connectionPoolMaxWaitTimeSec" : {
+            "type" : "integer",
+            "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
           },
-          "enableCommit" : {
-            "type" : "boolean",
-            "description" : "whether to enable commits for transactional behaviour in SDL\nNote that most JDBC drivers use auto-commit per default which is not recommended when[[enableCommit]]is true.\nDefault is enableCommit = true. To disable auto-commit see[[autoCommit]] ."
-          },
           "autoCommit" : {
             "type" : "boolean",
-            "description" : "flag to enable or disable the auto-commit behaviour of the JDBC driver\nIf not set, the default auto-commit mode of the JDBC driver is used."
+            "description" : "flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.\nDefault is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.",
+            "deprecated" : true
           },
           "connectionInitSql" : {
             "type" : "string",
@@ -1392,6 +1393,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -1425,34 +1454,6 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1911,6 +1912,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -1944,34 +1973,6 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2242,6 +2243,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -2275,34 +2304,6 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3328,6 +3329,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -3361,34 +3390,6 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3656,6 +3657,34 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn ", "Error " ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -3689,34 +3718,6 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -5329,7 +5330,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5339,18 +5340,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5593,6 +5594,25 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5624,25 +5644,6 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5904,6 +5905,17 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5927,17 +5939,6 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -5981,7 +5982,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5991,18 +5992,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -7290,9 +7291,17 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/Action/CopyAction"
+            }, {
               "$ref" : "#/definitions/Action/CustomDataFrameAction"
             }, {
               "$ref" : "#/definitions/Action/CustomFileAction"
+            }, {
+              "$ref" : "#/definitions/Action/CustomScriptAction"
+            }, {
+              "$ref" : "#/definitions/Action/DeduplicateAction"
+            }, {
+              "$ref" : "#/definitions/Action/FileTransferAction"
             }, {
               "$ref" : "#/definitions/Action/HistorizeAction"
             } ]
