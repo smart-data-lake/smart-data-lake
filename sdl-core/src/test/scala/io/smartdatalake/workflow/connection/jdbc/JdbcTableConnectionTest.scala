@@ -27,7 +27,7 @@ class JdbcTableConnectionTest extends FunSuite {
 
   test("autocommit is disabled by default") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
       "org.hsqldb.jdbcDriver")
 
     // run
@@ -39,8 +39,8 @@ class JdbcTableConnectionTest extends FunSuite {
 
   test("JdbcTransaction.commit returns connection back to pool") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
-      "org.hsqldb.jdbcDriver", maxParallelConnections = 1)
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver", maxParallelConnections = 1, connectionPoolMaxWaitTimeSec = 10)
 
     // run
     val transaction1 = jdbcConnection.beginTransaction()
@@ -54,8 +54,8 @@ class JdbcTableConnectionTest extends FunSuite {
 
   test("JdbcTransaction.rollback returns connection back to pool") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
-      "org.hsqldb.jdbcDriver", maxParallelConnections = 1)
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver", maxParallelConnections = 1, connectionPoolMaxWaitTimeSec = 10)
 
     // run
     val transaction1 = jdbcConnection.beginTransaction()
@@ -69,8 +69,8 @@ class JdbcTableConnectionTest extends FunSuite {
 
   test("maxParallelConnections > 1 allows concurrent transactions") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
-      "org.hsqldb.jdbcDriver", maxParallelConnections = 2)
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver", maxParallelConnections = 2, connectionPoolMaxWaitTimeSec = 10)
 
     // run
     val transaction1 = jdbcConnection.beginTransaction()
@@ -84,7 +84,7 @@ class JdbcTableConnectionTest extends FunSuite {
 
   test("rollback after failed statement") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
       "org.hsqldb.jdbcDriver")
 
     jdbcConnection.execJdbcStatement("drop table if exists test_rollback")
