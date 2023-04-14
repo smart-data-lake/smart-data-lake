@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction

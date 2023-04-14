@@ -118,8 +118,11 @@ extends SmartDataLakeLogger {
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     // get additional options from modules
     val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
+    // if SDL is case sensitive then Spark should be as well
+    val caseSensitivityOptions = Map("spark.sql.caseSensitive" -> Environment.caseSensitive.toString)
     // combine all options: custom options will override framework options
-    val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++ sparkOptions.getOrElse(Map())
+    val sparkOptionsExtended = Seq(moduleOptions, memoryLogOptions, executorPluginOptions, caseSensitivityOptions).reduceOption(mergeSparkOptions).getOrElse(Map()) ++ sparkOptions.getOrElse(Map())
+    checkCaseSensitivityIsConsistent(sparkOptionsExtended)
     val sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
     registerUdf(sparkSession)
     // adjust log level
@@ -130,6 +133,16 @@ extends SmartDataLakeLogger {
     Environment._sparkSession = sparkSession
     // return
     sparkSession
+  }
+
+  private def checkCaseSensitivityIsConsistent(options: Map[String, String]): Unit = {
+    options.get("spark.sql.caseSensitive")
+      .map(_.toBoolean)
+      .filter(_ != Environment.caseSensitive)
+      .foreach(caseSensitive => {
+        logger.warn(s"Spark property 'spark.sql.caseSensitive' is set to '$caseSensitive' but environment property 'caseSensitive' is '${Environment.caseSensitive}'." +
+          " Inconsistent case sensitivity in SDL and Spark may lead to unexpected behaviour.")
+      })
   }
 
   // private holder for spark session

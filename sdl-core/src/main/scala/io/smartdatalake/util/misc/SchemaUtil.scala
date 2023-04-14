@@ -117,10 +117,6 @@ object SchemaUtil {
     }
   }
 
-  def isSparkCaseSensitive: Boolean = {
-    SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
-  }
-
   def getSchemaFromCaseClass[T <: Product : TypeTag]: StructType = {
     Encoders.product[T].schema
   }
