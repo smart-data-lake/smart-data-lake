@@ -48,9 +48,9 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
     } else outputSubFeeds
   }
 
-  override def writeSubFeed(subFeed: ScriptSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[ScriptSubFeed] = {
+  override def writeSubFeed(subFeed: ScriptSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): ScriptSubFeed = {
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     output.scriptNotification(subFeed.parameters.getOrElse(Map()))
-    WriteSubFeedResult(subFeed, noData = None) // unknown if there is data
+    subFeed
   }
 }

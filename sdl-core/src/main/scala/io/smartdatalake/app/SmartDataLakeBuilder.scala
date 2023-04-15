@@ -384,7 +384,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id, info) => info.hasCompleted }
-    val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
+    val initialSubFeeds = actionsToSkip.flatMap(_._2.results).toSeq
     // get latest DataObject state and overwrite with current DataObject state
     val lastStateId = stateStore.getLatestStateId(Some(runState.runId - 1))
     val lastRunState = lastStateId.map(stateStore.recoverRunState)

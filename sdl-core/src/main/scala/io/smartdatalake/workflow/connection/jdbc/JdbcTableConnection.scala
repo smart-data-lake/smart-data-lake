@@ -98,12 +98,24 @@ case class JdbcTableConnection(override val id: ConnectionId,
   }
 
   /**
-   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
+   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary sql statement
+   * @return true if the first result is a ResultSet object; false if it is an update count or there are no results (see also Jdbc.Statement.execute())
    */
   def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
     execWithJdbcConnection(execWithJdbcStatement(_, doCommit = true) { stmt =>
       if (logging) logger.info(s"execJdbcStatement: $sql")
       stmt.execute(sql)
+    })
+  }
+
+  /**
+   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
+   * @return row count for SQL Data Manipulation Language (DML) statements (see also Jdbc.Statement.execute())
+   */
+  def execJdbcDmlStatement(sql: String, logging: Boolean = true): Int = {
+    execWithJdbcConnection(execWithJdbcStatement(_, doCommit = true) { stmt =>
+      if (logging) logger.info(s"execJdbcDmlStatement: $sql")
+      stmt.executeUpdate(sql)
     })
   }
 

@@ -131,11 +131,12 @@ object LogExtractor extends SmartDataLakeLogger {
   def getActionLog(actionId: ActionId, info: RuntimeInfo, executionId: SDLExecutionId, finalState: RuntimeEventState, context: ActionPipelineContext): ActionLog = {
     val duration = info.duration.map(_.getSeconds)
     val dataObjectLogs = info.results.map { result =>
-      val numTasks = result.mainMetrics.get("num_tasks").map(castToLong)
-      val filesWritten = result.mainMetrics.get("files_written").map(castToLong)
-      val recordsWritten = result.mainMetrics.get("records_written").map(castToLong)
-      val metrics = result.mainMetrics.filterKeys(!Set("num_tasks", "files_written", "records_written").contains(_))
-      MetricsLog(result.subFeed.dataObjectId.id, Timestamp.valueOf(info.startTstmp.get), numTasks, filesWritten, recordsWritten, metrics.mapValues(_.toString), result.subFeed.partitionValues.map(_.getMapString))
+      val metrics = result.metrics.getOrElse(Map())
+      val numTasks = metrics.get ("num_tasks").map (castToLong)
+      val filesWritten = metrics.get ("files_written").map (castToLong)
+      val recordsWritten = metrics.get ("records_written").map (castToLong)
+      val filteredMetrics = metrics.filterKeys (! Set ("num_tasks", "files_written", "records_written").contains (_) )
+      MetricsLog (result.dataObjectId.id, Timestamp.valueOf (info.startTstmp.get), numTasks, filesWritten, recordsWritten, filteredMetrics.mapValues (_.toString), result.partitionValues.map (_.getMapString) )
     }
     ActionLog(executionId.runId, Timestamp.valueOf(context.runStartTime), actionId.id
       , executionId.attemptId, Timestamp.valueOf(context.attemptStartTime), finalState

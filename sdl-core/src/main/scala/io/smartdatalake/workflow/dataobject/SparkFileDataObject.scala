@@ -21,22 +21,23 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
 import org.apache.spark.sql.functions.{col, input_file_name, lit}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.time.format.DateTimeFormatter
@@ -483,7 +484,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * @param partitionValues The partition layout to write.
    */
   final override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
@@ -524,7 +525,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     }
 
     // write
-    try {
+    val metrics = try {
       writeSparkDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
     } catch {
       // cleanup partition directory on failure to ensure restartability for PartitionDiffMode.
@@ -538,20 +539,28 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // rename files according to SparkRepartitionDef
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
+
+    // return
+    metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
   }
 
-  override private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     val hadoopPathString = path.toString
     logger.info(s"($id) Writing DataFrame to $hadoopPathString")
 
-    df.write.format(format)
-      .mode(SparkSaveMode.from(finalSaveMode))
-      .options(options)
-      .optionalPartitionBy(partitions)
-      .save(hadoopPathString)
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
+      df.write.format(format)
+        .mode(SparkSaveMode.from(finalSaveMode))
+        .options(options)
+        .optionalPartitionBy(partitions)
+        .save(hadoopPathString)
+    )
 
     // recreate current schema file, it gets deleted by SaveMode.Overwrite - this is to avoid schema inference and remember the schema if there is no data.
     if (SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite) createSchemaFile(df)
+
+    // return
+    metrics
   }
 
   /**

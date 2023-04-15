@@ -23,10 +23,12 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.SDLExecutionId
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -49,7 +51,6 @@ import java.nio.file.Files
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDateTime}
 import scala.collection.JavaConverters._
-import scala.util.Try
 
 /**
  * Utility methods for testing.
@@ -394,6 +395,10 @@ object TestUtil extends SmartDataLakeLogger {
     }
     val rows = (1 to nbRecords).map( x => arbitraryRow(schema.fields)).asJava
     session.createDataFrame(rows, schema)
+  }
+
+  def getMetrics(runtimeInfo: RuntimeInfo, dataObjectId: DataObjectId): MetricsMap = {
+    runtimeInfo.results.find(_.dataObjectId == dataObjectId).get.metrics.getOrElse(Map())
   }
 }
 

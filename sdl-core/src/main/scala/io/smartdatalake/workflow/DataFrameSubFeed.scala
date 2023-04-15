@@ -22,6 +22,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
 
@@ -31,7 +32,7 @@ import scala.reflect.runtime.universe.Type
 /**
  * A SubFeed that holds a DataFrame
  */
-trait DataFrameSubFeed extends SubFeed  {
+trait DataFrameSubFeed extends SubFeed {
   @transient
   def tpe: Type // concrete type of this DataFrameSubFeed
   implicit lazy val companion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(tpe)

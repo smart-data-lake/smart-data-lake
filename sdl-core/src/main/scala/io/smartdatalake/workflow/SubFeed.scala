@@ -22,6 +22,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.dag.DAGResult
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 
 /**
@@ -33,6 +34,7 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def partitionValues: Seq[PartitionValues]
   def isDAGStart: Boolean
   def isSkipped: Boolean
+  def metrics: Option[MetricsMap]
 
   /**
    * Break lineage.
@@ -64,6 +66,11 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
 
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed
   def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed
+
+  def withMetrics(metrics: MetricsMap): SubFeed
+
+  def appendMetrics(metrics: MetricsMap): SubFeed
+
 }
 object SubFeed {
   def filterPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[PartitionValues] = {

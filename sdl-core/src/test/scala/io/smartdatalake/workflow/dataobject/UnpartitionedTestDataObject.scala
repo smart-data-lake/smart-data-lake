@@ -25,6 +25,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -45,8 +46,9 @@ case class UnpartitionedTestDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     df.show
+    Map("records_written" -> df.count)
   }
 
   override def factory: FromConfigFactory[DataObject] = UnpartitionedTestDataObject

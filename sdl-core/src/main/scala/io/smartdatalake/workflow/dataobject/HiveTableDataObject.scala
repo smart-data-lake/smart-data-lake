@@ -24,9 +24,11 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, CompactionUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -169,7 +171,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
@@ -182,7 +184,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   private def writeDataFrameInternal(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq(), saveModeOptions: Option[SaveModeOptions] = None)
-                                    (implicit context: ActionPipelineContext): Unit = {
+                                    (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
@@ -204,10 +206,16 @@ case class HiveTableDataObject(override val id: DataObjectId,
       case _ => Unit
     }
 
-    // write table and fix acls
-    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), numInitialHdfsPartitions=numInitialHdfsPartitions )
+    // write table and collect Spark metrics
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
+      HiveUtil.writeDfToHive(dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), numInitialHdfsPartitions = numInitialHdfsPartitions)
+    )
+
+    // apply acls
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
+
+    // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"Analyze table ${table.fullName}.")
       HiveUtil.analyze(table, partitions, partitionValues)
@@ -215,14 +223,19 @@ case class HiveTableDataObject(override val id: DataObjectId,
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
+
+    // return
+    metrics
   }
 
-  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
-    df.write
-      .partitionBy(partitions:_*)
-      .format(OutputType.Parquet.toString)
-      .mode(SparkSaveMode.from(finalSaveMode))
-      .save(path.toString)
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
+    SparkStageMetricsListener.execWithMetrics( this.id,
+      df.write
+        .partitionBy(partitions: _*)
+        .format(OutputType.Parquet.toString)
+        .mode(SparkSaveMode.from(finalSaveMode))
+        .save(path.toString)
+    )
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {

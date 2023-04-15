@@ -156,7 +156,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
       val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
+      assert(runState.actionsState.head._2.results.head.partitionValues == selectedPartitions)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
 
@@ -512,7 +512,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val resultActionsState = runState.actionsState.mapValues(_.state)
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "20180101"))))
+      assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20180101"))))
     }
 
     // now fill src table with second partitions
@@ -542,7 +542,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val resultActionsState = runState.actionsState.mapValues(_.state)
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
+      assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
 

@@ -94,12 +94,12 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
   def extractLogEvents(actionId: ActionId, runtimeInfo: RuntimeInfo, logContext: StateLogEventContext, instanceRegistry: InstanceRegistry): Seq[StateLogEvent] = {
     val results = runtimeInfo.results.map {
       result =>
-        val metadata = instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
+        val metadata = instanceRegistry.get[DataObject](result.dataObjectId).metadata
         val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").mapValues(_.toString)
         else Map()
-        val dataObjectsState = runtimeInfo.dataObjectsState.find(_.dataObjectId == result.subFeed.dataObjectId).map(_.state)
+        val dataObjectsState = runtimeInfo.dataObjectsState.find(_.dataObjectId == result.dataObjectId).map(_.state)
         StateLogEvent(logContext, actionId.id, runtimeInfo.state.toString, runtimeInfo.msg,
-          Some(result.subFeed.dataObjectId.id), optionalizeMap(metadataMap), optionalizeMap(result.mainMetrics), optionalizeSeq(result.subFeed.partitionValues.map(_.toString)), dataObjectsState)
+          Some(result.dataObjectId.id), optionalizeMap(metadataMap), result.metrics, optionalizeSeq(result.partitionValues.map(_.toString)), dataObjectsState)
     }
     // generate at least one log entry per Action if no results
     if (results.nonEmpty) results

@@ -21,6 +21,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
@@ -33,7 +34,8 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException
  */
 case class InitSubFeed(override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
-                       override val isSkipped: Boolean = false
+                       override val isSkipped: Boolean = false,
+                       override val metrics: Option[MetricsMap] = None
                       )
   extends SubFeed {
   override def isDAGStart: Boolean = true
@@ -63,4 +65,8 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
   def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
   }
+  override def withMetrics(metrics: MetricsMap): InitSubFeed = {
+    this.copy(metrics = Some(metrics))
+  }
+  def appendMetrics(metrics: MetricsMap): InitSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 }

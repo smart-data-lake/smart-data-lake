@@ -25,11 +25,13 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, Environment, SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, EnvironmentUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -143,13 +145,14 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
-    writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput, saveModeOptions)
-
+    val metrics = writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput, saveModeOptions)
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
+    // return
+    metrics
   }
 
   /**
@@ -158,7 +161,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   def writeDataFrameInternal(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
-                            (implicit context: ActionPipelineContext): Unit = {
+                            (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
@@ -178,15 +181,24 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       } else df.repartition(numInitialHdfsPartitions)
     }
 
-    // write table and fix acls
-    val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), forceTickTock = isRecursiveInput)
+    // write table and collect Spark metrics
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id, {
+      val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+      HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), forceTickTock = isRecursiveInput)
+    })
+
+    // apply acls
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
+
+    // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
       HiveUtil.analyze(table, partitions, partitionValues)
     }
+
+    // return
+    metrics
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {

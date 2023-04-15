@@ -22,9 +22,11 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
@@ -356,14 +358,16 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) KafkaTopicDataObject does not support writing using partition values: partitionValues=${partitionValues.mkString(",")}")
-    convertToWriteDataFrame(df)
-      .write
-      .format("kafka")
-      .options(instanceOptions)
-      .option("topic", topicName)
-      .save
+    SparkStageMetricsListener.execWithMetrics(this.id,
+      convertToWriteDataFrame(df)
+        .write
+        .format("kafka")
+        .options(instanceOptions)
+        .option("topic", topicName)
+        .save
+    )
   }
 
   override def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)
