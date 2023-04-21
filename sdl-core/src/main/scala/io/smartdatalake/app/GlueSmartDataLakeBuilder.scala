@@ -116,8 +116,6 @@ class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
     val options: Seq[String] = rmArg(List[String](), args.toList)
     logger.info(s"Filtered command line args: +${options.mkString(";")}")
 
-    val scoptVersion = classOf[OParser[_, SmartDataLakeBuilderConfig]].getPackage.getImplementationVersion
-
     OParser.parse(parser, options, SmartDataLakeBuilderConfig()) match {
       case Some(config) =>
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
