@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.app.DatabricksSmartDataLakeBuilder.parser
 import io.smartdatalake.config.ConfigurationException
-import scopt.OParser
+import scopt.{DefaultOParserSetup, OParser, OParserSetup}
 
 /*
  * AWS Glue Smart Data Lake Command Line Application.
@@ -43,84 +42,13 @@ class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
     logger.info(s"Starting Program $appType $appVersion")
 
-    // filter the CLI arguments
-    def rmArg(sel: List[String], list: List[String]): List[String] = {
-      list match {
-        case Nil => sel
-        case "--additional-python-modules" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--class" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--continuous-log-conversionPattern" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--continuous-log-logGroup" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--continuous-log-logStreamPrefix" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--datalake-formats" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-auto-scaling" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-continuous-cloudwatch-log" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-continuous-log-filter" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-glue-datacatalog" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-job-insights" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-metrics" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-rename-algorithm-v2" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-s3-parquet-optimized-committer" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--enable-spark-ui" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--extra-files" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--extra-jars" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--extra-py-files" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--job-bookmark-option" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--job-language" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--python-modules-installer-option" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--scriptLocation" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--spark-event-logs-path" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--TempDir" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--use-postgres-driver" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--user-jars-first" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--conf" :: _ :: tail =>
-          rmArg(sel, tail)
 
-        case "--JOB_ID" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--JOB_RUN_ID" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "--JOB_NAME" :: _ :: tail =>
-          rmArg(sel, tail)
-        case "true" :: tail =>
-          rmArg(sel, tail)
-
-        case string :: tail =>
-          logger.debug("while filtering AWS GLUE options, found option for SDLB:" + string)
-          rmArg(sel :+ string, tail)
-      }
+    // Ignore the arguments we don't recognize as AWS Glue provides many unexpected arguments
+    val setup: OParserSetup = new DefaultOParserSetup {
+      override def errorOnUnknownArgument: Boolean = false
     }
 
-    val options: Seq[String] = rmArg(List[String](), args.toList)
-    logger.info(s"Filtered command line args: +${options.mkString(";")}")
-
-    OParser.parse(parser, options, SmartDataLakeBuilderConfig()) match {
+    OParser.parse(parser, args, SmartDataLakeBuilderConfig(), setup) match {
       case Some(config) =>
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
         val stats = run(config)
