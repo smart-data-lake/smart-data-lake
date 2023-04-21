@@ -27,12 +27,16 @@ import scopt.OParser
  *
  * Glue passes all job parameters (command line arguments) down to the application. This application filters out the
  *   Glue specific ones.
- * SCOPT issue:
- * This was tested with Glue 4.0. Glue 4.0 uses an older version of scopt, which is specified in the XBOOTPATH.
- * To fix the issue:
- *  - place the newer scopt jar an s3 bucket,
- *  - specify the path to it in the job property `Dependent JARs path` and
- *  - Job parameter: `--user-jars-first` with value `true`
+ * SCOPT issue with Glue 4.0:
+ * Since SmartDataLakeBuilder Version 2.5.0 we use scopt Version 4.0.1 in order to parse command line arguments.
+ Unfortunately, Glue 4.0 overwrites the library scopt with an older version by changing the classpath of the boot classloader using a Vm Option that looks like -Xbootclasspath/a:"/path/to/scopt_2.12-3.7.1.jar"
+ You are affected if you get an error message like this:
+ Exception in User Class: java.lang.NoSuchMethodError : scopt.OptionDef.<init>(Lscopt/OptionDefKind;Ljava/lang/String;Lscopt/Read;)V
+ 
+ * To fix the issue, you basically need to make sure scopt 4 is loaded, effectively undoing the -Xbootclasspath/a option:
+ *  - place the newer scopt jar an s3 bucket. You can get it here https://mvnrepository.com/artifact/com.github.scopt/scopt_2.12/4.0.1,
+ *  - specify the path to it in the job property `Dependent JARs path` and 
+ *  - set Job parameter: `--user-jars-first` with value `true`
  */
 class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
