@@ -21,7 +21,6 @@ package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
-import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.meta.GenericTypeDef
 import io.smartdatalake.meta.GenericTypeUtil.attributesForCaseClass
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -167,7 +166,17 @@ class JsonTypeConverterTest extends FunSuite {
     assert(jsonTypeDef.properties("options").isInstanceOf[JsonMapDef])
     assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.get.contains("```###<PROVIDERID>#<SECRETNAME>###```"))
   }
-  
+
+  case class TestClassWithoutSecretsInOptions(options: Map[String, String])
+  test("Map without StringOrSecret values has no additional description") {
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithoutSecretsInOptions])
+
+    val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
+
+    assert(jsonTypeDef.properties("options").isInstanceOf[JsonMapDef])
+    assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.isEmpty)
+  }
+
   private def getGenericTypeDef(tpe: Type, baseType: Option[Type] = None): GenericTypeDef = {
     val attributes = attributesForCaseClass(tpe, Map())
     GenericTypeDef("testTypeDef", baseType, tpe, None, true, Set(), attributes)

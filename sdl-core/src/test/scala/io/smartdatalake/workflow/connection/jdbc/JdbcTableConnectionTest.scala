@@ -21,21 +21,90 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import org.scalatest.FunSuite
 
+import java.sql.SQLException
+
 class JdbcTableConnectionTest extends FunSuite {
 
-  test("turn off autocommit with connectionInitSql") {
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
-      "org.hsqldb.jdbcDriver", connectionInitSql = Some("SET AUTOCOMMIT FALSE"))
+  test("autocommit is disabled by default") {
+    // prepare
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver")
 
+    // run
     val autoCommitEnabled = jdbcConnection.execWithJdbcConnection(_.getAutoCommit)
+
+    // check
     assert(!autoCommitEnabled)
   }
 
-  test("turn off autocommit with autoCommit flag") {
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb",
-      "org.hsqldb.jdbcDriver", autoCommit = Some(false))
+  test("JdbcTransaction.commit returns connection back to pool") {
+    // prepare
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver", maxParallelConnections = 1, connectionPoolMaxWaitTimeSec = 10)
 
-    val autoCommitEnabled = jdbcConnection.execWithJdbcConnection(_.getAutoCommit)
-    assert(!autoCommitEnabled)
+    // run
+    val transaction1 = jdbcConnection.beginTransaction()
+    transaction1.commit()
+    val transaction2 = jdbcConnection.beginTransaction()
+    transaction2.commit();
+
+    // check
+    // no exception
   }
+
+  test("JdbcTransaction.rollback returns connection back to pool") {
+    // prepare
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver", maxParallelConnections = 1, connectionPoolMaxWaitTimeSec = 10)
+
+    // run
+    val transaction1 = jdbcConnection.beginTransaction()
+    transaction1.rollback()
+    val transaction2 = jdbcConnection.beginTransaction()
+    transaction2.commit();
+
+    // check
+    // no exception
+  }
+
+  test("maxParallelConnections > 1 allows concurrent transactions") {
+    // prepare
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver", maxParallelConnections = 2, connectionPoolMaxWaitTimeSec = 10)
+
+    // run
+    val transaction1 = jdbcConnection.beginTransaction()
+    val transaction2 = jdbcConnection.beginTransaction()
+    transaction1.commit();
+    transaction2.commit();
+
+    // check
+    // no exception
+  }
+
+  test("rollback after failed statement") {
+    // prepare
+    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      "org.hsqldb.jdbcDriver")
+
+    jdbcConnection.execJdbcStatement("drop table if exists test_rollback")
+    jdbcConnection.execJdbcStatement("create table test_rollback( id int )")
+
+    // run
+    val transaction = jdbcConnection.beginTransaction()
+    try {
+      transaction.execJdbcStatement("insert into test_rollback(id) values(1)")
+      transaction.execJdbcStatement("insert into test_rollback(id) values('bla')") // throws exception
+    } catch {
+      case _: SQLException => transaction.rollback()
+    }
+
+    // check
+    jdbcConnection.execJdbcQuery("select count(*) from test_rollback", rs => {
+      rs.next()
+      assert(rs.getInt(1) == 0)
+    })
+  }
+
+
 }
