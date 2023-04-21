@@ -145,7 +145,7 @@ extends SmartDataLakeLogger {
       .map(_.resolve().toBoolean)
       .filter(_ != Environment.caseSensitive)
       .foreach(caseSensitive => {
-        logger.warn(s"Spark property 'spark.sql.caseSensitive' is set to '$caseSensitive' but environment property 'caseSensitive' is '${Environment.caseSensitive}'." +
+        logger.warn(s"Spark property 'spark.sql.caseSensitive' is set to '$caseSensitive' but SDL environment property 'caseSensitive' is '${Environment.caseSensitive}'." +
           " Inconsistent case sensitivity in SDL and Spark may lead to unexpected behaviour.")
       })
   }

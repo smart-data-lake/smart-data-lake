@@ -22,8 +22,9 @@ package io.smartdatalake.workflow.action.generic.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SQLUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -41,17 +42,37 @@ case class WhitelistTransformer(override val name: String = "whitelist", overrid
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
+    val colsToSelect =
+      if (Environment.caseSensitive) filterColumnsCaseSensitive(df)
+      else filterColumnsCaseInsensitive(df)
+    df.select(colsToSelect.map(SQLUtil.sparkQuoteSQLIdentifier).map(col))
+  }
+
+  private def filterColumnsCaseInsensitive(df: GenericDataFrame): Seq[String] = {
     val lowerCaseSchemaColumns = df.schema.columns.map(_.toLowerCase()).toSet
     val nonExistingColumns = columnWhitelist.filter(colName => !lowerCaseSchemaColumns.contains(colName.toLowerCase()))
     if (nonExistingColumns.nonEmpty) {
-      logger.warn(s"The whitelisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
-        s"Available columns are [${df.schema.columns.mkString(", ")}].")
+      logNonExistingColumns(nonExistingColumns, df)
     }
-
     val lowerCaseWhitelistColumns = columnWhitelist.map(_.toLowerCase()).toSet
-    val colsToSelect = df.schema.columns.filter(colName => lowerCaseWhitelistColumns.contains(colName.toLowerCase()))
-    df.select(colsToSelect.map(col))
+    df.schema.columns.filter(colName => lowerCaseWhitelistColumns.contains(colName.toLowerCase()))
   }
+
+  private def filterColumnsCaseSensitive(df: GenericDataFrame): Seq[String] = {
+    val schemaColumnsSet = df.schema.columns.toSet
+    val whitelistColumnSet = columnWhitelist.toSet
+    val nonExistingColumns = whitelistColumnSet -- schemaColumnsSet
+    if (nonExistingColumns.nonEmpty) {
+      logNonExistingColumns(nonExistingColumns, df)
+    }
+    (schemaColumnsSet & whitelistColumnSet).toSeq
+  }
+
+  private def logNonExistingColumns(nonExistingColumns: Iterable[String], df: GenericDataFrame): Unit = {
+    logger.warn(s"The whitelisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
+      s"Available columns are [${df.schema.columns.mkString(", ")}].")
+  }
+
   override def factory: FromConfigFactory[GenericDfTransformer] = WhitelistTransformer
 }
 

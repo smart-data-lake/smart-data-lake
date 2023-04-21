@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
@@ -36,21 +37,57 @@ class WhitelistTransformerTest extends FunSuite {
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("only columns where the names match are whitelisted") {
+    // prepare
     val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("column1", "column3"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
 
+    // execute
     val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
+    // check
     assert(transformed.schema.columns == Seq("column1"))
   }
 
-  test("column whitelisting is case insensitive") {
+  test("column whitelisting is case insensitive per default") {
+    // prepare
     val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("coLumn1"))
     val df = SparkDataFrame(Seq(1, 2).toDF("column1"))
 
+    // execute
     val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
+    // check
     assert(transformed.schema.columns == Seq("column1"))
   }
 
+  test("column whitelisting is case sensitive if Environment.caseSensitive=true") {
+    // prepare
+    val previousCaseSensitive = session.conf.get("spark.sql.caseSensitive")
+    session.conf.set("spark.sql.caseSensitive", true)
+    Environment._caseSensitive = Some(true)
+    val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("ColumN1", "blop"))
+    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "ColumN1"))
+
+    // execute
+    val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformed.schema.columns == Seq("ColumN1"))
+
+    // cleanup
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set("spark.sql.caseSensitive", previousCaseSensitive)
+  }
+
+  test("column whitelisting throws no error if whitelisted column has dots") {
+    // prepare
+    val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("column.1"))
+    val df = SparkDataFrame(Seq((1), (2)).toDF("column.1"))
+
+    // execute
+    val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformed.schema.columns == Seq("column.1"))
+  }
 }
