@@ -140,9 +140,9 @@ extends SmartDataLakeLogger {
     Seq(moduleOptions, memoryLogOptions, executorPluginOptions, caseSensitivityOptions).reduceOption(mergeSparkOptions).map(_.mapValues(StringOrSecret)).getOrElse(Map())
   }
 
-  private def checkCaseSensitivityIsConsistent(options: Map[String, String]): Unit = {
+  private def checkCaseSensitivityIsConsistent(options: Map[String, StringOrSecret]): Unit = {
     options.get("spark.sql.caseSensitive")
-      .map(_.toBoolean)
+      .map(_.resolve().toBoolean)
       .filter(_ != Environment.caseSensitive)
       .foreach(caseSensitive => {
         logger.warn(s"Spark property 'spark.sql.caseSensitive' is set to '$caseSensitive' but environment property 'caseSensitive' is '${Environment.caseSensitive}'." +
