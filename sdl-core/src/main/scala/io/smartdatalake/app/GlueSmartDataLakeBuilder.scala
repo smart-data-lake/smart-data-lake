@@ -27,6 +27,12 @@ import scopt.OParser
  *
  * Glue passes all job parameters (command line arguments) down to the application. This application filters out the
  *   Glue specific ones.
+ * SCOPT issue:
+ * This was tested with Glue 4.0. Glue 4.0 uses an older version of scopt, which is specified in the XBOOTPATH.
+ * To fix the issue:
+ *  - place the newer scopt jar an s3 bucket,
+ *  - specify the path to it in the job property `Dependent JARs path` and
+ *  - Job parameter: `--user-jars-first` with value `true`
  */
 class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
