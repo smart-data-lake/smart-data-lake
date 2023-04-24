@@ -104,6 +104,46 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>copy-libs</id>
+            <properties>
+                <scala.deps.scope>provided</scala.deps.scope>
+                <spark.deps.scope>provided</spark.deps.scope>
+                <hadoop.deps.scope>provided</hadoop.deps.scope>
+                <hive.deps.scope>provided</hive.deps.scope>
+                <hive.storage.scope>provided</hive.storage.scope>
+                <hive.common.scope>provided</hive.common.scope>
+                <hive.llap.scope>provided</hive.llap.scope>
+                <hive.serde.scope>provided</hive.serde.scope>
+                <hive.shims.scope>provided</hive.shims.scope>
+                <orc.deps.scope>provided</orc.deps.scope>
+                <parquet.deps.scope>provided</parquet.deps.scope>
+            </properties>
+            <build>
+                <plugins>
+                    <!-- Copy all dependencies to target/lib folder -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.1.1</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <excludeScope>provided</excludeScope>
+                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <!-- only scala 2.12 supported in spark 3.0 -->
         <profile>
             <id>scala-2.12</id>
@@ -644,25 +684,18 @@
                                     </includes>
                                 </artifactSet>
                                 <transformers>
-                                    <transformer
-                                            implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
                                         <resource>reference.conf</resource>
                                     </transformer>
-                                    <transformer
-                                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                        <mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                         <manifestEntries>
+                                            <Main-Class>io.smartdatalake.app.LocalSmartDataLakeBuilder</Main-Class>
                                             <Implementation-Version>${project.version}</Implementation-Version>
-                                            <!-- this is needed for Log4j2 plugins to work properly, e.g. JsonTemplateLayout  -->
                                             <Multi-Release>true</Multi-Release>
                                         </manifestEntries>
                                     </transformer>
-                                    <transformer
-                                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
-                                    </transformer>
-                                    <transformer
-                                            implementation="io.github.edwgiz.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer">
-                                    </transformer>
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                    <transformer implementation="io.github.edwgiz.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer" />
                                 </transformers>
                             </configuration>
                         </execution>
