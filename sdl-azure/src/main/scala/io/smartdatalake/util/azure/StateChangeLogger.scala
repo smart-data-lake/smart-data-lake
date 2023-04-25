@@ -43,9 +43,9 @@ import java.time.LocalDateTime
  * stateListeners = [{
  * className = "io.smartdatalake.util.azure.StateChangeLogger"
  * options = {
- *   endpoint: "https://sdlb-log-w2po.switzerlandnorth-1.ingest.monitor.azure.com"
- *   ruleId: "dcr-e7e5363647ed4f0ab7926e0e02bb8be5"
- *   tableName: "sdlb_state_CL"
+ *   endpoint: "https://....switzerlandnorth-1.ingest.monitor.azure.com"
+ *   ruleId: "dcr-..."
+ *   streamName: "Custom-sdlb-log"
  *   includeMetadata: "true" # optionally disable logging data object metadata
  * }
  * }]
@@ -65,9 +65,9 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
     // LogAnalyticsIngestionBackend
     val endpoint =  options.getOrElse("endpoint", throw new ConfigurationException(s"Option endpoint needed for ${this.getClass.getSimpleName}")).resolve()
     val ruleId =  options.getOrElse("ruleId", throw new ConfigurationException(s"Option ruleId needed for ${this.getClass.getSimpleName}")).resolve()
-    val tableName =  options.getOrElse("tableName", throw new ConfigurationException(s"Option tableName needed for ${this.getClass.getSimpleName}")).resolve()
+    val streamName =  options.getOrElse("streamName", throw new ConfigurationException(s"Option streamName needed for ${this.getClass.getSimpleName}")).resolve()
     val batchSize =  options.get("batchSize").map(_.resolve().toInt).getOrElse(100)
-    new LogAnalyticsIngestionBackend[StateLogEvent](endpoint, ruleId, tableName, batchSize, serialize)
+    new LogAnalyticsIngestionBackend[StateLogEvent](endpoint, ruleId, streamName, batchSize, serialize)
   } else throw new ConfigurationException("Configuration options missing for LogAnalyticsHttpCollectorBackend or LogAnalyticsIngestionBackend")
 
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
