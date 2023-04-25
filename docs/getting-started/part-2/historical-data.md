@@ -98,7 +98,7 @@ It has millisecond precision, but the timestamp value is set to the current time
 The two attributes show the time period in which an object with this combination of attribute values has existed in our data source. 
 The sampling rate is given by the frequency that our data pipeline is scheduled.
 
-    dataIntAirports.getDataFrame().printSchema
+    dataIntAirports.getSparkDataFrame().printSchema
 
     root
     |-- ident: string (nullable = true)
@@ -110,7 +110,7 @@ The sampling rate is given by the frequency that our data pipeline is scheduled.
 
 If you look at the data, there should be only one record per object for now, as we didn't run our data pipeline with historical data yet.
 
-    dataIntAirports.getDataFrame().orderBy($"ident",$"dl_ts_captured").show
+    dataIntAirports.getSparkDataFrame().orderBy($"ident",$"dl_ts_captured").show
 
     +-----+--------------------+------------------+-------------------+--------------------+-------------------+
     |ident|                name|      latitude_deg|      longitude_deg|      dl_ts_captured|    dl_ts_delimited|
@@ -132,7 +132,7 @@ Afterwards, start actions `download-airports` and `historize-airports` by using 
 
 Now check in Polynote again and you'll find several airports that have changed between the intitial and the current state:
 
-    dataIntAirports.getDataFrame()
+    dataIntAirports.getSparkDataFrame()
     .groupBy($"ident").count
     .orderBy($"count".desc)
     .show
@@ -149,7 +149,7 @@ Now check in Polynote again and you'll find several airports that have changed b
 
 When checking the details it seems that for many airports the number of significant digits was reduced for the position:
 
-    dataIntAirports.getDataFrame()
+    dataIntAirports.getSparkDataFrame()
     .where($"ident"==="CDV3")
     .show(false)
     
@@ -238,7 +238,7 @@ podman run --rm --hostname=localhost -v ${PWD}/data:/mnt/data -v ${PWD}/target:/
 After successful execution you can check the schema and data of our table in Polynote. 
 The new column `dl_ts_captured` shows the current time of the data pipeline run when this object first occurred in the input data. 
 
-    dataIntDepartures.getDataFrame().printSchema
+    dataIntDepartures.getSparkDataFrame().printSchema
 
     root
     |-- arrivalairportcandidatescount: long (nullable = true)
@@ -258,7 +258,7 @@ The new column `dl_ts_captured` shows the current time of the data pipeline run 
 
 We can check the work of DeduplicateAction by the following query in Polynote: 
 
-    dataIntDepartures.getDataFrame()
+    dataIntDepartures.getSparkDataFrame()
     .groupBy($"icao24", $"estdepartureairport", $"dt")
     .count
     .orderBy($"count".desc)

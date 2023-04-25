@@ -152,9 +152,9 @@ Having a look at the log, something similar should appear on your screen.
 ```
 
 It is important to notice that the two requests for each airport to the API were not send only once, but twice. 
-This stems from the fact that the method `getDataFrame` of the Data Object is called twice in the DAG execution of the Smart Data Lake Builder: 
+This stems from the fact that the method `getSparkDataFrame` of the Data Object is called twice in the DAG execution of the Smart Data Lake Builder: 
 Once during the Init Phase and once again during the Exec Phase. See [this page](/docs/reference/executionPhases) for more information on that. 
-Before we address and mitigate this behaviour in the next section, let's have a look at the `getDataFrame` method and the currently implemented logic:
+Before we address and mitigate this behaviour in the next section, let's have a look at the `getSparkDataFrame` method and the currently implemented logic:
 
 ```Scala
 // use the queryParameters from the config
@@ -187,7 +187,7 @@ We used such a column based function *from_json* to parse the response string wi
 At the end we return the freshly created data frame `departuresDf`.
 
 :::tip
-The return type of the response is `Array[Byte]`. To convert that to `Array[String]` a *User Defined Function* (also called *UDF*) `byte2String` has been used, which is declared inside the getDataFrame method.
+The return type of the response is `Array[Byte]`. To convert that to `Array[String]` a *User Defined Function* (also called *UDF*) `byte2String` has been used, which is declared inside the getSparkDataFrame method.
 This function is a nice example of how to write your own *UDF*.
 :::
 
