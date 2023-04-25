@@ -43,8 +43,8 @@ import java.io.Serializable;
  *     LogAnalyticsIngestion:
  *       name: AzureLogAnalytics
  *       endpoint: "https://???.switzerlandnorth-1.ingest.monitor.azure.com"
- *       ruleId: "???"
- *       tableName: "sdlb_CL"
+ *       ruleId: "dcr-..."
+ *       streamName: "Custom-sdlb-log"
  *       JsonTemplateLayout:
  *         eventTemplateUri: "classpath:LogAnalyticsSdlbLayout.json"
  *         locationInfoEnabled: "true"
@@ -60,9 +60,9 @@ public class LogAnalyticsIngestionAppenderPlugin extends AbstractAppender {
 
     private LogAnalyticsAppender impl = null;
 
-    private LogAnalyticsIngestionAppenderPlugin(String name, String endpoint, String ruleId, String tableName, Integer maxDelayMillis, Integer batchSize, Layout<? extends Serializable> layout, Filter filter) {
+    private LogAnalyticsIngestionAppenderPlugin(String name, String endpoint, String ruleId, String streamName, Integer maxDelayMillis, Integer batchSize, Layout<? extends Serializable> layout, Filter filter) {
         super(name, filter, layout, /*ignoreExceptions*/ false, new Property[]{});
-        impl = LogAnalyticsAppender$.MODULE$.createIngestionAppender(getName(), endpoint, ruleId, tableName, maxDelayMillis, batchSize, getLayout(), getFilter());
+        impl = LogAnalyticsAppender$.MODULE$.createIngestionAppender(getName(), endpoint, ruleId, streamName, maxDelayMillis, batchSize, getLayout(), getFilter());
     }
 
     @PluginBuilderFactory
@@ -100,7 +100,7 @@ public class LogAnalyticsIngestionAppenderPlugin extends AbstractAppender {
 
         @PluginBuilderAttribute(sensitive = true)
         @Required
-        private String tableName;
+        private String streamName;
 
         @PluginBuilderAttribute
         private Integer maxDelayMillis = 1000;
@@ -117,8 +117,8 @@ public class LogAnalyticsIngestionAppenderPlugin extends AbstractAppender {
             this.ruleId = ruleId;
             return asBuilder();
         }
-        public B setTableName(final String tableName) {
-            this.tableName = tableName;
+        public B setStreamName(final String streamName) {
+            this.streamName = streamName;
             return asBuilder();
         }
 
@@ -134,7 +134,7 @@ public class LogAnalyticsIngestionAppenderPlugin extends AbstractAppender {
 
         @Override
         public LogAnalyticsIngestionAppenderPlugin build() {
-            return new LogAnalyticsIngestionAppenderPlugin(getName(), endpoint, ruleId, tableName, maxDelayMillis, batchSize, getLayout(), getFilter());
+            return new LogAnalyticsIngestionAppenderPlugin(getName(), endpoint, ruleId, streamName, maxDelayMillis, batchSize, getLayout(), getFilter());
         }
     }
 }

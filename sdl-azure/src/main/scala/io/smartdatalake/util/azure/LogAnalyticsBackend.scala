@@ -32,17 +32,18 @@ import scala.collection.JavaConverters._
 import scala.reflect.{ClassTag, classTag}
 
 trait LogAnalyticsBackend[A] {
-  def send(events: Seq[A])
+  def send(events: Seq[A]): Unit
+
   def batchSize: Int
 }
 
 /**
  * LogAnalytics Http Data Collector API backend implementation
  *
- * @param workspaceId the id of the LogAnalytics workspace
+ * @param workspaceId  the id of the LogAnalytics workspace
  * @param workspaceKey the shared secret to access the LogAnalytics workspace
- * @param logType log type parameter submitted to LogAnalytics. LogAnalytics appends "_CL" to create the custom table name.
- * @param serialize a function to serialize the Log object to a Json String
+ * @param logType      log type parameter submitted to LogAnalytics. LogAnalytics appends "_CL" to create the custom table name.
+ * @param serialize    a function to serialize the Log object to a Json String
  */
 class LogAnalyticsHttpCollectorBackend[A](workspaceId: String, workspaceKey: String, logType: String, serialize: A => String) extends LogAnalyticsBackend[A] {
   lazy private val client = new LogAnalyticsClient(workspaceId, workspaceKey)
@@ -50,29 +51,33 @@ class LogAnalyticsHttpCollectorBackend[A](workspaceId: String, workspaceKey: Str
   override val batchSize = 100 // azure log analytics' limit
 
   override def send(events: Seq[A]): Unit = {
-    val body = "["+events.map(serialize).mkString(",")+"]"
-    client.send(body, logType)
+    events.grouped(batchSize).foreach { eventGroup =>
+      val body = "[" + eventGroup.map(serialize).mkString(",") + "]"
+      client.send(body, logType)
+    }
   }
 }
 
 /**
  * LogAnalytics Ingestion API backend implementation
  *
- * @param endpoint Azure Monitor Data Collector Endpoint URI
- * @param ruleId Azure Monitor Data Collection Rule ID
- * @param tableName LogAnalytics table name configure in Data Collection Rule. The name normally ends with '_CL' as it is a Custom Log table.
- * @param serialize a function to serialize the Log object to a Json String.
+ * @param endpoint   Azure Monitor Data Collector Endpoint URI
+ * @param ruleId     Azure Monitor Data Collection Rule ID
+ * @param streamName LogAnalytics stream name configured in Data Collection Rule.
+ * @param serialize  a function to serialize the Log object to a Json String.
  * @param credential optional TokenCredential object to authenticate against Azure AD. Default is to use DefaultAzureCredentialBuilder.
  */
-class LogAnalyticsIngestionBackend[A: ClassTag](endpoint: String, ruleId: String, tableName: String, override val batchSize: Int, serialize: A => String, credential: Option[TokenCredential] = None) extends LogAnalyticsBackend[A] {
+class LogAnalyticsIngestionBackend[A: ClassTag](endpoint: String, ruleId: String, streamName: String, override val batchSize: Int, serialize: A => String, credential: Option[TokenCredential] = None) extends LogAnalyticsBackend[A] {
   private val credentialPrep = credential.getOrElse(new DefaultAzureCredentialBuilder().build())
   private val client = new LogsIngestionClientBuilder().endpoint(endpoint).credential(credentialPrep).buildClient()
   private val uploadOptions = new LogsUploadOptions()
-    .setLogsUploadErrorConsumer(err => println("ERROR LogAnalyticsIngestionBackend: "+err.getResponseException)) // don't log this to avoid loops
+    .setLogsUploadErrorConsumer(err => System.err.println("ERROR LogAnalyticsIngestionBackend: " + err.getResponseException)) // don't log this to avoid loops
     .setObjectSerializer(new Log4jLayoutSerializer[A](serialize))
 
   override def send(events: Seq[A]): Unit = {
-    client.upload(ruleId, tableName, events.asInstanceOf[Seq[Object]].asJava, uploadOptions)
+    events.grouped(batchSize).foreach { eventGroup =>
+      client.upload(ruleId, streamName, eventGroup.asInstanceOf[Seq[Object]].asJava, uploadOptions)
+    }
   }
 }
 
