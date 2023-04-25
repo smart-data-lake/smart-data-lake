@@ -67,7 +67,7 @@ This data object acts as a target for our first action, so where and how to down
 We set type to JsonFileDataObject because we know from before that the webservice will return a json file.
 Path defines where the file will be stored. You could choose any name you want, but most of the time, the name of your DataObject is a good fit.
 Instead of writing *stg-departures* again,
-we used the placeholder *{~id}* which gets replaced by the DataObject-ID. Don't forget to surround that placeholder
+we used the placeholder *~{id}* which gets replaced by the DataObject-ID. Don't forget to surround that placeholder
 with double quotes so that it is interpreted as a string.
 We defined a relative path - it is relative to the working directory SDL is started in. 
 The working directory has been set to the *data* directory in the Dockerfile by setting the JVM Property 
