@@ -26,6 +26,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.internal.SQLConf
 import org.scalatest.FunSuite
 
 class WhitelistTransformerTest extends FunSuite {
@@ -62,8 +63,8 @@ class WhitelistTransformerTest extends FunSuite {
 
   test("column whitelisting is case sensitive if Environment.caseSensitive=true") {
     // prepare
-    val previousCaseSensitive = session.conf.get("spark.sql.caseSensitive")
-    session.conf.set("spark.sql.caseSensitive", true)
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
     Environment._caseSensitive = Some(true)
     val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("ColumN1", "blop"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "ColumN1"))
@@ -76,7 +77,7 @@ class WhitelistTransformerTest extends FunSuite {
 
     // cleanup
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set("spark.sql.caseSensitive", previousCaseSensitive)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
   test("column whitelisting throws no error if whitelisted column has dots") {
