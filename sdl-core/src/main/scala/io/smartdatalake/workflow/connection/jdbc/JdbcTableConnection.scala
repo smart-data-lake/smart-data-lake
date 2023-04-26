@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.connection.jdbc
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
+import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
 import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil, SmartDataLakeLogger, WithResourcePool}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
@@ -176,7 +176,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
       if (caseSensitive) userSchemaMap else CaseInsensitiveMap(userSchemaMap)
     }
     val options =  new JdbcOptionsInWrite(url, tableName, rawOptions)
-    val strSchema = schemaString(schema, SchemaUtil.isSparkCaseSensitive, options.url, options.createTableColumnTypes)
+    val strSchema = schemaString(schema, Environment.caseSensitive, options.url, options.createTableColumnTypes)
     val createTableOptions = options.createTableOptions
     val sql = s"CREATE TABLE $tableName ($strSchema) $createTableOptions"
     execJdbcStatement(sql)

@@ -377,7 +377,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   def evolveTableSchema(dsSchema: StructType)(implicit context: ActionPipelineContext): Unit = {
     logger.info(s"($id) evolving Iceberg table schema")
     val table = getIcebergTable
-    val caseSensitive = SchemaUtil.isSparkCaseSensitive
+    val caseSensitive = Environment.caseSensitive
 
     // convert the dataset schema and assign fresh ids for new fields
     val newSchema = SparkSchemaUtil.convertWithFreshIds(table.schema, dsSchema, caseSensitive)

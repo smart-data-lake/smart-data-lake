@@ -19,7 +19,7 @@
 
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.definitions.SaveModeMergeOptions
+import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject.Table
@@ -68,7 +68,7 @@ object SQLUtil {
    * Quote column name if spark is in case sensitive mode, or the name includes special characters.
    */
   def sparkQuoteCaseSensitiveColumn(column: String)(implicit context: ActionPipelineContext): String = {
-    if (SchemaUtil.isSparkCaseSensitive) sparkQuoteSQLIdentifier(column)
+    if (Environment.caseSensitive) sparkQuoteSQLIdentifier(column)
     else {
       // quote identifier if it contains special characters
       if (hasIdentifierSpecialChars(column)) sparkQuoteSQLIdentifier(column)

@@ -90,7 +90,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .options(connection.getSnowflakeOptions(table.db.get))
       .options(queryOrTable)
       .load()
-    df.colNamesLowercase
+    df
   }
 
   // Write a Spark DataFrame to the Snowflake table
