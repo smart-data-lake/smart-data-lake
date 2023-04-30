@@ -129,8 +129,8 @@ object SchemaUtil {
     JavaTypeInference.inferDataType(beanClass)._1.asInstanceOf[StructType]
   }
 
-  def getSchemaFromJsonSchema(jsonSchemaContent: String): StructType = {
-    JsonSchemaConverter.convert(jsonSchemaContent)
+  def getSchemaFromJsonSchema(jsonSchemaContent: String, strictTyping: Boolean, additionalPropertiesDefault: Boolean): StructType = {
+    JsonSchemaConverter.convert(jsonSchemaContent, strictTyping, additionalPropertiesDefault)
   }
 
   def getSchemaFromAvroSchema(avroSchemaContent: String): StructType = {
@@ -180,17 +180,19 @@ object SchemaUtil {
         } else LazyGenericSchema(schemaConfig)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size == 1 || valueElements.size == 2, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>', but received $value.")
+        assert(valueElements.size <= 4, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping>;<additionalPropertiesDefault>', but received $value.")
         val path = valueElements.head
-        val rowTag = valueElements.drop(1).headOption
+        val rowTag = if (valueElements.size>=2) Some(valueElements(1)).filter(_.isEmpty) else None
+        val strictTyping = if (valueElements.size>=3) Some(valueElements(2).toBoolean) else None
+        val additionalPropertiesDefault = if (valueElements.size>=4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
           val content = HdfsUtil.readHadoopFile(path)
-          val schema = getSchemaFromJsonSchema(content)
+          val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
       case AvroSchemaFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size == 1 || valueElements.size == 2, s"Avro schema provider configuration error. Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
+        assert(valueElements.size <= 2, s"Avro schema provider configuration error. Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         if (!lazyFileReading) {

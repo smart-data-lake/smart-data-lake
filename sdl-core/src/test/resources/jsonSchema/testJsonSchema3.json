@@ -13,11 +13,7 @@
         "item2": {
           "type": "string"
         }
-      },
-      "required": [
-        "item1",
-        "item2"
-      ]
+      }
     },
     "array": {
       "type": "array",
@@ -68,28 +64,21 @@
     "number": {
       "type": "number"
     },
-    "float": {
+    "floatRequired": {
       "type": "float"
     },
     "nullable": {
       "type": ["number", "null"]
     },
-    "boolean": {
-      "type": "boolean"
+    "booleanWithComment": {
+      "type": "boolean",
+      "description": "todo"
     },
     "additionalProperty": {
       "type": "string"
     }
   },
   "required": [
-    "object",
-    "array",
-    "structure",
-    "typeless",
-    "integer",
-    "string",
-    "number",
-    "nullable",
-    "boolean"
+    "floatRequired"
   ]
 }
