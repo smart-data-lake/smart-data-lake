@@ -67,6 +67,12 @@ class SchemaUtilTest extends FunSuite {
     assert(schema.columns == Seq("entry"))
   }
 
+  test("parse xsd schema with row tag and jsonCompatibility") {
+    val schemaConfig = s"${SchemaProviderType.XsdFile.toString}#${xsdFile.toString};basket;10;true"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
+    assert(schema.columns == Seq("entrys"))
+  }
+
   test("parse xsd schema with nested row tag and extract array type") {
     val schemaConfig = s"${SchemaProviderType.XsdFile.toString}#${xsdFile.toString};basket/entry"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)

@@ -21,18 +21,23 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf}
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkArrayDataType, SparkMapDataType, SparkSchema, SparkSimpleDataType, SparkStructDataType}
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{ArrayType, StructType}
+import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructField, StructType}
 import org.apache.spark.sql.xml.XsdSchemaConverter
+import org.apache.ws.commons.schema.XmlSchemaCollection
 
+import java.io.{File, FileInputStream, InputStreamReader}
+import java.nio.charset.StandardCharsets
 import scala.reflect.runtime.universe.{Type, TypeTag}
 
 object SchemaUtil {
@@ -137,8 +142,11 @@ object SchemaUtil {
     AvroSchemaConverter.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
   }
 
-  def getSchemaFromXsd(xsdContent: String, maxRecursion: Option[Int] = None): StructType = {
-    XsdSchemaConverter.read(xsdContent, maxRecursion.getOrElse(10)) // default is maxRecursion=10
+  def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)(implicit hadoopConfiguration: Configuration): StructType = {
+    val path = addHadoopDefaultSchemaAuthority(xsdFile)
+    implicit val fs = getHadoopFsWithConf(path)
+    SdlbXsdURIResolver.readXsd(xsdFile, maxRecursion.getOrElse(10)) // default is maxRecursion=10)
+    //XsdSchemaConverter.read(xsdContent, maxRecursion.getOrElse(10)) // default is maxRecursion=10
   }
 
   def getSchemaFromDdl(ddl: String): StructType = {
@@ -169,14 +177,16 @@ object SchemaUtil {
         SparkSchema(getSchemaFromJavaBean(clazz))
       case XsdFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size <= 3, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion>', but received $value.")
+        assert(valueElements.size <= 4, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>', but received $value.")
         val path = valueElements.head
-        val rowTag = valueElements.drop(1).headOption
-        val maxRecursion = valueElements.drop(2).headOption.map(_.toInt)
+        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)) else None
+        val maxRecursion = if (valueElements.size >= 3) Some(valueElements(2).toInt) else None
+        val jsonCompatibility = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
-          val schema = getSchemaFromXsd(content, maxRecursion)
-          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+          val schema = getSchemaFromXsd(new Path(path), maxRecursion)
+          val sparkSchema = SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+          if (jsonCompatibility.getOrElse(false)) makeXsdJsonCompatible(sparkSchema)
+          else sparkSchema
         } else LazyGenericSchema(schemaConfig)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
@@ -239,6 +249,36 @@ object SchemaUtil {
       .map(f => (f.name, f)).toMap
     // order fields according to schema1
     StructType(schema1.fields.map(f => fieldsMap(f.name)) ++ fields2Only.map(f => fieldsMap(f.name)))
+  }
+
+  /**
+   * In XML array elements are modeled with their own tag named with singular name.
+   * In JSON an array attribute has unnamed array entries, but the array attribute has a plural name.
+   *
+   * Often if you get an XSD file for JSON data (because the data is published as XML and JSON),
+   * the singular name of the array element in the XSD has to be converted to a plural name by adding an 's'.
+   * Thats what this method does.
+   */
+  def makeXsdJsonCompatible(sparkSchema: SparkSchema): SparkSchema = {
+    def visitField(field: StructField): StructField = {
+      val newName = field.dataType match {
+        // add final 's' to singular name of XML array field
+        case _: ArrayType => field.name + "s"
+        case _ => field.name
+      }
+      val newType = visitType(field.dataType)
+      field.copy(name = newName, dataType = newType)
+    }
+    def visitType(dataType: DataType): DataType = {
+      dataType match {
+        case structType: StructType => structType.copy(fields = structType.fields.map(f => visitField(f)))
+        case arrType: ArrayType => visitType(arrType.elementType)
+        case mapType: MapType => MapType(visitType(mapType.keyType), visitType(mapType.valueType))
+        case x => x
+      }
+    }
+    val newFields = sparkSchema.inner.fields.map(visitField)
+    SparkSchema(sparkSchema.inner.copy(fields = newFields))
   }
 }
 
