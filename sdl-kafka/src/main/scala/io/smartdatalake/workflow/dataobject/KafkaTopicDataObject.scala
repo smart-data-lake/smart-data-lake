@@ -407,12 +407,14 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       case KafkaColumnType.String => dataCol.cast(StringType)
       case KafkaColumnType.Json =>
         // reading is done with the specified schema.
-        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
+        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka"))
+          .convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
         from_json(dataCol.cast(StringType), sparkSchema)
       case KafkaColumnType.Avro =>
         import org.apache.spark.sql.avro.functions.from_avro
         // reading is done with the specified schema. It needs to be converted to an avro schema for from_avro.
-        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
+        val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka"))
+          .convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
         val avroSchema = AvroSchemaConverter.toAvroType(sparkSchema)
         from_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>

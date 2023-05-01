@@ -34,6 +34,11 @@ case class LazyGenericSchema(schemaConfig: String) extends GenericSchema {
 
   private lazy val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig, lazyFileReading = false)
 
+  /**
+   * Get the parsed schema
+   */
+  def get = schema
+
   override def diffSchema(schema: GenericSchema): Option[GenericSchema] = schema.diffSchema(schema)
   override def columns: Seq[String] = schema.columns
   override def fields: Seq[GenericField] = schema.fields
