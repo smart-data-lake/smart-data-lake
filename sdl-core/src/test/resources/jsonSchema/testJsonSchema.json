@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
   "id": "testSchema",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "title": "Root schema.",
   "description": "schema.json for testing schema converter",
   "name": "/",

@@ -179,7 +179,7 @@ object SchemaUtil {
         val valueElements = value.split(";")
         assert(valueElements.size <= 4, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>', but received $value.")
         val path = valueElements.head
-        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)) else None
+        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
         val maxRecursion = if (valueElements.size >= 3) Some(valueElements(2).toInt) else None
         val jsonCompatibility = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
@@ -190,9 +190,9 @@ object SchemaUtil {
         } else LazyGenericSchema(schemaConfig)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size <= 4, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping>;<additionalPropertiesDefault>', but received $value.")
+        assert(valueElements.size <= 4, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>', but received $value.")
         val path = valueElements.head
-        val rowTag = if (valueElements.size>=2) Some(valueElements(1)).filter(_.isEmpty) else None
+        val rowTag = if (valueElements.size>=2) Some(valueElements(1)).filter(_.nonEmpty) else None
         val strictTyping = if (valueElements.size>=3) Some(valueElements(2).toBoolean) else None
         val additionalPropertiesDefault = if (valueElements.size>=4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
