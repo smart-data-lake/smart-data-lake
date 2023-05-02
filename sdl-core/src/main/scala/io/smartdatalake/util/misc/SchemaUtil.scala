@@ -260,28 +260,40 @@ object SchemaUtil {
    * Thats what this method does.
    */
   def makeXsdJsonCompatible(sparkSchema: SparkSchema): SparkSchema = {
-    def visitField(field: StructField): StructField = {
+    def renameArrayToPluralForm(field: StructField): StructField = {
       val newName = field.dataType match {
         // add final 's' to singular name of XML array field
         case _: ArrayType => field.name + "s"
         case _ => field.name
       }
-      val newType = visitType(field.dataType)
-      field.copy(name = newName, dataType = newType)
+      field.copy(name = newName)
     }
+    transformSchemaFields(sparkSchema, renameArrayToPluralForm)
+  }
+
+  /**
+   * A function to transform recursively the fields of a schema.
+   */
+  def transformSchemaFields(sparkSchema: SparkSchema, fieldTransformer: StructField => StructField): SparkSchema = {
+    def visitField(field: StructField): StructField = {
+      val transformedField = fieldTransformer(field)
+      val newType = visitType(transformedField.dataType)
+      transformedField.copy(dataType = newType)
+    }
+
     def visitType(dataType: DataType): DataType = {
       dataType match {
         case structType: StructType => structType.copy(fields = structType.fields.map(f => visitField(f)))
-        case arrType: ArrayType => visitType(arrType.elementType)
+        case arrType: ArrayType => arrType.copy(elementType = visitType(arrType.elementType))
         case mapType: MapType => MapType(visitType(mapType.keyType), visitType(mapType.valueType))
         case x => x
       }
     }
+
     val newFields = sparkSchema.inner.fields.map(visitField)
     SparkSchema(sparkSchema.inner.copy(fields = newFields))
   }
 }
-
 
 object SchemaProviderType extends Enumeration {
   type SchemaProviderType = Value
