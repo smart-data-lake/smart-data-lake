@@ -77,7 +77,7 @@ case class KafkaConnection(override val id: ConnectionId,
         props.setProperty(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSASLSSLSecurityProtocol)
         props.setProperty("sasl.mechanism", m.sslMechanism)
         props.setProperty("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\""
-          + m.username + "\" password=\"" + m.passwordSecret + "\";")
+          + m.username.resolve() + "\" password=\"" + m.passwordSecret.resolve() + "\";")
         props.setProperty(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
         props.setProperty(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePassSecret.resolve())
         props.setProperty(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))

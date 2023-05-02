@@ -188,7 +188,7 @@ case class SSLCertsAuthMode (
  * Validate by SASL_SSL Authentication : user / password and truststore
  */
 case class SASLSCRAMAuthMode (
-                                 username: String,
+                                 username: StringOrSecret,
                                  @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None,
                                  private val password: Option[StringOrSecret],
                                  sslMechanism: String,
