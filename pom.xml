@@ -78,6 +78,7 @@
                 <hive.shims.scope>provided</hive.shims.scope>
                 <orc.deps.scope>provided</orc.deps.scope>
                 <parquet.deps.scope>provided</parquet.deps.scope>
+                <jetty.deps.scope>provided</jetty.deps.scope>
             </properties>
             <build>
                 <plugins>
@@ -91,9 +92,6 @@
         </profile>
         <profile>
             <id>fat-jar-with-spark</id>
-            <properties>
-                <jetty.deps.scope>compile</jetty.deps.scope>
-            </properties>
             <build>
                 <plugins>
                     <!-- Builds executable fat-jar that includes all dependencies -->
@@ -118,7 +116,35 @@
                 <hive.shims.scope>provided</hive.shims.scope>
                 <orc.deps.scope>provided</orc.deps.scope>
                 <parquet.deps.scope>provided</parquet.deps.scope>
+                <jetty.deps.scope>provided</jetty.deps.scope>
             </properties>
+            <build>
+                <plugins>
+                    <!-- Copy all dependencies to target/lib folder -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.1.1</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <excludeScope>provided</excludeScope>
+                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>copy-libs-with-spark</id>
             <build>
                 <plugins>
                     <!-- Copy all dependencies to target/lib folder -->
@@ -268,7 +294,7 @@
         <orc.deps.scope>compile</orc.deps.scope>
         <parquet.deps.scope>compile</parquet.deps.scope>
         <parquet.test.deps.scope>test</parquet.test.deps.scope>
-        <jetty.deps.scope>provided</jetty.deps.scope>
+        <jetty.deps.scope>compile</jetty.deps.scope>
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
