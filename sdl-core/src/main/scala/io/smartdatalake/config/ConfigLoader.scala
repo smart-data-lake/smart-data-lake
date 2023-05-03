@@ -26,9 +26,9 @@ import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 
-import java.io.{InputStreamReader, Reader}
+import java.io.{FileNotFoundException, InputStreamReader, Reader}
 import scala.util.{Failure, Success, Try}
 
 object ConfigLoader extends SmartDataLakeLogger {
@@ -91,10 +91,18 @@ object ConfigLoader extends SmartDataLakeLogger {
     val hadoopConf: Configuration = new Configuration() // note that we could not yet load additional hadoop/spark configurations set in the configuration files
 
     // Search locations for config files
-    val configFiles = hadoopPaths.flatMap(
-      location => if (ClasspathConfigFile.canHandleScheme(location)) Seq(ClasspathConfigFile(location))
-      else getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+    val configFiles = hadoopPaths.flatMap( location =>
+        if (ClasspathConfigFile.canHandleScheme(location))
+          Seq(ClasspathConfigFile(location))
+        else
+          try
+            getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+          catch {
+            case exception: FileNotFoundException => throw ConfigurationException(s"The provided config file ${location.toUri.getPath} does not exist", None, exception)
+          }
     )
+
+
     if (configFiles.isEmpty) throw ConfigurationException(s"No configuration files found in ${hadoopPaths.mkString(", ")}. " +
       s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
 
@@ -188,7 +196,7 @@ object ConfigLoader extends SmartDataLakeLogger {
             .partition(_.isDirectory)
           (files ++ directories).flatMap(p => getFilesInBfsOrder(p.getPath)).toSeq
       }
-    } else if (fs.isFile(path) && ConfigFile.canHandleExtension(path)) {
+    } else if (fs.getFileStatus(path).isInstanceOf[FileStatus] && ConfigFile.canHandleExtension(path)) {
       if (path.getName.contains("log4j")) {
         logger.debug(s"Ignoring log4j configuration file '$path'.")
         Seq()
