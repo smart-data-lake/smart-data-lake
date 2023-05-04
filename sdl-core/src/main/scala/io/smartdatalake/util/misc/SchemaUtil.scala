@@ -19,13 +19,16 @@
 
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.config.ConfigUtil
+import io.smartdatalake.config.ConfigLoader.ClasspathConfigFile
+import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
 import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
@@ -33,6 +36,9 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{ArrayType, StructType}
 import org.apache.spark.sql.xml.XsdSchemaConverter
 
+import java.io.{BufferedReader, InputStreamReader}
+import java.nio.charset.StandardCharsets
+import java.util.stream.Collectors
 import scala.reflect.runtime.universe.{Type, TypeTag}
 
 object SchemaUtil {
@@ -149,6 +155,24 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
+  private[smartdatalake] def parseInputPath(inputPath: String): String = {
+    val hadoopConf: Configuration = new Configuration()
+    val path = addHadoopDefaultSchemaAuthority(new Path(inputPath))
+        if (ClasspathSchemaFile.canHandleSchema(path)){
+          val inputStream = Option(getClass.getResourceAsStream(path.toUri.getPath))
+            .getOrElse(throw ConfigurationException(s"Could not find resource ${path.toUri.getPath} in classpath"))
+          new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
+        }
+        else{
+          val filesystem = getHadoopFsWithConf(path)(hadoopConf)
+          readHadoopFile(path)(filesystem)
+        }
+  }
+
+  private object ClasspathSchemaFile {
+    def canHandleSchema(path: Path): Boolean = path.toUri.getScheme == "cp"
+  }
+
   /**
    * Parses a Spark [[StructType]] by using the desired schema provider.
    * The schema provider is included in the configuration value as prefix terminated by '#'.
@@ -161,7 +185,7 @@ object SchemaUtil {
       case DDL =>
         SparkSchema(getSchemaFromDdl(value))
       case DDLFile =>
-        val content = HdfsUtil.readHadoopFile(value)
+        val content = parseInputPath(value)
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
         val clazz = this.getClass.getClassLoader.loadClass(value)
@@ -178,7 +202,7 @@ object SchemaUtil {
         val rowTag = valueElements.drop(1).headOption
         val maxRecursion = valueElements.drop(2).headOption.map(_.toInt)
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
+          val content = parseInputPath(path)
           val schema = getSchemaFromXsd(content, maxRecursion)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
@@ -188,7 +212,7 @@ object SchemaUtil {
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
+          val content = parseInputPath(path)
           val schema = getSchemaFromJsonSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
@@ -198,7 +222,7 @@ object SchemaUtil {
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
+          val content = parseInputPath(path)
           val schema = getSchemaFromAvroSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
@@ -298,4 +322,5 @@ object SchemaProviderType extends Enumeration {
    *   To extract a nested row tag, split the elements by slash (/).
    */
   val AvroSchemaFile: SchemaProviderType.Value = Value("avroschemafile")
+
 }
