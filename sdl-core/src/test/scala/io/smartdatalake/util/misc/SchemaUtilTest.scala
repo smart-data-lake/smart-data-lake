@@ -43,6 +43,11 @@ class SchemaUtilTest extends FunSuite {
   private val avroSchemaFile = tempDir.resolve(avroSchemaResourceFile).toFile
   TestUtil.copyResourceToFile(avroSchemaResourceFile, avroSchemaFile)
 
+  // copy ddl file from resource to filesystem
+  private val ddlSchemaResourceFile = "ddlSchema/testDDLSchema.ddl"
+  private val ddlSchemaFile = tempDir.resolve(ddlSchemaResourceFile).toFile
+  TestUtil.copyResourceToFile(ddlSchemaResourceFile, ddlSchemaFile)
+
   test("parse ddl schema") {
     val schemaConfig = s"${SchemaProviderType.DDL.toString}#a int, b string"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
@@ -55,6 +60,18 @@ class SchemaUtilTest extends FunSuite {
     assert(schema.columns == Seq("a", "b"))
   }
 
+  test("parse ddl schema from file") {
+    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#${ddlSchemaFile.toString};"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
+    assert(schema.columns == Seq("a", "b"))
+  }
+
+  test("parse ddl schema from file as a file from classpath") {
+    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#cp:/${ddlSchemaResourceFile.toString};"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
+    assert(schema.columns == Seq("a", "b"))
+  }
+
   test("parse schema from case class") {
     val schemaConfig = s"${SchemaProviderType.CaseClass.toString}#${classOf[TestSchema].getName}"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
@@ -63,6 +80,12 @@ class SchemaUtilTest extends FunSuite {
 
   test("parse xsd schema with row tag") {
     val schemaConfig = s"${SchemaProviderType.XsdFile.toString}#${xsdFile.toString};basket"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
+    assert(schema.columns == Seq("entry"))
+  }
+
+  test("parse xsd schema with row tag as a file from classpath") {
+    val schemaConfig = s"${SchemaProviderType.XsdFile.toString}#cp:/${xsdResourceFile};basket"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("entry"))
   }
@@ -85,8 +108,20 @@ class SchemaUtilTest extends FunSuite {
     assert(schema.columns == Seq("key", "value"))
   }
 
+  test("parse json schema with nested row tag as a file from classpath") {
+    val schemaConfig = s"${SchemaProviderType.JsonSchemaFile.toString}#cp:/${jsonSchemaResourceFile};structure/nestedArray"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
+    assert(schema.columns == Seq("key", "value"))
+  }
+
   test("parse avro schema") {
     val schemaConfig = s"${SchemaProviderType.AvroSchemaFile.toString}#${avroSchemaFile.toString};"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
+    assert(schema.columns == Seq("id", "username", "passwordHash", "signupDate", "emailAddresses"))
+  }
+
+  test("parse avro schema as a file from classpath") {
+    val schemaConfig = s"${SchemaProviderType.AvroSchemaFile.toString}#cp:/${avroSchemaResourceFile};"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("id", "username", "passwordHash", "signupDate", "emailAddresses"))
   }
