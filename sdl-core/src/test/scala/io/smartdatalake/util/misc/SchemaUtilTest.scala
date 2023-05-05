@@ -21,6 +21,7 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.testutils.TestUtil
 import org.scalatest.FunSuite
+import org.scalatest.Matchers.{a, be}
 
 import java.nio.file.Files
 
@@ -64,6 +65,11 @@ class SchemaUtilTest extends FunSuite {
     val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#${ddlSchemaFile.toString}"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("a", "b"))
+  }
+
+  test("parse ddl schema from file and throws error") {
+    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#${ddlSchemaFile.toString};a"
+    a [AssertionError] should be thrownBy  SchemaUtil.readSchemaFromConfigValue(schemaConfig)
   }
 
   test("parse ddl schema from file as a file from classpath") {
