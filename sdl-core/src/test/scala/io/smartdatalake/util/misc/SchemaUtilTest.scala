@@ -61,13 +61,13 @@ class SchemaUtilTest extends FunSuite {
   }
 
   test("parse ddl schema from file") {
-    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#${ddlSchemaFile.toString};"
+    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#${ddlSchemaFile.toString}"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("a", "b"))
   }
 
   test("parse ddl schema from file as a file from classpath") {
-    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#cp:/${ddlSchemaResourceFile.toString};"
+    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#cp:/${ddlSchemaResourceFile.toString}"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("a", "b"))
   }
