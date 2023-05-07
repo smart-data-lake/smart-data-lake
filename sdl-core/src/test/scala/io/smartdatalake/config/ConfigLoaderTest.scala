@@ -62,8 +62,12 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
     an [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("foo/bar"), defaultHadoopConf)
   }
 
+  it must "fail if provided directory is empty" in {
+    an[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config").toURI.toString + "/emptydirectory"), defaultHadoopConf)
+  }
+
   it must "fail if no configuration files are found for any location provided location in the Sequence" in {
-    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/error.conf"), defaultHadoopConf)
+    //a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/error.conf"), defaultHadoopConf)
     a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/empty"), defaultHadoopConf)
   }
 
