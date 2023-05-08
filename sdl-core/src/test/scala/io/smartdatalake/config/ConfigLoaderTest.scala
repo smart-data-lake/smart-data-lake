@@ -67,7 +67,7 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
   }
 
   it must "fail if no configuration files are found for any location provided location in the Sequence" in {
-    //a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/error.conf"), defaultHadoopConf)
+    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/error.conf"), defaultHadoopConf)
     a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/empty"), defaultHadoopConf)
   }
 
