@@ -96,12 +96,11 @@ object ConfigLoader extends SmartDataLakeLogger {
           Seq(ClasspathConfigFile(location))
         else
           try {
-            var fs = location.getFileSystem(hadoopConf)
-            if(fs.getFileStatus(location).isDirectory & !RemoteIteratorWrapper(fs.listFiles(location, true)).exists(path =>
-                configFileExtensions.contains(path.getPath.toUri.toString.split("\\.").last)
-              ))
-                throw ConfigurationException(s"The provided directory path ${location.toUri.getPath} does not contain any valid config files")
-            getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+            val files = getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+            if (files.isEmpty){
+              throw ConfigurationException(s"The provided directory path ${location.toUri.getPath} does not contain any valid config files")
+            }
+            files
           } catch {
             case exception: FileNotFoundException => throw ConfigurationException(s"The provided config file does not exist or the provided directory is empty:  ${location.toUri.getPath}", None, exception)
          }
