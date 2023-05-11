@@ -427,6 +427,18 @@ object Environment {
   }
   var _failSimulationOnMissingInputSubFeeds: Option[Boolean] = None
 
+  /**
+   * Whether SDL should run in case sensitive mode. If true Spark will also be configured to be case sensitive.
+   * Default is false.
+   */
+  def caseSensitive: Boolean = {
+    if (_caseSensitive.isEmpty) {
+      _caseSensitive = Some(EnvironmentUtil.getSdlParameter("caseSensitive").exists(_.toBoolean))
+    }
+    _caseSensitive.get
+  }
+  var _caseSensitive: Option[Boolean] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

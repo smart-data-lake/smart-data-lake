@@ -31,6 +31,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.{PythonUDFCreatorConfi
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.PrivateAccessor
 
 /**
@@ -111,6 +112,7 @@ extends SmartDataLakeLogger {
    */
   private def createSparkSession(appName: String, master: Option[String], deployMode: Option[String] = None): SparkSession = {
     val sparkOptionsExtended = additionalSparkOptions ++ sparkOptions.getOrElse(Map())
+    checkCaseSensitivityIsConsistent(sparkOptionsExtended)
     val sparkSession = AppUtil.createSparkSession(appName, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
     registerUdf(sparkSession)
     // adjust log level
@@ -134,7 +136,19 @@ extends SmartDataLakeLogger {
     val memoryLogOptions = memoryLogTimer.map(_.getAsMap).getOrElse(Map())
     // get additional options from modules
     val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
-    Seq(moduleOptions, memoryLogOptions, executorPluginOptions).reduceOption(mergeSparkOptions).map(_.mapValues(StringOrSecret)).getOrElse(Map())
+    // if SDL is case sensitive then Spark should be as well
+    val caseSensitivityOptions = Map(SQLConf.CASE_SENSITIVE.key -> Environment.caseSensitive.toString)
+    Seq(moduleOptions, memoryLogOptions, executorPluginOptions, caseSensitivityOptions).reduceOption(mergeSparkOptions).map(_.mapValues(StringOrSecret)).getOrElse(Map())
+  }
+
+  private def checkCaseSensitivityIsConsistent(options: Map[String, StringOrSecret]): Unit = {
+    options.get(SQLConf.CASE_SENSITIVE.key)
+      .map(_.resolve().toBoolean)
+      .filter(_ != Environment.caseSensitive)
+      .foreach(caseSensitive => {
+        logger.warn(s"Spark property '${SQLConf.CASE_SENSITIVE.key}' is set to '$caseSensitive' but SDL environment property 'caseSensitive' is '${Environment.caseSensitive}'." +
+          " Inconsistent case sensitivity in SDL and Spark may lead to unexpected behaviour.")
+      })
   }
 
   // private holder for spark session

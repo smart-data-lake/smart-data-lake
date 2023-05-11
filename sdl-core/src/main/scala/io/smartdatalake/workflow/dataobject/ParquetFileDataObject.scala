@@ -93,12 +93,6 @@ case class ParquetFileDataObject( override val id: DataObjectId,
 
   override val options: Map[String, String] = parquetOptions.getOrElse(Map())
 
-  // when writing parquet files, schema column names are forced to lower,
-  // because they can also be accessed by Hive which is case insensitive.
-  // See: https://medium.com/@an_chee/why-using-mixed-case-field-names-in-hive-spark-sql-is-a-bad-idea-95da8b6ec1e0
-  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame =
-    super.beforeWrite(df).colNamesLowercase
-
   override def factory: FromConfigFactory[DataObject] = ParquetFileDataObject
 }
 

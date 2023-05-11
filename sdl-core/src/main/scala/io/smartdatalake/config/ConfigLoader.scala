@@ -95,13 +95,16 @@ object ConfigLoader extends SmartDataLakeLogger {
         if (ClasspathConfigFile.canHandleScheme(location))
           Seq(ClasspathConfigFile(location))
         else
-          try
-            getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
-          catch {
-            case exception: FileNotFoundException => throw ConfigurationException(s"The provided config file ${location.toUri.getPath} does not exist", None, exception)
-          }
+          try {
+            val files = getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+            if (files.isEmpty){
+              throw ConfigurationException(s"The provided directory path ${location.toUri.getPath} does not contain any valid config files")
+            }
+            files
+          } catch {
+            case exception: FileNotFoundException => throw ConfigurationException(s"The provided config file does not exist or the provided directory is empty:  ${location.toUri.getPath}", None, exception)
+         }
     )
-
 
     if (configFiles.isEmpty) throw ConfigurationException(s"No configuration files found in ${hadoopPaths.mkString(", ")}. " +
       s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
@@ -184,7 +187,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    * @return     a BFS ordered config file list.
    */
   private def getFilesInBfsOrder(path: Path)(implicit fs: FileSystem): Seq[ConfigFile] = {
-    if (fs.isDirectory(path)) {
+    if (fs.getFileStatus(path).isDirectory) {
       Try(RemoteIteratorWrapper(fs.listStatusIterator(path))) match {
         case Failure(exception) =>
           logger.warn(s"Failed to list directory content of ${path.toString}.", exception)
@@ -196,7 +199,7 @@ object ConfigLoader extends SmartDataLakeLogger {
             .partition(_.isDirectory)
           (files ++ directories).flatMap(p => getFilesInBfsOrder(p.getPath)).toSeq
       }
-    } else if (fs.getFileStatus(path).isInstanceOf[FileStatus] && ConfigFile.canHandleExtension(path)) {
+    } else if (fs.getFileStatus(path).isFile && ConfigFile.canHandleExtension(path)) {
       if (path.getName.contains("log4j")) {
         logger.debug(s"Ignoring log4j configuration file '$path'.")
         Seq()

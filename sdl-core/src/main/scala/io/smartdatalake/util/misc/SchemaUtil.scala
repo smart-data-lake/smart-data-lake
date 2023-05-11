@@ -19,9 +19,8 @@
 
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.config.ConfigLoader.ClasspathConfigFile
+
 import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
-import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
@@ -32,13 +31,10 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{ArrayType, StructType}
 import org.apache.spark.sql.xml.XsdSchemaConverter
 
-import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
-import java.util.stream.Collectors
 import scala.reflect.runtime.universe.{Type, TypeTag}
 
 object SchemaUtil {
@@ -123,10 +119,6 @@ object SchemaUtil {
     }
   }
 
-  def isSparkCaseSensitive: Boolean = {
-    SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
-  }
-
   def getSchemaFromCaseClass[T <: Product : TypeTag]: StructType = {
     Encoders.product[T].schema
   }
@@ -158,15 +150,15 @@ object SchemaUtil {
   private[smartdatalake] def parseInputPath(inputPath: String): String = {
     val hadoopConf: Configuration = new Configuration()
     val path = addHadoopDefaultSchemaAuthority(new Path(inputPath))
-        if (ClasspathSchemaFile.canHandleSchema(path)){
-          val inputStream = Option(getClass.getResourceAsStream(path.toUri.getPath))
-            .getOrElse(throw ConfigurationException(s"Could not find resource ${path.toUri.getPath} in classpath"))
-          new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
-        }
-        else{
-          val filesystem = getHadoopFsWithConf(path)(hadoopConf)
-          readHadoopFile(path)(filesystem)
-        }
+    if (ClasspathSchemaFile.canHandleSchema(path)){
+      val inputStream = Option(getClass.getResourceAsStream(path.toUri.getPath))
+        .getOrElse(throw ConfigurationException(s"Could not find resource ${path.toUri.getPath} in classpath"))
+      new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
+    }
+    else{
+      val filesystem = getHadoopFsWithConf(path)(hadoopConf)
+      readHadoopFile(path)(filesystem)
+    }
   }
 
   private object ClasspathSchemaFile {

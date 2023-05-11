@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
@@ -123,7 +123,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   )
 
   // Define partition columns
-  override val partitions: Seq[String] = if (SchemaUtil.isSparkCaseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
+  override val partitions: Seq[String] = if (Environment.caseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
 
   // TODO: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
   // Using generic observations is forced therefore.
@@ -199,7 +199,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
     }
     validateSchemaMin(SparkSchema(df.schema), "read")
-    df.colNamesLowercase
+    df
   }
 
   // Store incremental output state. It is stored as tuple of incrementalOutputExpr, lastHighWatermarkValue, dataType
@@ -250,7 +250,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     val existingSchema = SparkSchema(getExistingSchema.get)
-    val newSchema = if (SchemaUtil.isSparkCaseSensitive) SparkSchema(newSchemaRaw) else SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema]
+    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema]
     // prepare changes
     val newColumns = newSchema.columns.diff(existingSchema.columns) // add new column
     val missingNotNullColumns = existingSchema.columns.diff(newSchema.columns) // make missing columns nullable
@@ -441,7 +441,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!SchemaUtil.isSparkCaseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = true).asInstanceOf[SparkSchema].inner)
+      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema].inner)
     }
     cachedExistingSchema
   }
@@ -521,13 +521,13 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     _cachedJdbcColumnMetadata
   }
   private def getJdbcColumn(sparkColName: String)(implicit context: ActionPipelineContext): Option[JdbcColumn] = {
-    if (SchemaUtil.isSparkCaseSensitive) jdbcColumnMetadata.flatMap(_.find(_.name == sparkColName))
+    if (Environment.caseSensitive) jdbcColumnMetadata.flatMap(_.find(_.name == sparkColName))
     else jdbcColumnMetadata.flatMap(_.find(_.nameEqualsIgnoreCaseSensitive(sparkColName)))
   }
 
   // if we generate sql statements with column names we need to care about quoting them properly
   private def quoteCaseSensitiveColumn(column: String)(implicit context: ActionPipelineContext): String = {
-    if (SchemaUtil.isSparkCaseSensitive) connection.catalog.quoteIdentifier(column)
+    if (Environment.caseSensitive) connection.catalog.quoteIdentifier(column)
     else {
       val jdbcColumn = getJdbcColumn(column)
       if (jdbcColumn.isDefined) {

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.{normalizeToAscii, strCamelCase2LowerCaseWithUnderscores}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -161,7 +161,7 @@ trait GenericDataFrame extends GenericTypedObject {
       standardName
     }
     import function._
-    select(schema.columns.map(c => col(c).as(standardizeColName(c))))
+    select(schema.columns.map(c => col(SQLUtil.sparkQuoteSQLIdentifier(c)).as(standardizeColName(c))))
   }
 
   /**
