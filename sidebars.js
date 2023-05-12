@@ -42,8 +42,8 @@ module.exports = {
         ]},
         {'Hocon Configuration' : [
           'reference/hoconOverview',
-          'reference/hoconSecrets',
           'reference/hoconVariables',
+          'reference/hoconSecrets',
         ]},
         'reference/dag',
         'reference/schema',
