@@ -35,20 +35,4 @@ object ConfigUtil {
     }
   }
   private[smartdatalake] val configValuePattern = "([^#]*)#(.*)".r
-
-  //readfile cp -> Classpath, not -> hadoop path (always use this function)
-  /*
-  private[smartdatalake] val parseFileData(){
-    val configFiles = hadoopPaths.flatMap(location =>
-      if (ClasspathConfigFile.canHandleScheme(location))
-        Seq(ClasspathConfigFile(location))
-      else
-        try
-          getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
-        catch {
-          case exception: FileNotFoundException => throw ConfigurationException(s"The provided config file ${location.toUri.getPath} does not exist", None, exception)
-        }
-    )
-  }
-  */
 }
