@@ -957,13 +957,13 @@
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
                 <version>${guava.version}</version>
-                <scope>provided</scope>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.jpmml</groupId>
                 <artifactId>pmml-model</artifactId>
                 <version>1.4.8</version>
-                <scope>provided</scope>
+                <scope>${spark.deps.scope}</scope>
                 <exclusions>
                     <exclusion>
                         <groupId>org.jpmml</groupId>
