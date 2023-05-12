@@ -112,10 +112,7 @@
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-splunk_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
-            <!-- TODO: cannot be made optional because of a very strange behaviour:
-                 deployment with copy-libs doesn't find classes anymore (e.g. Hive)
-                 if snowflake-ingest-sdk-0.10.8.jar is missing! -->
-            <!--optional>true</optional-->
+            <optional>true</optional>
         </dependency>
 
         <dependency>
