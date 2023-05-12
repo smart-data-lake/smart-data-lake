@@ -147,7 +147,7 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
-  private[smartdatalake] def parseInputPath(inputPath: String): String = {
+  private def parseInputPath(inputPath: String): String = {
     val hadoopConf: Configuration = new Configuration()
     val path = addHadoopDefaultSchemaAuthority(new Path(inputPath))
     if (ClasspathSchemaFile.canHandleSchema(path)){

@@ -35,6 +35,4 @@ object ConfigUtil {
     }
   }
   private[smartdatalake] val configValuePattern = "([^#]*)#(.*)".r
-
-  //readfile cp -> Classpath, not -> hadoop path (always use this function)
 }
