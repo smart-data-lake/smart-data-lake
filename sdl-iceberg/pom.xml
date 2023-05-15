@@ -88,12 +88,12 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.iceberg</groupId>
-			<artifactId>iceberg-spark-${spark.minor.version}_${scala.minor.version}</artifactId>
+			<artifactId>iceberg-spark-${spark.minor.version.old}_${scala.minor.version}</artifactId>
 			<version>${iceberg.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.iceberg</groupId>
-			<artifactId>iceberg-spark-extensions-${spark.minor.version}_${scala.minor.version}</artifactId>
+			<artifactId>iceberg-spark-extensions-${spark.minor.version.old}_${scala.minor.version}</artifactId>
 			<version>${iceberg.version}</version>
 		</dependency>
 		<dependency>

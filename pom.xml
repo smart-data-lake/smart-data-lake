@@ -306,6 +306,9 @@
 
         <netty.version>4.1.74.Final</netty.version>
 
+        <spark.version.old>3.3.2</spark.version.old>
+        <spark.minor.version.old>3.3</spark.minor.version.old>
+
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
         <!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
         <slf4j.version>2.0.6</slf4j.version>
@@ -313,7 +316,7 @@
         <!-- make sure to update IsolatedClientLoader whenever this version is changed -->
         <hadoop.version>3.3.4</hadoop.version>
         <!-- Protobuf version for building with Hadoop/Yarn dependencies -->
-        <protobuf.hadoopDependency.version>2.5.0</protobuf.hadoopDependency.version>
+        <protobuf.hadoopDependency.version>3.23.0</protobuf.hadoopDependency.version>
         <!-- Actual Protobuf version in Spark modules like Spark Connect, protobuf connector, etc. -->
         <!-- SPARK-41247: When updating `protobuf.version`, also need to update `protoVersion` in `SparkBuild.scala` -->
         <protobuf.version>3.21.12</protobuf.version>
@@ -324,7 +327,7 @@
         <hive.group>org.apache.hive</hive.group>
         <hive.classifier>core</hive.classifier>
         <!-- Version used in Maven Hive dependency -->
-        <hive.version>2.3.9</hive.version>
+        <hive.version>3.1.3</hive.version>
         <hive23.version>2.3.9</hive23.version>
         <!-- Version used for internal directory structure -->
         <hive.version.short>2.3</hive.version.short>
@@ -436,9 +439,9 @@
         <!-- other dependency versions -->
         <scopt.version>4.0.1</scopt.version>
         <databricks.spark-xml.version>0.14.0</databricks.spark-xml.version>
-        <spark.excel.version>${spark.minor.version}.1_0.18.6-beta1</spark.excel.version>
+        <spark.excel.version>${spark.minor.version.old}.1_0.18.6-beta1</spark.excel.version>
         <ucanaccess.version>5.0.1</ucanaccess.version>
-        <hsqldb.version>2.5.2</hsqldb.version>
+        <hsqldb.version>2.7.1</hsqldb.version>
         <!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
         <typesafe.config.version>1.4.1</typesafe.config.version>
         <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
@@ -2963,6 +2966,113 @@
                 <artifactId>scalacheck_${scala.minor.version}</artifactId>
                 <version>1.14.3</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- Vulnerable Dependencies Upgrades -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>3.23.0</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-collections</groupId>
+                <artifactId>commons-collections</artifactId>
+                <version>3.2.2</version>
+            </dependency>
+            <dependency>
+                <groupId>com.nimbusds</groupId>
+                <artifactId>nimbus-jose-jwt</artifactId>
+                <version>9.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.woodstox</groupId>
+                <artifactId>woodstox-core</artifactId>
+                <version>6.5.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>2.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>2.10</version>
+            </dependency>
+            <dependency>
+                <groupId>org.hsqldb</groupId>
+                <artifactId>hsqldb</artifactId>
+                <version>2.7.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk15on</artifactId>
+                <version>1.70</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jboss.resteasy</groupId>
+                <artifactId>resteasy-core</artifactId>
+                <version>4.7.9.Final</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jboss.resteasy</groupId>
+                <artifactId>resteasy-multipart-provider</artifactId>
+                <version>4.7.9.Final</version>
+            </dependency>
+            <dependency>
+                <groupId>net.minidev</groupId>
+                <artifactId>json-smart</artifactId>
+                <version>2.4.10</version>
+            </dependency>
+            <dependency>
+                <groupId>net.snowflake</groupId>
+                <artifactId>snowflake-jdbc</artifactId>
+                <version>3.13.30</version>
+            </dependency>
+            <dependency>
+                <groupId>org.wildfly.openssl</groupId>
+                <artifactId>wildfly-openssl</artifactId>
+                <version>1.1.3.Final</version>
+            </dependency>
+            <dependency>
+                <groupId>org.json</groupId>
+                <artifactId>json</artifactId>
+                <version>20230227</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jboss.resteasy</groupId>
+                <artifactId>resteasy-core</artifactId>
+                <version>4.7.9.Final</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-exec</artifactId>
+                <version>3.1.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-metastore</artifactId>
+                <version>3.1.3</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-codec</artifactId>
+                <version>4.1.86.Final</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-hdfs</artifactId>
+                <version>2.10.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.jettison</groupId>
+                <artifactId>jettison</artifactId>
+                <version>1.5.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-common</artifactId>
+                <version>3.3.5</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
