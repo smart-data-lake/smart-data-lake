@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 
@@ -92,8 +92,9 @@ object ConfigLoader extends SmartDataLakeLogger {
 
     // Search locations for config files
     val configFiles = hadoopPaths.flatMap( location =>
-        if (ClasspathConfigFile.canHandleScheme(location))
+        if (FileUtil.canHandleScheme(location)) {
           Seq(ClasspathConfigFile(location))
+        }
         else
           try {
             val files = getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
@@ -220,15 +221,11 @@ object ConfigLoader extends SmartDataLakeLogger {
   private case class ClasspathConfigFile(override val path: Path) extends ConfigFile {
     postConstruct(ConfigParseOptions.defaults())
     override def reader: InputStreamReader = {
-      val resource = path.toUri.getPath
-      val inputStream = Option(getClass.getResourceAsStream(resource))
-        .getOrElse(throw ConfigurationException(s"Could not find resource $resource in classpath"))
+      val inputStream = FileUtil.readUriFromPath(path)
       new InputStreamReader(inputStream)
     }
   }
-  private object ClasspathConfigFile {
-    def canHandleScheme(path: Path): Boolean = path.toUri.getScheme == "cp"
-  }
+
   private trait ConfigFile extends Parseable {
     def path: Path
     lazy val extension: String = ConfigFile.getExtension(path)

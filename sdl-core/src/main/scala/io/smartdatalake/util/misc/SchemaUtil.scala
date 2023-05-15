@@ -161,19 +161,14 @@ object SchemaUtil {
   private def parseInputPath(inputPath: String): String = {
     val hadoopConf: Configuration = new Configuration()
     val path = addHadoopDefaultSchemaAuthority(new Path(inputPath))
-        if (ClasspathSchemaFile.canHandleSchema(path)){
-          val inputStream = Option(getClass.getResourceAsStream(path.toUri.getPath))
-            .getOrElse(throw ConfigurationException(s"Could not find resource ${path.toUri.getPath} in classpath"))
+        if (FileUtil.canHandleScheme(path)){
+          val inputStream = FileUtil.readUriFromPath(path)
           new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
         }
         else{
           val filesystem = getHadoopFsWithConf(path)(hadoopConf)
           readHadoopFile(path)(filesystem)
         }
-  }
-
-  private object ClasspathSchemaFile {
-    def canHandleSchema(path: Path): Boolean = path.toUri.getScheme == "cp"
   }
 
   /**
