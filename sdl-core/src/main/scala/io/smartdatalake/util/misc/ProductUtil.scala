@@ -168,8 +168,9 @@ private[smartdatalake] object ProductUtil {
   def createEncoder(tpe: Type): ExpressionEncoder[_] = {
     val mirror = ScalaReflection.mirror
     val cls = mirror.runtimeClass(tpe)
-    val serializer = ScalaReflection.serializerForType(tpe)
-    val deserializer = ScalaReflection.deserializerForType(tpe)
+    val encoder = ScalaReflection.encoderFor(tpe)
+    val serializer = ScalaReflection.serializerFor(encoder)
+    val deserializer = ScalaReflection.deserializerFor(encoder)
     new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
   }
 

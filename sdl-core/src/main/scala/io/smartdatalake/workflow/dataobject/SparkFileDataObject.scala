@@ -586,7 +586,7 @@ object SparkFileDataObject extends SmartDataLakeLogger {
   private[smartdatalake] def getFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Seq[String] = {
     val fileSources = df.queryExecution.executedPlan.collect { case x: FileSourceScanExec => x }
     if (fileSources.isEmpty) throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process")
-    fileSources.flatMap(_.inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath))
+    fileSources.flatMap(_.inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath.toString()))
   }
   private[smartdatalake] def tryGetFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Option[Seq[String]] = try {
     Some(getFilesProcessedFromSparkPlan(id, df))
