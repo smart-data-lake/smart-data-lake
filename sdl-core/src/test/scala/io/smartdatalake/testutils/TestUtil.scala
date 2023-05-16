@@ -47,6 +47,7 @@ import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.server.session.ServerSession
+import org.apache.sshd.server.subsystem.SubsystemFactory
 import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -130,7 +131,7 @@ object TestUtil extends SmartDataLakeLogger {
     sshd.setFileSystemFactory(new NativeFileSystemFactory())
     sshd.setPort(port)
     sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(Files.createTempDirectory("sshd").resolve("hostkey.ser")))
-    sshd.setSubsystemFactories(List(new SftpSubsystemFactory().asInstanceOf[NamedFactory[Command]]).asJava)
+    sshd.setSubsystemFactories(List(new SftpSubsystemFactory().asInstanceOf[SubsystemFactory]).asJava)
     sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
       override def authenticate(user: String, password: String, session: ServerSession): Boolean = user == usr && password == pwd
     })

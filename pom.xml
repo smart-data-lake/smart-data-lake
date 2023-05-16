@@ -459,7 +459,7 @@
         <scaladoc.reader.version>1.0.2</scaladoc.reader.version>
 
         <scalatest.test.version>3.0.8</scalatest.test.version>
-        <sshd.test.version>2.7.0</sshd.test.version>
+        <sshd.test.version>2.5.0</sshd.test.version>
 
         <!-- Sonar related -->
         <sonar.organization>smart-data-lake</sonar.organization>
