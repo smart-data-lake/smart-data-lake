@@ -32,19 +32,18 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import scala.collection.JavaConverters._
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Python/PySpark code.
+ * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m) as Python/PySpark code.
  * Note that this transformer needs a Python and PySpark environment installed.
  * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
  * Other variables available are
- * - `inputDf`: Input DataFrame
+ * - `inputDfs`: Input DataFrames
  * - `options`: Transformation options as Map[String,String]
- * - `dataObjectId`: Id of input dataObject as String
- * Output DataFrame must be set with `setOutputDf(df)`.
+ * Output DataFrames must be set with `setOutputDfs(dict)`.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
- * @param file           Optional file with python code to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.
- * @param code           Optional python code to user for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.
+ * @param file           Optional file with python code to use for python transformation. The python code can use variables inputDfs and options. The transformed DataFrames has to be set with setOutputDfs.
+ * @param code           Optional python code to user for python transformation. The python code can use variables inputDfs and options. The transformed DataFrame has to be set with setOutputDfs.
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
@@ -62,7 +61,7 @@ case class PythonCodeDfsTransformer(
     file
       .map(file => HdfsUtil.readHadoopFile(file))
       .orElse(code)
-      .getOrElse(throw ConfigurationException(s"Either file or code must be defined for PythonCodeTransformer"))
+      .getOrElse(throw ConfigurationException(s"Either file or code must be defined for PythonCodeDfsTransformer"))
   }
 
   override def transformSparkWithOptions(
@@ -84,7 +83,7 @@ case class PythonCodeDfsTransformer(
           |outputDfs = gateway.jvm.java.util.HashMap()
           |def setOutputDfs(dict):
           |    for k in dict.keys():
-          |        outputDfs[k] = dict[k]._jdf
+          |        outputDfs[k] = dict[k]._jdf # convert output dataframe to java
           |    entryPoint.setOutputDfs(outputDfs)
           """.stripMargin
       PythonUtil.execPythonSparkCode(
@@ -93,7 +92,7 @@ case class PythonCodeDfsTransformer(
       )
       entryPoint.outputDfs.getOrElse(
         throw new IllegalStateException(
-          s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"
+          s"($actionId.transformers.$name) Python transformation must set output DataFrames (call setOutputDfs(df))"
         )
       )
     } catch {
