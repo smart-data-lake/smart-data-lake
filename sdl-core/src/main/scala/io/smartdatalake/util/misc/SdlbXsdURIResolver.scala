@@ -30,6 +30,10 @@ import org.xml.sax.InputSource
 import java.io.StringReader
 import java.net.{MalformedURLException, URI}
 
+/**
+ * SdlbXsdURIResolver resolves URIs included in XSD schemas by using Hadoop Filesystem.
+ * It can be used by org.apache.ws.xmlschema to parse XSD schemas distributed over multiple files from Hadoop filesystem.
+ */
 class SdlbXsdURIResolver(fs: FileSystem) extends CollectionURIResolver {
   override def resolveEntity(targetNamespace: String, schemaLocation: String, baseUri: String): InputSource = {
 

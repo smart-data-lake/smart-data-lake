@@ -144,9 +144,8 @@ object SchemaUtil {
 
   def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)(implicit hadoopConfiguration: Configuration): StructType = {
     val path = addHadoopDefaultSchemaAuthority(xsdFile)
-    implicit val fs = getHadoopFsWithConf(path)
-    SdlbXsdURIResolver.readXsd(xsdFile, maxRecursion.getOrElse(10)) // default is maxRecursion=10)
-    //XsdSchemaConverter.read(xsdContent, maxRecursion.getOrElse(10)) // default is maxRecursion=10
+    implicit val fs: FileSystem = getHadoopFsWithConf(path)
+    SdlbXsdURIResolver.readXsd(xsdFile, maxRecursion.getOrElse(10)) // default is maxRecursion=10
   }
 
   def getSchemaFromDdl(ddl: String): StructType = {
