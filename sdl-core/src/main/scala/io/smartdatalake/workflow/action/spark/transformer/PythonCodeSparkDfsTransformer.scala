@@ -124,9 +124,3 @@ private[smartdatalake] class DfsTransformerPythonSparkEntryPoint(
     outputDfs = Some(outDfs.asScala.toMap)
   }
 }
-
-/**
- * Exception is thrown if the Python transformation can not be executed correctly
- */
-private[smartdatalake] class PythonTransformationException(msg: String, throwable: Throwable)
-    extends RuntimeException(msg, throwable)
