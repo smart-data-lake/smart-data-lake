@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
-import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 
@@ -92,7 +92,7 @@ object ConfigLoader extends SmartDataLakeLogger {
 
     // Search locations for config files
     val configFiles = hadoopPaths.flatMap( location =>
-        if (FileUtil.canHandleScheme(location)) {
+        if (ResourceUtil.canHandleScheme(location)) {
           Seq(ClasspathConfigFile(location))
         }
         else
@@ -221,7 +221,7 @@ object ConfigLoader extends SmartDataLakeLogger {
   private case class ClasspathConfigFile(override val path: Path) extends ConfigFile {
     postConstruct(ConfigParseOptions.defaults())
     override def reader: InputStreamReader = {
-      val inputStream = FileUtil.readUriFromPath(path)
+      val inputStream = ResourceUtil.readResource(path)
       new InputStreamReader(inputStream)
     }
   }

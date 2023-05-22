@@ -19,31 +19,22 @@
 
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.config.ConfigLoader.ClasspathConfigFile
-import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
-import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
-import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf}
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataframe.spark.{SparkArrayDataType, SparkMapDataType, SparkSchema, SparkSimpleDataType, SparkStructDataType}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructField, StructType}
-import org.apache.spark.sql.xml.XsdSchemaConverter
-import org.apache.ws.commons.schema.XmlSchemaCollection
+import org.apache.spark.sql.types._
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
 import java.util.stream.Collectors
-import java.io.{File, FileInputStream, InputStreamReader}
-import java.nio.charset.StandardCharsets
 import scala.reflect.runtime.universe.{Type, TypeTag}
 
 object SchemaUtil {
@@ -158,12 +149,14 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
-  private def parseInputPath(inputPath: String): String = {
+  private def readFromPath(inputPath: String): String = {
     val hadoopConf: Configuration = new Configuration()
     val path = addHadoopDefaultSchemaAuthority(new Path(inputPath))
-        if (FileUtil.canHandleScheme(path)){
-          val inputStream = FileUtil.readUriFromPath(path)
-          new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
+        if (ResourceUtil.canHandleScheme(path)){
+          val inputStream = ResourceUtil.readResource(path)
+          new BufferedReader(
+        new InputStreamReader(inputStream, StandardCharsets.UTF_8))
+        .lines().collect(Collectors.joining())
         }
         else{
           val filesystem = getHadoopFsWithConf(path)(hadoopConf)
@@ -185,7 +178,7 @@ object SchemaUtil {
       case DDLFile =>
         val valueElements = value.split(";")
         assert(valueElements.size == 1, s"DDL schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
-        val content = parseInputPath(valueElements.head)
+        val content = readFromPath(valueElements.head)
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
         val clazz = this.getClass.getClassLoader.loadClass(value)
@@ -204,7 +197,7 @@ object SchemaUtil {
         val jsonCompatibility = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
           // TODO
-          val content = parseInputPath(path)
+          val content = readFromPath(path)
           val schema = getSchemaFromXsd(new Path(path), maxRecursion)
           val sparkSchema = SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
           if (jsonCompatibility.getOrElse(false)) makeXsdJsonCompatible(sparkSchema)
@@ -218,7 +211,7 @@ object SchemaUtil {
         val strictTyping = if (valueElements.size>=3) Some(valueElements(2).toBoolean) else None
         val additionalPropertiesDefault = if (valueElements.size>=4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
-          val content = parseInputPath(path)
+          val content = readFromPath(path)
           val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
@@ -228,7 +221,7 @@ object SchemaUtil {
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         if (!lazyFileReading) {
-          val content = parseInputPath(path)
+          val content = readFromPath(path)
           val schema = getSchemaFromAvroSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
