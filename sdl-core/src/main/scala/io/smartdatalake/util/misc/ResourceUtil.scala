@@ -22,9 +22,9 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.config.ConfigurationException
 import org.apache.hadoop.fs.Path
 
-import java.io.{InputStream, InputStreamReader}
+import java.io.InputStream
 
-object FileUtil {
+object ResourceUtil {
 
   /**
    * Validates if the a provided path has the schema 'cp'
@@ -40,7 +40,8 @@ object FileUtil {
    * @param path [[Path]] pointing to a directory or file
    * @return [[InputStream]] from the provided path
    */
-  def readUriFromPath(path: Path): InputStream ={
+  def readResource(path: Path): InputStream ={
+    assert(canHandleScheme(path), "The provided path does not have the schema 'cp'.")
     val resource = path.toUri.getPath
     val inputStream = Option(getClass.getResourceAsStream(resource))
       .getOrElse(throw ConfigurationException(s"Could not find resource $resource in classpath"))
