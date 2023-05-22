@@ -173,7 +173,7 @@ object SchemaUtil {
         SparkSchema(getSchemaFromDdl(value))
       case DDLFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size == 1, s"XSD schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
+        assert(valueElements.size == 1, s"DDL schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
         val content = parseInputPath(valueElements.head)
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
