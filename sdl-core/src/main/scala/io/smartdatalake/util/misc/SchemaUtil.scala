@@ -140,8 +140,6 @@ object SchemaUtil {
   }
 
   def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)(implicit hadoopConfiguration: Configuration): StructType = {
-    val path = addHadoopDefaultSchemaAuthority(xsdFile)
-    implicit val fs: FileSystem = getHadoopFsWithConf(path)
     SdlbXsdURIResolver.readXsd(xsdFile, maxRecursion.getOrElse(10)) // default is maxRecursion=10
   }
 
@@ -149,19 +147,17 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
-  private def readFromPath(inputPath: String): String = {
-    val hadoopConf: Configuration = new Configuration()
-    val path = addHadoopDefaultSchemaAuthority(new Path(inputPath))
-        if (ResourceUtil.canHandleScheme(path)){
-          val inputStream = ResourceUtil.readResource(path)
-          new BufferedReader(
-        new InputStreamReader(inputStream, StandardCharsets.UTF_8))
-        .lines().collect(Collectors.joining())
-        }
-        else{
-          val filesystem = getHadoopFsWithConf(path)(hadoopConf)
-          readHadoopFile(path)(filesystem)
-        }
+  def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
+    val path = addHadoopDefaultSchemaAuthority(inputPath)
+    if (ResourceUtil.canHandleScheme(path)) {
+      val inputStream = ResourceUtil.readResource(path)
+      new BufferedReader(
+        new InputStreamReader(inputStream, StandardCharsets.UTF_8)
+      ).lines().collect(Collectors.joining())
+    } else {
+      val filesystem = getHadoopFsWithConf(path)
+      readHadoopFile(path)(filesystem)
+    }
   }
 
   /**
@@ -178,7 +174,7 @@ object SchemaUtil {
       case DDLFile =>
         val valueElements = value.split(";")
         assert(valueElements.size == 1, s"DDL schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
-        val content = readFromPath(valueElements.head)
+        val content = readFromPath(new Path(valueElements.head))
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
         val clazz = this.getClass.getClassLoader.loadClass(value)
@@ -196,8 +192,6 @@ object SchemaUtil {
         val maxRecursion = if (valueElements.size >= 3) Some(valueElements(2).toInt) else None
         val jsonCompatibility = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
-          // TODO
-          val content = readFromPath(path)
           val schema = getSchemaFromXsd(new Path(path), maxRecursion)
           val sparkSchema = SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
           if (jsonCompatibility.getOrElse(false)) makeXsdJsonCompatible(sparkSchema)
@@ -211,7 +205,7 @@ object SchemaUtil {
         val strictTyping = if (valueElements.size>=3) Some(valueElements(2).toBoolean) else None
         val additionalPropertiesDefault = if (valueElements.size>=4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
-          val content = readFromPath(path)
+          val content = readFromPath(new Path(path))
           val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
@@ -221,7 +215,7 @@ object SchemaUtil {
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         if (!lazyFileReading) {
-          val content = readFromPath(path)
+          val content = readFromPath(new Path(path))
           val schema = getSchemaFromAvroSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
