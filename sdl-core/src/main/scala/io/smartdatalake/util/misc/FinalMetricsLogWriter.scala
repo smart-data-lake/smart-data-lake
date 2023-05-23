@@ -131,9 +131,9 @@ object LogExtractor extends SmartDataLakeLogger {
   def getActionLog(actionId: ActionId, info: RuntimeInfo, executionId: SDLExecutionId, finalState: RuntimeEventState, context: ActionPipelineContext): ActionLog = {
     val duration = info.duration.map(_.getSeconds)
     val dataObjectLogs = info.results.map { result =>
-      val numTasks = result.mainMetrics.get("num_tasks").map(_.asInstanceOf[Long])
-      val filesWritten = result.mainMetrics.get("files_written").map(_.asInstanceOf[Long])
-      val recordsWritten = result.mainMetrics.get("records_written").map(_.asInstanceOf[Long])
+      val numTasks = result.mainMetrics.get("num_tasks").map(castToLong)
+      val filesWritten = result.mainMetrics.get("files_written").map(castToLong)
+      val recordsWritten = result.mainMetrics.get("records_written").map(castToLong)
       val metrics = result.mainMetrics.filterKeys(!Set("num_tasks", "files_written", "records_written").contains(_))
       MetricsLog(result.subFeed.dataObjectId.id, Timestamp.valueOf(info.startTstmp.get), numTasks, filesWritten, recordsWritten, metrics.mapValues(_.toString), result.subFeed.partitionValues.map(_.getMapString))
     }
@@ -142,6 +142,15 @@ object LogExtractor extends SmartDataLakeLogger {
       , Timestamp.valueOf(info.startTstmp.get), duration.get
       , info.state, info.dataObjectsState.map(_.toStringTuple).toMap, dataObjectLogs
     )
+  }
+
+  private def castToLong(v: Any): Long = v match {
+    case x: Long => x
+    case x: Int => x.toLong
+    case x: Short => x.toLong
+    case x: Byte => x.toLong
+    case x: BigInt => x.toLong
+    case _ => throw new IllegalStateException(s"$v can not be converted to Long")
   }
 }
 
