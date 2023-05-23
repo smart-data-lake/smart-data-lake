@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{AppUtil, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -104,7 +104,11 @@ case class ActionPipelineContext (
   /**
    * helper method to access spark session
    */
-  def sparkSession: SparkSession = globalConfig.sparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
+  def sparkSession: SparkSession = {
+    val session = globalConfig.sparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
+    AppUtil.applySdlbRunLoggerContext(session)
+    session
+  }
 
   /**
    * True if a SparkSession has been created in this job

@@ -312,6 +312,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
+    AppUtil.setSdlbRunLoggerContext(appConfig)
     val stats = try {
       // invoke SDLPlugin if configured
       Environment.sdlPlugin.foreach(_.startup())
@@ -427,6 +428,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @return tuple of list of final subfeeds and statistics (action count per RuntimeEventState)
    */
   private[smartdatalake] def startRun(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now, attemptStartTime: LocalDateTime = LocalDateTime.now, actionsToSkip: Map[ActionId, RuntimeInfo] = Map(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, simulation: Boolean = false)(implicit hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+    AppUtil.setSdlbRunLoggerContext(appConfig, Some(executionId), Some(runStartTime))
 
     // validate application config
     appConfig.validate()
@@ -470,7 +472,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   private[smartdatalake] def exec(appConfig: SmartDataLakeBuilderConfig, executionId: SDLExecutionId, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, actionsToSkip: Map[ActionId, RuntimeInfo], initialSubFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], simulation: Boolean, globalConfig: GlobalConfig)(implicit instanceRegistry: InstanceRegistry): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
-    AppUtil.setLoggerContext(appConfig, executionId, runStartTime)
+    AppUtil.setSdlbRunLoggerContext(appConfig, Some(executionId), Some(runStartTime))
 
     // select actions by feedSel
     val actionsSelected = AppUtil.filterActionList(appConfig.feedSel, instanceRegistry.getActions.toSet).toSeq
@@ -555,7 +557,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   @tailrec
   final def execActionDAG(actionDAGRun: ActionDAGRun, actionsSelected: Seq[Action], context: ActionPipelineContext, lastStartTime: Option[LocalDateTime] = None): Seq[SubFeed] = {
-    AppUtil.setLoggerContext(context)
+    AppUtil.setSdlbRunLoggerContext(context)
 
     // handle skipped actions for next execution of streaming mode
     val nextExec: Option[(ActionDAGRun, ActionPipelineContext, Option[LocalDateTime])] = if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
