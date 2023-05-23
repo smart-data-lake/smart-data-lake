@@ -270,6 +270,25 @@ object Environment {
   var _simplifyFinalExceptionLog: Option[Boolean] = None
 
   /**
+   * Include exception's root cause in final DAG error messages.
+   * If disabled the most important exception is printed to stderr. But this is not suitable on environments
+   * where stderr is not available, e.g. logging to Azure LogAnalytics.
+   * By enabling includeDAGResultExceptionInLog the exception cause is also included in the LogEvent and logged
+   * according to the logging configuration.
+   */
+  def includeDAGResultExceptionInLog: Boolean = {
+    if (_includeDAGResultExceptionInLog.isEmpty) {
+      _includeDAGResultExceptionInLog = Some(
+        EnvironmentUtil.getSdlParameter("includeDAGResultExceptionInLog")
+          .map(_.toBoolean).getOrElse(false)
+      )
+    }
+    _includeDAGResultExceptionInLog.get
+  }
+
+  var _includeDAGResultExceptionInLog: Option[Boolean] = None
+
+  /**
    * Number of Executions to keep runtime data for in streaming mode (default = 10).
    * Must be bigger than 1.
    */
