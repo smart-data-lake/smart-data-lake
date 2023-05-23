@@ -20,15 +20,16 @@
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.ActionHelper
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.collection.JavaConverters._
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Python/PySpark code.
@@ -48,53 +49,85 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class PythonCodeDfTransformer(override val name: String = "pythonSparkTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
+case class PythonCodeDfsTransformer(
+    override val name: String = "pythonSparkTransform",
+    override val description: Option[String] = None,
+    code: Option[String] = None,
+    file: Option[String] = None,
+    options: Map[String, String] = Map(),
+    runtimeOptions: Map[String, String] = Map()
+) extends OptionsSparkDfsTransformer {
   private val pythonCode = {
     implicit val defaultHadoopConf: Configuration = new Configuration()
-    file.map(file => HdfsUtil.readHadoopFile(file))
+    file
+      .map(file => HdfsUtil.readHadoopFile(file))
       .orElse(code)
       .getOrElse(throw ConfigurationException(s"Either file or code must be defined for PythonCodeTransformer"))
   }
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
+
+  override def transformSparkWithOptions(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      dfs: Map[String, DataFrame],
+      options: Map[String, String]
+  )(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     // python transformation is executed by passing options and input/output DataFrame through entry point
-    val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
     try {
-      val entryPoint = new DfTransformerPythonSparkEntryPoint(context.sparkSession, options, df, objectId)
+      val entryPoint = new DfsTransformerPythonSparkEntryPoint(context.sparkSession, options, dfs)
       val additionalInitCode =
         """
           |# prepare input parameters
-          |inputDf = DataFrame(entryPoint.getInputDf(), sqlContext) # convert input dataframe to pyspark
-          |dataObjectId = entryPoint.getDataObjectId()
+          |inputDfs = {}
+          |for k,v in entryPoint.getInputDfs().items():
+          |    inputDfs[k] = DataFrame(v, sqlContext) # convert input dataframe to pyspark
           |# helper function to return output dataframe
-          |def setOutputDf( df ):
-          |    entryPoint.setOutputDf(df._jdf)
+          |outputDfs = gateway.jvm.java.util.HashMap()
+          |def setOutputDfs(dict):
+          |    for k in dict.keys():
+          |        outputDfs[k] = dict[k]._jdf
+          |    entryPoint.setOutputDfs(outputDfs)
           """.stripMargin
-      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator") + pythonCode.stripMargin)
-      entryPoint.outputDf.getOrElse(throw new IllegalStateException(s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"))
+      PythonUtil.execPythonSparkCode(
+        entryPoint,
+        additionalInitCode + sys.props("line.separator") + pythonCode.stripMargin
+      )
+      entryPoint.outputDfs.getOrElse(
+        throw new IllegalStateException(
+          s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"
+        )
+      )
     } catch {
-      case e: Throwable => throw new PythonTransformationException(s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}", e)
+      case e: Throwable =>
+        throw new PythonTransformationException(
+          s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}",
+          e
+        )
     }
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = PythonCodeDfTransformer
+  override def factory: FromConfigFactory[GenericDfsTransformer] = PythonCodeDfsTransformer
 }
 
-object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PythonCodeDfTransformer = {
-    extract[PythonCodeDfTransformer](config)
+object PythonCodeDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PythonCodeDfsTransformer = {
+    extract[PythonCodeDfsTransformer](config)
   }
 }
 
-
-private[smartdatalake] class DfTransformerPythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends PythonSparkEntryPoint(session, options) {
+private[smartdatalake] class DfsTransformerPythonSparkEntryPoint(
+    override val session: SparkSession,
+    options: Map[String, String],
+    inputDfs: Map[String, DataFrame],
+    var outputDfs: Option[Map[String, DataFrame]] = None
+) extends PythonSparkEntryPoint(session, options) {
   // it seems that py4j needs getter functions for attributes
-  def getInputDf: DataFrame = inputDf
-  def getDataObjectId: String = dataObjectId
-  def setOutputDf(df: DataFrame): Unit = {
-    outputDf = Some(df)
+  def getInputDfs: java.util.Map[String, DataFrame] = inputDfs.asJava
+  def setOutputDfs(outDfs: java.util.Map[String, DataFrame]): Unit = {
+    outputDfs = Some(outDfs.asScala.toMap)
   }
 }
 
 /**
  * Exception is thrown if the Python transformation can not be executed correctly
  */
-private[smartdatalake] class PythonTransformationException(msg: String, throwable: Throwable) extends RuntimeException(msg, throwable)
+private[smartdatalake] class PythonTransformationException(msg: String, throwable: Throwable)
+    extends RuntimeException(msg, throwable)
