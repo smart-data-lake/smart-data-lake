@@ -19,12 +19,22 @@
 
 package io.smartdatalake.util.azure
 
+import io.smartdatalake.app.AppUtil
 import org.apache.logging.log4j.core.Filter.Result
 import org.apache.logging.log4j.core._
 import org.apache.logging.log4j.core.appender.AbstractAppender
+import org.apache.logging.log4j.core.impl.ThrowableProxy
+import org.apache.logging.log4j.core.time.Instant
 import org.apache.logging.log4j.layout.template.json.JsonTemplateLayout
+import org.apache.logging.log4j.message.Message
+import org.apache.logging.log4j.spi.DefaultThreadContextMap
+import org.apache.logging.log4j.util.ReadOnlyStringMap
+import org.apache.logging.log4j.{Level, Marker, ThreadContext}
+import org.apache.spark.TaskContext
 
+import java.util
 import java.util.concurrent.TimeUnit
+import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 
 /**
@@ -58,7 +68,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
     if (filter.map(_.filter(event)).contains(Result.DENY)) return
     // process event
     synchronized {
-      msgBuffer.append(event.toImmutable)
+      msgBuffer.append(enrichSparkLocalProperties(event.toImmutable))
     }
     if (backend.isDefined && msgBuffer.size >= backend.get.batchSize) flush()
   }
@@ -81,13 +91,20 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
     val duration = FiniteDuration(maxDelayMillis.getOrElse(1000), TimeUnit.MILLISECONDS)
     scheduler.scheduleAtFixedRate(duration, duration)(flush())
     sys.addShutdownHook(flush())
-    println("started")
+    println("LogAnalyticsAppender started")
   }
 
   override def stop(): Unit = {
     flush()
     super.stop()
-    println("stopped")
+    println("LogAnalyticsAppender stopped")
+  }
+
+  private def enrichSparkLocalProperties(event: LogEvent) = {
+    // If we are on an executor, we have a TaskContext
+    // On executors we need to enrich LogEvent with SDLB information from spark local properties
+    if (TaskContext.get != null) new LogEventWithSparkLocalProperties(event)
+    else event
   }
 }
 
@@ -114,4 +131,56 @@ object LogAnalyticsAppender {
     val backend = new LogAnalyticsIngestionBackend[LogEvent](endpoint, ruleId, streamName, batchSize, jsonLayout.toSerializable)
     new LogAnalyticsAppender(name, Some(backend), jsonLayout, Option(filter), Option(maxDelayMillis).map(_.toInt))
   }
+}
+
+/**
+ * Wrapper around a LogEvent to add SDLB context data on executors.
+ */
+class LogEventWithSparkLocalProperties(event: LogEvent) extends LogEvent {
+  override def toImmutable: LogEvent = new LogEventWithSparkLocalProperties(event.toImmutable)
+  override def getContextMap: util.Map[String, String] = event.getContextData.toMap
+  override def getContextData: ReadOnlyStringMap = {
+    val data = event.getContextData
+    if (data.containsKey(AppUtil.MDC_SDLB_PROPERTIES.head)) data
+    else LogEventWithSparkLocalProperties.getContextData
+  }
+  override def getContextStack: ThreadContext.ContextStack = event.getContextStack
+  override def getLoggerFqcn: String = event.getLoggerFqcn
+  override def getLevel: Level = event.getLevel
+  override def getLoggerName: String = event.getLoggerName
+  override def getMarker: Marker = event.getMarker
+  override def getMessage: Message = event.getMessage
+  override def getTimeMillis: Long = event.getTimeMillis
+  override def getInstant: Instant = event.getInstant
+  override def getSource: StackTraceElement = event.getSource
+  override def getThreadName: String = event.getThreadName
+  override def getThreadId: Long = event.getThreadId
+  override def getThreadPriority: Int = event.getThreadPriority
+  override def getThrown: Throwable = event.getThrown
+  override def getThrownProxy: ThrowableProxy = event.getThrownProxy
+  override def isEndOfBatch: Boolean = event.isEndOfBatch
+  override def isIncludeLocation: Boolean = event.isIncludeLocation
+  override def setEndOfBatch(endOfBatch: Boolean): Unit = event.setEndOfBatch(endOfBatch)
+  override def setIncludeLocation(locationRequired: Boolean): Unit = event.setIncludeLocation(locationRequired)
+  override def getNanoTime: Long = event.getNanoTime
+}
+object LogEventWithSparkLocalProperties {
+
+  // cache spark local properties context data per stage id, as it should not change in between
+  @transient private val cachedContextData = mutable.Map[Int,ReadOnlyStringMap]()
+  def getContextData: ReadOnlyStringMap = {
+    val tc = TaskContext.get()
+    if (tc != null) {
+      cachedContextData.getOrElseUpdate(tc.stageId, {
+        val data = new DefaultThreadContextMap()
+        AppUtil.MDC_SDLB_PROPERTIES
+          .flatMap(k => Option((k, tc.getLocalProperty(k))))
+          .foreach { case (k, v) => data.put(k, v) }
+        AppUtil.getMachineContext
+          .foreach { case (k, v) => data.put(k, v) }
+        data
+      })
+    } else emptyContextMap
+  }
+  private final val emptyContextMap = new DefaultThreadContextMap()
 }

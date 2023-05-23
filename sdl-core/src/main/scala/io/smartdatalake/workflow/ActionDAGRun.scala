@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.StateListener
+import io.smartdatalake.app.{AppUtil, StateListener}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
@@ -31,6 +31,7 @@ import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import org.apache.spark.SparkContext
 import org.slf4j.event.Level
 
 import scala.concurrent.Await
@@ -73,7 +74,11 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   private def run[R <: DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit context: ActionPipelineContext): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
-    val task = dag.buildTaskGraph[R](new ActionEventListener(phase))(operation)
+    val task = dag.buildTaskGraph[R](new ActionEventListener(phase)){
+      (node, results) =>
+        AppUtil.setSdlbRunLoggerContext(context) // prepare context for logger in this scheduler thread
+        operation.tupled(node, results)
+    }
     val futureResult = task.runToFuture(scheduler)
 
     // wait for result
