@@ -22,6 +22,7 @@ import io.smartdatalake.app.{AppUtil, StateListener}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
+import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
@@ -98,7 +99,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     dagExceptions.distinct.foreach { ex =>
       val loggerSeverity = if (ex.severity <= ExceptionSeverity.FAILED_DONT_STOP) Level.ERROR
       else Environment.taskSkippedExceptionLogLevel
-      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}", getRootCause(ex))
     }
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.runId}", dag, Some(executionId))

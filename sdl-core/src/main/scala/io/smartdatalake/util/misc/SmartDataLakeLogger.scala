@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.definitions.Environment
 import org.apache.spark.annotation.DeveloperApi
 import org.slf4j.event.Level
 import org.slf4j.{Logger, LoggerFactory}
@@ -38,9 +39,11 @@ trait SmartDataLakeLogger {
     e
   }
 
-  private[smartdatalake] def logWithSeverity(severity: Level, msg: String): Unit = {
+  private[smartdatalake] def logWithSeverity(severity: Level, msg: String, cause: Throwable): Unit = {
     severity match {
+      case Level.ERROR if Environment.includeDAGResultExceptionInLog => logger.error(msg, cause)
       case Level.ERROR => logger.error(msg)
+      case Level.WARN if Environment.includeDAGResultExceptionInLog => logger.warn(msg, cause)
       case Level.WARN => logger.warn(msg)
       case Level.INFO => logger.info(msg)
       case Level.DEBUG => logger.debug(msg)
