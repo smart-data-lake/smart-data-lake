@@ -1,0 +1,43 @@
+{
+  "appConfig" : {
+    "feedSel" : "test",
+    "configuration" : [ "/home/runner/work/smart-data-lake/smart-data-lake/sdl-core/target/test-classes/configState/WithFinalStateWriter.conf" ],
+    "parallelism" : 1,
+    "streaming" : false
+  },
+  "runId" : 1,
+  "attemptId" : 1,
+  "runStartTime" : "2023-05-24T11:32:36.461339",
+  "attemptStartTime" : "2023-05-24T11:32:36.461346",
+  "actionsState" : {
+    "act" : {
+      "executionId" : {
+        "type" : "SDLExecutionId",
+        "runId" : 1,
+        "attemptId" : 1
+      },
+      "state" : "SUCCEEDED",
+      "startTstmp" : "2023-05-24T11:32:36.802751",
+      "duration" : "PT0.190238S",
+      "results" : [ {
+        "subFeed" : {
+          "type" : "SparkSubFeed",
+          "dataObjectId" : "tgt",
+          "partitionValues" : [ ],
+          "isDAGStart" : false,
+          "isSkipped" : false,
+          "isDummy" : false
+        },
+        "mainMetrics" : {
+          "stage" : "save",
+          "num_tasks" : 1,
+          "records_written" : 1,
+          "stage_duration" : "PT0.05S",
+          "bytes_written" : 20
+        }
+      } ],
+      "dataObjectsState" : [ ]
+    }
+  },
+  "isFinal" : true
+}
