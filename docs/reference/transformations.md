@@ -235,9 +235,8 @@ Check the method signature in CustomDfTransformer and CustomDfsTransformer accor
 
 
 ### Python
-At the moment, only 1-to-1 transformations are supported in Python.
-The transformer needs to use type `PythonCodeSparkDfTransformer`. 
-You can either provide it as separate file or inline as Python code again:
+The transformer needs to use type `PythonCodeSparkDfTransformer` (1-to-1) or `PythonCodeSparkDfsTransformer` (many-to-many. 
+You can either provide it as separate file or inline as Python code again.
 
 Inline example:
 ```
