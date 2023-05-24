@@ -45,15 +45,15 @@ The following predefined 1-to-1 transformations are supported:
 
 | Transformer | Description                                                                                           |
 | ----------- |-------------------------------------------------------------------------------------------------------|
-| AdditionalColumnsTransformer | Add additional columns to the DataFrame by extracting information from the context                    |
+| AdditionalColumnsTransformer | Add additional columns to the DataFrame by extracting information from the context  or derive new columns from existing columns  |
 | BlacklistTransformer | Apply a column blacklist to discard columns                                                           |
 | DataValidationTransformer | validates DataFrame with a user defined set of rules and creates column with potential error messages |
 | DecryptColumnsTransformer | Decrypts specified columns using AES/GCM algorithm                                                    |
 | EncryptColumnsTransformer | Encrypts specified columns using AES/GCM algorithm                                                    |
 | FilterTransformer | Filter DataFrame with expression                                                                      |
-| SparkRepartitionTransformer | Repartions a DataFrame                                                                                |
+| SparkRepartitionTransformer | Repartitons a DataFrame                                                                                |
 | StandardizeColNamesTransformer | Used to standardize column names according to configurable rules                                      |
-| StandardizeDatatypesTransformer | Standardize data types of a DataFrame (decimal to corresponding int / float)                          |
+| StandardizeSparkDatatypesTransformer| Standardize data types of a DataFrame (decimal to corresponding int / float)                          |
 | WhitelistTransformer | Apply a column whitelist to a DataFrame                                                               |
 
 
@@ -76,7 +76,8 @@ The following custom transformations are available.
 | ScalaClassSparkDsTransformer     | Spark DataSet transformation in Scala 1-to-1              |
 | ScalaClassSparkDsNTo1Transformer | Spark DataFrame transformation in Scala many-to-one       |
 | ScalaNotebookSparkDfTransformer  | Loads custom code from a Notebook                         | 
-| PythonCodeSparkDfTransformer | Python implementation (using PySpark)                     |
+| PythonCodeSparkDfTransformer | Spark DataFrame transformation in Python 1-to-1 (using PySpark)  |
+| PythonCodeSparkDfsTransformer | Spark DataFrame transformation in Python many-to-many (using PySpark) |
 
 There are usually two variants, one for 1-to-1 transformations called _DfTransformer_ and one
 for many-to-many transformations called _DfsTransformer_.
@@ -90,9 +91,11 @@ Many-to-many transformers are only listed under many-to-many actions, i.e. Custo
 
 ### SQL
 Spark SQL is probably the easiest way to write a custom transformation, directly in your HOCON configuration.
-All input Data Objects are available as tables to select from.
-Because of naming limitations, all special characters are replaced by an underscore. 
-So an input Data Object called `Table-With-Hyphen` becomes `table_with_hyphen` inside the SQL query.
+All input Data Objects are available in the select statement with following naming:
+- special characters are replaced by an underscore
+- a postfix `_sdltemp` is added.
+So an input Data Object called `table-with-hyphen` becomes `table_with_hyphen_sdltemp` inside the SQL query.
+To simplify this you can also use the special token %{inputViewName} for 1-to-1 transformations, or ${inputViewName_<inputDataObjectName>} for n-to-m transformations, that will be replaced with the correct name at runtime.
 
 ##### SQL 1-to-1
 1-to-1 transformations use type SQLDfTransformer. 
@@ -102,7 +105,7 @@ We can then write a SQL transformation directly in our HOCON configuration:
 ```
 transformers = [{
   type = SQLDfTransformer
-  sqlCode = "select id, count(*) from dataObject1 group by id"
+  sqlCode = "select id, count(*) from %{inputViewName} group by id"
 }]
 ```
 
@@ -117,8 +120,8 @@ Therefore, we now have a map of objectIds and corresponding SQL statements:
 transformers = [{
   type = SQLDfsTransformer
   code = {
-    dataObjectOut1 = "select id, cnt from dataObjectIn1 where group = 'test1'",
-    dataObjectOut2 = "select id, cnt from dataObjectIn1 where group = 'test2'"
+    dataObjectOut1 = "select id, cnt from %{inputViewName_dataObjectIn1} where group = 'test1'",
+    dataObjectOut2 = "select id, cnt from %{inputViewName_dataObjectIn1} where group = 'test2'"
   }
 }
 ```
@@ -129,9 +132,9 @@ In custom Scala code, the whole Spark Dataset API is available.
 It's of course also possible to include additional libraries for your code, 
 so anything you can do in Spark Scala, you can do with SDLB. 
 
-##### As separate file
-If you have a Java/Scala project, it usually makes sense to create separate files for your custom Scala code.
-Any files in your classpath are picked up and can be referenced. 
+##### As Scala class
+If you have a Java/Scala project, it usually makes sense to create separate classes for your custom Scala code.
+Any classes in your classpath are picked up and can be referenced. 
 
 To transform data in a 1-to-1 action, i.e. CopyAction:
 ```
@@ -260,7 +263,7 @@ The output DataFrame needs to be set with `setOutputDf(df)`.
 
 ##### Requirements
 Running Python transformations needs some additional setup. 
-In general, Python >= 3.4 is required and PySpark package needs to be installed with a version matching your SDL spark version.
+In general, Python >= 3.4 is required and PySpark package needs to be installed with a version matching your SDL spark version. Further environment variable PYTHONPATH needs to be set to your python environment `.../Lib/site-packages` directory, and pyspark command needs to be accessible from the PATH environment variable.
 
 
 ### Options / RuntimeOptions
@@ -274,11 +277,11 @@ For custom transformers, you can therefore provide additional options:
 
 
 ##### In SQL
-If you want to use runtimeOptions in SQL, the syntax is %{key}:
+If you want to use options in SQL, the syntax is %{key}:
 ```
 transformers = [{
   type = SQLDfTransformer
-  sqlCode = "select id, cnt, '%{test}' as test, %{run_id} as last_run_id from dataObject1"
+  sqlCode = "select id, cnt, '%{test}' as test, %{last_run_id} as last_run_id from dataObject1"
   options = {
     test = "test run"
   }
