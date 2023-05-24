@@ -22,7 +22,7 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.workflow.AtlasExportable
 
-private[smartdatalake] trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
+trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
 
   /**
    * A unique identifier for this instance.

@@ -60,7 +60,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
-        |       keyVariable = "CLEAR#A%D*G-KaPdSgVkYp"
+        |       key = "A%D*G-KaPdSgVkYp"
         |     }]
         |   }
         |   actdec = {
@@ -73,7 +73,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
-        |       keyVariable = "CLEAR#A%D*G-KaPdSgVkYp"
+        |       key = "A%D*G-KaPdSgVkYp"
         |     }]
         |   }
         |}

@@ -64,7 +64,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with ExpectationValidation {
+  extends TransactionalTableDataObject with ExpectationValidation {
 
   private val connection = getConnection[SnowflakeConnection](connectionId)
   val fullyQualifiedTableName = connection.database + "." + table.fullName
@@ -90,7 +90,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .options(connection.getSnowflakeOptions(table.db.get))
       .options(queryOrTable)
       .load()
-    df.colNamesLowercase
+    df
   }
 
   // Write a Spark DataFrame to the Snowflake table

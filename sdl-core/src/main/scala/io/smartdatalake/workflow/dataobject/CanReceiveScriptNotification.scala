@@ -22,7 +22,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.SparkSession
 
-private[smartdatalake] trait CanReceiveScriptNotification {
+trait CanReceiveScriptNotification {
 
   def scriptNotification(parameters: Map[String,String], partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit
 

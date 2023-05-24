@@ -8,6 +8,7 @@ venv
 *.js
 *.log
 /sdl-core/src/main/resources/application.conf
+spark-warehouse
 
 # User-specific stuff
 .idea/**/workspace.xml

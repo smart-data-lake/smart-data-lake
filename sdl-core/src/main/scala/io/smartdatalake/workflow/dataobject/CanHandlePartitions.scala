@@ -18,13 +18,12 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.SparkExpressionUtil
-import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.SchemaViolationException
+import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /**
  * A trait to be implemented by DataObjects which store partitioned data
@@ -87,9 +86,7 @@ trait CanHandlePartitions { this: DataObject =>
    * Filter list of partition values by expected partitions condition
    */
   private[smartdatalake] final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    import org.apache.spark.sql.functions.expr
     val session = context.sparkSession
-    import session.implicits._
     expectedPartitionsCondition.map{ condition =>
       // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
       val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString), pv.hashCode))
@@ -111,7 +108,7 @@ trait CanHandlePartitions { this: DataObject =>
    * @throws SchemaViolationException if the partitions columns are not included.
    */
   def validateSchemaHasPartitionCols(df: DataFrame, role: String): Unit = {
-    val missingCols = if (SchemaUtil.isSparkCaseSensitive) partitions.diff(df.columns)
+    val missingCols = if (Environment.caseSensitive) partitions.diff(df.columns)
     else partitions.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
   }
@@ -124,7 +121,7 @@ trait CanHandlePartitions { this: DataObject =>
    * @throws SchemaViolationException if the partitions columns are not included.
    */
   def validateSchemaHasPrimaryKeyCols(df: DataFrame, primaryKeyCols: Seq[String], role: String): Unit = {
-    val missingCols = if (SchemaUtil.isSparkCaseSensitive) primaryKeyCols.diff(df.columns)
+    val missingCols = if (Environment.caseSensitive) primaryKeyCols.diff(df.columns)
     else primaryKeyCols.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing primary key cols ${missingCols.mkString(", ")} on $role")
   }

@@ -23,7 +23,7 @@ package io.smartdatalake.config
  *
  * @param configurationPath Some configuration path associated to this exception or None.
  */
-private[smartdatalake] case class ConfigurationException(message: String, configurationPath: Option[String] = None, throwable: Throwable = null) extends RuntimeException(message, throwable) {
+case class ConfigurationException(message: String, configurationPath: Option[String] = None, throwable: Throwable = null) extends RuntimeException(message, throwable) {
 
   /**
    * Get the path of the configuration property (if any) that is associated to this exception.

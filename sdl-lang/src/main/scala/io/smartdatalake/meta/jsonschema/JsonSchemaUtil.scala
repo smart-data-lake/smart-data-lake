@@ -22,8 +22,9 @@ package io.smartdatalake.meta.jsonschema
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, jsonschema}
+import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, ScaladocUtil, jsonschema}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -31,6 +32,7 @@ import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
+import scaladoc.Tag
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
@@ -143,6 +145,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         case t if t.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] => JsonStringDef(description, deprecated = isDeprecated) // map DataObjectId as string
         case t if t =:= typeOf[StructType] => JsonStringDef(description, deprecated = isDeprecated) // map StructType (Spark schema) as string
         case t if t =:= typeOf[GenericSchema] => JsonStringDef(description, deprecated = isDeprecated) // map GenericSchema as string
+        case t if t =:= typeOf[StringOrSecret] => JsonStringDef(Some(addSecretScaladocToDescription(description)), deprecated = isDeprecated) // map StringOrSecret as string
         case t if t =:= typeOf[OutputMode] => JsonStringDef(description, enum = Some(Seq("Append", "Complete", "Update")), deprecated = isDeprecated) // OutputMode is not an ordinary enum...
         // BaseTypes needs to be handled before ParsableFromConfig type
         case t if registry.baseTypeExists(t) => {
@@ -168,6 +171,9 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
             case 1 =>
               val subTypeCls = t.typeArgs.head.typeSymbol.asClass
               JsonArrayDef(convertToJsonType(subTypeCls.toType), description, deprecated = isDeprecated)
+            // map with key=String and value=StringOrSecret
+            case 2 if t.typeArgs.head.typeSymbol.asType.toType =:= typeOf[String] && t.typeArgs.last.typeSymbol.asType.toType =:= typeOf[StringOrSecret] =>
+              JsonMapDef(additionalProperties = convertToJsonType(typeOf[StringOrSecret]), description = Some(addSecretScaladocToDescription(description)), deprecated = isDeprecated)
             // map with key=String
             case 2 if t.typeArgs.head.typeSymbol.asType.toType =:= typeOf[String] || t.typeArgs.head.typeSymbol.asType.toType <:< typeOf[ConfigObjectId] =>
               val valueCls = t.typeArgs.last.typeSymbol.asClass
@@ -179,10 +185,24 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
           assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
           JsonStringDef(description, enum = Some(enumValues.map(_.name.toString).toSeq), deprecated = isDeprecated)
+        case t if t.typeSymbol.asClass.isJavaEnum =>
+          // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
+          val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
+          val firstClassNamePart = classNamePartsIterator.takeWhile(_.head.isLower)
+          val javaEnumClassName = (firstClassNamePart :+ classNamePartsIterator.drop(firstClassNamePart.length).mkString("$")).mkString(".")
+          val enumValues = getClass.getClassLoader.loadClass(javaEnumClassName).getEnumConstants.map(_.toString)
+          assert(enumValues.nonEmpty, s"Java enum values for ${t.typeSymbol.fullName}/$javaEnumClassName not found")
+          JsonStringDef(description, enum = Some(enumValues.toSeq), deprecated = isDeprecated)
         case t =>
           logger.warn(s"Json schema creator for ${t.typeSymbol.fullName} missing. Creating type as existingJavaType.")
           JsonStringDef(description, existingJavaType = Some(t.typeSymbol.fullName), deprecated = isDeprecated)
       }
+    }
+
+    private def addSecretScaladocToDescription(description: Option[String]): String = {
+      val stringOrSecretScalaDoc = ScaladocUtil.extractScalaDoc(typeOf[StringOrSecret].typeSymbol.annotations).get
+      val scalaDocForSecretParameter = ScaladocUtil.formatScaladocMarkup(stringOrSecretScalaDoc.tags.last.asInstanceOf[Tag.Param].markup)
+      description.map(_ + "\n\n").getOrElse("") + scalaDocForSecretParameter
     }
 
     def addTypeProperty(jsonDef: JsonObjectDef, className: String): JsonObjectDef = {

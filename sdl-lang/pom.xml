@@ -24,7 +24,7 @@
     <parent>
         <artifactId>sdl-parent</artifactId>
         <groupId>io.smartdatalake</groupId>
-        <version>2.4.0</version>
+        <version>2.5.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -72,7 +72,7 @@
             </exclusions>
         </dependency>
 
-        <!-- all modules needed to create configuration schema -->
+        <!-- all modules needed to create configuration schema, but not as transitive dependencies (-> optional=true) -->
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
@@ -82,31 +82,37 @@
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-azure_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-deltalake_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-jms_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-kafka_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-snowflake_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-splunk_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <dependency>
@@ -119,11 +125,13 @@
             <groupId>com.github.andyglow</groupId>
             <artifactId>scaladoc-ast_${scala.minor.version}</artifactId>
             <version>0.0.14</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.github.andyglow</groupId>
             <artifactId>scaladoc-parser_${scala.minor.version}</artifactId>
             <version>0.0.14</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- TEST dependencies -->

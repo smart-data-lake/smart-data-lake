@@ -23,7 +23,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-private[smartdatalake] trait CanCreateStreamingDataFrame {
+trait CanCreateStreamingDataFrame {
 
   def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit context: ActionPipelineContext) : DataFrame
 

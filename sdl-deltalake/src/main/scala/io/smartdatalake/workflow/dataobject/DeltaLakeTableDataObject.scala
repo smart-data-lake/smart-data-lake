@@ -53,6 +53,11 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * - table is not registered but path contains parquet files without _delta_log subfolder -> path is converted to delta format and table is registered
  * - table is not registered and path does not exists -> table is created on write
  *
+ *  * DeltaLakeTableDataObject implements
+ * - [[CanMergeDataFrame]] by using DeltaTable.merge API.
+ * - [[CanEvolveSchema]] by using mergeSchema option.
+ * - Overwriting partitions is implemented by replaceWhere option in one transaction.
+ *
  * @param id unique name of this data object
  * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
@@ -92,7 +97,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -133,7 +138,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // dont use "filesystem" to avoid loop
   }
 
-  table = table.overrideDb(connection.map(_.db))
+  table = table.overrideCatalogAndDb(connection.flatMap(_.catalog), connection.map(_.db))
   if (table.db.isEmpty) {
     throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
   }

@@ -18,7 +18,9 @@
  */
 package io.smartdatalake.app
 
+import io.smartdatalake.app.DatabricksSmartDataLakeBuilder.parser
 import io.smartdatalake.config.ConfigurationException
+import scopt.OParser
 
 /**
  * Default Smart Data Lake Command Line Application.
@@ -30,8 +32,8 @@ class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
     logger.info(s"Starting Program $appType $appVersion")
 
-    parseCommandLineArguments(args, initConfigFromEnvironment) match {
-      case Some(config) =>
+    OParser.parse(parser, args, SmartDataLakeBuilderConfig()) match {
+      case Some (config) =>
         assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
         val stats = run(config)
           .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string

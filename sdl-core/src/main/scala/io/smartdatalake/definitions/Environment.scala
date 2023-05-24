@@ -20,6 +20,7 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
@@ -39,7 +40,7 @@ object Environment {
   // this class loader needs to be overridden to find custom classes in some environments (e.g. Polynote)
   def classLoader(): ClassLoader = {
     if (_classLoader.isEmpty) {
-      _classLoader = Option(this.getClass.getClassLoader)
+      _classLoader = Option(Thread.currentThread().getContextClassLoader)
         .orElse(Option(ClassLoader.getSystemClassLoader))
     }
     _classLoader.get
@@ -269,6 +270,25 @@ object Environment {
   var _simplifyFinalExceptionLog: Option[Boolean] = None
 
   /**
+   * Include exception's root cause in final DAG error messages.
+   * If disabled the most important exception is printed to stderr. But this is not suitable on environments
+   * where stderr is not available, e.g. logging to Azure LogAnalytics.
+   * By enabling includeDAGResultExceptionInLog the exception cause is also included in the LogEvent and logged
+   * according to the logging configuration.
+   */
+  def includeDAGResultExceptionInLog: Boolean = {
+    if (_includeDAGResultExceptionInLog.isEmpty) {
+      _includeDAGResultExceptionInLog = Some(
+        EnvironmentUtil.getSdlParameter("includeDAGResultExceptionInLog")
+          .map(_.toBoolean).getOrElse(false)
+      )
+    }
+    _includeDAGResultExceptionInLog.get
+  }
+
+  var _includeDAGResultExceptionInLog: Option[Boolean] = None
+
+  /**
    * Number of Executions to keep runtime data for in streaming mode (default = 10).
    * Must be bigger than 1.
    */
@@ -389,6 +409,54 @@ object Environment {
     _compileScalaCodeLazy.get
   }
   var _compileScalaCodeLazy: Option[Boolean] = None
+
+  /**
+   * Factory to use for creating Hadoop FileSystems.
+   * Configure a class name implementing [[FileSystemFactory]].
+   * Default is to use a special factory for Databricks with Unity Catalog, and standard Hadoop FileSystem creation otherwise.
+   */
+  def fileSystemFactory: FileSystemFactory = {
+    if (_fileSystemFactory.isEmpty) {
+      _fileSystemFactory = Some(
+        EnvironmentUtil.getSdlParameter("fileSystemFactory")
+          .map(CustomCodeUtil.getClassInstanceByName[FileSystemFactory])
+          .getOrElse{
+            if (UCFileSystemFactory.needUcFileSystem) new UCFileSystemFactory()
+            else new DefaultFileSystemFactory()
+          }
+      )
+    }
+    _fileSystemFactory.get
+  }
+  var _fileSystemFactory: Option[FileSystemFactory] = None
+
+  /**
+   * If true simulation runs fail when input subfeeds are missing.
+   * If false it will get a DataFrame from the input DataObject as a normal run would do.
+   * Default is to fail if an input subfeed is not defined.
+   */
+  def failSimulationOnMissingInputSubFeeds: Boolean = {
+    if (_failSimulationOnMissingInputSubFeeds.isEmpty) {
+      _failSimulationOnMissingInputSubFeeds = Some(
+        EnvironmentUtil.getSdlParameter("failSimulationOnMissingInputSubFeeds")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _failSimulationOnMissingInputSubFeeds.get
+  }
+  var _failSimulationOnMissingInputSubFeeds: Option[Boolean] = None
+
+  /**
+   * Whether SDL should run in case sensitive mode. If true Spark will also be configured to be case sensitive.
+   * Default is false.
+   */
+  def caseSensitive: Boolean = {
+    if (_caseSensitive.isEmpty) {
+      _caseSensitive = Some(EnvironmentUtil.getSdlParameter("caseSensitive").exists(_.toBoolean))
+    }
+    _caseSensitive.get
+  }
+  var _caseSensitive: Option[Boolean] = None
 
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(

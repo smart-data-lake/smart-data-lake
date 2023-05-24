@@ -29,7 +29,7 @@ import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceive
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.concurrent.duration.Duration
 
@@ -68,7 +68,7 @@ case class JmsDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.user, basicAuthMode.password, connectionFactory, queue)
+    val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.userSecret.resolve(), basicAuthMode.passwordSecret.resolve(), connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)

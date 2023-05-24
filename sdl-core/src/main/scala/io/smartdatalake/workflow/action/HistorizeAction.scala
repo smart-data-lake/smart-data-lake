@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -44,7 +44,7 @@ import scala.util.{Failure, Success, Try}
  * Historization creates a technical history of data by creating valid-from/to columns.
  * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
  *
- * HistorizeAction needs a transactional table (e.g. implementation of [[TransactionalSparkTableDataObject]]) as output with defined primary keys.
+ * HistorizeAction needs a transactional table (e.g. implementation of [[TransactionalTableDataObject]]) as output with defined primary keys.
  *
  * Normal historization join new with all existing data, and rewrites all data in output table. This is not optimal from
  * a performance perspective.
@@ -115,9 +115,9 @@ case class HistorizeAction(
                           )(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
-  override val output: TransactionalSparkTableDataObject = getOutputDataObject[TransactionalSparkTableDataObject](outputId)
+  override val output: TransactionalTableDataObject = getOutputDataObject[TransactionalTableDataObject](outputId)
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override val outputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+  override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   private val mergeModeAdditionalJoinPredicateExpr: Option[Column] = try {
     mergeModeAdditionalJoinPredicate.map(expr)
@@ -168,7 +168,7 @@ case class HistorizeAction(
   }
 
   // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
-  override val recursiveInputs: Seq[TransactionalSparkTableDataObject] = Seq(output)
+  override val recursiveInputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
@@ -239,7 +239,7 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), TechnicalTableColumn.captured)
+      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), TechnicalTableColumn.captured)
       // apply schema evolution
       val (modifiedExistingDf, modifiedNewFeedDf) = SchemaEvolution.process(existingDf.get, newFeedDf, ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns
         , colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
@@ -265,7 +265,7 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
+      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
       // note that schema evolution is done by output DataObject
       Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist)
@@ -278,7 +278,7 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
+      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
       // note that schema evolution is done by output DataObject
       Historization.incrementalCDCHistorize(newDf, mergeModeDeletedRecordsConditionExpr, refTimestamp)

@@ -119,20 +119,6 @@ private[smartdatalake] object DataFrameUtil {
     def castAllDecimal2IntegralFloat: DataFrame = df.columns.foldLeft(df)({ (df, s) => df.castDecimalColumn2IntegralFloat(s) })
 
     /**
-     * Transforms column names of [[DataFrame]] to lowercase.
-     *
-     * @return transformed [[DataFrame]]
-     */
-    def colNamesLowercase: DataFrame = df.select(df.columns.map(c => col(c).as(c.toLowerCase)): _*)
-
-    /**
-     * Transforms column names of [[DataFrame]] to lowercase, Camel case to lower case with underscores.
-     *
-     * @return transformed [[DataFrame]]
-     */
-    def colCamelNamesLowercase: DataFrame = df.select(df.columns.map(c => col(c).as(strCamelCase2LowerCaseWithUnderscores(c.toString))): _*)
-
-    /**
      * Checks whether the specified columns contain nulls
      *
      * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
@@ -352,6 +338,16 @@ private[smartdatalake] object DataFrameUtil {
       .filter(_.nonEmpty).mkString("_")
     // preserve leading underscores
     x.takeWhile(_ == '_') + normalized
+  }
+
+  /**
+   * Transforms name with dashs and underscores to LowerCamelCase.
+   */
+  def strToLowerCamelCase(x: String): String = {
+    val parts = x.split("[_\\- ]")
+    val camelCase = parts.map(_.capitalize).mkString
+    // lowercase first letter
+    camelCase.head.toLower +: camelCase.tail
   }
 
   /**

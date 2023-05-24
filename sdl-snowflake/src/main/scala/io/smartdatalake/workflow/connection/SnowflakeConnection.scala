@@ -64,8 +64,8 @@ case class SnowflakeConnection(override val id: ConnectionId,
       case m: BasicAuthMode =>
         Map(
           "sfURL" -> url,
-          "sfUser" -> m.user,
-          "sfPassword" -> m.password,
+          "sfUser" -> m.userSecret.resolve(),
+          "sfPassword" -> m.passwordSecret.resolve(),
           "sfDatabase" -> database,
           "sfRole" -> role,
           "sfSchema" -> schema,
@@ -89,8 +89,8 @@ case class SnowflakeConnection(override val id: ConnectionId,
       case m: BasicAuthMode =>
         val builder = Session.builder.configs(Map(
           "URL" -> url,
-          "USER" -> m.user,
-          "PASSWORD" -> m.password,
+          "USER" -> m.userSecret.resolve(),
+          "PASSWORD" -> m.passwordSecret.resolve(),
           "ROLE" -> role,
           "WAREHOUSE" -> warehouse,
           "DB" -> database,

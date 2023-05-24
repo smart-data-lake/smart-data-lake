@@ -18,18 +18,18 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.connection.{DefaultJdbcCatalog, JdbcTableConnection}
+import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
   import session.implicits._
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:file:target/JdbcTableDataObjectTest/hsqldb", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableDataObjectTest", "org.hsqldb.jdbcDriver")
 
   test("write and read jdbc table") {
     instanceRegistry.register(jdbcConnection)
@@ -276,5 +276,18 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     assert(newState1.get < newState2.get)
 
     targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+  }
+
+  test("write to jdbc table with different order of columns") {
+    instanceRegistry.register(jdbcConnection)
+    val table = Table(Some("public"), "table1")
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1")
+    dataObject.dropTable
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val dfColumnsSwitched = df.select("type", "rating", "firstname", "lastname")
+    dataObject.initSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(dfColumnsSwitched, Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())
+    assert(dfRead.symmetricDifference(df).isEmpty)
   }
 }

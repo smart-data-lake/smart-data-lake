@@ -20,7 +20,6 @@
 package io.smartdatalake.workflow.action.generic.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.DataFrameSubFeedCompanion
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 
 /**

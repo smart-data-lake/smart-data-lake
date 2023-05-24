@@ -23,7 +23,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 /**
  * DataObjects should implement this interface to allow incremental processing
  */
-private[smartdatalake] trait CanCreateIncrementalOutput {
+trait CanCreateIncrementalOutput {
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.

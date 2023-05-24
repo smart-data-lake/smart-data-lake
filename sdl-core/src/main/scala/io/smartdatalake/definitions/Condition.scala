@@ -19,7 +19,6 @@
 
 package io.smartdatalake.definitions
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode

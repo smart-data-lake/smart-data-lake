@@ -25,7 +25,7 @@ import org.apache.spark.sql.types.StructType
 
 import scala.reflect.runtime.universe.Type
 
-private[smartdatalake] trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaValidation {
+trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaValidation {
 
   var table: Table
 

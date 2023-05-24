@@ -20,19 +20,21 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
-import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
 import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{ArrayType, StructType}
-import org.apache.spark.sql.xml.XsdSchemaConverter
+import org.apache.spark.sql.types._
 
+import java.io.{BufferedReader, InputStreamReader}
+import java.nio.charset.StandardCharsets
+import java.util.stream.Collectors
 import scala.reflect.runtime.universe.{Type, TypeTag}
 
 object SchemaUtil {
@@ -117,10 +119,6 @@ object SchemaUtil {
     }
   }
 
-  def isSparkCaseSensitive: Boolean = {
-    SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
-  }
-
   def getSchemaFromCaseClass[T <: Product : TypeTag]: StructType = {
     Encoders.product[T].schema
   }
@@ -133,20 +131,33 @@ object SchemaUtil {
     JavaTypeInference.inferDataType(beanClass)._1.asInstanceOf[StructType]
   }
 
-  def getSchemaFromJsonSchema(jsonSchemaContent: String): StructType = {
-    JsonSchemaConverter.convert(jsonSchemaContent)
+  def getSchemaFromJsonSchema(jsonSchemaContent: String, strictTyping: Boolean, additionalPropertiesDefault: Boolean): StructType = {
+    JsonSchemaConverter.convert(jsonSchemaContent, strictTyping, additionalPropertiesDefault)
   }
 
   def getSchemaFromAvroSchema(avroSchemaContent: String): StructType = {
     AvroSchemaConverter.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
   }
 
-  def getSchemaFromXsd(xsdContent: String, maxRecursion: Option[Int] = None): StructType = {
-    XsdSchemaConverter.read(xsdContent, maxRecursion.getOrElse(10)) // default is maxRecursion=10
+  def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)(implicit hadoopConfiguration: Configuration): StructType = {
+    SdlbXsdURIResolver.readXsd(xsdFile, maxRecursion.getOrElse(10)) // default is maxRecursion=10
   }
 
   def getSchemaFromDdl(ddl: String): StructType = {
     StructType.fromDDL(ddl)
+  }
+
+  def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
+    val path = addHadoopDefaultSchemaAuthority(inputPath)
+    if (ResourceUtil.canHandleScheme(path)) {
+      val inputStream = ResourceUtil.readResource(path)
+      new BufferedReader(
+        new InputStreamReader(inputStream, StandardCharsets.UTF_8)
+      ).lines().collect(Collectors.joining())
+    } else {
+      val filesystem = getHadoopFsWithConf(path)
+      readHadoopFile(path)(filesystem)
+    }
   }
 
   /**
@@ -161,7 +172,9 @@ object SchemaUtil {
       case DDL =>
         SparkSchema(getSchemaFromDdl(value))
       case DDLFile =>
-        val content = HdfsUtil.readHadoopFile(value)
+        val valueElements = value.split(";")
+        assert(valueElements.size == 1, s"DDL schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
+        val content = readFromPath(new Path(valueElements.head))
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
         val clazz = this.getClass.getClassLoader.loadClass(value)
@@ -173,32 +186,36 @@ object SchemaUtil {
         SparkSchema(getSchemaFromJavaBean(clazz))
       case XsdFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size <= 3, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion>', but received $value.")
+        assert(valueElements.size <= 4, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>', but received $value.")
         val path = valueElements.head
-        val rowTag = valueElements.drop(1).headOption
-        val maxRecursion = valueElements.drop(2).headOption.map(_.toInt)
+        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
+        val maxRecursion = if (valueElements.size >= 3) Some(valueElements(2).toInt) else None
+        val jsonCompatibility = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
-          val schema = getSchemaFromXsd(content, maxRecursion)
-          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+          val schema = getSchemaFromXsd(new Path(path), maxRecursion)
+          val sparkSchema = SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+          if (jsonCompatibility.getOrElse(false)) makeXsdJsonCompatible(sparkSchema)
+          else sparkSchema
         } else LazyGenericSchema(schemaConfig)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size == 1 || valueElements.size == 2, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>', but received $value.")
+        assert(valueElements.size <= 4, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>', but received $value.")
         val path = valueElements.head
-        val rowTag = valueElements.drop(1).headOption
+        val rowTag = if (valueElements.size>=2) Some(valueElements(1)).filter(_.nonEmpty) else None
+        val strictTyping = if (valueElements.size>=3) Some(valueElements(2).toBoolean) else None
+        val additionalPropertiesDefault = if (valueElements.size>=4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
-          val schema = getSchemaFromJsonSchema(content)
+          val content = readFromPath(new Path(path))
+          val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
       case AvroSchemaFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size == 1 || valueElements.size == 2, s"Avro schema provider configuration error. Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
+        assert(valueElements.size <= 2, s"Avro schema provider configuration error. Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
         val path = valueElements.head
         val rowTag = valueElements.drop(1).headOption
         if (!lazyFileReading) {
-          val content = HdfsUtil.readHadoopFile(path)
+          val content = readFromPath(new Path(path))
           val schema = getSchemaFromAvroSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
         } else LazyGenericSchema(schemaConfig)
@@ -242,8 +259,50 @@ object SchemaUtil {
     // order fields according to schema1
     StructType(schema1.fields.map(f => fieldsMap(f.name)) ++ fields2Only.map(f => fieldsMap(f.name)))
   }
-}
 
+  /**
+   * In XML array elements are modeled with their own tag named with singular name.
+   * In JSON an array attribute has unnamed array entries, but the array attribute has a plural name.
+   *
+   * Often if you get an XSD file for JSON data (because the data is published as XML and JSON),
+   * the singular name of the array element in the XSD has to be converted to a plural name by adding an 's'.
+   * Thats what this method does.
+   */
+  def makeXsdJsonCompatible(sparkSchema: SparkSchema): SparkSchema = {
+    def renameArrayToPluralForm(field: StructField): StructField = {
+      val newName = field.dataType match {
+        // add final 's' to singular name of XML array field
+        case _: ArrayType => field.name + "s"
+        case _ => field.name
+      }
+      field.copy(name = newName)
+    }
+    transformSchemaFields(sparkSchema, renameArrayToPluralForm)
+  }
+
+  /**
+   * A function to transform recursively the fields of a schema.
+   */
+  def transformSchemaFields(sparkSchema: SparkSchema, fieldTransformer: StructField => StructField): SparkSchema = {
+    def visitField(field: StructField): StructField = {
+      val transformedField = fieldTransformer(field)
+      val newType = visitType(transformedField.dataType)
+      transformedField.copy(dataType = newType)
+    }
+
+    def visitType(dataType: DataType): DataType = {
+      dataType match {
+        case structType: StructType => structType.copy(fields = structType.fields.map(f => visitField(f)))
+        case arrType: ArrayType => arrType.copy(elementType = visitType(arrType.elementType))
+        case mapType: MapType => MapType(visitType(mapType.keyType), visitType(mapType.valueType))
+        case x => x
+      }
+    }
+
+    val newFields = sparkSchema.inner.fields.map(visitField)
+    SparkSchema(sparkSchema.inner.copy(fields = newFields))
+  }
+}
 
 object SchemaProviderType extends Enumeration {
   type SchemaProviderType = Value
@@ -298,4 +357,5 @@ object SchemaProviderType extends Enumeration {
    *   To extract a nested row tag, split the elements by slash (/).
    */
   val AvroSchemaFile: SchemaProviderType.Value = Value("avroschemafile")
+
 }

@@ -25,7 +25,7 @@ import scala.language.implicitConversions
 /**
  * A first class object from which SDL [[ActionDAG]]s are built.
  */
-private[smartdatalake] trait SdlConfigObject {
+private[smartdatalake] trait SdlConfigObject extends ConfigHolder {
 
   /**
    * A unique identifier for this instance.
@@ -44,11 +44,15 @@ object SdlConfigObject {
     def id: String
   }
 
+  case class AgentId(override val id: String) extends AnyVal with ConfigObjectId {
+    override def toString: String = "Agent~" + id
+  }
+
   /**
    * Value class for connection identifiers.
    */
   case class ConnectionId(override val id: String) extends AnyVal with ConfigObjectId {
-    override def toString: String = "Connection~"+id
+    override def toString: String = "Connection~" + id
   }
 
   /**

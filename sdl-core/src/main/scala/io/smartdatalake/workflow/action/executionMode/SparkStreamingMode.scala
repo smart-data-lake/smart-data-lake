@@ -51,7 +51,7 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
       Trigger.Continuous(triggerTime.get)
   }
 
-  override private[smartdatalake] def isAsynchronous = trigger != Trigger.Once
+  override def isAsynchronous = trigger != Trigger.Once
 
   override def factory: FromConfigFactory[ExecutionMode] = SparkStreamingMode
 }

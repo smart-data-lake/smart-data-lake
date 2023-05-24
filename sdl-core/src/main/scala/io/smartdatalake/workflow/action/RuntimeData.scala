@@ -194,7 +194,7 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
   }
   def getLatestMetric(dataObjectId: DataObjectId): Option[ActionMetrics] = {
     // combine latest metric for all types
-    val metricsMap = metrics.get(dataObjectId).map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduce(_ ++ _))
+    val metricsMap = metrics.get(dataObjectId).map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
     metricsMap.map(GenericMetrics("latest", 1, _))
   }
   def getFinalMetric(dataObjectId: DataObjectId): Option[ActionMetrics] = {

@@ -26,10 +26,11 @@ import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
@@ -38,13 +39,19 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
   import session.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+
+  private var tempDir: NioPath = _
+  private var tempPath: String = _
 
   before {
     instanceRegistry.clear()
+    tempDir = Files.createTempDirectory("test")
+    tempPath = tempDir.toAbsolutePath.toString
+  }
+
+  after {
+    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
   test("historize load") {

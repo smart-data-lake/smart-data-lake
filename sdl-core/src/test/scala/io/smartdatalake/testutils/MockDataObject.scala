@@ -19,6 +19,7 @@
 
 package io.smartdatalake.testutils
 
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
@@ -37,7 +38,7 @@ import org.apache.spark.sql.functions.col
  * PartitionValues are inferred if parameter of writeSparkDataFrame is empty.
  * writeSparkDataFrame mimicks overwrite mode, also for partitions.
  */
-case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(), override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None) extends DataObject with CanHandlePartitions with TransactionalSparkTableDataObject {
+case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(), override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None) extends DataObject with CanHandlePartitions with TransactionalTableDataObject {
 
   // variables to store mock values. They are filled using writeSparkDataFrame
   private var dataFrameMock: Option[DataFrame] = None
@@ -94,6 +95,13 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
 
   private implicit val subFeedCompanion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
 
-  override def factory: FromConfigFactory[DataObject] = null
+  override def factory: FromConfigFactory[DataObject] = MockDataObject
 
 }
+
+object MockDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MockDataObject = {
+    extract[MockDataObject](config)
+  }
+}
+

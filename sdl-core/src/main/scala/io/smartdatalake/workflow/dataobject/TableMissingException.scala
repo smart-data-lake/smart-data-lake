@@ -21,4 +21,4 @@ package io.smartdatalake.workflow.dataobject
 /**
  * Exception if a table is missing
  */
-private[smartdatalake] class TableMissingException(message: String) extends RuntimeException(message) {}
+class TableMissingException(message: String) extends RuntimeException(message) {}

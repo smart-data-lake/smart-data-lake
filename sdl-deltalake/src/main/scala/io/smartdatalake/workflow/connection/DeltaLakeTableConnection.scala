@@ -27,12 +27,14 @@ import io.smartdatalake.util.misc.AclDef
  * Connection information for DeltaLake tables
  *
  * @param id unique id of this connection
+ * @param catalog optional catalog to be used for this connection
  * @param db hive db
  * @param pathPrefix schema, authority and base path for tables directory on hadoop
  * @param acl permissions for files created with this connection
  * @param metadata
  */
 case class DeltaLakeTableConnection(override val id: ConnectionId,
+                                    catalog: Option[String] = None,
                                     db: String,
                                     pathPrefix: String,
                                     acl: Option[AclDef] = None,

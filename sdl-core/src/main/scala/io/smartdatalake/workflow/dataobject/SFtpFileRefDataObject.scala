@@ -20,18 +20,20 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.SftpFileRefConnection
-import net.schmizz.sshj.sftp.SFTPException
+import io.smartdatalake.workflow.connection.SFtpFileRefConnection
+import net.schmizz.sshj.sftp.{SFTPClient, SFTPException}
 
 import java.io.{InputStream, OutputStream}
 import java.nio.file.FileAlreadyExistsException
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -44,9 +46,12 @@ import scala.util.{Failure, Success, Try}
  *
  * @param partitionLayout partition layout defines how partition values can be extracted from the path.
  *                        Use "%<colname>%" as token to extract the value for a partition column.
+ *                        As partition layout extracts partition from the path of individual files, it can also be used to extract partitions from the file name.
  *                        With "%<colname:regex>%" a regex can be given to limit search. This is especially useful
  *                        if there is no char to delimit the last token from the rest of the path or also between
  *                        two tokens.
+ *                        Be careful that for directory based partition values extraction, the final path separator must be part
+ *                        of the partition layout to extract the last token correctly, e.g. "%year%/" for partitioning with yearly directories.
  * @param saveMode Overwrite or Append new data.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -66,7 +71,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   /**
    * Connection defines host, port and credentials in central location
    */
-  private val connection = getConnection[SftpFileRefConnection](connectionId)
+  private val connection = getConnection[SFtpFileRefConnection](connectionId)
 
   override def getFileRefs(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[FileRef] = {
     connection.execWithSFtpClient {
@@ -86,6 +91,55 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
+  override def deleteAll(implicit context: ActionPipelineContext): Unit = {
+    connection.execWithSFtpClient { sftp =>
+      def deleteDirectoryContent(path: String): Unit = {
+        val (dirs, files) = sftp.ls(getPath).asScala.partition(_.isDirectory)
+        files.foreach(f => sftp.rm(f.getPath))
+        dirs.foreach { d =>
+          deleteDirectoryContent(d.getPath)
+          sftp.rmdir(d.getPath)
+        }
+      }
+      deleteDirectoryContent(getPath)
+    }
+  }
+
+  /**
+   * Get parent directory of path
+   */
+  private def getParent(path: String) = {
+    path.reverse.dropWhile(_ == separator).dropWhile(_ != separator).dropWhile(_ == separator).reverse
+  }
+
+  def deletePartitionsContent(partitionValues: Seq[PartitionValues], sftp: SFTPClient)(implicit context: ActionPipelineContext): Seq[String] = {
+    val searchPaths = getSearchPaths(partitionValues).map(_._2)
+    searchPaths.map { p =>
+      val files = SshUtil.sftpListFiles(p)(sftp)
+      files.foreach(sftp.rm)
+      p
+    }
+  }
+
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    connection.execWithSFtpClient { sftp =>
+      @tailrec
+      def deleteEmptyParents(partitionPath: String): Unit = {
+        val parentPath = getParent(partitionPath)
+        // check that it is subdirectory of base path
+        if (parentPath.startsWith(getPath) && parentPath.length > getPath.length) {
+          if (sftp.ls(parentPath).isEmpty) {
+            sftp.rmdir(parentPath)
+            deleteEmptyParents(parentPath)
+          }
+        }
+      }
+      val searchPaths = deletePartitionsContent(partitionValues, sftp)
+      val parentDirectories = searchPaths.map(getParent).distinct
+      parentDirectories.foreach(deleteEmptyParents)
+    }
+  }
+
   override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
     connection.execWithSFtpClient {
       sftp => sftp.rm(file)
@@ -102,6 +156,12 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
+  override def mkDirs(path: String)(implicit context: ActionPipelineContext): Unit = {
+    connection.execWithSFtpClient {
+      sftp => sftp.mkdirs(path)
+    }
+  }
+
   override def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream = {
     Try {
       implicit val sftp = connection.pool.borrowObject
@@ -113,10 +173,17 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   }
 
   override def startWritingOutputStreams(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit = {
+    // ensure base and partition directories are existing
+    mkDirs(path)
+    val searchPaths = getSearchPaths(partitionValues)
+    val partitionDirectories = searchPaths.map(p => getParent(p._2))
+    partitionDirectories.foreach(mkDirs)
+    // cleanup on overwrite
     if (saveMode == SDLSaveMode.Overwrite) {
       if (partitions.nonEmpty)
-        if (partitionValues.nonEmpty) deletePartitions(partitionValues)
-        else logger.warn(s"($id) Cannot delete data from partitioned data object as no partition values are given but saveMode=overwrite")
+        if (partitionValues.nonEmpty) connection.execWithSFtpClient { sftp =>
+          deletePartitionsContent(partitionValues, sftp)
+        } else logger.warn(s"($id) Cannot delete data from partitioned data object as no partition values are given but saveMode=overwrite")
       else deleteAll
     }
   }
@@ -129,7 +196,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   override def createOutputStream(path: String, overwrite: Boolean)(implicit context: ActionPipelineContext): OutputStream = {
     Try {
       implicit val sftp = connection.pool.borrowObject
-      SshUtil.getOutputStream(path, () => Try(connection.pool.returnObject(sftp)))
+      SshUtil.getOutputStream(path, overwrite, () => Try(connection.pool.returnObject(sftp)))
     } match {
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
@@ -165,6 +232,8 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
   } catch {
     case ex: Throwable => throw ConnectionTestException(s"($id) Can not connect. Error: ${ex.getMessage}", ex)
   }
+
+  override def recommendedParallelism: Option[Int] = Some(connection.maxParallelConnections)
 
   override def factory: FromConfigFactory[DataObject] = SFtpFileRefDataObject
 }

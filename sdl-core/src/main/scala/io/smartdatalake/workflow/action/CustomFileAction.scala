@@ -22,8 +22,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
-import io.smartdatalake.util.filetransfer.FileTransfer
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
+import io.smartdatalake.util.filetransfer.{FileTransfer, StreamFileTransfer}
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResource}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
@@ -89,8 +89,8 @@ case class CustomFileAction(override val id: ActionId,
         .map { case (srcPath, tgtPath) =>
           val hadoopSrcPath = new Path(srcPath)
           val hadoopTgtPath = new Path(tgtPath)
-          val result = TryWithRessource.exec(srcDO.getFilesystem(hadoopSrcPath).open(hadoopSrcPath)) { is =>
-            TryWithRessource.exec(tgtDO.getFilesystem(hadoopTgtPath).create(hadoopTgtPath, true)) { os => // overwrite = true
+          val result = WithResource.exec(srcDO.getFilesystem(hadoopSrcPath).open(hadoopSrcPath)) { is =>
+            WithResource.exec(tgtDO.getFilesystem(hadoopTgtPath).create(hadoopTgtPath, true)) { os => // overwrite = true
               transformerVal.transform(is, os)
             }
           }
@@ -114,17 +114,17 @@ case class CustomFileAction(override val id: ActionId,
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     // create output sample file in init-phase
     if (context.phase == ExecutionPhase.Init) {
-      subFeed.fileRefMapping.map(_.head).foreach {
+      subFeed.fileRefMapping.flatMap(_.headOption).foreach {
         sampleFileRefMapping =>
           val sampleFile = output.createSampleFile
           // exec only if output returned a sample file to create
           sampleFile.foreach {
             file =>
-              val sampleFileTransfer = FileTransfer(input, output, overwrite = true)
+              val sampleFileTransfer = new StreamFileTransfer(input, output, overwrite = true)
               val hadoopSrcPath = new Path(sampleFileRefMapping.src.fullPath)
               val hadoopTgtPath = new Path(file)
-              val result = TryWithRessource.exec(input.filesystem.open(hadoopSrcPath)) { is =>
-                TryWithRessource.exec(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
+              val result = WithResource.exec(input.filesystem.open(hadoopSrcPath)) { is =>
+                WithResource.exec(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
                   transformer.transform(is, os)
                 }
               }

@@ -18,10 +18,11 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.StateListener
+import io.smartdatalake.app.{AppUtil, StateListener}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
+import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
@@ -31,6 +32,7 @@ import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import org.apache.spark.SparkContext
 import org.slf4j.event.Level
 
 import scala.concurrent.Await
@@ -73,7 +75,11 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   private def run[R <: DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit context: ActionPipelineContext): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
-    val task = dag.buildTaskGraph[R](new ActionEventListener(phase))(operation)
+    val task = dag.buildTaskGraph[R](new ActionEventListener(phase)){
+      (node, results) =>
+        AppUtil.setSdlbRunLoggerContext(context) // prepare context for logger in this scheduler thread
+        operation.tupled(node, results)
+    }
     val futureResult = task.runToFuture(scheduler)
 
     // wait for result
@@ -93,7 +99,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     dagExceptions.distinct.foreach { ex =>
       val loggerSeverity = if (ex.severity <= ExceptionSeverity.FAILED_DONT_STOP) Level.ERROR
       else Environment.taskSkippedExceptionLogLevel
-      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}", getRootCause(ex))
     }
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.runId}", dag, Some(executionId))
@@ -122,7 +128,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   def init(implicit context: ActionPipelineContext): Seq[SubFeed] = {
     context.phase = ExecutionPhase.Init
     // initialize state listeners
-    stateListeners.foreach(_.init())
+    stateListeners.foreach(_.init(context))
     // run init for every node
     val t = run[SubFeed](context.phase) {
       case (node: InitDAGNode, _) =>
@@ -199,7 +205,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
           case dataObject: CanHandlePartitions => dataObject.partitions
           case _ => Seq()
         }
-        if (context.simulation) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
+        if (context.simulation && Environment.failSimulationOnMissingInputSubFeeds) throw new IllegalStateException(s"Initial subfeed for $dataObjectId missing for dry run.")
         else InitSubFeed(dataObjectId, partitionValues).updatePartitionValues(partitions, breakLineageOnChange = false)
       }
   }

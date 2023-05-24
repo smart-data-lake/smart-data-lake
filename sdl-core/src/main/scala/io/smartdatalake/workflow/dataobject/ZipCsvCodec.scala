@@ -35,7 +35,7 @@ import java.util.zip.{ZipEntry, ZipInputStream, ZipOutputStream}
  */
 class ZipCsvCodec extends ZipCodec("data.csv")
 
-private[smartdatalake] class ZipCodec(entryName: String) extends DefaultCodec {
+class ZipCodec(entryName: String) extends DefaultCodec {
   override def createInputStream(in: InputStream): CompressionInputStream = {
     val zipIs = new ZipInputStream(in)
     new ZipDecompressorStream(zipIs)
@@ -47,7 +47,7 @@ private[smartdatalake] class ZipCodec(entryName: String) extends DefaultCodec {
   override def getDefaultExtension: String = ".zip"
 }
 
-private[smartdatalake] class ZipDecompressorStream(in: ZipInputStream) extends CompressionInputStream(in) {
+class ZipDecompressorStream(in: ZipInputStream) extends CompressionInputStream(in) {
   in.getNextEntry
   private val oneByte = new Array[Byte](1)
   override def read(): Int = {
@@ -60,7 +60,7 @@ private[smartdatalake] class ZipDecompressorStream(in: ZipInputStream) extends C
   override def resetState(): Unit = {}
 }
 
-private[smartdatalake] class ZipCompressorStream(out: ZipOutputStream, entryName: String) extends CompressionOutputStream(out) {
+class ZipCompressorStream(out: ZipOutputStream, entryName: String) extends CompressionOutputStream(out) {
   out.putNextEntry(new ZipEntry(entryName))
   override def write(b: Int): Unit = out.write(b)
   override def write(data: Array[Byte], offset: Int, length: Int): Unit = {

@@ -22,8 +22,9 @@ package io.smartdatalake.workflow.action.generic.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SQLUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -42,17 +43,37 @@ case class BlacklistTransformer(override val name: String = "blacklist", overrid
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
+    val colsToSelect =
+      if (Environment.caseSensitive) filterColumnsCaseSensitive(df)
+      else filterColumnsCaseInsensitive(df)
+    df.select(colsToSelect.map(SQLUtil.sparkQuoteSQLIdentifier).map(col))
+  }
+
+  private def filterColumnsCaseInsensitive(df: GenericDataFrame): Seq[String] = {
     val lowerCaseSchemaColumns = df.schema.columns.map(_.toLowerCase()).toSet
     val nonExistingColumns = columnBlacklist.filter(colName => !lowerCaseSchemaColumns.contains(colName.toLowerCase()))
     if (nonExistingColumns.nonEmpty) {
-      logger.warn(s"The blacklisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
-        s"Available columns are [${df.schema.columns.mkString(", ")}].")
+      logNonExistingColumns(nonExistingColumns, df)
     }
-
     val lowerCaseBlacklistColumns = columnBlacklist.map(_.toLowerCase()).toSet
-    val colsToSelect = df.schema.columns.filter(colName => !lowerCaseBlacklistColumns.contains(colName.toLowerCase()))
-    df.select(colsToSelect.map(col))
+    df.schema.columns.filter(colName => !lowerCaseBlacklistColumns.contains(colName.toLowerCase()))
   }
+
+  private def filterColumnsCaseSensitive(df: GenericDataFrame): Seq[String] = {
+    val schemaColumnsSet = df.schema.columns.toSet
+    val blacklistColumnsSet = columnBlacklist.toSet
+    val nonExistingColumns = blacklistColumnsSet -- schemaColumnsSet
+    if (nonExistingColumns.nonEmpty) {
+      logNonExistingColumns(nonExistingColumns, df)
+    }
+    (schemaColumnsSet -- blacklistColumnsSet).toSeq
+  }
+
+  private def logNonExistingColumns(nonExistingColumns: Iterable[String], df: GenericDataFrame): Unit = {
+    logger.warn(s"The blacklisted columns [${nonExistingColumns.mkString(", ")}] do not exist in dataframe. " +
+      s"Available columns are [${df.schema.columns.mkString(", ")}].")
+  }
+
   override def factory: FromConfigFactory[GenericDfTransformer] = BlacklistTransformer
 }
 

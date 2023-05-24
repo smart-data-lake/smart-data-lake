@@ -18,19 +18,19 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{ConfigException, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
-import io.smartdatalake.workflow.connection.JdbcTableConnection
-import io.smartdatalake.workflow.dataobject.{Table, _}
+import io.smartdatalake.workflow.connection.JavaNetProxyConfig
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.reflect.runtime.universe.{MethodSymbol, typeOf}
 
 class DataObjectImplTests extends FlatSpec with Matchers {
 
@@ -326,8 +326,8 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          |    ssoServer = server
          |    ssoRealm = realm
          |    ssoGrantType = client_token
-         |    clientIdVariable = "CLEAR#foo"
-         |    clientSecretVariable = "CLEAR#secret"
+         |    clientId = "foo"
+         |    clientSecret = "secret"
          |  }
          | }
          |}
@@ -337,7 +337,44 @@ class DataObjectImplTests extends FlatSpec with Matchers {
     registry.instances.values.head shouldBe WebserviceFileDataObject(
       id = "123",
       url = "http://test",
-      authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token", clientIdVariable = "CLEAR#foo", clientSecretVariable = "CLEAR#secret"))
+      authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token",
+        clientId = Some(StringOrSecret("foo")), clientSecret= Some(StringOrSecret("secret"))))
+    )
+  }
+
+  "SFtpFileRefDataObject" should "be parsable" in {
+    val config = ConfigFactory.parseString(
+      """
+        |connections = {
+        |  sftp {
+        |    type = SFtpFileRefConnection
+        |    host = localhost
+        |    authMode {
+        |      type = BasicAuthMode
+        |      userVariable = "CLEAR#foo"
+        |      passwordVariable = "CLEAR#pwd"
+        |    }
+        |    proxy {
+        |      host = localhost
+        |      port = 8080
+        |      proxyType = HTTP
+        |    }
+        |  }
+        |}
+        |dataObjects = {
+        | 123 = {
+        |  type = SFtpFileRefDataObject
+        |  path = abc
+        |  connectionId = sftp
+        | }
+        |}
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    registry.get[SFtpFileRefDataObject](DataObjectId("123")) shouldBe SFtpFileRefDataObject(
+      id = "123",
+      path = "abc",
+      connectionId = "sftp"
     )
   }
 
@@ -364,7 +401,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
       |}
       |""".stripMargin).resolve
 
-    val thrown = the [ConfigException] thrownBy ConfigParser.parse(config)
+    val thrown = the [ConfigurationException] thrownBy ConfigParser.parse(config)
 
     thrown.getMessage should include ("123")
     thrown.getMessage should include ("con1")

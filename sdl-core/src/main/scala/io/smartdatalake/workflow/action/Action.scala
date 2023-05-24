@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
@@ -29,20 +29,19 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalSparkTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
 
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 /**
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
  * the DAG of actions.
  */
-private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger with AtlasExportable {
+trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger with AtlasExportable {
 
   /**
    * A unique identifier for this instance.
@@ -61,11 +60,14 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
   def inputs: Seq[DataObject]
 
   /**
-   * Recursive Inputs are DataObjects that are used as Output and Input in the same action.
+   * Recursive Inputs are DataObjects that are used as Output and Input in the same or different action.
    * This is usually prohibited as it creates loops in the DAG.
    * In special cases this makes sense, i.e. when building a complex comparision/update logic.
+   * Recursive inputs are allowed in the same Action if the DataObject implements TransactionalSparkTableDataObject.
+   * For special cases this is to restrictive. To allow special DataObjects for recursive use within two different actions,
+   * see also [[GlobalConfig.allowAsRecursiveInput]].
    *
-   * Usage: add DataObjects used as Output and Input as outputIds and recursiveInputIds, but not as inputIds.
+   * Usage: add DataObjects that are used both as Output and Input as outputIds and recursiveInputIds, but do not add them as inputIds.
    */
   def recursiveInputs: Seq[DataObject] = Seq()
 
@@ -104,6 +106,8 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
 
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 
+  def agentId: Option[AgentId] = None
+
   /**
    * Validate configuration.
    * Put validation logic here which will run on class instantiation. It has to be put into a separate method because like that
@@ -112,9 +116,14 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * This must be called by every Action in initialization code of the case class.
    */
   def validateConfig(): Unit = {
-    recursiveInputs.foreach{ input =>
-      assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action.")
-      assert(input.isInstanceOf[TransactionalSparkTableDataObject], s"($id) Recursive input ${input.id} is not a TransactionalSparkTableDataObjects.")
+    recursiveInputs.foreach { input =>
+      if (outputs.exists(_.id == input.id)) {
+        assert(input.isInstanceOf[TransactionalTableDataObject], s"($id) Recursive input ${input.id} is listed in outputIds but is not a TransactionalTableDataObject.")
+      } else if (Environment.globalConfig.allowAsRecursiveInput.contains(input.id)) {
+        logger.info(s"($id) Using ${input.id} as recursive input even though it is not listed in outputIds of the same Action, but in globalConfig.allowAsRecursiveInput")
+      } else {
+        assert(outputs.exists(_.id == input.id), s"($id) Recursive input ${input.id} is not listed in outputIds of the same action. If you're sure about this, mark it as exception in globalConfig.allowAsRecursiveInput.")
+      }
     }
   }
 
@@ -290,7 +299,11 @@ private[smartdatalake] trait Action extends SdlConfigObject with ParsableFromCon
    * Handle class cast exception when getting objects from instance registry
    */
   private def getDataObject[T <: DataObject](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val dataObject = registry.get[T](dataObjectId)
+    val dataObject = try {
+      registry.get[T](dataObjectId)
+    } catch {
+      case _: NoSuchElementException => throw new NoSuchElementException(s"key not found in instance registry for $role: $dataObjectId")
+    }
     try {
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
       ct.runtimeClass.cast(dataObject).asInstanceOf[T]

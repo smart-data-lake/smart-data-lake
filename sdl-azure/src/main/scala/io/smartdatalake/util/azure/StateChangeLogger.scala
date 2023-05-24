@@ -19,127 +19,118 @@
 
 package io.smartdatalake.util.azure
 
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase}
-import io.smartdatalake.workflow.action.ResultRuntimeInfo
-import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import io.smartdatalake.app.StateListener
-import com.google.gson.Gson
-import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
-import io.smartdatalake.util.secrets.SecretsUtil
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.util.misc.ProductUtil.attributesWithValuesForCaseClass
+import io.smartdatalake.util.misc.ScalaUtil.{optionalizeMap, optionalizeSeq}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.RuntimeInfo
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
+import org.json4s.jackson.Serialization
+import org.json4s.{Formats, NoTypeHints}
 
 import java.time.LocalDateTime
 
 /**
- * usage:
- * in global config section, integrate the following:
+ * Log state changes to LogAnalytics workspace.
+ * Supports LogAnalyticsIngestionBackend and the older LogAnalyticsHttpCollectorBackend by defining corresponding configuration as options.
  *
- *        stateListeners = [
- *         { className = "io.smartdatalake.util.azure.StateChangeLogger"
- *           options = { workspaceID : "xxx",    // Workspace ID found under azure log analytics workspace's 'agents management' section
- *                       logAnalyticsKey : "xxx",   // primary or secondary key found under azure log analytics workspace's 'agents management' section
- *                        logType : "__yourLogType__"} }
- *        ]
+ * To enable add the state listener as follows to global config section:
+ *
+ * stateListeners = [{
+ * className = "io.smartdatalake.util.azure.StateChangeLogger"
+ * options = {
+ *   endpoint: "https://....switzerlandnorth-1.ingest.monitor.azure.com"
+ *   ruleId: "dcr-..."
+ *   streamName: "Custom-sdlb-log"
+ *   includeMetadata: "true" # optionally disable logging data object metadata
+ * }
+ * }]
  */
-class StateChangeLogger(options: Map[String,String]) extends StateListener with SmartDataLakeLogger {
+class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListener with SmartDataLakeLogger {
 
-  assert(options.contains("workspaceID"))
-  assert(options.contains("logAnalyticsKey"))
+  val includeMetadata = options.get("includeMetadata").map(_.resolve().toBoolean).getOrElse(false)
+  val batchSize = 100 // azure log analytics' limit
 
-  val logType : String = options.getOrElse("logType", "StateChange")
-  val maxDocumentsNumber = 100   // azure log analytics' limit
+  val backend: LogAnalyticsBackend[StateLogEvent] = if (options.isDefinedAt("workspaceId")) {
+    // LogAnalyticsHttpCollectorBackend
+    val workspaceId =  options.getOrElse("workspaceID", throw new ConfigurationException(s"Option workspaceID needed for ${this.getClass.getSimpleName}")).resolve()
+    val workspaceKey = options.getOrElse("workspaceKey", throw new ConfigurationException(s"Option workspaceKey needed for ${this.getClass.getSimpleName}")).resolve()
+    val logType = options.get("logType").map(_.resolve()).getOrElse("sdlb_state")
+    new LogAnalyticsHttpCollectorBackend[StateLogEvent](workspaceId, workspaceKey, logType, serialize)
+  } else if (options.isDefinedAt("endpoint")) {
+    // LogAnalyticsIngestionBackend
+    val endpoint =  options.getOrElse("endpoint", throw new ConfigurationException(s"Option endpoint needed for ${this.getClass.getSimpleName}")).resolve()
+    val ruleId =  options.getOrElse("ruleId", throw new ConfigurationException(s"Option ruleId needed for ${this.getClass.getSimpleName}")).resolve()
+    val streamName =  options.getOrElse("streamName", throw new ConfigurationException(s"Option streamName needed for ${this.getClass.getSimpleName}")).resolve()
+    val batchSize =  options.get("batchSize").map(_.resolve().toInt).getOrElse(100)
+    new LogAnalyticsIngestionBackend[StateLogEvent](endpoint, ruleId, streamName, batchSize, serialize)
+  } else throw new ConfigurationException("Configuration options missing for LogAnalyticsHttpCollectorBackend or LogAnalyticsIngestionBackend")
 
-  lazy private val logAnalyticsKey: String = SecretsUtil.getSecret(options("logAnalyticsKey"))
-  lazy private val azureLogClient = new LogAnalyticsClient(options("workspaceID"), logAnalyticsKey)
+  implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
-  override def init(): Unit = {
-    logger.debug(s"io.smartdatalake.util.log.StateChangeLogger init done, " +
-                 s"logType: $logType, key: _${logAnalyticsKey.substring(0,4)} .. ${logAnalyticsKey.substring(logAnalyticsKey.length-4)}_ ")
+  override def init(context: ActionPipelineContext): Unit = {
+    logger.debug(s"initialized")
   }
 
-  case class StateLogEventContext(thread: String, notificationTime: String, application: String, executionId: String, phase: String, actionId: String, state: String, message: String)
-  case class TargetObjectMetadata(name: String, layer: String, subjectArea: String, description: String)
-  case class Result(targetObjectMetadata: TargetObjectMetadata, recordsWritten: String, stageDuration: String)
-  case class StateLogEvent(context: StateLogEventContext, result: Result)
-
-  private val gson = new Gson
-
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, oChangedActionId : Option[ActionId]): Unit = {
-
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
+    val logContext = StateLogEventContext.from(context, state.isFinal)
     if (state.isFinal) {
-      sendLogEvents(state.actionsState.flatMap { aStateEntry => extractLogEvents(aStateEntry._1, aStateEntry._2, context) }.toSeq)
+      val events = state.actionsState.flatMap { case (actionId, runtimeInfo) =>
+        extractLogEvents(actionId, runtimeInfo, logContext, context.instanceRegistry)
+      }.toSeq
+      sendLogEvents(events)
     }
-    else if (oChangedActionId.isDefined)
-    {
-      val changedActionId = oChangedActionId.get
-      assert(state.actionsState.get(changedActionId).isDefined)
-
-      sendLogEvents(extractLogEvents(changedActionId, state.actionsState(changedActionId), context))
+    else if (changedActionId.isDefined) {
+      val changedActionState = state.actionsState.getOrElse(changedActionId.get, throw new IllegalStateException(s"changed $changedActionId not found in state!"))
+      val logEvents = extractLogEvents(changedActionId.get, changedActionState, logContext, context.instanceRegistry)
+      sendLogEvents(logEvents)
     }
   }
 
-  def extractLogEvents(actionId: ActionId, runtimeInfo: RuntimeInfo, context: ActionPipelineContext): Seq[StateLogEvent] = {
-
-    val notificationTime = LocalDateTime.now
-
-    val logContext = StateLogEventContext(Thread.currentThread().getName,
-      notificationTime.toString,
-      application = context.application,
-      executionId = runtimeInfo.executionId.toString,
-      phase = context.phase.toString,
-      actionId = actionId.toString,
-      state = runtimeInfo.state.toString,
-      message = runtimeInfo.msg.getOrElse(" no message"))
-
-    val optResults = {   // we generate at least one log entry, and one log entry per result
-      if (runtimeInfo.results.nonEmpty) runtimeInfo.results.map({result : ResultRuntimeInfo => Some(result)})
-      else Seq(None)
+  def extractLogEvents(actionId: ActionId, runtimeInfo: RuntimeInfo, logContext: StateLogEventContext, instanceRegistry: InstanceRegistry): Seq[StateLogEvent] = {
+    val results = runtimeInfo.results.map {
+      result =>
+        val metadata = instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
+        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").mapValues(_.toString)
+        else Map()
+        val dataObjectsState = runtimeInfo.dataObjectsState.find(_.dataObjectId == result.subFeed.dataObjectId).map(_.state)
+        StateLogEvent(logContext, actionId.id, runtimeInfo.state.toString, runtimeInfo.msg,
+          Some(result.subFeed.dataObjectId.id), optionalizeMap(metadataMap), optionalizeMap(result.mainMetrics), optionalizeSeq(result.subFeed.partitionValues.map(_.toString)), dataObjectsState)
     }
-    optResults.map(optResult => {
-      val result = optResult.map(
-        {result : ResultRuntimeInfo =>
-
-          val toMetadata = {
-            val metadata = context.instanceRegistry.get[DataObject](result.subFeed.dataObjectId).metadata
-            def extractString(attribute: DataObjectMetadata => Option[String]) = metadata.map(attribute(_).getOrElse("")).getOrElse("")
-
-            TargetObjectMetadata(name = extractString(_.name),
-              layer = extractString(_.layer),
-              subjectArea = extractString(_.subjectArea),
-              description = extractString(_.description))
-          }
-
-          Result(toMetadata, result.mainMetrics.getOrElse("records_written", -1).toString, result.mainMetrics.getOrElse("stage_duration", -1).toString)
-        })
-
-      StateLogEvent(logContext, result.orNull)
-    })
+    // generate at least one log entry per Action if no results
+    if (results.nonEmpty) results
+    else Seq(StateLogEvent(logContext, actionId.id, runtimeInfo.state.toString, runtimeInfo.msg))
   }
 
-  private def sendLogEvents(logEvents: Seq[StateLogEvent]) : Unit =
-  {
-
-    val (list_of_list, last_list) : (List[List[StateLogEvent]], List[StateLogEvent]) =
-      logEvents.foldLeft((List[List[StateLogEvent]](), List[StateLogEvent]()))  // build batches of maxDocumentsNumber entries
-      { (accumulator, stateLogEvent) =>
-        val (outputDone, outputOngoing) = accumulator
-
-        if (outputOngoing.size >= maxDocumentsNumber)
-          (outputDone :+ outputOngoing, List[StateLogEvent](stateLogEvent))
-        else
-          (outputDone, outputOngoing :+ stateLogEvent)
-      }
-
-    val full_list = list_of_list :+ last_list
-    full_list.foreach // and then handle each batch separately
-    {
+  private def sendLogEvents(logEvents: Seq[StateLogEvent]): Unit = {
+    logEvents.grouped(batchSize).foreach {
       logEvents =>
-        val jsonEvents = logEvents.map{le:StateLogEvent => gson.toJson(le)}.mkString(",")
-        logger.debug("logType " + logType+ " sending: " + jsonEvents.toString())
-        azureLogClient.send("[ " + jsonEvents + " ]", logType)
+        backend.send(logEvents)
     }
     logger.debug("sending completed")
   }
+
+  private def serialize(event: StateLogEvent): String = Serialization.write(event)
 }
+
+case class StateLogEventContext(application: String, startTime: LocalDateTime, runId: Int, attemptId: Int, phase: String, isFinal: Boolean)
+
+object StateLogEventContext {
+  def from(context: ActionPipelineContext, isFinal: Boolean): StateLogEventContext = {
+    StateLogEventContext(
+      application = context.application,
+      startTime = context.runStartTime,
+      runId = context.executionId.runId,
+      attemptId = context.executionId.attemptId,
+      phase = context.phase.toString,
+      isFinal = isFinal
+    )
+  }
+}
+
+case class StateLogEvent(context: StateLogEventContext, actionId: String, state: String, msg: Option[String], dataObjectId: Option[String] = None, metadata: Option[Map[String, String]] = None, metrics: Option[Map[String, Any]] = None, partitionValues: Option[Seq[String]] = None, dataObjectsState: Option[String] = None)
+

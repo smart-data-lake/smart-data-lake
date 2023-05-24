@@ -22,7 +22,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 
-private[smartdatalake] trait FileTransfer {
+import scala.util.matching.Regex
+
+trait FileTransfer {
 
   protected val srcDO: FileRefDataObject
   protected val tgtDO: FileRefDataObject
@@ -32,8 +34,8 @@ private[smartdatalake] trait FileTransfer {
    * @param fileRefs files to be transferred
    * @return target files which will be created when file transfer is executed
    */
-  def getFileRefMapping(fileRefs: Seq[FileRef])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
-    tgtDO.translateFileRefs(fileRefs)
+  def getFileRefMapping(fileRefs: Seq[FileRef], filenameExtractorRegex: Option[Regex] = None)(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
+    tgtDO.translateFileRefs(fileRefs, filenameExtractorRegex)
   }
 
   /**
@@ -42,17 +44,4 @@ private[smartdatalake] trait FileTransfer {
    */
   def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit
 
-}
-
-/**
- * Factory for FileTransfer's.
- * For now we can do everything with the StreamFileTransfer.
- */
-private[smartdatalake] object FileTransfer {
-  def apply( srcDO: DataObject, tgtDO: DataObject, overwrite: Boolean): FileTransfer = {
-    (srcDO, tgtDO) match {
-      case (inputDO: FileRefDataObject with CanCreateInputStream, outputDO: FileRefDataObject with CanCreateOutputStream) => new StreamFileTransfer(inputDO, outputDO, overwrite)
-      case x => throw new IllegalStateException(s"Unmatched case $x")
-    }
-  }
 }

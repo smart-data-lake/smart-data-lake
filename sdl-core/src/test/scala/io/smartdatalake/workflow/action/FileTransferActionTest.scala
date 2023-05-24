@@ -18,17 +18,17 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.nio.file.Files
-
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import java.nio.file.{Files, Path => NioPath}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{BasicAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.executionMode.FileIncrementalMoveMode
-import io.smartdatalake.workflow.connection.SftpFileRefConnection
+import io.smartdatalake.workflow.connection.SFtpFileRefConnection
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.sshd.server.SshServer
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
@@ -36,9 +36,6 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
-
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
@@ -58,7 +55,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode("CLEAR#"+sshUser, "CLEAR#"+sshPwd), ignoreHostKeyVerification = true))
+    instanceRegistry.register(SFtpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshUser))), ignoreHostKeyVerification = true))
   }
 
   test("copy file from sftp to hadoop without partitions") {

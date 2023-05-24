@@ -43,7 +43,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Implementation of logic needed for Spark Actions.
  * This is a generic implementation that supports many input and output SubFeeds.
  */
-private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] {
+abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
   override def outputs: Seq[DataObject with CanWriteDataFrame]
@@ -179,7 +179,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
         if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
           context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
         // process subfeed
-        if (phase==ExecutionPhase.Exec) {
+        if (phase==ExecutionPhase.Exec || context.simulation) {
           // check if dataFrame must be created
           if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
             // validate partition values existing for input
@@ -294,9 +294,9 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     WriteSubFeedResult(outputSubFeed, noData)
     // get expectations metrics and check violations
     output match {
-      case evDataObject: DataObject with ExpectationValidation =>
+      case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
-        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, subFeed.partitionValues, scopeJobExpectationMetrics)
+        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
         WriteSubFeedResult(outputSubFeed, noData, Some(metrics))
       case _ =>
         WriteSubFeedResult(outputSubFeed, noData)
@@ -385,7 +385,7 @@ private[smartdatalake] abstract class DataFrameActionImpl extends ActionSubFeeds
     }
     // create output subfeeds from transformed dataframes
     outputSubFeeds.map { subFeed=>
-        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available tesults are ${outputDfsMap.keys.mkString(", ")}."))
+        val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDfsMap.keys.mkString(", ")}."))
         subFeed.withDataFrame(Some(df))
     }
   }

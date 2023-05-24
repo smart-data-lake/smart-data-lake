@@ -6,9 +6,16 @@ on:
       - 'master-spark*'
     types: [closed]
 
+  # allow for manual releases from hotfix branches
+  # the version to create needs to be set correctly in all pom.xml files, e.g. by using `mvn versions:set -DnewVersion=x.y.z`
+  # then a normal release is created including tag, but without increasing version number on original branch
+  workflow_dispatch:
+    branches:
+      - 'hotfix/*'
+
 jobs:
-  build-release:
-    if: github.event.pull_request.merged == true
+  deploy-release:
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
 
     runs-on: ubuntu-latest
 
@@ -78,8 +85,24 @@ jobs:
         git push origin # push commits
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
         git push origin ${MVN_RELEASE_VERSION} # push tag
+
+    - name: Push sdl-schema.json to documentation branch
+      run: |
+        git fetch origin documentation
+        git checkout documentation
+        # note that sdl-schema.json should be available in the location below from the previous maven build.
+        mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
+        git add static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
+        git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_RELEASE_VERSION}.json" # only if there is something to commit
+        git push        
         
-    # DEVELOP BRANCH
+  update-snapshot-version:
+    needs: deploy-release
+    if: github.event_name != 'workflow_dispatch'
+
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Develop Git Checkout
       run: |
         git fetch origin ${GITHUB_HEAD_REF}
@@ -106,13 +129,3 @@ jobs:
       run: |
         git push
 
-    # DOCUMENTATION BRANCH
-    - name: Push sdl-schema.json to documentation branch
-      run: |
-        git fetch origin documentation
-        git checkout documentation
-        # note that sdl-schema.json should be available in the location below from the previous maven build.
-        mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
-        git add static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
-        git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_RELEASE_VERSION}.json" # only if there is something to commit
-        git push

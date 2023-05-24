@@ -27,7 +27,6 @@ import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, Runtime
 import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read, writePretty}
 import org.reflections.Reflections
 
@@ -70,6 +69,7 @@ case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, 
 }
 case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def getEntry: (DataObjectId, DataObjectState) = (dataObjectId, this)
+  def toStringTuple: (String,String) = (dataObjectId.id, state)
 }
 
 private[smartdatalake] object ActionDAGRunState {

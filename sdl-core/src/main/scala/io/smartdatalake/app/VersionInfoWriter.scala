@@ -20,8 +20,8 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.app.BuildVersionInfo.buildVersionInfoFilename
-import io.smartdatalake.config.{ConfigLoader, ConfigToolbox, ConfigurationException, InstanceRegistry}
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, TryWithRessource}
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResource}
 import scopt.OptionParser
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
@@ -83,7 +83,7 @@ case class BuildVersionInfo(version: String, user: String, date: LocalDateTime) 
     props.setProperty("version", version)
     props.setProperty("user", user)
     props.setProperty("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-    TryWithRessource.exec(Files.newOutputStream(Paths.get(versionInfoFile), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+    WithResource.exec(Files.newOutputStream(Paths.get(versionInfoFile), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
       os => props.store(os, "")
     }
   }
@@ -106,13 +106,13 @@ object BuildVersionInfo extends SmartDataLakeLogger {
    * Read the SDLB version info properties from the corresponding classpath resource.
    * @return: version, user, date
    */
-  private[smartdatalake] def readBuildVersionInfo: Option[BuildVersionInfo] = {
+  def readBuildVersionInfo: Option[BuildVersionInfo] = {
     val resourceStream = Thread.currentThread().getContextClassLoader.getResourceAsStream(buildVersionInfoFilename)
     if (resourceStream == null) {
       logger.warn(s"Could not find resource $buildVersionInfoFilename")
       None
     } else {
-      TryWithRessource.exec(resourceStream) {
+      WithResource.exec(resourceStream) {
         stream =>
           val props = new Properties()
           props.load(stream)

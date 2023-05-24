@@ -53,13 +53,12 @@ public class LogAnalyticsClient implements Closeable {
     private static final String DEFAULT_URL_SUFFIX = "ods.opinsights.azure.com";
     private static final String DEFAULT_API_VERSION = "2016-04-01";
     private static final String URL_FORMAT = "https://%s.%s/api/logs?api-version=%s";
-    private static final String RESOURCE_ID =
-        "/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s";
+    private static final String RESOURCE_ID = "/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s";
 
     @Override
     public void close() throws IOException {
         if (this.httpClient instanceof Closeable) {
-            ((Closeable)this.httpClient).close();
+            ((Closeable) this.httpClient).close();
         }
     }
 
@@ -84,17 +83,17 @@ public class LogAnalyticsClient implements Closeable {
     }
 
     public LogAnalyticsClient(String workspaceId, String workspaceKey,
-                               HttpClient httpClient) {
+                              HttpClient httpClient) {
         this(workspaceId, workspaceKey, httpClient, DEFAULT_URL_SUFFIX);
     }
 
     public LogAnalyticsClient(String workspaceId, String workspaceKey,
-                               HttpClient httpClient, String urlSuffix) {
+                              HttpClient httpClient, String urlSuffix) {
         this(workspaceId, workspaceKey, httpClient, urlSuffix, DEFAULT_API_VERSION);
     }
 
     public LogAnalyticsClient(String workspaceId, String workspaceKey,
-                               HttpClient httpClient, String urlSuffix, String apiVersion) {
+                              HttpClient httpClient, String urlSuffix, String apiVersion) {
         if (isNullOrWhitespace(workspaceId)) {
             throw new IllegalArgumentException("workspaceId cannot be null, empty, or only whitespace");
         }
@@ -141,8 +140,7 @@ public class LogAnalyticsClient implements Closeable {
 
             final Date xmsDate = Calendar.getInstance().getTime();
 
-            SimpleDateFormat dateFormat = new SimpleDateFormat(
-                    "EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
+            SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
             dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
             String xmsDateString = dateFormat.format(xmsDate);
 
@@ -180,7 +178,7 @@ public class LogAnalyticsClient implements Closeable {
                 }
             } finally {
                 if (httpResponse instanceof Closeable) {
-                    ((Closeable)httpResponse).close();
+                    ((Closeable) httpResponse).close();
                 }
             }
         } catch (Exception ex) {
@@ -230,8 +228,8 @@ public class LogAnalyticsClient implements Closeable {
     }
 
     /**
-     * Gets the value of a System.getenv call or null if it is not set or
-     * if the length is 0.
+     * Gets the value of a System.getenv call or null if it is not set or if the length is 0.
+     *
      * @param key System environment variable.
      * @return value of System.getenv(key) or null.
      */
@@ -245,6 +243,7 @@ public class LogAnalyticsClient implements Closeable {
 
     /**
      * Gets Azure Resource Id from System Environment variables.
+     *
      * @return ResourceId in the form of:
      * /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
      */
@@ -261,8 +260,8 @@ public class LogAnalyticsClient implements Closeable {
         String type = sysEnvOrNull(AZ_RSRC_TYPE);
         String name = sysEnvOrNull(AZ_RSRC_NAME);
         if (id == null || grpName == null ||
-            provName == null || type == provName ||
-            name == null) {
+                provName == null || type == provName ||
+                name == null) {
             return null;
         }
         return String.format(RESOURCE_ID, id, grpName, provName, type, name);

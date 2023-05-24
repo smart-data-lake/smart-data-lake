@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.nio.file.Files
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
@@ -30,6 +28,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
+import java.nio.file.Files
 import scala.collection.mutable._
 
 class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAndAfter with SmartDataLakeLogger {

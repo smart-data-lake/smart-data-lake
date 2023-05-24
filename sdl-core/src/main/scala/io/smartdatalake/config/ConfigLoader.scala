@@ -24,11 +24,11 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 
-import java.io.{InputStreamReader, Reader}
+import java.io.{FileNotFoundException, InputStreamReader, Reader}
 import scala.util.{Failure, Success, Try}
 
 object ConfigLoader extends SmartDataLakeLogger {
@@ -91,10 +91,22 @@ object ConfigLoader extends SmartDataLakeLogger {
     val hadoopConf: Configuration = new Configuration() // note that we could not yet load additional hadoop/spark configurations set in the configuration files
 
     // Search locations for config files
-    val configFiles = hadoopPaths.flatMap(
-      location => if (ClasspathConfigFile.canHandleScheme(location)) Seq(ClasspathConfigFile(location))
-      else getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+    val configFiles = hadoopPaths.flatMap( location =>
+        if (ResourceUtil.canHandleScheme(location)) {
+          Seq(ClasspathConfigFile(location))
+        }
+        else
+          try {
+            val files = getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+            if (files.isEmpty){
+              throw ConfigurationException(s"The provided directory path ${location.toUri.getPath} does not contain any valid config files")
+            }
+            files
+          } catch {
+            case exception: FileNotFoundException => throw ConfigurationException(s"The provided config file does not exist or the provided directory is empty:  ${location.toUri.getPath}", None, exception)
+         }
     )
+
     if (configFiles.isEmpty) throw ConfigurationException(s"No configuration files found in ${hadoopPaths.mkString(", ")}. " +
       s"Ensure the configuration files have one of the following extensions: ${configFileExtensions.map(ext => s".$ext").mkString(", ")}")
 
@@ -141,7 +153,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    * Merge configurations such that configurations earlier in the list overwrite configurations at the end of the list.
    *
    * @param configs a list of [[Config]]s sorted according to their priority
-   * @return        a merged [[Config]].
+   * @return a merged [[Config]].
    */
   private def mergeConfigs(configs: Seq[Config]): Config = {
     configs.reduceLeft((c1, c2) => c1.withFallback(c2))
@@ -176,7 +188,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    * @return     a BFS ordered config file list.
    */
   private def getFilesInBfsOrder(path: Path)(implicit fs: FileSystem): Seq[ConfigFile] = {
-    if (fs.isDirectory(path)) {
+    if (fs.getFileStatus(path).isDirectory) {
       Try(RemoteIteratorWrapper(fs.listStatusIterator(path))) match {
         case Failure(exception) =>
           logger.warn(s"Failed to list directory content of ${path.toString}.", exception)
@@ -188,7 +200,7 @@ object ConfigLoader extends SmartDataLakeLogger {
             .partition(_.isDirectory)
           (files ++ directories).flatMap(p => getFilesInBfsOrder(p.getPath)).toSeq
       }
-    } else if (fs.isFile(path) && ConfigFile.canHandleExtension(path)) {
+    } else if (fs.getFileStatus(path).isFile && ConfigFile.canHandleExtension(path)) {
       if (path.getName.contains("log4j")) {
         logger.debug(s"Ignoring log4j configuration file '$path'.")
         Seq()
@@ -209,15 +221,11 @@ object ConfigLoader extends SmartDataLakeLogger {
   private case class ClasspathConfigFile(override val path: Path) extends ConfigFile {
     postConstruct(ConfigParseOptions.defaults())
     override def reader: InputStreamReader = {
-      val resource = path.toUri.getPath
-      val inputStream = Option(getClass.getResourceAsStream(resource))
-        .getOrElse(throw ConfigurationException(s"Could not find resource $resource in classpath"))
+      val inputStream = ResourceUtil.readResource(path)
       new InputStreamReader(inputStream)
     }
   }
-  private object ClasspathConfigFile {
-    def canHandleScheme(path: Path): Boolean = path.toUri.getScheme == "cp"
-  }
+
   private trait ConfigFile extends Parseable {
     def path: Path
     lazy val extension: String = ConfigFile.getExtension(path)

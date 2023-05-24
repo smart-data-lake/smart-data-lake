@@ -19,7 +19,7 @@
 
 package io.smartdatalake.util.json
 
-import io.smartdatalake.util.misc.TryWithRessource
+import io.smartdatalake.util.misc.WithResource
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
@@ -32,34 +32,29 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
 
   val expectedStruct = StructType(Array(
     StructField("object", StructType(Array(
-      StructField("item1", StringType, nullable = false),
-      StructField("item2", StringType, nullable = false)
-    )), nullable = false),
+      StructField("item1", StringType),
+      StructField("item2", StringType)
+    ))),
     StructField("array", ArrayType(StructType(Array(
-      StructField("itemProperty1", StringType, nullable = false),
-      StructField("itemProperty2", DoubleType, nullable = false)
-    )), containsNull = false), nullable = false),
+      StructField("itemProperty1", StringType),
+      StructField("itemProperty2", DoubleType)
+    )), containsNull = false)),
     StructField("structure", StructType(Array(
       StructField("nestedArray", ArrayType(StructType(Array(
-        StructField("key", StringType, nullable = false),
-        StructField("value", LongType, nullable = false)
-      )), containsNull = false), nullable = false)
-    )), nullable = false),
-    StructField("integer", LongType, nullable = false),
-    StructField("string", StringType, nullable = false),
-    StructField("number", DoubleType, nullable = false),
-    StructField("float", FloatType, nullable = false),
-    StructField("nullable", DoubleType, nullable = true),
-    StructField("boolean", BooleanType, nullable = false),
-    StructField("additionalProperty", StringType, nullable = false)
+        StructField("key", StringType),
+        StructField("value", LongType)
+      )), containsNull = false))
+    ))),
+    StructField("integer", LongType),
+    StructField("string", StringType),
+    StructField("number", DoubleType),
+    StructField("floatRequired", FloatType, nullable = false),
+    StructField("nullable", DoubleType),
+    StructField("booleanWithComment", BooleanType).withComment("todo"),
+    StructField("additionalProperty", StringType)
   ))
 
   test("should convert schema.json into spark StructType") {
-    val testSchema = SchemaConverter.convertStrict(getTestResourceContent("/jsonSchema/testJsonSchema.json"))
-    assert(testSchema === expectedStruct)
-  }
-
-  test("should convert schema.json content into spark StructType") {
     val testSchema = SchemaConverter.convertStrict(getTestResourceContent("/jsonSchema/testJsonSchema.json"))
     assert(testSchema === expectedStruct)
   }
@@ -94,14 +89,15 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
           "type": "object",
           "properties": {
             "address": {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": true
             }
           }
         }
       """
     )
     val expected = StructType(Array(
-      StructField("address", StructType(Seq.empty), nullable = false)
+      StructField("address", MapType(StringType,StringType), nullable = true)
     ))
 
     assert(schema === expected)
@@ -134,7 +130,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
         """
         )
         val expected = StructType(Array(
-          StructField("array", ArrayType(datatype, containsNull = false), nullable = false)
+          StructField("array", ArrayType(datatype, containsNull = false), nullable = true)
         ))
 
         assert(schema === expected)
@@ -163,7 +159,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
         """
     )
     val expected = StructType(Array(
-      StructField("array", ArrayType(ArrayType(StringType, containsNull = false), containsNull = false), nullable = false)
+      StructField("array", ArrayType(ArrayType(StringType, containsNull = false), containsNull = false), nullable = true)
     ))
 
     assert(schema === expected)
@@ -180,7 +176,8 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
               "array" : {
                 "type" : "array",
                 "items": {
-                  "type": "object"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
@@ -188,7 +185,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
         """
     )
     val expected = StructType(Array(
-      StructField("array", ArrayType(StructType(Seq.empty), containsNull = false), nullable = false)
+      StructField("array", ArrayType(MapType(StringType, StringType), containsNull = false), nullable = true)
     ))
 
     assert(schema === expected)
@@ -218,7 +215,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
         """
     )
     val expected = StructType(Array(
-      StructField("array", ArrayType(StructType(Seq(StructField("name", StringType, nullable = false))), containsNull = false), nullable = false)
+      StructField("array", ArrayType(StructType(Seq(StructField("name", StringType, nullable = true))), containsNull = false), nullable = true)
     ))
 
     assert(schema === expected)
@@ -226,7 +223,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
 
   test("Array of unknown type should fail") {
 
-    assertThrows[IllegalArgumentException] {
+    assertThrows[IllegalStateException] {
       val schema = SchemaConverter.convertStrict(
         """
           {
@@ -244,25 +241,66 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
     }
   }
 
-  test("Array of various type should fail") {
-    assertThrows[IllegalArgumentException] {
-      val schema = SchemaConverter.convertStrict(
-        """
-          {
-            "$$schema": "smallTestSchema",
-            "type": "object",
-            "properties": {
-              "array" : {
-                "type" : "array",
-                "items" : {
-                  "type" : ["string", "integer"]
-                }
+  test("Array of various type should be merged") {
+    val schema = SchemaConverter.convertStrict(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "type": "object",
+          "properties": {
+            "array" : {
+              "type" : "array",
+              "items" : {
+                "type" : ["string", "integer"]
               }
             }
           }
-        """
-      )
-    }
+        }
+      """
+    )
+    val expected = StructType(Array(
+      StructField("array", ArrayType(StringType, containsNull = false), nullable = true)
+    ))
+
+    assert(schema === expected)
+  }
+
+  test("Array of various object type should be merged") {
+    val schema = SchemaConverter.convertStrict(
+      """
+      {
+        "$$schema": "smallTestSchema",
+        "type": "object",
+        "properties": {
+          "array" : {
+            "type" : "array",
+            "items" : {
+              "type" : [{
+                  "type": "object",
+                  "properties" : {
+                    "prop1" : {
+                      "type" : "string"
+                    }
+                  }
+                }, {
+                  "type": "object",
+                  "properties" : {
+                    "prop2" : {
+                      "type" : "string"
+                    }
+                  }
+                }]
+            }
+          }
+        }
+      }
+    """
+    )
+    val expected = StructType(Array(
+      StructField("array", ArrayType(StructType(Seq(StructField("prop1",StringType),StructField("prop2",StringType))), containsNull = false), nullable = true)
+    ))
+
+    assert(schema === expected)
   }
 
   test("Array of nullable type should be an array of nullable type") {
@@ -293,7 +331,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
         )
 
         val expected = StructType(Array(
-          StructField("array", ArrayType(atype, containsNull = true), nullable = false)
+          StructField("array", ArrayType(atype, containsNull = true))
         ))
 
         assert(schema === expected)
@@ -319,7 +357,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
     )
 
     val expected = StructType(Array(
-      StructField("array", ArrayType(StringType, containsNull = false), nullable = false)
+      StructField("array", ArrayType(StringType, containsNull = false))
     ))
 
     assert(schema === expected)
@@ -340,7 +378,8 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
                     "prop" : {
                       "type" : "string"
                     }
-                  }
+                  },
+                  "required": ["prop"]
                 }
               }
             }
@@ -351,7 +390,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
     val expected = StructType(Array(
       StructField("array", ArrayType(
         StructType(Seq(StructField("prop", StringType, nullable = false))), containsNull = true
-      ), nullable = false)
+      ))
     ))
 
     assert(schema === expected)
@@ -411,7 +450,9 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
               "prop" : {
                 "type" : ["integer", "float"]
               }
-            }
+            },
+            "required": ["prop"],
+            "additionalProperties": false
           }
         """
     )
@@ -459,11 +500,40 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
     }
   }
 
+
+  test("Object with oneOf type should be merged") {
+    val schema = SchemaConverter.convertStrict(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "oneOf": [{
+            "type": "object",
+            "properties" : {
+              "prop1" : {
+                "type" : "string"
+              }
+            }
+          }, {
+            "type": "object",
+            "properties" : {
+              "prop2" : {
+                "type" : "string"
+              }
+            },
+            "required": ["prop2"]
+          }]
+        }
+      """
+    )
+    val expected = StructType(Seq(StructField("prop1", StringType), StructField("prop2", StringType)))
+
+    assert(schema === expected)
+  }
+
   def getTestResourceContent(relativePath: String): String = {
     Option(getClass.getResource(relativePath)) match {
-      case Some(relPath) => TryWithRessource.exec(Source.fromURL(relPath))(_.mkString)
+      case Some(relPath) => WithResource.exec(Source.fromURL(relPath))(_.mkString)
       case None => throw new IllegalArgumentException(s"Path can not be reached: $relativePath")
     }
   }
-
 }

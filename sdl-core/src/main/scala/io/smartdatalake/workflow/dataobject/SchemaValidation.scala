@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.SchemaViolationException
 /**
  * A [[DataObject]] that allows for optional schema validation on read and on write.
  */
-private[smartdatalake] trait SchemaValidation { this: DataObject =>
+trait SchemaValidation { this: DataObject =>
 
   /**
    * An optional, minimal schema that a [[DataObject]] schema must have to pass schema validation.

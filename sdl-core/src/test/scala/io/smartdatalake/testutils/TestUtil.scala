@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, defaultPersistDf}
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
@@ -57,10 +58,10 @@ import scala.util.Try
  */
 object TestUtil extends SmartDataLakeLogger {
 
-  def sparkSessionBuilder(withHive : Boolean = false, additionalSparkProperties: Map[String,String] = Map()) : SparkSession.Builder = {
+  def sparkSessionBuilder(withHive : Boolean = false, additionalSparkProperties: Map[String,StringOrSecret] = Map()) : SparkSession.Builder = {
     // create builder
     val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
-      case (builder, config) => builder.config(config._1, config._2)
+      case (builder, config) => builder.config(config._1, config._2.resolve())
     }
       .config("hive.exec.dynamic.partition", "true")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
@@ -83,6 +84,9 @@ object TestUtil extends SmartDataLakeLogger {
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     getDefaultActionPipelineContext(sessionHiveCatalog) // initialize with Spark session incl. Hive support
+  }
+  def getDefaultActionPipelineContextWithoutHive(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
+    getDefaultActionPipelineContext(sessionWithoutHive) // initialize with Spark session without Hive support
   }
 
   def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {

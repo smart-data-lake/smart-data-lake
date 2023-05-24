@@ -33,7 +33,7 @@ import java.time.LocalDateTime
 /**
  * Functions for historization
  */
-private[smartdatalake] object Historization extends SmartDataLakeLogger {
+object Historization extends SmartDataLakeLogger {
 
   private[smartdatalake] val historizeHashColName = "dl_hash" // incrementalHistorize adds hash col to target schema for comparing changes
   private[smartdatalake] val historizeOperationColName = "dl_operation" // incrementalHistorize needs operation col for merge statement. It is temporary and is not added to target schema.
@@ -365,7 +365,7 @@ private[smartdatalake] object Historization extends SmartDataLakeLogger {
   }
 }
 
-private[smartdatalake] object HistorizationRecordOperations {
+object HistorizationRecordOperations {
   val updateClose = "updateClose"
   val insertNew = "insertNew"
 }

@@ -20,19 +20,24 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import org.apache.hadoop.security.UserGroupInformation
+import org.apache.spark.SparkEnv
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.util.ChildFirstURLClassLoader
+import org.slf4j.MDC
 
-import java.net.{URL, URLClassLoader}
+import java.net.{InetAddress, URL, URLClassLoader}
+import java.time.LocalDateTime
 import scala.annotation.tailrec
 import scala.util.Try
 
 /**
  * Utilities and conventions to name and validate command line parameters
  */
-private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
+object AppUtil extends SmartDataLakeLogger {
 
   // Kerberos Authentication...
   def authenticate(keytab: String, userAtRealm: String): Unit = {
@@ -44,7 +49,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
   def createSparkSession(name:String, masterOpt: Option[String] = None,
                          deployModeOpt: Option[String] = None,
                          kryoClassNamesOpt: Option[Seq[String]] = None,
-                         sparkOptionsOpt: Map[String,String] = Map(),
+                         sparkOptionsOpt: Map[String,StringOrSecret] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
     logger.info(s"Creating spark session: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive")
@@ -53,7 +58,7 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
     val sessionBuilder = SparkSession.builder()
       .optionalMaster(masterOpt)
       .appName(name)
-      .config("hive.exec.dynamic.partition", true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
+      .config("hive.exec.dynamic.partition", value = true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .optionalConfig( "deploy-mode", deployModeOpt)
@@ -124,11 +129,11 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
         builder.config(key, value.get)
       } else builder
     }
-    def optionalConfigs( options: Map[String,String] ): SparkSession.Builder = {
+    def optionalConfigs( options: Map[String,StringOrSecret] ): SparkSession.Builder = {
       if (options.nonEmpty) {
-        logger.info("Additional sparkOptions: " + options.map{ case (k,v) => createMaskedSecretsKVLog(k,v) }.mkString(", "))
+        logger.info("Additional sparkOptions: " + options.map{ case (k,v) => createMaskedSecretsKVLog(k,v.toString) }.mkString(", "))
         options.foldLeft( builder ){
-          case (sb,(key,value)) => sb.config(key,value)
+          case (sb,(key,value)) => sb.config(key,value.resolve())
         }
       } else builder
     }
@@ -211,4 +216,40 @@ private[smartdatalake] object AppUtil extends SmartDataLakeLogger {
   def getManifestVersion: Option[String] = {
     Option(getClass.getPackage.getImplementationVersion)
   }
+
+  /**
+   * Set SDLB job information in MDC context for logger.
+   * MDC (Mapped Diagnostic Context) allows to make available additional context information to logger layouts.
+   */
+  def setSdlbRunLoggerContext(appConfig: SmartDataLakeBuilderConfig, executionId: Option[SDLExecutionId] = None, runStartTime: Option[LocalDateTime] = None): Unit = {
+    MDC.put(MDC_SDLB_APP, appConfig.appName)
+    executionId.foreach(executionId => MDC.put(MDC_SDLB_RUN_ID, executionId.runId.toString))
+    executionId.foreach(executionId => MDC.put(MDC_SDLB_ATTEMPT_ID, executionId.attemptId.toString))
+    runStartTime.foreach(runStartTime => MDC.put(MDC_SDLB_START_TIME, runStartTime.toString))
+    getMachineContext.foreach{ case (k,v) => MDC.put(k,v)}
+  }
+  def setSdlbRunLoggerContext(context: ActionPipelineContext): Unit = {
+    setSdlbRunLoggerContext(context.appConfig, Some(context.executionId), Some(context.runStartTime))
+  }
+  private final val MDC_SDLB_APP = "app"
+  private final val MDC_SDLB_RUN_ID = "runId"
+  private final val MDC_SDLB_ATTEMPT_ID = "attemptId"
+  private final val MDC_SDLB_START_TIME = "startTime"
+  final val MDC_SDLB_PROPERTIES = Seq(MDC_SDLB_APP, MDC_SDLB_RUN_ID, MDC_SDLB_ATTEMPT_ID, MDC_SDLB_START_TIME)
+  def applySdlbRunLoggerContext(session: SparkSession): Unit = {
+    MDC_SDLB_PROPERTIES.foreach(k => session.sparkContext.setLocalProperty(k,MDC.get(k)))
+  }
+
+  /**
+   * get machine information for logger context.
+   */
+  def getMachineContext: Map[String,String] = {
+    Seq(
+      Option(SparkEnv.get).map(se => (MDC_EXECUTOR_ID, se.executorId)),
+      Some((MDC_HOSTNAME, hostname))
+    ).flatten.toMap
+  }
+  private final val MDC_EXECUTOR_ID = "executorId"
+  private final val MDC_HOSTNAME = "hostname"
+  @transient private lazy val hostname = InetAddress.getLocalHost.getHostName
 }

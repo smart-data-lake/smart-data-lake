@@ -8,9 +8,19 @@ on:
     branches:
       - 'develop-spark*'
     types: [opened, synchronize]
-
+  # allow for manual snapshot releases from bugfix & feature branches
+  # this extracts issue number from branch name as additional attribute in the created version, e.g. <mvnVersion>-<issueNb>-SNAPSHOT
+  workflow_dispatch:
+    inputs:
+      skipBuild:
+        description: 'skip build job'
+        required: false
+        type: boolean
+        default: false
+        
 jobs:
   build:
+    if: ${{ !inputs.skipBuild }}
 
     runs-on: ubuntu-latest
 
@@ -39,19 +49,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: mvn -P scala-2.12,test-sonar -B clean test scoverage:report --file pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
+      run: mvn -P scala-2.12,test-sonar -B clean test scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
     - name: Build with Maven for Scala 2.11, only if on develop-spark2* branch
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2') }}
-      run: mvn -P scala-2.11 -B clean test --file pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
+      run: mvn -P scala-2.11 -B clean test -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
 
   deploy:
     needs: build
-    if: github.event_name == 'push'
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
 
     runs-on: ubuntu-latest
 
@@ -74,6 +84,16 @@ jobs:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
+
+      - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
+        if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
+        run: |
+          MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+          BRANCH_ISSUE_NB_STR=$(echo $GITHUB_REF_NAME | sed -n 's/^.*\(feature\|bugfix\)\/\([0-9]*\).*$/-\2/p')
+          MVN_NEW_VERSION=$(echo $MVN_CURRENT_VERSION | sed -n "s/-SNAPSHOT$/${BRANCH_ISSUE_NB_STR}-SNAPSHOT/p")
+          if [ -z "$MVN_NEW_VERSION" ]; then exit -1; fi
+          echo "setting version to $MVN_NEW_VERSION"
+          mvn versions:set -B -DnewVersion=${MVN_NEW_VERSION} -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.12
         uses: samuelmeuli/action-maven-publish@v1
@@ -98,9 +118,10 @@ jobs:
           maven_args: -B -DskipTests -pl '!.' -f pom.xml
 
       - name: Maven Get Version
-        run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+        run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
 
       - name: Push new sdl-schema.json to documentation branch
+        if: ${{ contains(github.base_ref, 'develop-spark') || contains(github.ref, 'develop-spark')}}
         run: |
           git fetch origin documentation
           git checkout documentation

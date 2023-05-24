@@ -26,7 +26,6 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{DataValidationTransformer, RowLevelValidationRule}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
-import org.apache.spark.sql.functions._
 
 class DataValidationTransformerTest extends FunSuite {
 

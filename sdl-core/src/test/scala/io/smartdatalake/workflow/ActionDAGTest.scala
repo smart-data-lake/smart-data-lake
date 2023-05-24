@@ -21,19 +21,19 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action._
-import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, ExecutionModeFailedException, FailIfNoPartitionValuesMode, PartitionDiffMode, ProcessAllMode, SparkStreamingMode}
+import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -1282,6 +1282,50 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.init
     val results = dag.exec(contextExec)
     assert(results.head.isSkipped)
+  }
+
+  test("action dag with 2 actions in sequence and output from second action as recursive input for first action") {
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1")
+    instanceRegistry.register(srcDO1)
+    val recDO = MockDataObject("rec1", schemaMin = Some(SparkSchema(StructType(Seq(StructField("lastname",StringType), StructField("role",StringType))))))
+    recDO.dropTable
+    instanceRegistry.register(recDO)
+    val tgt1DO = MockDataObject("tgt1")
+    instanceRegistry.register(tgt1DO)
+
+    // initialize global config (used for validating allowAsRecursiveInput)
+    Environment._globalConfig = GlobalConfig()
+    // not allowed if not present in allowAsRecursiveInput
+    intercept[AssertionError](CustomDataFrameAction("a", Seq(srcDO1.id), Seq(tgt1DO.id), recursiveInputIds = Seq(recDO.id)))
+    // now add it to the list
+    Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq(recDO.id))
+
+    // prepare DAG
+    val df1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(df1)
+    recDO.writeSparkDataFrame(df1.select($"lastname", lit("tester").as("role")))
+    val actions = Seq(
+      CustomDataFrameAction("a", Seq(srcDO1.id), Seq(tgt1DO.id), recursiveInputIds = Seq(recDO.id),
+        transformers = Seq(SQLDfsTransformer(code = Map(tgt1DO.id.id -> "select * from src1 left join rec1 using (lastname)")))
+      ),
+      CustomDataFrameAction("b", Seq(tgt1DO.id), Seq(recDO.id),
+        transformers = Seq(SQLDfsTransformer(code = Map(recDO.id.id -> "select * from tgt1")))
+      )
+    )
+    instanceRegistry.register(actions)
+
+    val dag = ActionDAGRun(actions)
+
+    // first dag run
+    dag.prepare
+    dag.init
+    dag.exec(contextExec)
+
+    assert(recDO.getSparkDataFrame().count > 0)
+
+    // and cleanup special config again
+    Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())
   }
 
 }

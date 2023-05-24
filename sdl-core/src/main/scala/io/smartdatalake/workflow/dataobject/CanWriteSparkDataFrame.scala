@@ -25,12 +25,12 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
-import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter, Dataset, Row, SaveMode}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-private[smartdatalake] trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
+trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
 
   /**
    * Configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].

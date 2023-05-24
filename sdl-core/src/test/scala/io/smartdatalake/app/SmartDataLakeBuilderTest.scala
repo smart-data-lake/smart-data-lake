@@ -27,6 +27,7 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer}
@@ -161,6 +162,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // test and reset SDLPlugin config
     assert(TestSDLPlugin.startupCalled)
+    assert(TestSDLPlugin.configureCalled)
     assert(TestSDLPlugin.shutdownCalled)
     Environment._sdlPlugin = None
   }
@@ -702,18 +704,15 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
-    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    val (outputSubFeeds, _) = sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
 
     // check result
-    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
-    val dfTgt = tgt.getSparkDataFrame()
-    val colName = dfTgt.columns
-    assert(colName.toSeq == Seq("test_column", "column_naeme"))
+    val dfTgt = outputSubFeeds.head.dataFrame.get
+    val colName = dfTgt.schema.columns
+    assert(colName == Seq("test_column", "column_naeme"))
   }
 
 
@@ -754,30 +753,26 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("FOO", "noCamel")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // Run SDLB
-    sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
+    val (outputSubFeeds, _) = sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
 
     // check result
-    val tgt = instanceRegistry.get[CsvFileDataObject]("tgt")
-    val dfTgt = tgt.getSparkDataFrame()
-    val colName = dfTgt.columns
-    assert(colName.toSeq == Seq("foo", "nocamel"))
+    val dfTgt = outputSubFeeds.head.dataFrame.get
+    val colName = dfTgt.schema.columns
+    assert(colName == Seq("foo", "nocamel"))
   }
 
 
-  test("sdlb run with external state file using FinalStateWriter and Environment setting override from config") {
+  test("sdlb run with state file using FinalStateWriter and FinalMetricsWriter and Environment setting override from config") {
 
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
-    val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")
+    val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     dummySrcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
 
@@ -796,8 +791,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(Environment.dagGraphLogMaxLineLength == 100)
 
     // check result
-    val fileResult = filesystem.exists(new Path("ext-state/state-test"))
-    assert(fileResult)
+    assert(filesystem.exists(new Path("ext-state/state-test")))
+    val dfActionLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("actionLog")).getSparkDataFrame()
+    assert(dfActionLog.select($"run_id", $"action_id", $"attempt_id",$"state").as[(Long,String,Int,String)].collect().toSet == Set((1L,"act",1,"SUCCEEDED")))
+    val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("metricsLog")).getSparkDataFrame()
+    assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long,String,String,Long)].collect().toSet == Set((1L,"act","tgt",1L)))
   }
 }
 
@@ -826,7 +824,7 @@ class ExecNoDataTransformer extends CustomDfTransformer {
   }
 }
 
-class TestStateListener(options: Map[String,String]) extends StateListener {
+class TestStateListener(options: Map[String,StringOrSecret]) extends StateListener {
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
@@ -850,10 +848,12 @@ class TestUDFAddXCreator() extends SparkUDFCreator {
 
 class TestSDLPlugin extends SDLPlugin {
   override def startup(): Unit = { TestSDLPlugin.startupCalled = true }
+  override def configure(options: Map[String, StringOrSecret]): Unit = { TestSDLPlugin.configureCalled = true }
   override def shutdown(): Unit = { TestSDLPlugin.shutdownCalled = true }
 }
 object TestSDLPlugin {
   var startupCalled = false
+  var configureCalled = false
   var shutdownCalled = false
 }
 

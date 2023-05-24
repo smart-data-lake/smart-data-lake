@@ -21,9 +21,11 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.filetransfer.StreamFileTransfer
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.SftpFileRefConnection
+import io.smartdatalake.workflow.connection.SFtpFileRefConnection
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.sshd.server.SshServer
@@ -41,11 +43,13 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
   val sshPort = 8001
   val sshUser = "test"
   val sshPwd = "test"
+  var con: SFtpFileRefConnection = _
 
   var tempDir: Path = _
 
   override protected def beforeAll(): Unit = {
     sshd = TestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
+    con = SFtpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshPwd))), ignoreHostKeyVerification = true, maxParallelConnections = 10)
   }
 
   override protected def afterAll(): Unit = {
@@ -54,7 +58,7 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
 
   override def beforeEach(): Unit = {
     registry.clear()
-    registry.register(SftpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode("CLEAR#"+sshUser, "CLEAR#"+sshPwd), ignoreHostKeyVerification = true))
+    registry.register(con)
     tempDir = Files.createTempDirectory("sftp-test")
   }
 
@@ -114,14 +118,14 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
       , tempDir.resolve(ftpDir).toString.replace('\\','/')
       , connectionId = "con1"
       , partitions = Seq("town", "year")
-      , partitionLayout = Some("AB_%town%_%year%" ))
+      , partitionLayout = Some("AB_%town%_%year:[0-9]+%" ))
     val partitionValuesExpected = Seq(PartitionValues(Map("town" -> "NYC", "year" -> "2019")))
 
     // list all files and extract partitions
     val fileRefsAll = sftpDO.getFileRefs(Seq())
     assert(fileRefsAll.size == 1)
     assert(fileRefsAll.head.fileName == resourceFile)
-    assert(fileRefsAll.head.partitionValues.keys == Set("town","year"))
+    assert(fileRefsAll.head.partitionValues == partitionValuesExpected.head)
 
     // list with matched partition filter
     val fileRefsPartitionFilter = sftpDO.getFileRefs(partitionValuesExpected)
@@ -151,14 +155,14 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
       , tempDir.resolve(ftpDir).toString.replace('\\','/')
       , connectionId = "con1"
       , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year%" ))
+      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%" ))
     val partitionValuesExpected = Seq(PartitionValues(Map("date" -> "20190101", "town" -> "NYC", "year" -> "2019")))
 
     // list all files and extract partitions
     val fileRefsAll = sftpDO.getFileRefs(Seq())
     assert(fileRefsAll.size == 1)
     assert(fileRefsAll.head.fileName == resourceFile)
-    assert(fileRefsAll.head.partitionValues.keys == Set("date","town","year"))
+    assert(fileRefsAll.head.partitionValues == partitionValuesExpected.head)
 
     // list with matched partition filter
     val fileRefsPartitionFilter = sftpDO.getFileRefs(partitionValuesExpected)
@@ -205,5 +209,111 @@ class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAft
     )
     val fileRefs2 = sftpDO.getFileRefs(Seq())
     assert(fileRefs2.size == 2 && fileRefs2.map(_.fileName).forall(_.startsWith(resourceFile)))
+  }
+
+
+  test("overwrite target") {
+
+    val srcDir1 = "testSrc1"
+    val srcDir2 = "testSrc2"
+    val tgtDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+
+    // copy data file to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve(resourceFile + "1").toFile)
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir2).resolve(resourceFile + "2").toFile)
+
+    // setup DataObject
+    val srcDO1 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir1).toString.replace('\\', '/'), connectionId = "con1")
+    val srcDO2 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir2).toString.replace('\\', '/'), connectionId = "con1")
+    val tgtDO = SFtpFileRefDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), connectionId = "con1")
+
+    // src1 file transfer
+    val filetransfer1 = new StreamFileTransfer(srcDO1, tgtDO)
+    val srcFileRefs1 = srcDO1.getFileRefs(Seq())
+    assert(srcFileRefs1.nonEmpty)
+    val fileRefPairs1 = tgtDO.translateFileRefs(srcFileRefs1)
+    tgtDO.startWritingOutputStreams(fileRefPairs1.map(_.tgt.partitionValues))
+    filetransfer1.exec(fileRefPairs1)
+    val tgtFileRefs1 = tgtDO.getFileRefs(Seq())
+    assert(tgtFileRefs1.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("AB_NYC_2019.csv1"))
+
+    // src2 file transfer overwriting partition 2022
+    val filetransfer2 = new StreamFileTransfer(srcDO2, tgtDO)
+    val srcFileRefs2 = srcDO2.getFileRefs(Seq())
+    assert(srcFileRefs2.nonEmpty)
+    val fileRefPairs2 = tgtDO.translateFileRefs(srcFileRefs2)
+    tgtDO.startWritingOutputStreams(fileRefPairs2.map(_.tgt.partitionValues))
+    filetransfer2.exec(fileRefPairs2)
+    val tgtFileRefs2 = tgtDO.getFileRefs(Seq())
+    assert(tgtFileRefs2.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("AB_NYC_2019.csv2"))
+  }
+
+  test("overwrite directory based partition") {
+
+    val srcDir1 = "testSrc1"
+    val srcDir2 = "testSrc2"
+    val tgtDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+
+    // copy data file to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve("2022").resolve(resourceFile+"1").toFile)
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir2).resolve("2022").resolve(resourceFile+"2").toFile)
+
+    // setup DataObject
+    val srcDO1 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir1).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("year"), partitionLayout = Some("%year%/"))
+    val srcDO2 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir2).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("year"), partitionLayout = Some("%year%/"))
+    val tgtDO = SFtpFileRefDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("year"), partitionLayout = Some("%year%/"))
+
+    // src1 file transfer
+    val filetransfer1 = new StreamFileTransfer(srcDO1, tgtDO)
+    val srcFileRefs1 = srcDO1.getFileRefs(Seq())
+    assert(srcFileRefs1.nonEmpty)
+    val fileRefPairs1 = tgtDO.translateFileRefs(srcFileRefs1)
+    tgtDO.startWritingOutputStreams(fileRefPairs1.map(_.tgt.partitionValues))
+    filetransfer1.exec(fileRefPairs1)
+    val tgtFileRefs1 = tgtDO.getFileRefs(Seq())
+    assert(tgtFileRefs1.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("2022/AB_NYC_2019.csv1"))
+
+    // src2 file transfer overwriting partition 2022
+    val filetransfer2 = new StreamFileTransfer(srcDO2, tgtDO)
+    val srcFileRefs2 = srcDO2.getFileRefs(Seq())
+    assert(srcFileRefs2.nonEmpty)
+    val fileRefPairs2 = tgtDO.translateFileRefs(srcFileRefs2)
+    tgtDO.startWritingOutputStreams(fileRefPairs2.map(_.tgt.partitionValues))
+    filetransfer2.exec(fileRefPairs2)
+    val tgtFileRefs2 = tgtDO.getFileRefs(Seq())
+    assert(tgtFileRefs2.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("2022/AB_NYC_2019.csv2"))
+  }
+
+  test("overwrite directory and filename based partition") {
+
+    val srcDir1 = "testSrc1"
+    val tgtDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+
+    // copy data file to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve("20220101").resolve(resourceFile + "2").toFile)
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220101").resolve(resourceFile + "1").toFile)
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220101").resolve("AB_BN_2019.csv").toFile)
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220201").resolve(resourceFile).toFile)
+
+    // setup DataObject
+    val srcDO1 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir1).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("date","town","year"), partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%"))
+    val tgtDO = SFtpFileRefDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("date","town","year"), partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%"))
+
+    // src1 file transfer
+    val filetransfer1 = new StreamFileTransfer(srcDO1, tgtDO)
+    val srcFileRefs1 = srcDO1.getFileRefs(Seq())
+    assert(srcFileRefs1.map(f => srcDO1.relativizePath(f.fullPath)).toSet==Set("20220101/AB_NYC_2019.csv2"))
+    val tgtFileRefs1 = tgtDO.getFileRefs(Seq())
+    assert(tgtFileRefs1.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("20220101/AB_BN_2019.csv","20220101/AB_NYC_2019.csv1","20220201/AB_NYC_2019.csv"))
+    val fileRefPairs1 = tgtDO.translateFileRefs(srcFileRefs1, Some("\\.csv.*".r)) // keep only filetype from source filename, the rest is handled as partition values...
+    tgtDO.startWritingOutputStreams(fileRefPairs1.map(_.tgt.partitionValues))
+    filetransfer1.exec(fileRefPairs1)
+    val tgtFileRefs1after = tgtDO.getFileRefs(Seq(PartitionValues(Map("date"->"20220101","town"->"NYC","year"->"2019"))))
+    assert(tgtFileRefs1after.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("20220101/AB_NYC_2019.csv2"))
+    val tgtFileRefsFinal = tgtDO.getFileRefs(Seq())
+    assert(tgtFileRefsFinal.map(f => tgtDO.relativizePath(f.fullPath)).toSet == Set("20220101/AB_BN_2019.csv","20220101/AB_NYC_2019.csv2","20220201/AB_NYC_2019.csv"))
   }
 }

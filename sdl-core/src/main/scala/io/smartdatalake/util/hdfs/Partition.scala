@@ -20,7 +20,6 @@ package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.workflow.dataframe.GenericColumn
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
-import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.DataFrame
 
 import scala.util.matching.Regex
@@ -172,7 +171,7 @@ object PartitionValues {
 /**
  * Helper methods to handle partition layout string
  */
-private[smartdatalake] object PartitionLayout {
+object PartitionLayout {
   private[hdfs] val delimiter = "%"
   private val tokenRegex = s"$delimiter([0-9a-zA-Z_]+)(:(.*?))?$delimiter".r.unanchored
 

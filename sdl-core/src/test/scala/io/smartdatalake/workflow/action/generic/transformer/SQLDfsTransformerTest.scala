@@ -23,7 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CustomDataFrameAction
-import io.smartdatalake.workflow.connection.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
 import org.apache.spark.sql.SparkSession

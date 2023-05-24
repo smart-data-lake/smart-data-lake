@@ -55,7 +55,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        override val housekeepingMode: Option[HousekeepingMode] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalSparkTableDataObject with CanHandlePartitions with ExpectationValidation {
+  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -63,7 +63,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   private val connection = connectionId.map(c => getConnection[HiveTableConnection](c))
 
   // prepare table
-  table = table.overrideDb(connection.map(_.db))
+  table = table.overrideCatalogAndDb(None, connection.map(_.db))
   if (table.db.isEmpty) throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
 
   assert(saveMode!=SDLSaveMode.OverwritePreserveDirectories, s"($id) saveMode OverwritePreserveDirectories not supported for now.")
