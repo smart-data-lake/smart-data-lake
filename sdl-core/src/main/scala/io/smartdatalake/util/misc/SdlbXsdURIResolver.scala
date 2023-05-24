@@ -19,8 +19,8 @@
 
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.util.hdfs.HdfsUtil
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.xml.XsdSchemaConverter
 import org.apache.ws.commons.schema.XmlSchemaCollection
@@ -28,42 +28,25 @@ import org.apache.ws.commons.schema.resolver.CollectionURIResolver
 import org.xml.sax.InputSource
 
 import java.io.StringReader
-import java.net.{MalformedURLException, URI}
+import scala.util.Try
 
 /**
  * SdlbXsdURIResolver resolves URIs included in XSD schemas by using Hadoop Filesystem.
  * It can be used by org.apache.ws.xmlschema to parse XSD schemas distributed over multiple files from Hadoop filesystem.
  */
-class SdlbXsdURIResolver(fs: FileSystem) extends CollectionURIResolver {
+class SdlbXsdURIResolver(implicit hadoopConf: Configuration) extends CollectionURIResolver {
   override def resolveEntity(targetNamespace: String, schemaLocation: String, baseUri: String): InputSource = {
 
-    // get path to read
-    // copied from DefaultURIResolver and converted to Scala / Hadoop
-    val path = if (baseUri != null) {
-      try {
-        var baseFile: Path = null
-        var newBaseUri: String = baseUri
-        try {
-          val uri = new URI(newBaseUri)
-          baseFile = new Path(uri)
-          if (!fs.exists(baseFile)) baseFile = new Path(newBaseUri)
-        } catch {
-          case ex: Throwable => baseFile = new Path(newBaseUri)
-        }
-        if (fs.exists(baseFile)) newBaseUri = baseFile.toUri.toString
-        else if (collectionBaseURI.isDefined) {
-          baseFile = new Path(collectionBaseURI.get)
-          if (fs.exists(baseFile)) newBaseUri = baseFile.toUri.toString
-        }
-        new Path(new Path(newBaseUri), schemaLocation)
-      } catch {
-        case e1: MalformedURLException => throw new RuntimeException(e1)
-      }
-    } else new Path(schemaLocation)
+    // try reading baseUri/schemaLocation
+    val content = Option(baseUri).map(uri => new Path(new Path(uri), schemaLocation))
+      .flatMap(p => Try(SchemaUtil.readFromPath(p)).toOption)
+    // try reading collectionUri/schemaLocation
+      .orElse(collectionBaseURI.map(uri => new Path(new Path(uri), schemaLocation))
+        .flatMap(p => Try(SchemaUtil.readFromPath(p)).toOption))
+    // read from schemaLocation
+      .getOrElse(SchemaUtil.readFromPath(new Path(schemaLocation)))
 
-    // create InputSource
-    val inputStream = fs.open(path)
-    new InputSource(inputStream)
+    new InputSource(new StringReader(content))
   }
 
   private var collectionBaseURI: Option[String] = None
@@ -76,16 +59,16 @@ class SdlbXsdURIResolver(fs: FileSystem) extends CollectionURIResolver {
 }
 
 object SdlbXsdURIResolver {
-  def readXsd(xsdFile: Path, maxRecursion: Int)(implicit fs: FileSystem): StructType = {
+  def readXsd(xsdFile: Path, maxRecursion: Int)(implicit hadoopConf: Configuration): StructType = {
 
     // setup schema collection with our own URI resolver to resolve referenced schemas
-    val uriResolver = new SdlbXsdURIResolver(fs)
+    val uriResolver = new SdlbXsdURIResolver
     val xmlSchemaCollection = new XmlSchemaCollection()
     xmlSchemaCollection.setSchemaResolver(uriResolver)
     xmlSchemaCollection.setBaseUri(xsdFile.getParent.toString)
 
     // read from hadoop and convert
-    val xsdString = HdfsUtil.readHadoopFile(xsdFile)
+    val xsdString = SchemaUtil.readFromPath(xsdFile)
     val xmlSchema = xmlSchemaCollection.read(new StringReader(xsdString))
     new XsdSchemaConverter(xmlSchema, maxRecursion).getStructType
   }
