@@ -69,7 +69,7 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
           |def setOutputDf( df ):
           |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
-      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator") + pythonCode)
+      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator") + pythonCode.stripMargin)
       entryPoint.outputDf.getOrElse(throw new IllegalStateException(s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"))
     } catch {
       case e: Throwable => throw new PythonTransformationException(s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}", e)
