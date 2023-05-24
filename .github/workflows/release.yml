@@ -120,8 +120,8 @@ jobs:
 
     - name: Git Merge to develop
       run: |
-        git merge origin/${{ github.base_ref }}
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
+        git merge origin/${{ github.base_ref }} --no-commit
+        git diff-index --quiet HEAD || git commit -m "Merge release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
 
     - name: Develop Get Next Version
       id: bump_version
