@@ -95,7 +95,7 @@ All input Data Objects are available in the select statement with following nami
 - special characters are replaced by an underscore
 - a postfix `_sdltemp` is added.
 So an input Data Object called `table-with-hyphen` becomes `table_with_hyphen_sdltemp` inside the SQL query.
-To simplify this you can also use the special token %{inputViewName} for 1-to-1 transformations, or ${inputViewName_<inputDataObjectName>} for n-to-m transformations, that will be replaced with the correct name at runtime.
+To simplify this you can also use the special token `%{inputViewName}` for 1-to-1 transformations, or `${inputViewName_<inputDataObjectName>}` for n-to-m transformations, that will be replaced with the correct name at runtime.
 
 ##### SQL 1-to-1
 1-to-1 transformations use type SQLDfTransformer. 
