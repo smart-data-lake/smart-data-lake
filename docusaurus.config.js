@@ -107,6 +107,21 @@ const config = {
             darkTheme: darkCodeTheme,
             //additionalLanguages: ['scala'],
       },
+      algolia: {
+        // The application ID provided by Algolia
+        appId: 'UOM3ZOMCU0',
+
+        // Public API key: it is safe to commit it
+        apiKey: '83bd98a629daf2b2aa34487d5e061c06',
+
+        indexName: 'smartdatalake',
+
+        // Optional: see doc section below
+        contextualSearch: true,
+
+        // Optional: path for search page that enabled by default (`false` to disable it)
+        searchPagePath: 'search',
+      },
     }),
 
   plugins:  ['./src/plugins/PostBuildCreateSchemaListPlugin'],
