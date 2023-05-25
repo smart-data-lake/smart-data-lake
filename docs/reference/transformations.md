@@ -235,10 +235,10 @@ Check the method signature in CustomDfTransformer and CustomDfsTransformer accor
 
 
 ### Python
-The transformer needs to use type `PythonCodeSparkDfTransformer` (1-to-1) or `PythonCodeSparkDfsTransformer` (many-to-many. 
+The transformer needs to use type `PythonCodeSparkDfTransformer` (1-to-1) or `PythonCodeSparkDfsTransformer` (many-to-many). 
 You can either provide it as separate file or inline as Python code again.
 
-Inline example:
+Inline 1-to-1 example:
 ```
 transformers = [{
   type = PythonCodeDfTransformer 
@@ -259,6 +259,20 @@ Some additional variables are also available:
 * `dataObjectId`: Id of input DataObject as string
 
 The output DataFrame needs to be set with `setOutputDf(df)`.
+
+And many-to-many inline example:
+```
+transformers = [{
+  type = PythonCodeDfsTransformer 
+  code = """
+    |dfResult = inputDfs[df1].join(inputDfs[df2], inputDfs[df1].id == inputDfs[df2].fk, "left") \
+    |  .select(inputDfs[df1].id, inputDfs[df1].desc, inputDfs[df2].desc)
+    |setOutputDf({"outputId": dfResult})
+  """
+}]
+```
+
+In this case, `inputDfs` is an array and `setOutputDf` expects a map.
 
 ##### Requirements
 Running Python transformations needs some additional setup. 
