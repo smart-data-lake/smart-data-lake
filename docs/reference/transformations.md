@@ -272,7 +272,7 @@ transformers = [{
 }]
 ```
 
-In this case, `inputDfs` is an array and `setOutputDf` expects a map.
+In this case, `inputDfs` is a dictionary (dict) and `setOutputDf` expects a dictionary.
 
 ##### Requirements
 Running Python transformations needs some additional setup. 
@@ -312,5 +312,5 @@ This Map contains the combined `options` and `runtimeOptions`.
 So in your custom class, you can read all options and runtimeOptions and use them accordingly to parametrize your code.
 
 ##### In Python
-Similarly in Python, in addition to the variables `inputDf` and `dataObjectId`, you get a variable called `options`
+Similarly in Python, in addition to the variables `inputDf` and `dataObjectId` (resp. `inputsDfs'), you get a variable called `options`
 containing all `options` and `runtimeOptions`.
