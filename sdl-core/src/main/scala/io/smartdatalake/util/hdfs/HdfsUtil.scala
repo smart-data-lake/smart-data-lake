@@ -184,13 +184,12 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * Rename single path as one hadoop operation (note it depends on the implementation if this is atomic).
    */
   def renamePath(path: Path, newPath: Path)(implicit fs: FileSystem ): Unit = {
+    // check if file already exists before rename, as error of fs.rename is not detailled enough (depending on hadoop fs implementation)
+    val fileStat = Try(fs.getFileStatus(newPath))
+    if (fileStat.isSuccess && fileStat.get.isFile) throw new FileAlreadyExistsException(s"Rename $path to $newPath failed. New file already exists.")
     if (fs.rename(path, newPath)) {
       logger.debug(s"Path $path renamed to $newPath")
-    } else {
-      val fileStat = Try(fs.getFileStatus(newPath))
-      if (fileStat.isSuccess && fileStat.get.isFile) throw new FileAlreadyExistsException(s"Rename $path to $newPath failed. New file already exists.")
-      else new IOException(s"Rename $path to $newPath failed. Reason unknown.")
-    }
+    } else new IOException(s"Rename $path to $newPath failed. Reason unknown.")
   }
 
   /**
