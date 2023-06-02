@@ -1,27 +1,16 @@
-import React, {useEffect} from 'react';
+import React from 'react';
 import Layout from '@theme/Layout';
+import { SchemaViewer } from 'sdlb-schema-viewer';
 
 function JsonSchemaViewer() {
-  
-  const onLoad = () => {
-    const wrapper = document.getElementsByClassName("main-wrapper")[0]
-    wrapper.style.display = 'flex'
-  };
-  
   return (
-    <Layout title="JsonSchemaViewer" >
-        <iframe
-          onLoad={onLoad}
-          id="JsonSchemaViewer"
-          src="/json-schema-viewer/index.html"
-          width="100%"
-          scrolling="no"
-          frameBorder="0"
-          style={{
-            flex: '1',
-          }}
-        ></iframe>
-    </Layout>    
+    <Layout title="JsonSchemaViewer">
+      <div style={{height: '90vh'}}>
+        {/* This does not show the local schemas but only the deployed ones.
+            The schema viewer must be adapted to be able to show local schemas. */}
+        <SchemaViewer schemasUrl="https://smartdatalake.ch/json-schema-viewer/schemas/"/>
+      </div>
+    </Layout>
   );
 }
 
