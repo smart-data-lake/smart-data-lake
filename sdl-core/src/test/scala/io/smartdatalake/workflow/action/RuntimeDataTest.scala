@@ -119,16 +119,17 @@ class RuntimeDataTest extends FunSuite {
 
   test("get summarized runtime info") {
     val runtimeData = SynchronousRuntimeData(10)
-    val dataObjectId = DataObjectId("test")
+    val inputDataObjectId = DataObjectId("input")
+    val outputDataObjectId = DataObjectId("test")
     val now = LocalDateTime.now()
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now, ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq(SparkSubFeed(None, dataObjectId, Seq()))))
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now.plusSeconds(10), ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, None, Seq(SparkSubFeed(None, dataObjectId, Seq()))))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map()))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map("test"->999)))
-    runtimeData.addMetric(Some(SDLExecutionId(1)), dataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
-    val info = runtimeData.getRuntimeInfo(Seq(dataObjectId), Seq())
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now, ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq(SparkSubFeed(None, outputDataObjectId, Seq()))))
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now.plusSeconds(10), ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, None, Seq(SparkSubFeed(None, outputDataObjectId, Seq()))))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), outputDataObjectId, GenericMetrics("test-metric1", 1, Map()))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), outputDataObjectId, GenericMetrics("test-metric2", 2, Map("test"->999)))
+    runtimeData.addMetric(Some(SDLExecutionId(1)), outputDataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
+    val info = runtimeData.getRuntimeInfo(Seq(inputDataObjectId), Seq(outputDataObjectId), Seq())
     assert(info.exists(_.duration.get.getSeconds == 10))
-    val doResults = info.flatMap(_.results.find(_.subFeed.dataObjectId == dataObjectId))
+    val doResults = info.flatMap(_.results.find(_.subFeed.dataObjectId == outputDataObjectId))
     assert(doResults.exists(_.mainMetrics("test") == 999))
   }
 

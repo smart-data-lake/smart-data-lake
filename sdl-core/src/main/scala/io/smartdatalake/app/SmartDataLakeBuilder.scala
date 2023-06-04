@@ -375,6 +375,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   private[smartdatalake] def recoverRun[S <: StateId](appConfig: SmartDataLakeBuilderConfig, stateStore: ActionDAGRunStateStore[S], runState: ActionDAGRunState)(implicit hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
+
+    // Accept recovery of old state files (without version), check version for newer formats
+    assert(runState.runStateFormatVersion.isEmpty || runState.runStateFormatVersion.get.equals(Environment.runStateFormatVersion),
+      s"State file format version ${runState.runStateFormatVersion.get} does not match current version ${Environment.runStateFormatVersion}. Can not recover run from different state format."
+    )
+
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id, info) => info.hasCompleted }

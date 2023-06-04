@@ -37,6 +37,9 @@ import java.net.URI
  */
 object Environment {
 
+  // Version of state files, increment if state file format changes
+  val runStateFormatVersion = "1.0"
+
   // this class loader needs to be overridden to find custom classes in some environments (e.g. Polynote)
   def classLoader(): ClassLoader = {
     if (_classLoader.isEmpty) {
