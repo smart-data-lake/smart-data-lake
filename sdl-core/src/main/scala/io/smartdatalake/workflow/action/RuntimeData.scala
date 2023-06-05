@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.{ActionMetrics, DataObjectState, GenericMetrics, InitSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionMetrics, DataObjectState, ExecutionPhase, GenericMetrics, InitSubFeed, SubFeed}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 
@@ -213,12 +213,20 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     assert(events.nonEmpty, "Cannot getRuntimeInfo if events are empty")
     val lastEvent = events.last
     val lastResults = events.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
+    val preparedEvent = events.reverseIterator.find(event => event.state == RuntimeEventState.PREPARED && event.phase == ExecutionPhase.Prepare)
+    val initializedEvent = events.reverseIterator.find(event => event.state == RuntimeEventState.INITIALIZED && event.phase == ExecutionPhase.Init)
     val startEvent = events.reverseIterator.find(event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase)
+    val preparedDuration = preparedEvent.map(p => Duration.between(p.tstmp, initializedEvent.map(_.tstmp).getOrElse(p.tstmp)))
+    val initializedDuration = initializedEvent.map(i => Duration.between(i.tstmp, startEvent.map(_.tstmp).getOrElse(i.tstmp)))
     val duration = startEvent.map(start => Duration.between(start.tstmp, lastEvent.tstmp))
     val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
     else outputIds.map(outputId => InitSubFeed(outputId, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
     val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, getLatestMetric(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())))
-    Some(RuntimeInfo(id, lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
+    Some(RuntimeInfo(id, lastEvent.state,
+      startTstmp = startEvent.map(_.tstmp), duration = duration,
+      startTstmpPrepare = preparedEvent.map(_.tstmp), durationPrepare = preparedDuration,
+      startTstmpInit = initializedEvent.map(_.tstmp), durationInit = initializedDuration,
+      msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
   }
 }
 private[smartdatalake] case class LateArrivingMetricException(msg: String) extends Exception(msg)
@@ -279,6 +287,10 @@ case class RuntimeInfo(
                        state: RuntimeEventState,
                        startTstmp: Option[LocalDateTime] = None,
                        duration: Option[Duration] = None,
+                       startTstmpPrepare: Option[LocalDateTime] = None,
+                       durationPrepare: Option[Duration] = None,
+                       startTstmpInit: Option[LocalDateTime] = None,
+                       durationInit: Option[Duration] = None,
                        msg: Option[String] = None,
                        results: Seq[ResultRuntimeInfo] = Seq(),
                        dataObjectsState: Seq[DataObjectState] = Seq(),
