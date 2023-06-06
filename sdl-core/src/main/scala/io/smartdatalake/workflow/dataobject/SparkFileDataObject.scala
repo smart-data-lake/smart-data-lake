@@ -111,7 +111,6 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * @return The schema to use for the data frame reader when reading from the source.
    */
   def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
-    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
     _schemaHolder = _schemaHolder.orElse(
         // get defined schema
         schema.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
@@ -127,15 +126,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
         // or try inferring schema from sample data file
         if (filesystem.exists(sampleFile)) {
           logger.info(s"($id) Inferring schema from sample data file")
-          val df = context.sparkSession.read
-            .format(readFormat)
-            .options(options)
-            .load(sampleFile.toString)
-            .withOptionalColumn(filenameColumn, input_file_name)
-          val dfWithPartitions = partitions.foldLeft(df) {
-            case (df, p) => df.withColumn(p, functions.lit("dummyString"))
-          }
-          Some(SparkSchema(dfWithPartitions.schema))
+          Some(inferSchemaFromPath(sampleFile.toString))
         } else None
       )
     // return
@@ -146,6 +137,18 @@ trait SparkFileDataObject extends HadoopFileDataObject
     val fileStat = Try(filesystem.getFileStatus(hadoopPath)).toOption
     val dataObjectRootPath = if (fileStat.exists(_.isFile)) hadoopPath.getParent else hadoopPath
     new Path( new Path(dataObjectRootPath, ".schema"), "currentSchema.json")
+  }
+  protected def inferSchemaFromPath(path: String)(implicit context: ActionPipelineContext): SparkSchema = {
+    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+    val df = context.sparkSession.read
+      .format(readFormat)
+      .options(options)
+      .load(path)
+      .withOptionalColumn(filenameColumn, input_file_name)
+    val dfWithPartitions = partitions.foldLeft(df) {
+      case (df, p) => df.withColumn(p, functions.lit("dummyString"))
+    }
+    SparkSchema(dfWithPartitions.schema)
   }
 
   /**
@@ -340,7 +343,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
       filesystem.globStatus(new Path(hadoopPath,fileName)).toSeq
         .filter(_.isFile).map(fs => (PartitionValues(Map()),fs.getPath))
     } else {
-      partitionValues.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
+      val pvs = if (partitionValues.isEmpty) listPartitions else partitionValues
+      pvs.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
     }
     // get and union DataFrames per File
     val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
