@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTr
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.{SQLExpectation, _}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
@@ -192,7 +192,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
         SQLFractionExpectation("pctBob", countConditionExpression = "firstname = 'bob'", expectation = Some("= 0")), // because we only select Rob and not Bob...
         CountExpectation(name = "countPerPartition", expectation = Some(">= 1"), scope = ExpectationScope.JobPartition),
         CountExpectation(name = "countAll", expectation = Some(">= 1"), scope = ExpectationScope.All),
-        SQLQueryExpectation(name = "countOfPartitionsWith1Record", code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)", scope = ExpectationScope.All)
+        SQLQueryExpectation(name = "countOfPartitionsWith1Record", code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)", scope = ExpectationScope.All),
+        SQLExpectation("resultNull", Some("dont fail if result is null"), "null", Some("> 1")),
       )
     )
     tgtDO.dropTable
@@ -216,7 +217,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics
     val metrics1 = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
-    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "countAll" -> 1, "countOfPartitionsWith1Record" -> 1))
+    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "countAll" -> 1, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None))
 
     // add another record & process
     val l2 = Seq(("dau", "peter", 5)).toDF("lastname", "firstname", "rating")
@@ -226,7 +227,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics - countAll should be 2 now, but count should stay 1
     val metrics2 = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
-    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#dau" -> 1, "countAll" -> 2, "countOfPartitionsWith1Record" -> 2))
+    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#dau" -> 1, "countAll" -> 2, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None))
 
     // fail constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
