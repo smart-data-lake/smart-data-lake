@@ -21,11 +21,13 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 
 /**
  * DataObject of type raw for files with unknown content.
@@ -60,6 +62,15 @@ case class RawFileDataObject( override val id: DataObjectId,
                               override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
+
+  private val isFormatWithFixedSchema = Seq("text", "binaryfile").contains(readFormat.toLowerCase)
+  if (isFormatWithFixedSchema && schema.isDefined) throw ConfigurationException(s"($id) Schema is fixed for format=$readFormat. Remove schema attribute from DataObject configuration.")
+
+  /** override schema for text and binaryfile format, as these are fixed */
+  override def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
+    if (isFormatWithFixedSchema) Some(inferSchemaFromPath(hadoopPath.toString))
+    else super.getSchema
+  }
 
   override def format: String = customFormat.getOrElse(throw ConfigurationException(s"($id) set attribute customFormat if you want to read/write this a RawFileDataObject with Spark"))
 
