@@ -20,8 +20,10 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
+import org.apache.hadoop.fs.Path
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import org.apache.poi.ss.usermodel
 import org.apache.poi.ss.usermodel.{DateUtil, Sheet, Workbook}
@@ -149,9 +151,45 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     data should have size 6
   }
 
+  test("reading multiple XSSF excel sheet from different partitions") {
+
+    val testConfig = ConfigFactory.parseString(
+      s"""
+         |{
+         | id = src1
+         | path = "${escapedFilePath(xlsxTempDir.toString)}"
+         | partitions = [id]
+         | excel-options {
+         |   useHeader = true
+         |   num-lines-to-skip = 0
+         |   start-column = A
+         |   end-column = E
+         | }
+         |}
+       """.stripMargin)
+
+    // prepare
+    val actionInputExcel = ExcelFileDataObject.fromConfig(testConfig)
+
+    // check reading all partitions
+    {
+      val df = actionInputExcel.getSparkDataFrame()
+      assert(df.columns.contains("id"))
+      val data = df.collect().toList
+      data should have size 6
+    }
+
+    // check reading one partitions
+    {
+      val df = actionInputExcel.getSparkDataFrame(Seq(PartitionValues(Map("id"->"1"))))
+      assert(df.columns.contains("id"))
+      val data = df.collect().toList
+      data should have size 3
+    }
+  }
+
   testsFor(readNonExistingSources(createDataObject(ExcelOptions(sheetName = Some("testSheet"))), ".xlsx"))
-  // read empty file with spark-excel results in "java.util.NoSuchElementException: head of empty list" on df.show
-  //testsFor(readEmptySources(createDataObject(ExcelOptions(useHeader = false)), ".xlsx"))
+  testsFor(readEmptySources(createDataObject(ExcelOptions(useHeader = false)), ".xlsx"))
   testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
 
@@ -161,6 +199,9 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     xlsxTempDir = createTempDir
     createTempFile(createXSSFWorkbook(3, 20), XlsxSuffix, Some(xlsxTempDir))
     createTempFile(createXSSFWorkbook(3, 21), XlsxSuffix, Some(xlsxTempDir))
+    // partitions
+    createTempFile(createXSSFWorkbook(3, 20), XlsxSuffix, Some(xlsxTempDir.resolve("id=1")))
+    createTempFile(createXSSFWorkbook(3, 21), XlsxSuffix, Some(xlsxTempDir.resolve("id=2")))
   }
 
   override def afterAll(): Unit = {
@@ -170,6 +211,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
 
   private def createTempFile(workbook: Workbook, suffix: String, dir: Option[NioPath] = None): String = {
     val tempDir = dir.getOrElse(Files.createTempDirectory(suffix))
+    if (Files.notExists(tempDir)) Files.createDirectory(tempDir)
     val tempFile = Files.createTempFile(tempDir, "test", suffix).toFile
     tempFile.deleteOnExit()
     val tempOutputStream = new FileOutputStream(tempFile)
