@@ -80,11 +80,11 @@ private[smartdatalake] trait RuntimeData {
    * Get the latest metrics for all DataObjects and a given ExecutionId.
    * If ExecutionId is empty, metrics for the current existing ExecutionId is returned.
    */
-  def getRuntimeInfo(outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId] = None): Option[RuntimeInfo] = {
+  def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId] = None): Option[RuntimeInfo] = {
     if(executions.isEmpty) None
     else {
-      if (executionIdOpt.isEmpty) currentExecution.flatMap(_.getRuntimeInfo(outputIds, dataObjectsState))
-      else executions.find(_.id == executionIdOpt.get).flatMap(_.getRuntimeInfo(outputIds, dataObjectsState))
+      if (executionIdOpt.isEmpty) currentExecution.flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
+      else executions.find(_.id == executionIdOpt.get).flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
     }
   }
 }
@@ -162,13 +162,13 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
     unassignedMetrics.clear
     firstSDLExecutionId = None
   }
-  override def getRuntimeInfo(outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId]): Option[RuntimeInfo] = {
+  override def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId]): Option[RuntimeInfo] = {
     if (executionIdOpt.exists(_.isInstanceOf[SDLExecutionId])) {
       // report state as STREAMING after first SDLexecutionId only. This allows to skip first execution in recovery if SUCCEEDED.
-      if (executionIdOpt == firstSDLExecutionId) super.getRuntimeInfo(outputIds, dataObjectsState, executionIdOpt)
-      else super.getRuntimeInfo(outputIds, dataObjectsState, None).map(_.copy(state = RuntimeEventState.STREAMING))
+      if (executionIdOpt == firstSDLExecutionId) super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, executionIdOpt)
+      else super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, None).map(_.copy(state = RuntimeEventState.STREAMING))
     } else {
-      super.getRuntimeInfo(outputIds, dataObjectsState, executionIdOpt)
+      super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, executionIdOpt)
     }
   }
 }
@@ -209,7 +209,7 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     // return
     latestMetrics
   }
-  def getRuntimeInfo(outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState]): Option[RuntimeInfo] = {
+  def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState]): Option[RuntimeInfo] = {
     assert(events.nonEmpty, "Cannot getRuntimeInfo if events are empty")
     val lastEvent = events.last
     val lastResults = events.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
@@ -218,7 +218,7 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
     else outputIds.map(outputId => InitSubFeed(outputId, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
     val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, getLatestMetric(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())))
-    Some(RuntimeInfo(id, lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState))
+    Some(RuntimeInfo(id, lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
   }
 }
 private[smartdatalake] case class LateArrivingMetricException(msg: String) extends Exception(msg)
@@ -281,7 +281,9 @@ case class RuntimeInfo(
                        duration: Option[Duration] = None,
                        msg: Option[String] = None,
                        results: Seq[ResultRuntimeInfo] = Seq(),
-                       dataObjectsState: Seq[DataObjectState] = Seq()
+                       dataObjectsState: Seq[DataObjectState] = Seq(),
+                       inputIds: Seq[DataObjectId] = Seq(),
+                       outputIds: Seq[DataObjectId] = Seq()
                      ) {
   /**
    * Completed Actions will be ignored in recovery

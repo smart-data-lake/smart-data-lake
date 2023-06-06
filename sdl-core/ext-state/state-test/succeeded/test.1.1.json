@@ -36,7 +36,13 @@
           "bytes_written" : 20
         }
       } ],
-      "dataObjectsState" : [ ]
+      "dataObjectsState" : [ ],
+      "inputIds" : [ {
+        "id" : "oneInput"
+      } ],
+      "outputIds" : [ {
+        "id" : "oneOutput"
+      } ]
     }
   },
   "isFinal" : true
