@@ -68,7 +68,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
         if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"SparkObservation $name did not receive metrics within timeout of $timeoutSec seconds.")
       }
     }
-    metrics.get
+    metrics.get.mapValues(Option(_).getOrElse(Option.empty[Any])) // if null convert to None
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {
