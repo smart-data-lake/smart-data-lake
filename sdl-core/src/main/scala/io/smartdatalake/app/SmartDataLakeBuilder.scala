@@ -377,8 +377,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
 
     // Accept recovery of old state files (without version), check version for newer formats
-    assert(runState.runStateFormatVersion.isEmpty || runState.runStateFormatVersion.get.equals(Environment.runStateFormatVersion),
-      s"State file format version ${runState.runStateFormatVersion.get} does not match current version ${Environment.runStateFormatVersion}. Can not recover run from different state format."
+    assert(runState.runStateFormatVersion.isEmpty || runState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion,
+      s"State file format version ${runState.runStateFormatVersion.get} does not match current version ${ActionDAGRunState.runStateFormatVersion}. Can not recover run from different state format."
     )
 
     // skip all succeeded actions

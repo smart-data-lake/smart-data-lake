@@ -36,7 +36,7 @@ import java.time.{Duration, LocalDateTime}
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
 case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
-                                                    , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean, runStateFormatVersion: Option[String]) {
+                                                    , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean, runStateFormatVersion: Option[Int]) {
 
   def toJson: String = ActionDAGRunState.toJson(this)
 
@@ -74,6 +74,8 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 }
 
 private[smartdatalake] object ActionDAGRunState {
+
+  val runStateFormatVersion: Int = 1
 
   private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {

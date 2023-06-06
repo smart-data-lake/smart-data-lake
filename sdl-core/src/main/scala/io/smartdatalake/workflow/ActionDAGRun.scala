@@ -233,7 +233,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    */
   def saveState(phase: ExecutionPhase, changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
-    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal, Some(Environment.runStateFormatVersion))
+    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal, Some(ActionDAGRunState.runStateFormatVersion))
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))
     }
