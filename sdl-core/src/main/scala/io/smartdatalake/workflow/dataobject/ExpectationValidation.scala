@@ -83,7 +83,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
       .filter(_._2.nonEmpty)
     if (jobPartitionExpectations.nonEmpty) {
       this match {
-        case partitionedDataObject: DataObject with CanHandlePartitions =>
+        case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.nonEmpty =>
           val aggExpressions = jobPartitionExpectations.flatMap(_._2)
           if (aggExpressions.nonEmpty) {
             logger.info(s"($id) collecting aggregate column metrics for expectations with scope = JobPartition")
