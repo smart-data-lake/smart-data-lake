@@ -91,7 +91,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
             val colNames = dfMetrics.schema.columns
             def colNameIndex(colName: String) = colNames.indexOf(colName)
             val metrics = dfMetrics.collect.flatMap { row =>
-              val partitionValuesStr = partitionedDataObject.partitions.map(c => Option(row.getAs[Any](colNameIndex(c)).toString).getOrElse(None)).mkString(partitionDelimiter)
+              val partitionValuesStr = partitionedDataObject.partitions.map(c => Option(row.getAs[Any](colNameIndex(c))).map(_.toString).getOrElse(None)).mkString(partitionDelimiter)
               val metricsNameAndValue = jobPartitionExpectations.map(_._1).map(e => (e.name, Option(row.getAs[Any](colNameIndex(e.name))).getOrElse(None)))
               metricsNameAndValue.map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
             }
