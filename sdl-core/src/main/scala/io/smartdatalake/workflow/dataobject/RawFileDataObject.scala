@@ -63,11 +63,10 @@ case class RawFileDataObject( override val id: DataObjectId,
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
 
-  private val isFormatWithFixedSchema = Seq("text", "binaryfile").contains(readFormat.toLowerCase)
-  if (isFormatWithFixedSchema && schema.isDefined) throw ConfigurationException(s"($id) Schema is fixed for format=$readFormat. Remove schema attribute from DataObject configuration.")
-
   /** override schema for text and binaryfile format, as these are fixed */
   override def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
+    val isFormatWithFixedSchema = Seq("text", "binaryfile").contains(readFormat.toLowerCase)
+    if (isFormatWithFixedSchema && schema.isDefined) throw ConfigurationException(s"($id) Schema is fixed for format=$readFormat. Remove schema attribute from DataObject configuration.")
     if (isFormatWithFixedSchema) Some(inferSchemaFromPath(hadoopPath.toString))
     else super.getSchema
   }
