@@ -80,7 +80,10 @@ trait Expectation extends ParsableFromConfig[Expectation] with ConfigHolder with
 
   // helpers
   protected def getMetric[T](dataObjectId: DataObjectId, metrics: Map[String,Any], key: String): T = {
-    metrics.getOrElse(key, throw new IllegalStateException(s"($dataObjectId) Metric '$key' for expectation ${name} not found for validation")).asInstanceOf[T]
+    metrics.getOrElse(key, throw new IllegalStateException(s"($dataObjectId) Metric '$key' for expectation ${name} not found for validation")) match {
+      case Some(x: T) => x
+      case x: T => x
+    }
   }
 }
 
@@ -134,7 +137,8 @@ abstract class ExpectationDefaultImpl extends Expectation {
     expectation.map { expectationStr =>
       val valueStr = value match {
         case None => "null"
-        case x: String => x
+        case Some(x) => x.toString
+        case null => "null"
         case x => x.toString
       }
       val validationExpr = s"$valueStr $expectationStr"
