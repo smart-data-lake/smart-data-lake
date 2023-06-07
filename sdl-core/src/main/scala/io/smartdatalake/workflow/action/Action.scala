@@ -136,7 +136,6 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * This runs during the "prepare" phase of the DAG.
    */
   def prepare(implicit context: ActionPipelineContext): Unit = {
-    reset // reset statistics, this is especially needed in unit tests when the same action is started multiple times
     inputs.foreach(_.prepare)
     outputs.foreach(_.prepare)
     executionMode.foreach(_.prepare(id))
