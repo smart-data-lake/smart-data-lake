@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow
 
 import java.time.{Duration, LocalDateTime}
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.app.{BuildVersionInfo, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
@@ -38,7 +38,8 @@ class ActionDAGRunTest extends FunSuite {
     val df = Seq(("a",1)).toDF("txt", "value")
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"),
       results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1))
+    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo )
     val json = state.toJson
     println(json)
     // remove DataFrame from SparkSubFeed, it should not be serialized
