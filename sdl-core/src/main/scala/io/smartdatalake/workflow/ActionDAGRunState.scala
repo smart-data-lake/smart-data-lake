@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.app.{BuildVersionInfo, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
@@ -35,8 +35,9 @@ import java.time.{Duration, LocalDateTime}
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
  */
-case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime
-                                                    , actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean, runStateFormatVersion: Option[Int]) {
+case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime,
+                             actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean, runStateFormatVersion: Option[Int],
+                             buildVersionInfo: Option[BuildVersionInfo]) {
 
   def toJson: String = ActionDAGRunState.toJson(this)
 
