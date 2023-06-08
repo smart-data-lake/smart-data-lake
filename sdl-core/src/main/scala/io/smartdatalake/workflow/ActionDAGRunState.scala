@@ -75,7 +75,7 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 
 private[smartdatalake] object ActionDAGRunState {
 
-  val runStateFormatVersion: Int = 1
+  val runStateFormatVersion: Int = 2
 
   private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {

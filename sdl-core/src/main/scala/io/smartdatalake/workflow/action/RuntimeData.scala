@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.{ActionMetrics, DataObjectState, GenericMetrics, InitSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionMetrics, DataObjectState, ExecutionPhase, GenericMetrics, InitSubFeed, SubFeed}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 
@@ -213,12 +213,28 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     assert(events.nonEmpty, "Cannot getRuntimeInfo if events are empty")
     val lastEvent = events.last
     val lastResults = events.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
-    val startEvent = events.reverseIterator.find(event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase)
-    val duration = startEvent.map(start => Duration.between(start.tstmp, lastEvent.tstmp))
+
+    val prepareEvents = events.filter(p => p.phase == ExecutionPhase.Prepare)
+    val initEvents = events.filter(i => i.phase == ExecutionPhase.Init)
+    val execEvents = events.filter(e => e.phase == ExecutionPhase.Exec)
+    val prepareStartEvent = prepareEvents.headOption
+    val prepareEndEvent = if(prepareEvents.nonEmpty && prepareEvents.lastOption!=prepareStartEvent) prepareEvents.lastOption else None
+    val initStartEvent = initEvents.headOption
+    val initEndEvent = if(initEvents.nonEmpty && initEvents.lastOption!=initStartEvent) initEvents.lastOption else None
+    val execStartEvent = execEvents.headOption
+    val execEndEvent = if(execEvents.nonEmpty && execEvents.lastOption!=execStartEvent) execEvents.lastOption else None
+    val startEventLastPhase = events.reverseIterator.find(event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase)
+    // Duration of last successful phase
+    val duration = startEventLastPhase.map(start => Duration.between(start.tstmp, lastEvent.tstmp))
     val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
     else outputIds.map(outputId => InitSubFeed(outputId, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
     val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, getLatestMetric(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())))
-    Some(RuntimeInfo(id, lastEvent.state, startTstmp = startEvent.map(_.tstmp), duration = duration, msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
+    Some(RuntimeInfo(id, lastEvent.state,
+      startTstmp = execStartEvent.map(_.tstmp), endTstmp = execEndEvent.map(_.tstmp),
+      duration = duration,
+      startTstmpPrepare = prepareStartEvent.map(_.tstmp), endTstmpPrepare = prepareEndEvent.map(_.tstmp),
+      startTstmpInit = initStartEvent.map(_.tstmp), endTstmpInit = initEndEvent.map(_.tstmp),
+      msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
   }
 }
 private[smartdatalake] case class LateArrivingMetricException(msg: String) extends Exception(msg)
@@ -277,7 +293,12 @@ private[smartdatalake] object SparkStreamingExecutionId {
 case class RuntimeInfo(
                        executionId: ExecutionId = SDLExecutionId(-1, -1), // default value is needed for backward compatibility
                        state: RuntimeEventState,
+                       startTstmpPrepare: Option[LocalDateTime] = None,
+                       endTstmpPrepare: Option[LocalDateTime] = None,
+                       startTstmpInit: Option[LocalDateTime] = None,
+                       endTstmpInit: Option[LocalDateTime] = None,
                        startTstmp: Option[LocalDateTime] = None,
+                       endTstmp: Option[LocalDateTime] = None,
                        duration: Option[Duration] = None,
                        msg: Option[String] = None,
                        results: Seq[ResultRuntimeInfo] = Seq(),
