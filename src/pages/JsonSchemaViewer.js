@@ -1,18 +1,15 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import BrowserOnly from '@docusaurus/BrowserOnly';
+import useIsBrowser from '@docusaurus/useIsBrowser';
 
 function JsonSchemaViewer() {
+    // only load schema viewer in browser because the schema viewer does not support server side rendering
+    const SchemaViewerInBrowser = useIsBrowser ? require('../schema-viewer/SchemaViewerComponent').default : (<div />);
+
     return (
         <Layout title="JsonSchemaViewer" noFooter={true} wrapperClassName="schema-viewer-wrapper">
             <div style={{flex: 1}}>
-                {/* prevent any server side rendering by docusaurus because the schema viewer does not support it */}
-                <BrowserOnly>
-                    {() => {
-                        const SchemaViewerComponent = require('../schema-viewer/SchemaViewerComponent').default;
-                        return (<SchemaViewerComponent/>)
-                    }}
-                </BrowserOnly>
+                <SchemaViewerInBrowser  />
             </div>
         </Layout>
     );
