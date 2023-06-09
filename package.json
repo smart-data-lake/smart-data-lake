@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "docusaurus": "docusaurus",
-    "start": "docusaurus start",
-    "build": "docusaurus build",
+    "start": "node create-schema-index.js && docusaurus start",
+    "build": "node create-schema-index.js && docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -27,7 +27,7 @@
     "prism-react-renderer": "^1.2.1",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
-    "sdlb-schema-viewer": "^1.0.0"
+    "sdlb-schema-viewer": "^1.1.0"
   },
   "browserslist": {
     "production": [
