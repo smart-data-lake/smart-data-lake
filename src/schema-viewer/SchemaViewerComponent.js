@@ -2,6 +2,7 @@ import React from 'react';
 import { SchemaViewer, defaultTheme } from 'sdlb-schema-viewer';
 import { CssVarsProvider } from "@mui/joy";
 import UseColorMode from "./UseColorMode";
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 export default function SchemaViewerComponent() {
     // UseColorMode needs to be placed inside a CssVarsProvider.
@@ -15,7 +16,7 @@ export default function SchemaViewerComponent() {
     );
 }
 
-const schemasUrl = window.location.protocol + '//' + window.location.host + '/json-schema-viewer/schemas/';
+const schemasUrl = useBaseUrl('/json-schema-viewer/schemas/');
 
 function loadSchemaNames() {
     return fetch(schemasUrl + 'index.json').then(res => res.json());
