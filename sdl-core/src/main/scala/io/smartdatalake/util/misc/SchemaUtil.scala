@@ -65,6 +65,11 @@ object SchemaUtil {
     schema
   }
 
+  def prepareColumnsForDiff(schemaIn: GenericSchema, caseSensitive: Boolean): Seq[String] = {
+    if (caseSensitive) schemaIn.columns
+    else schemaIn.columns.map(_.toLowerCase)
+  }
+
   /**
    * Computes the set difference of `right` minus `left`, i.e: `Set(right)` \ `Set(left)`.
    *

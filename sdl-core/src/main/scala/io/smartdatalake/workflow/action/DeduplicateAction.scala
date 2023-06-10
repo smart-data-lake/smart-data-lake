@@ -24,10 +24,11 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.expressions.Window
@@ -103,7 +104,12 @@ case class DeduplicateAction(override val id: ActionId,
     // force SDLSaveMode.Merge if mergeModeEnable = true
     assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
     // customize update condition
-    val updateCondition = if (updateCapturedColumnOnlyWhenChanged) Some(checkRecordChangedColumns.map(c => s"existing.$c != new.$c").mkString(" or "))
+    val updateCondition = if (updateCapturedColumnOnlyWhenChanged) {
+      val (colsToUpdate, colsNew) = checkRecordChangedColumns.partition(outputCols.contains)
+      val colsToUpdateConditions = colsToUpdate.map(c => s"existing.$c != new.$c or (existing.$c is not null and new.$c is null) or (existing.$c is null and new.$c is not null)") // comparing equality including null is complicated with standard sql
+      val colsNewCondition = colsNew.map(c => s"new.$c is not null") // null is the default value of the new column, we need to update if the value in new data is not null
+      Some((colsToUpdateConditions ++ colsNewCondition).mkString(" or "))
+    }
     else None
     Some(SaveModeMergeOptions(updateCondition = updateCondition, additionalMergePredicate = mergeModeAdditionalJoinPredicate))
   } else {
@@ -112,6 +118,8 @@ case class DeduplicateAction(override val id: ActionId,
   }
   // DataFrame columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
   private var checkRecordChangedColumns: Seq[String] = Seq()
+  // Output columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
+  private var outputCols: Set[String] = Set()
 
   // If mergeModeEnabled=false, output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalTableDataObject] = if (!mergeModeEnable) Seq(output) else Seq()
@@ -158,7 +166,12 @@ case class DeduplicateAction(override val id: ActionId,
   }
 
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    checkRecordChangedColumns = inputSubFeed.dataFrame.map(_.schema.columns.toSeq).getOrElse(Seq())
+    checkRecordChangedColumns = inputSubFeed.dataFrame
+      .map(df => SchemaUtil.prepareColumnsForDiff(df.schema, Environment.caseSensitive))
+      .getOrElse(Seq())
+    if (output.isTableExisting && mergeModeEnable && updateCapturedColumnOnlyWhenChanged) {
+      outputCols = SchemaUtil.prepareColumnsForDiff(output.getDataFrame(Seq(), outputSubFeed.tpe).schema, Environment.caseSensitive).toSet
+    }
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
