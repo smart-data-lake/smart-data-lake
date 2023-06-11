@@ -55,7 +55,7 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
   override def clearSkipped(): InitSubFeed = throw new NotImplementedException() // calling clearSkipped makes no sense on InitSubFeed
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues))
+    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped)
   }
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)

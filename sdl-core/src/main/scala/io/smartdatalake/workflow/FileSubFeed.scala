@@ -82,11 +82,11 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
     case fileSubFeed: FileSubFeed if this.fileRefs.isDefined && fileSubFeed.fileRefs.isDefined =>
       this.copy(fileRefs = this.fileRefs.map(_ ++ fileSubFeed.fileRefs.get)
         , partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped)
     case fileSubFeed: FileSubFeed =>
       this.copy(fileRefs = None, partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart)
-    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped)
+    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart, isSkipped = this.isSkipped && x.isSkipped)
   }
 
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): FileSubFeed = {
