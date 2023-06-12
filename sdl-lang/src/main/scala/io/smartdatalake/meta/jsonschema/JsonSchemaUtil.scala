@@ -184,7 +184,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
           val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
           assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
-          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString).toSeq), deprecated = isDeprecated)
+          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString.trim).toSeq), deprecated = isDeprecated)
         case t if t.typeSymbol.asClass.isJavaEnum =>
           // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
           val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
