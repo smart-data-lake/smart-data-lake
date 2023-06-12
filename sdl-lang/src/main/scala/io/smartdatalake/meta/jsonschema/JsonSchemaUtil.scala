@@ -153,7 +153,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           if (refDefs.size > 1) JsonOneOfDef(refDefs, description, deprecated = isDeprecated)
           else refDefs.head
         }
-        case t if registry.typeExists(t) => registry.getJsonRefDef(t)
+        case t if registry.typeExists(t) => registry.getJsonRefDef(t, isDeprecated)
         case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass)
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
           val baseCls = getClass.getClassLoader.loadClass(t.typeSymbol.fullName)
@@ -232,10 +232,10 @@ private[smartdatalake] class DefinitionRegistry() {
   def getJsonRefDef(baseType: Option[Type], tpe: Type): JsonRefDef = {
     JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}")
   }
-  def getJsonRefDef(tpe: Type): JsonRefDef = {
+  def getJsonRefDef(tpe: Type, isDeprecated: Option[Boolean]): JsonRefDef = {
     val baseType = entries.flatMap { case (baseType, typeDefs) => typeDefs.keys.map( typeDef => (typeDef, baseType))}
       .find(_._1 == tpe).get._2
-    JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}")
+    JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}", deprecated = isDeprecated)
   }
   def getDefinitionMap: Map[String, ListMap[String, JsonTypeDef]] = {
     entries.map {
