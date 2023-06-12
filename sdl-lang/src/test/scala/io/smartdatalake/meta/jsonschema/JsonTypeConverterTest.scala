@@ -23,6 +23,7 @@ import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.meta.GenericTypeDef
 import io.smartdatalake.meta.GenericTypeUtil.attributesForCaseClass
+import io.smartdatalake.meta.jsonschema.TestEnum.TestEnum
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
@@ -181,4 +182,21 @@ class JsonTypeConverterTest extends FunSuite {
     val attributes = attributesForCaseClass(tpe, Map())
     GenericTypeDef("testTypeDef", baseType, tpe, None, true, Set(), attributes)
   }
+
+  case class TestClassWithEnum(testEnum: TestEnum)
+  test("convert scala enum to json enum") {
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithEnum])
+
+    val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
+
+    assert(jsonTypeDef.properties("testEnum").isInstanceOf[JsonStringDef])
+    val jsonEnum = jsonTypeDef.properties("testEnum").asInstanceOf[JsonStringDef]
+    assert(jsonEnum.enum.get.toSet == Set("firstValue", "secondValue"))
+   }
+}
+
+object TestEnum extends Enumeration {
+  type TestEnum = Value
+  val firstValue = Value("firstValue")
+  val secondValue = Value("secondValue")
 }
