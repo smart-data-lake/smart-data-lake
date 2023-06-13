@@ -935,7 +935,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -1070,12 +1070,12 @@
           "dateColumnType" : {
             "type" : "string",
             "description" : "Specifies the string format used for writing date typed data.",
-            "enum" : [ "Default ", "String ", "Date " ]
+            "enum" : [ "Default", "String", "Date" ]
           },
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -1362,7 +1362,7 @@
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "AvgCountPerPartitionExpectation",
@@ -1373,7 +1373,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1383,29 +1383,36 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "ExpectationDefaultImpl"
+                  }
+                },
+                "title" : "ExpectationDefaultImpl",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1431,62 +1438,18 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLExpectation",
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "ExpectationDefaultImpl"
-                  }
-                },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1516,18 +1479,55 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLFractionExpectation",
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -1535,7 +1535,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "[[SDLSaveMode]] to use when writing files, default is \\\"overwrite\\\". Overwrite, Append and Merge are supported for now.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
             "type" : "boolean",
@@ -1692,7 +1692,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -1816,7 +1816,7 @@
           "dateColumnType" : {
             "type" : "string",
             "description" : "type of date column",
-            "enum" : [ "Default ", "String ", "Date " ]
+            "enum" : [ "Default", "String", "Date" ]
           },
           "schemaMin" : {
             "type" : "string",
@@ -1881,7 +1881,7 @@
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "AvgCountPerPartitionExpectation",
@@ -1892,7 +1892,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1902,29 +1902,36 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "ExpectationDefaultImpl"
+                  }
+                },
+                "title" : "ExpectationDefaultImpl",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1950,62 +1957,18 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLExpectation",
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "ExpectationDefaultImpl"
-                  }
-                },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2035,18 +1998,55 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLFractionExpectation",
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2058,7 +2058,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "spark[[SaveMode]] to use when writing files, default is \\\"overwrite\\\"",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "acl" : {
             "type" : "object",
@@ -2212,7 +2212,7 @@
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "AvgCountPerPartitionExpectation",
@@ -2223,7 +2223,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -2233,29 +2233,36 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "ExpectationDefaultImpl"
+                  }
+                },
+                "title" : "ExpectationDefaultImpl",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2281,62 +2288,18 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLExpectation",
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "ExpectationDefaultImpl"
-                  }
-                },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2366,18 +2329,55 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLFractionExpectation",
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2389,7 +2389,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "[[SDLSaveMode]] to use when writing table, default is \\\"Overwrite\\\". Only \\\"Append\\\" and \\\"Overwrite\\\" supported.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
             "type" : "boolean",
@@ -2533,7 +2533,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -2653,7 +2653,7 @@
           "keyType" : {
             "type" : "string",
             "description" : "Optional type the key column should be converted to. If none is given it will be interpreted as string.",
-            "enum" : [ "String ", "Binary ", "Json ", "Avro ", "JsonSchemaRegistry ", "AvroSchemaRegistry " ]
+            "enum" : [ "String", "Binary", "Json", "Avro", "JsonSchemaRegistry", "AvroSchemaRegistry" ]
           },
           "keySchema" : {
             "type" : "string",
@@ -2662,7 +2662,7 @@
           "valueType" : {
             "type" : "string",
             "description" : "Optional type the value column should be converted to. If none is given it will be interpreted as string.",
-            "enum" : [ "String ", "Binary ", "Json ", "Avro ", "JsonSchemaRegistry ", "AvroSchemaRegistry " ]
+            "enum" : [ "String", "Binary", "Json", "Avro", "JsonSchemaRegistry", "AvroSchemaRegistry" ]
           },
           "valueSchema" : {
             "type" : "string",
@@ -2790,7 +2790,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "spark[[SaveMode]] to use when writing files, default is \\\"overwrite\\\"",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -2933,7 +2933,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -3068,7 +3068,7 @@
           "dateColumnType" : {
             "type" : "string",
             "description" : "Specifies the string format used for writing date typed data.",
-            "enum" : [ "Default ", "String ", "Date " ]
+            "enum" : [ "Default", "String", "Date" ]
           },
           "treatMissingColumnsAsCorrupt" : {
             "type" : "boolean",
@@ -3081,7 +3081,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -3208,7 +3208,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -3292,7 +3292,7 @@
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "AvgCountPerPartitionExpectation",
@@ -3303,7 +3303,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3313,29 +3313,36 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "ExpectationDefaultImpl"
+                  }
+                },
+                "title" : "ExpectationDefaultImpl",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3361,62 +3368,18 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLExpectation",
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "ExpectationDefaultImpl"
-                  }
-                },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3446,18 +3409,55 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLFractionExpectation",
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -3465,7 +3465,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "spark[[SDLSaveMode]] to use when writing files, default is \\\"overwrite\\\"",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "connectionId" : {
             "type" : "string",
@@ -3555,7 +3555,7 @@
           },
           "dateColumnType" : {
             "type" : "string",
-            "enum" : [ "Default ", "String ", "Date " ]
+            "enum" : [ "Default", "String", "Date" ]
           },
           "schemaMin" : {
             "type" : "string",
@@ -3620,7 +3620,7 @@
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "AvgCountPerPartitionExpectation",
@@ -3631,7 +3631,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3641,29 +3641,36 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "ExpectationDefaultImpl"
+                  }
+                },
+                "title" : "ExpectationDefaultImpl",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3689,62 +3696,18 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLExpectation",
                 "required" : [ "name", "aggExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "ExpectationDefaultImpl"
-                  }
-                },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type`any` ."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3774,18 +3737,55 @@
                   "scope" : {
                     "type" : "string",
                     "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All ", "JobPartition ", "Job " ]
+                    "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
                     "type" : "string",
                     "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn ", "Error " ]
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
                 "title" : "SQLFractionExpectation",
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'= 0\\\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
               } ]
             },
             "description" : "Map of expectation name and definition to evaluate on write, see[[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
@@ -3795,7 +3795,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "acl" : {
             "type" : "object",
@@ -3914,7 +3914,7 @@
           },
           "writeMethod" : {
             "type" : "string",
-            "enum" : [ "Delete ", "Put ", "Post ", "Get " ]
+            "enum" : [ "Delete", "Put", "Post", "Get" ]
           },
           "proxy" : {
             "type" : "object",
@@ -4005,7 +4005,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -4118,7 +4118,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "enum" : [ "Merge ", "OverwriteOptimized ", "OverwritePreserveDirectories ", "Ignore ", "ErrorIfExists ", "Append ", "Overwrite " ]
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           }
         },
         "title" : "SaveModeGenericOptions",
@@ -4300,6 +4300,52 @@
         "title" : "ConnectionMetadata",
         "additionalProperties" : false,
         "description" : "Additional metadata for a Connection"
+      },
+      "CustomDfTransformerConfig" : {
+        "type" : "object",
+        "properties" : {
+          "className" : {
+            "type" : "string",
+            "description" : "Optional class name implementing trait[[CustomDfTransformer]]"
+          },
+          "scalaFile" : {
+            "type" : "string",
+            "description" : "Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type[[fnTransformType]] ."
+          },
+          "scalaCode" : {
+            "type" : "string",
+            "description" : "Optional scala code for transformation. The scala code needs to be a function of type[[fnTransformType]] ."
+          },
+          "sqlCode" : {
+            "type" : "string",
+            "description" : "Optional SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\""
+          },
+          "pythonFile" : {
+            "type" : "string",
+            "description" : "Optional pythonFile to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
+          },
+          "pythonCode" : {
+            "type" : "string",
+            "description" : "Optional pythonCode to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options to pass to the transformation"
+          },
+          "runtimeOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
+          }
+        },
+        "title" : "CustomDfTransformerConfig",
+        "additionalProperties" : false,
+        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` ."
       },
       "DataObjectMetadata" : {
         "type" : "object",
@@ -5651,6 +5697,25 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5682,25 +5747,6 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5854,17 +5900,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5888,6 +5923,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -6191,7 +6237,7 @@
           "parameterResolution" : {
             "type" : "string",
             "description" : "By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.\nBut there are other options, see[[ParameterResolution]] .",
-            "enum" : [ "DataObjectOrdering ", "DataObjectId " ]
+            "enum" : [ "DataObjectOrdering", "DataObjectId" ]
           },
           "strictInputValidation" : {
             "type" : "boolean",
@@ -6282,50 +6328,8 @@
             "description" : "a flag to enable deletion of input partitions after copying."
           },
           "transformer" : {
-            "type" : "object",
-            "properties" : {
-              "className" : {
-                "type" : "string",
-                "description" : "Optional class name implementing trait[[CustomDfTransformer]]"
-              },
-              "scalaFile" : {
-                "type" : "string",
-                "description" : "Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type[[fnTransformType]] ."
-              },
-              "scalaCode" : {
-                "type" : "string",
-                "description" : "Optional scala code for transformation. The scala code needs to be a function of type[[fnTransformType]] ."
-              },
-              "sqlCode" : {
-                "type" : "string",
-                "description" : "Optional SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\""
-              },
-              "pythonFile" : {
-                "type" : "string",
-                "description" : "Optional pythonFile to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
-              },
-              "pythonCode" : {
-                "type" : "string",
-                "description" : "Optional pythonCode to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
-              },
-              "options" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "Options to pass to the transformation"
-              },
-              "runtimeOptions" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
-              }
-            },
-            "title" : "CustomDfTransformerConfig",
-            "additionalProperties" : false,
-            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` ."
+            "$ref" : "#/definitions/Others/CustomDfTransformerConfig",
+            "deprecated" : true
           },
           "transformers" : {
             "type" : "array",
@@ -6786,50 +6790,8 @@
             "description" : "output DataObject"
           },
           "transformer" : {
-            "type" : "object",
-            "properties" : {
-              "className" : {
-                "type" : "string",
-                "description" : "Optional class name implementing trait[[CustomDfTransformer]]"
-              },
-              "scalaFile" : {
-                "type" : "string",
-                "description" : "Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type[[fnTransformType]] ."
-              },
-              "scalaCode" : {
-                "type" : "string",
-                "description" : "Optional scala code for transformation. The scala code needs to be a function of type[[fnTransformType]] ."
-              },
-              "sqlCode" : {
-                "type" : "string",
-                "description" : "Optional SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\""
-              },
-              "pythonFile" : {
-                "type" : "string",
-                "description" : "Optional pythonFile to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
-              },
-              "pythonCode" : {
-                "type" : "string",
-                "description" : "Optional pythonCode to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
-              },
-              "options" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "Options to pass to the transformation"
-              },
-              "runtimeOptions" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
-              }
-            },
-            "title" : "CustomDfTransformerConfig",
-            "additionalProperties" : false,
-            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` ."
+            "$ref" : "#/definitions/Others/CustomDfTransformerConfig",
+            "deprecated" : true
           },
           "transformers" : {
             "type" : "array",
@@ -7055,50 +7017,8 @@
             "description" : "output DataObject"
           },
           "transformer" : {
-            "type" : "object",
-            "properties" : {
-              "className" : {
-                "type" : "string",
-                "description" : "Optional class name implementing trait[[CustomDfTransformer]]"
-              },
-              "scalaFile" : {
-                "type" : "string",
-                "description" : "Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type[[fnTransformType]] ."
-              },
-              "scalaCode" : {
-                "type" : "string",
-                "description" : "Optional scala code for transformation. The scala code needs to be a function of type[[fnTransformType]] ."
-              },
-              "sqlCode" : {
-                "type" : "string",
-                "description" : "Optional SQL code for transformation.\nUse tokens %{<key>} to replace with runtimeOptions in SQL code.\nExample: \\\"select * from test where run = %{runId}\\\""
-              },
-              "pythonFile" : {
-                "type" : "string",
-                "description" : "Optional pythonFile to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
-              },
-              "pythonCode" : {
-                "type" : "string",
-                "description" : "Optional pythonCode to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf."
-              },
-              "options" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "Options to pass to the transformation"
-              },
-              "runtimeOptions" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
-              }
-            },
-            "title" : "CustomDfTransformerConfig",
-            "additionalProperties" : false,
-            "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nDefine a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a\nDataFrame, see also[[CustomDfTransformer]].\n\nNote about Python transformation: Environment with Python and PySpark needed.\nPySpark session is initialize and available under variables`sc`,`session`,`sqlContext`.\nOther variables available are\n-`inputDf`: Input DataFrame\n-`options`: Transformation options as Map[String,String]\n-`dataObjectId`: Id of input dataObject as String\nOutput DataFrame must be set with`setOutputDf(df)` ."
+            "$ref" : "#/definitions/Others/CustomDfTransformerConfig",
+            "deprecated" : true
           },
           "transformers" : {
             "type" : "array",
@@ -7255,13 +7175,11 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/Action/CopyAction"
-            }, {
               "$ref" : "#/definitions/Action/CustomDataFrameAction"
             }, {
-              "$ref" : "#/definitions/Action/CustomScriptAction"
+              "$ref" : "#/definitions/Action/CustomFileAction"
             }, {
-              "$ref" : "#/definitions/Action/HistorizeAction"
+              "$ref" : "#/definitions/Action/FileTransferAction"
             } ]
           },
           "agent" : {
