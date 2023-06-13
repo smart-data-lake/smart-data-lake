@@ -6,6 +6,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
@@ -40,7 +41,8 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[HousekeepingMode],
     typeOf[AuthMode],
     typeOf[ValidationRule],
-    typeOf[SaveModeOptions]
+    typeOf[SaveModeOptions],
+    typeOf[CustomDfTransformerConfig]
   )
 
   def getReflections = new Reflections("io.smartdatalake")

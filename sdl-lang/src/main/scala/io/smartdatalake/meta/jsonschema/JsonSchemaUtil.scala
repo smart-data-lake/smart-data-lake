@@ -153,7 +153,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           if (refDefs.size > 1) JsonOneOfDef(refDefs, description, deprecated = isDeprecated)
           else refDefs.head
         }
-        case t if registry.typeExists(t) => registry.getJsonRefDef(t)
+        case t if registry.typeExists(t) => registry.getJsonRefDef(t, isDeprecated)
         case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass)
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
           val baseCls = getClass.getClassLoader.loadClass(t.typeSymbol.fullName)
@@ -184,7 +184,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
           val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
           assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
-          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString).toSeq), deprecated = isDeprecated)
+          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString.trim).toSeq), deprecated = isDeprecated)
         case t if t.typeSymbol.asClass.isJavaEnum =>
           // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
           val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
@@ -232,10 +232,10 @@ private[smartdatalake] class DefinitionRegistry() {
   def getJsonRefDef(baseType: Option[Type], tpe: Type): JsonRefDef = {
     JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}")
   }
-  def getJsonRefDef(tpe: Type): JsonRefDef = {
+  def getJsonRefDef(tpe: Type, isDeprecated: Option[Boolean]): JsonRefDef = {
     val baseType = entries.flatMap { case (baseType, typeDefs) => typeDefs.keys.map( typeDef => (typeDef, baseType))}
       .find(_._1 == tpe).get._2
-    JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}")
+    JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}", deprecated = isDeprecated)
   }
   def getDefinitionMap: Map[String, ListMap[String, JsonTypeDef]] = {
     entries.map {
