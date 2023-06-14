@@ -65,15 +65,26 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
     this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
   }
 
-  override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case snowparkSubFeed: SnowparkSubFeed if this.dataFrame.isDefined && snowparkSubFeed.dataFrame.isDefined =>
-      this.copy(dataFrame = Some(this.dataFrame.get.unionByName(snowparkSubFeed.dataFrame.get)),
-        partitionValues = unionPartitionValues(snowparkSubFeed.partitionValues),
-        isDAGStart = this.isDAGStart || snowparkSubFeed.isDAGStart)
-    case subFeed =>
-      this.copy(dataFrame = None,
-        partitionValues = unionPartitionValues(subFeed.partitionValues),
-        isDAGStart = this.isDAGStart || subFeed.isDAGStart)
+  override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
+    val (dataFrame, dummy) = other match {
+      // both subfeeds have a DataFrame to reuse -> union DataFrames
+      case sparkSubFeed: SnowparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
+        (this.dataFrame.map(_.unionByName(sparkSubFeed.dataFrame.get)), false)
+      // both subfeeds have DataFrames, but they are not reusable, e.g. they just transport the schema
+      case sparkSubFeed: SnowparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
+        (this.dataFrame.orElse(sparkSubFeed.dataFrame), true) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
+      // otherwise no dataframe
+      case _ =>
+        (None, false)
+    }
+    var resultSubfeed = this.copy(dataFrame = dataFrame
+      , partitionValues = unionPartitionValues(other.partitionValues)
+      , isDAGStart = this.isDAGStart || other.isDAGStart
+      , isSkipped = this.isSkipped && other.isSkipped
+    )
+    if (dummy) resultSubfeed = resultSubfeed.convertToDummy(dataFrame.get.schema)
+    // return
+    resultSubfeed
   }
 
   override def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): SnowparkSubFeed = {

@@ -84,17 +84,26 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
     this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
   }
-  override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case sparkSubFeed: SparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
-      this.copy(dataFrame = this.dataFrame.map(_.unionByName(sparkSubFeed.dataFrame.get))
-        , partitionValues = unionPartitionValues(sparkSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || sparkSubFeed.isDAGStart)
-    case sparkSubFeed: SparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
-      this.copy(dataFrame = this.dataFrame.orElse(sparkSubFeed.dataFrame)
-        , partitionValues = unionPartitionValues(sparkSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || sparkSubFeed.isDAGStart)
-        .convertToDummy(this.dataFrame.orElse(sparkSubFeed.dataFrame).get.schema) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
-    case x => this.copy(dataFrame = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
+  override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
+    val (dataFrame, dummy) = other match {
+      // both subfeeds have a DataFrame to reuse -> union DataFrames
+      case sparkSubFeed: SparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
+        (this.dataFrame.map(_.unionByName(sparkSubFeed.dataFrame.get)), false)
+      // both subfeeds have DataFrames, but they are not reusable, e.g. they just transport the schema
+      case sparkSubFeed: SparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
+        (this.dataFrame.orElse(sparkSubFeed.dataFrame), true) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
+      // otherwise no dataframe
+      case _ =>
+        (None, false)
+    }
+    var resultSubfeed = this.copy( dataFrame = dataFrame
+      , partitionValues = unionPartitionValues(other.partitionValues)
+      , isDAGStart = this.isDAGStart || other.isDAGStart
+      , isSkipped = this.isSkipped && other.isSkipped
+    )
+    if (dummy) resultSubfeed = resultSubfeed.convertToDummy(dataFrame.get.schema)
+    // return
+    resultSubfeed
   }
   override def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): SparkSubFeed = {
     // if filter is removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
