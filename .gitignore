@@ -21,6 +21,9 @@ spark-warehouse
 
 # Generated files
 .idea/**/contentModel.xml
+.bloop
+.metals
+.vscode
 
 # Sensitive or high-churn files
 .idea/**/dataSources/
