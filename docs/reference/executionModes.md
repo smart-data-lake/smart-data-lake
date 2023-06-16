@@ -145,7 +145,7 @@ For each condition you can also define a description which will be inserted into
 <!--TODO show a short example of PartitionDiffMode.failConditions with descriptions -->
 
 #### selectExpression
-The option `selectExpression` defines the list of selected output partitions.
+The option `selectExpression` refines or overrides the list of selected output partitions. It can access the partition values selected by the default behaviour and refine the list, or it can override selected partition values by using input & output partition values directly.
 Define a spark sql expression working with attributes of PartitionDiffModeExpressionData returning a `Seq(Map(String,String))`.
 
 Example - only process the last selected partition:
