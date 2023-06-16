@@ -266,10 +266,10 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(resultat2)
   }
 
-  // Note that this is not possible with DeltaLake 1.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
+  // Note that this is not possible with DeltaLake <= 2.3.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
   // Unfortunately this is needed by HistorizeAction with merge.
   // We test for failure to be notified once it is working...
-  test("SaveMode merge with updateCols and schema evolution - fails in deltalake 1.0") {
+  test("SaveMode merge with updateCols and schema evolution - fails in deltalake <= 2.3.0") {
     val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
