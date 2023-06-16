@@ -19,7 +19,7 @@ executionMode {
 
 There are 2 major types of execution modes selecting the subset of data based on:
 
-* __partitions__: the user selects specific partition to process, or lets SDLB select missing partitions automatically 
+* __partition-wise__: Either SDLB will automatically select and process missing partitions from the input, or the partitions are defined manually by a command line parameter.
 * __incremental__: SDLB will automatically select new and updated data from the input and process data incrementally.
 
 
