@@ -13,7 +13,7 @@ hide_table_of_contents: false
 In this article, we're taking a look on how we use SDLB's housekeeping features to keep our pipelines running efficiently.
 
 Some DataObject contain housekeeping features of their own. 
-Make sur you use them!
+Make sure you use them!
 For example, Delta Tables support commands like `optimize` and `vacuum` to optimize storage and delete no longer needed files.
 
 But usually, those commands do not re-organize your partitions. 
@@ -23,8 +23,8 @@ The example is taken from a real world project we've implemented.
 
 ## Context
 In this particular project we are collecting data from various reporting units and process it in batches.
-The reporting units use an Azure Function to upload JSON files to a Azure Data Lake Storage. 
-From there, we pick up the files to validate and process them. 
+The reporting units use an Azure Function to upload JSON files to an Azure Data Lake Storage. 
+From there, we pick them up for validation and processing. 
 Reporting units can upload data anytime, but it is only processed a few times a day.
 
 Once validated, we use Delta Lake tables in Databricks to process data through the layers of the Lakehouse.
@@ -80,7 +80,7 @@ Note how we just use run_id as part of the schema without any further declaratio
 Since we use the state path, SDLB uses a `run_id` internally, and we can use it too.
 
 ## Drawback
-Let's take a look at the partition layout of `stage_json`:
+Let's take a look at the resulting partition layout of `stage_json`:
 ```
 processedFolder/
   run_id=1/
