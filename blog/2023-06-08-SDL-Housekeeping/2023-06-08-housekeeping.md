@@ -100,7 +100,7 @@ In further stages we can clearly work with files that were processed in the curr
 But the drawbacks of this partition scheme becomes apparent after running for a longer time:
   - Some reporting units don't upload data for days. You end up with only a few reporting_unit partitions per run_id.
   - File sizes are rather small (< 1 MiB), partition sizes end up very small too.
-  - If you use hourly runs and run 24/7, you end up with 168 per week, plus sub-partitions for reporting units.
+  - If you use hourly runs and run 24/7, you end up with 168 partitions per week, plus sub-partitions for reporting units.
   - Once files are correctly processed, we don't read the uploaded files anymore. 
     We still keep them as raw files should we ever need to re-process them.
 
