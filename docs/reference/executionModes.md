@@ -227,7 +227,7 @@ In this case, SDLB needs to remember what data increments were already uploaded.
 :::
 
 ### SparkStreamingMode
-SDLB also supports a streaming with the `SparkStreamingMode`.
+SDLB also supports streaming with the `SparkStreamingMode`.
 Under the hood it uses [Spark Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html).
 An Action with SparkStreamingMode in streaming mode is an asynchronous action.
 
