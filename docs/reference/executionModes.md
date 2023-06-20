@@ -256,7 +256,7 @@ e.g. committed offsets.
 Another paradigm for incremental processing with files is to move or delete input files once they are processed.
 This can be achieved by using FileIncrementalMoveMode. If option `archiveSubdirectory` is configured, files are moved into that directory after processing, otherwise they are deleted.
 
-FileIncrementalMoveMode is the only execution mode that can be used with the file engine (see also [Execution engines](executionEngines.md)), but also with SparkFileDataObjects and the data frame engine.
+FileIncrementalMoveMode can be used with the file engine (see also [Execution engines](executionEngines.md)), but also with SparkFileDataObjects and the data frame engine.
 
 ## Others
 
