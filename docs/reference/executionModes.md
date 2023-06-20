@@ -51,13 +51,6 @@ partitionedDataObject {
 ```
 Note that not all DataObjects support partitioning.
 
-TODO:
-<!--
-too detailed:
-This is the case for most DataObjects, even though some cannot directly access the partitions in the data storage. 
-We implemented a concept called virtual partitions for them, see JdbcTableDataObject and KafkaTopicDataObject.
--->
-
 ### Default Behavior
 In its simplest form, you manually define the partition values to be processed by specifying the command line parameter `--partition-values` or `--multi-partition-values`, see [Command Line](commandLine.md).
 This is in the form of columnName=columnValue, e.g. `--partition-values day=2020-01-01`.
@@ -76,25 +69,32 @@ Automatic selection uses a heuristic:
 The first input which is not skipped, is not in the list of `inputIdsToIgnoreFilter`, and has the most partition columns defined is chosen.
 :::
 
-TODO: Check
 Another special case you might encounter is if an output DataObject has different partition columns than the input DataObject.
-In these cases, the partition values of the input DataObject will be used and passed on to the next action.  
-So if your input DataObject has [runId] as partition values and your output DataObject [runId, division],
-then `division` will be removed from the partition values before they are passed on.
+In these cases, the partition value columns of the input DataObject will be filtered and passed on to the next action.  
+So if your input DataObject has [runId, division] as partition values and your output DataObject [runId],
+then `division` will be removed from the partition value columns before they are passed on.
 
 This default behaviour is active without providing any explicit `executionMode` in the config of your Actions.
 This means that processing partitioned data is available out-of-the-box in SDLB.
 
 :::info
 The partition values act as filter.
-If you define partition values that do not exist in the input dataObject, these partitions will not be automatically created for you.
+SDLB also validates that partition values actually exist in input DataObjects. 
+If they don't, execution will stop with an error. 
+This behavior can be changed by setting `DataObject.expectedPartitionsCondition`.
 
-TODO:
---SDLB also validates that partition values actually exist in input DataObjects.
-SDLB also validates that partition values exist in input data objects (can be overriden by DataObject.expectedPartitionsCondition). This is especially interesting with CustomDataFrameAction and multiple partitioned inputs, so you dont just join them even if some input data is missing...
-Isn't that contradicting the above sentence? What happens if values don't exist? Simply not created?
-Or pipeline fails?
+This is especially interesting with CustomDataFrameAction having multiple partitioned inputs, 
+so you don't just join them if some of the input data is missing.
+:::
 
+:::info
+Another important caveat:  
+Partition values filter all input DataObject _that contain the given partition columns_.
+This also means, that they don't have any effect on input DataObjects with different partition columns 
+or no partitions at all.
+
+If you need to read everything from one DataObject, even though it does have the same partition columns,
+you can again use `CustomDataFrameAction.inputIdsToIgnoreFilter` to override the default behavior.
 :::
 
 
@@ -150,7 +150,12 @@ Sometimes the `failCondition` can become quite complex with multiple terms conca
 To improve interpretability of error messages, multiple fail conditions can be configured as an array using the attribute `failConditions`.
 For each condition you can also define a description which will be inserted into the error message.
 
-<!--TODO show a short example of PartitionDiffMode.failConditions with descriptions -->
+```
+  failConditions = [{
+    expression = "(size(selectedPartitionValues) > 0 and array_min(transform(selectedPartitionValues, x -> x.dt)) < array_max(transform(outputPartitionValues, x > x.dt)))"
+    description = "fail if partitions are not processed in strictly increasing order of partition column dt"
+  }]
+```
 
 #### selectExpression
 The option `selectExpression` refines or overrides the list of selected output partitions. It can access the partition values selected by the default behaviour and refine the list, or it can override selected partition values by using input & output partition values directly.
@@ -168,17 +173,12 @@ You can force PartitionDiffMode to check for missing partitions against another 
 This can even be a DataObject that comes later in your pipeline so it doesn't have to be one of the Actions output DataObjects.
 
 #### partitionColNb
-TODO
+When comparing which partitions and subpartitions need to be transferred, usually all the parition columns are used.
+With these setting, you can limit the amount of columns used for the comparison to the first N columns.
 
 #### nbOfPartitionValuesPerRun
 If you have a lot of partitions, you might want to limit the number of partitions processed per run.
 If you define `nbOfPartitionValuesPerRun`, PartitionDiffMode will only process the first n partitions and ignore the rest.
-
-#### applyPartitionValuesTransform
-TODO
-
-#### selectAdditionalInputExpression
-TODO
 
 
 ### CustomPartitionMode
@@ -248,7 +248,8 @@ These are `KafkaTopicDataObject` and all `SparkFileDataObjects`, see also [Spark
 
 
 ### KafkaStateIncrementalMode
-TODO
+A special incremental execution mode for Kafka inputs, remembering the state from the last increment through the Kafka Consumer, 
+e.g. committed offsets.
 
 
 ### FileIncrementalMoveMode
@@ -263,9 +264,16 @@ FileIncrementalMoveMode is the only execution mode that can be used with the fil
 An execution mode which forces processing of all data from its inputs.
 Any partitionValues and filter conditions received from previous actions are ignored.
 
+### CustomPartitionMode
+This execution mode allows to implement arbitrary custom partition logic using Scala.
+
+Implement trait `CustomPartitionMode` by defining a function which receives the main input and output DataObjects
+and returns the partition values that need to be processed.
 
 ### CustomMode
 This execution mode allows to implement arbitrary processing logic using Scala.
 
-Implement trait `CustomModeLogic` by defining a function which receives main input and output DataObject and returns an `ExecutionModeResult`.
+Implement trait `CustomModeLogic` by defining a function which receives main input and output DataObjects and returns an `ExecutionModeResult`.
 The result can contain input and output partition values, but also options which are passed to the transformations defined in the Action.
+
+
