@@ -3,6 +3,7 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 
 /**
@@ -11,15 +12,14 @@ import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, Hado
  */
 class FinalStateWriter(options: Map[String,StringOrSecret]) extends StateListener with SmartDataLakeLogger {
 
-  val path = options.get("path").getOrElse(throw new IllegalArgumentException("Option 'path' not defined")).resolve()
-  var stateStore: Option[HadoopFileActionDAGRunStateStore] = None
+  private val path = options.getOrElse("path", throw new IllegalArgumentException("Option 'path' not defined")).resolve()
+  private var stateStore: Option[HadoopFileActionDAGRunStateStore] = None
 
   logger.info(s"instantiated: path=$path")
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[SdlConfigObject.ActionId]): Unit = {
     // initialize state store
     if (stateStore.isEmpty) {
-      val path = options.get("path").getOrElse(throw new IllegalArgumentException("Option 'path' not defined")).resolve()
       stateStore = Some(new HadoopFileActionDAGRunStateStore(path, context.application, context.hadoopConf))
       // check connection
       stateStore.get.getLatestRunId

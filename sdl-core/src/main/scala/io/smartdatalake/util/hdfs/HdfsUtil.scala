@@ -27,7 +27,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import java.io.IOException
 import java.net.URI
 import scala.collection.AbstractIterator
-import scala.io.Source
+import scala.io.{Codec, Source}
 import scala.util.Try
 
 /**
@@ -305,13 +305,13 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
 
   def readHadoopFile(file: Path)(implicit filesystem: FileSystem): String = {
     val is = filesystem.open(file)
-    Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
+    Source.fromInputStream(is)(Codec.UTF8).getLines.mkString(sys.props("line.separator"))
   }
 
   def writeHadoopFile(file: Path, content: String)(implicit filesystem: FileSystem): Unit = {
     val os = filesystem.create(file, true)
     try {
-      os.writeBytes(content)
+      os.write(content.getBytes(Codec.UTF8.name))
     } finally {
       os.close()
     }
