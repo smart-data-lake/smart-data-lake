@@ -93,7 +93,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
   /**
    * Search state directory for state files of this app
    */
-  private def getFiles(path: Option[Path] = None): Seq[HadoopFileStateId] = {
+  def getFiles(path: Option[Path] = None): Seq[HadoopFileStateId] = {
     val filenameMatcher = s"(.+)\\${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}([0-9]+)\\${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}([0-9]+)\\.json".r
     val pathFilter = new PathFilter {
       override def accept(path: Path): Boolean = path.getName.startsWith(appName + HadoopFileActionDAGRunStateStore.fileNamePartSeparator)

@@ -17,13 +17,13 @@ class FinalStateWriter(options: Map[String,StringOrSecret]) extends StateListene
 
   logger.info(s"instantiated: path=$path")
 
+  override def init(context: ActionPipelineContext): Unit = {
+    stateStore = Some(new HadoopFileActionDAGRunStateStore(path, context.application, context.hadoopConf))
+    // check connection
+    stateStore.get.getLatestRunId
+  }
+
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[SdlConfigObject.ActionId]): Unit = {
-    // initialize state store
-    if (stateStore.isEmpty) {
-      stateStore = Some(new HadoopFileActionDAGRunStateStore(path, context.application, context.hadoopConf))
-      // check connection
-      stateStore.get.getLatestRunId
-    }
     // write state file on final notification
     if (state.isFinal) {
       stateStore.get.saveState(state)
