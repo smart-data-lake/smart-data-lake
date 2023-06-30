@@ -22,8 +22,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
-import io.smartdatalake.util.filetransfer.{FileTransfer, StreamFileTransfer}
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResource}
+import io.smartdatalake.util.filetransfer.StreamFileTransfer
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.dataobject.HadoopFileDataObject

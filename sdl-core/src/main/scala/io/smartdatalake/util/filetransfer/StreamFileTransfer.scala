@@ -18,14 +18,12 @@
  */
 package io.smartdatalake.util.filetransfer
 
-import java.io.{InputStream, OutputStream}
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResource}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
-import org.apache.spark.sql.SparkSession
 
+import java.io.{InputStream, OutputStream}
 import scala.annotation.tailrec
-import scala.collection.GenSeqLike
 import scala.util.{Failure, Success, Try, Using}
 
 /**

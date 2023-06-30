@@ -21,7 +21,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.app.BuildVersionInfo.buildVersionInfoFilename
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResource}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import scopt.OptionParser
 
 import java.nio.file.{Files, Paths, StandardOpenOption}

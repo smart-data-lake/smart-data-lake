@@ -20,7 +20,6 @@
 package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.WithResource
 
 import scala.util.Using
 

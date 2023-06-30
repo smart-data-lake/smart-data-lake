@@ -19,7 +19,6 @@
 
 package io.smartdatalake.util.json
 
-import io.smartdatalake.util.misc.WithResource
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 

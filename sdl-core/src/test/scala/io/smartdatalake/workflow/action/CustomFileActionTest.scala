@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.WithResource
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
