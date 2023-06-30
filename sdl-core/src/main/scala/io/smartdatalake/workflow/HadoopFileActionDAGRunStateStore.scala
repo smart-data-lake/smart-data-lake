@@ -40,12 +40,12 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
    */
   override def saveState(state: ActionDAGRunState): Unit = synchronized {
     // write state file
-    val file = saveStateToFile(state)
+    val fileName = saveStateToFile(state)
     // if succeeded:
     // - delete temporary state file from current directory
     // - move previous failed attempt files from current to succeeded directory
     if (state.isSucceeded) {
-      filesystem.delete(file, /*recursive*/ false)
+      filesystem.delete(new Path(currentStatePath, fileName), false)
       getFiles(Some(currentStatePath))
         .filter( stateFile => stateFile.runId==state.runId && stateFile.attemptId<state.attemptId)
         .foreach { stateFile =>
@@ -56,7 +56,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     }
   }
 
-  def saveStateToFile(state: ActionDAGRunState): Path = {
+  def saveStateToFile(state: ActionDAGRunState): String = {
     val path = if (state.isSucceeded) succeededStatePath else currentStatePath
     val json = state.toJson
     val fileName = s"$appName${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.runId}${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.attemptId}.json"
@@ -64,7 +64,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     HdfsUtil.writeHadoopFile(file, json)
     logger.info(s"updated state into $file")
     // return
-    file
+    fileName
   }
 
   /**
