@@ -26,7 +26,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.annotation.tailrec
 import scala.collection.GenSeqLike
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success, Try, Using}
 
 /**
   * Copy data of each file from Input- to OutputStream of DataObject's
@@ -40,8 +40,8 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
     parallelize(fileRefPairs).foreach { m =>
       logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${m.tgt.toStringShort}")
       // get streams
-      WithResource.exec(srcDO.createInputStream(m.src.fullPath)) { is =>
-        WithResource.exec( tgtDO.createOutputStream(m.tgt.fullPath, overwrite)) { os =>
+      Using.resource(srcDO.createInputStream(m.src.fullPath)) { is =>
+        Using.resource( tgtDO.createOutputStream(m.tgt.fullPath, overwrite)) { os =>
           // transfer data
           Try(copyStream(is, os)) match {
             case Success(r) => r

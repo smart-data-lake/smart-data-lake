@@ -24,6 +24,7 @@ import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
 import scala.io.Source
+import scala.util.Using
 
 /**
  * This code originates from https://github.com/zalando-incubator/spark-json-schema and is protected by its corresponding MIT license.
@@ -532,7 +533,7 @@ class SchemaConverterTest extends FunSuite with Matchers with BeforeAndAfter {
 
   def getTestResourceContent(relativePath: String): String = {
     Option(getClass.getResource(relativePath)) match {
-      case Some(relPath) => WithResource.exec(Source.fromURL(relPath))(_.mkString)
+      case Some(relPath) => Using.resource(Source.fromURL(relPath))(_.mkString)
       case None => throw new IllegalArgumentException(s"Path can not be reached: $relativePath")
     }
   }

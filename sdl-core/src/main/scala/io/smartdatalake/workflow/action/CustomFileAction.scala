@@ -30,6 +30,8 @@ import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.hadoop.fs.Path
 
+import scala.util.Using
+
 /**
  * [[Action]] to transform files between two Hadoop Data Objects.
  * The transformation is executed in distributed mode on the Spark executors.
@@ -89,8 +91,8 @@ case class CustomFileAction(override val id: ActionId,
         .map { case (srcPath, tgtPath) =>
           val hadoopSrcPath = new Path(srcPath)
           val hadoopTgtPath = new Path(tgtPath)
-          val result = WithResource.exec(srcDO.getFilesystem(hadoopSrcPath).open(hadoopSrcPath)) { is =>
-            WithResource.exec(tgtDO.getFilesystem(hadoopTgtPath).create(hadoopTgtPath, true)) { os => // overwrite = true
+          val result = Using.resource(srcDO.getFilesystem(hadoopSrcPath).open(hadoopSrcPath)) { is =>
+            Using.resource(tgtDO.getFilesystem(hadoopTgtPath).create(hadoopTgtPath, true)) { os => // overwrite = true
               transformerVal.transform(is, os)
             }
           }
@@ -123,8 +125,8 @@ case class CustomFileAction(override val id: ActionId,
               val sampleFileTransfer = new StreamFileTransfer(input, output, overwrite = true)
               val hadoopSrcPath = new Path(sampleFileRefMapping.src.fullPath)
               val hadoopTgtPath = new Path(file)
-              val result = WithResource.exec(input.filesystem.open(hadoopSrcPath)) { is =>
-                WithResource.exec(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
+              val result = Using.resource(input.filesystem.open(hadoopSrcPath)) { is =>
+                Using.resource(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
                   transformer.transform(is, os)
                 }
               }

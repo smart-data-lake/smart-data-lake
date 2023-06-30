@@ -28,6 +28,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Properties
+import scala.util.Using
 
 /**
  * Configuration for writing SDLB version info file
@@ -83,7 +84,7 @@ case class BuildVersionInfo(version: String, user: String, date: LocalDateTime) 
     props.setProperty("version", version)
     props.setProperty("user", user)
     props.setProperty("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-    WithResource.exec(Files.newOutputStream(Paths.get(versionInfoFile), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+    Using.resource(Files.newOutputStream(Paths.get(versionInfoFile), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
       os => props.store(os, "")
     }
   }
@@ -112,7 +113,7 @@ object BuildVersionInfo extends SmartDataLakeLogger {
       logger.warn(s"Could not find resource $buildVersionInfoFilename")
       None
     } else {
-      WithResource.exec(resourceStream) {
+      Using.resource(resourceStream) {
         stream =>
           val props = new Properties()
           props.load(stream)
