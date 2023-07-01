@@ -19,7 +19,6 @@
 
 package io.smartdatalake.lab
 
-import io.smartdatalake.util.misc.WithResource
 import org.scalatest.FunSuite
 
 import java.nio.file.{Files, Paths}
