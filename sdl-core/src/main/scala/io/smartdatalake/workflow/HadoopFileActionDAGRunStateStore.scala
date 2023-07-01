@@ -29,9 +29,9 @@ import scala.io.Codec
 private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: String, appName: String, hadoopConf: Configuration) extends ActionDAGRunStateStore[HadoopFileStateId] with SmartDataLakeLogger {
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
-  private val currentStatePath = new Path(hadoopStatePath, "current")
-  private val succeededStatePath = new Path(hadoopStatePath, "succeeded")
-  implicit private val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
+  val currentStatePath: Path = new Path(hadoopStatePath, "current")
+  val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
+  implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
   filesystem.setWriteChecksum(false) // disable writing CRC files
 
@@ -39,27 +39,32 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
    * Save state to file
    */
   override def saveState(state: ActionDAGRunState): Unit = synchronized {
-    val path = if (state.isSucceeded) succeededStatePath else currentStatePath
     // write state file
-    val json = state.toJson
-    val fileName = s"$appName${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.runId}${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.attemptId}.json"
-    val file = new Path(path, fileName)
-    val os = filesystem.create(file, true) // overwrite if exists
-    os.write(json.getBytes("UTF-8"))
-    os.close()
-    logger.info(s"updated state into ${file.toUri}")
+    val fileName = saveStateToFile(state)
     // if succeeded:
     // - delete temporary state file from current directory
     // - move previous failed attempt files from current to succeeded directory
     if (state.isSucceeded) {
-      filesystem.delete(new Path(currentStatePath, fileName), /*recursive*/ false)
+      filesystem.delete(new Path(currentStatePath, fileName), false)
       getFiles(Some(currentStatePath))
         .filter( stateFile => stateFile.runId==state.runId && stateFile.attemptId<state.attemptId)
         .foreach { stateFile =>
-          logger.info(s"renamed ${stateFile.path}")
-          FileUtil.copy(filesystem, stateFile.path, filesystem, succeededStatePath, /*deleteSource*/ true, filesystem.getConf)
+          val tgtFile = new Path(succeededStatePath, stateFile.path.getName)
+          HdfsUtil.renamePath(stateFile.path, tgtFile)
+          logger.info(s"renamed ${stateFile.path} -> $tgtFile")
         }
     }
+  }
+
+  def saveStateToFile(state: ActionDAGRunState): String = {
+    val path = if (state.isSucceeded) succeededStatePath else currentStatePath
+    val json = state.toJson
+    val fileName = s"$appName${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.runId}${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.attemptId}.json"
+    val file = new Path(path, fileName)
+    HdfsUtil.writeHadoopFile(file, json)
+    logger.info(s"updated state into $file")
+    // return
+    fileName
   }
 
   /**
@@ -88,7 +93,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
   /**
    * Search state directory for state files of this app
    */
-  private def getFiles(path: Option[Path] = None): Seq[HadoopFileStateId] = {
+  def getFiles(path: Option[Path] = None): Seq[HadoopFileStateId] = {
     val filenameMatcher = s"(.+)\\${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}([0-9]+)\\${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}([0-9]+)\\.json".r
     val pathFilter = new PathFilter {
       override def accept(path: Path): Boolean = path.getName.startsWith(appName + HadoopFileActionDAGRunStateStore.fileNamePartSeparator)
@@ -113,11 +118,9 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
   override def recoverRunState(stateId: HadoopFileStateId): ActionDAGRunState = {
     val stateFile = stateId.path
     require(filesystem.isFile(stateFile), s"Cannot recover previous run state. ${stateFile.toUri} doesn't exists or is not a file.")
-    val is = filesystem.open(stateFile)
-    val json = scala.io.Source.fromInputStream(is)(Codec.UTF8).mkString
+    val json = HdfsUtil.readHadoopFile(stateFile)
     ActionDAGRunState.fromJson(json)
   }
-
 }
 
 case class HadoopFileStateId(path: Path, appName: String, runId: Int, attemptId: Int) extends StateId {

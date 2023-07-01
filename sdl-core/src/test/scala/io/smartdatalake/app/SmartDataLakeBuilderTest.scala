@@ -26,7 +26,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.EnvironmentUtil
+import io.smartdatalake.util.misc.{EnvironmentUtil, FinalStateUploader}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
@@ -41,6 +41,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
+import org.scalactic.source.Position
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
@@ -75,7 +76,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
     // source table has partitions columns dt and type
     val srcDO = MockDataObject( "src1", partitions = Seq("dt","type")).register
     val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
@@ -157,7 +157,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == selectedPartitions)
-      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+      assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
 
     // test and reset SDLPlugin config
@@ -245,7 +245,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
       val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
-      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+      assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
 
   }
@@ -349,7 +349,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
         action5.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,1))
       )
       assert(resultActionsState == expectedActionsState)
-      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+      assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
   }
 
@@ -543,7 +543,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.subFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
-      if (!EnvironmentUtil.isWindowsOS) assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty) // doesnt work on windows
+      assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
 
     // check state listener
@@ -767,6 +767,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   test("sdlb run with state file using FinalStateWriter and FinalMetricsWriter and Environment setting override from config") {
 
+    val port = 8080 // for some reason, only the default port seems to work
+    val httpsPort = 8443
+    val host = "127.0.0.1"
+    val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
+
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
@@ -791,11 +796,24 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(Environment.dagGraphLogMaxLineLength == 100)
 
     // check result
-    assert(filesystem.exists(new Path("ext-state/state-test")))
+    val uploadStagePath = "target/ext-state/upload-stage-path-test"
+    assert(filesystem.exists(new Path("target/ext-state/state-test")))
+    assert(filesystem.exists(new Path(uploadStagePath)))
+    filesystem.listFiles(new Path(uploadStagePath), true).hasNext
     val dfActionLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("actionLog")).getSparkDataFrame()
     assert(dfActionLog.select($"run_id", $"action_id", $"attempt_id",$"state").as[(Long,String,Int,String)].collect().toSet == Set((1L,"act",1,"SUCCEEDED")))
     val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("metricsLog")).getSparkDataFrame()
     assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long,String,String,Long)].collect().toSet == Set((1L,"act","tgt",1L)))
+
+    // check FinalStateUploader retry
+    val writer = new FinalStateUploader(Map(
+      "uploadUrl" -> "https://localhost/good/post/no_auth",
+      "uploadStagePath" -> uploadStagePath
+    ).mapValues(StringOrSecret))
+    writer.init(actionPipelineContext)
+    writer.stageStateStore.get.getFiles().isEmpty
+
+    wireMockServer.stop()
   }
 }
 
