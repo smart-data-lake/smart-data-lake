@@ -125,6 +125,15 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
     assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "einstein"))))
   }
 
+  test("PartitionDiffMode selectExpression should be applied before nbOfPartitionValuesPerRun=1 ") {
+    val executionMode = PartitionDiffMode(selectExpression = Some("slice(selectedOutputPartitionValues,-1,1)"), nbOfPartitionValuesPerRun = Some(1)) // select last value only
+    executionMode.prepare(ActionId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
+    // 'einstein' is the last partition value. If selectExpression is applied after nbOfPartitionValuesPerRun, this would result in 'doe' (the first partition value).
+    assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "einstein"))))
+  }
+
   test("PartitionDiffMode selectAdditionalInputExpression with udf") {
     val udfConfig = SparkUDFCreatorConfig(classOf[TestUdfAddLastnameEinstein].getName)
     ExpressionEvaluator.registerUdf("testUdfAddLastNameEinstein", udfConfig.getUDF)
