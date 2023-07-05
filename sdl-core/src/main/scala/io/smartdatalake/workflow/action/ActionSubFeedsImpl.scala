@@ -217,8 +217,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   protected def logWritingStarted(subFeed: S)(implicit context: ActionPipelineContext): Unit = {
-    val msg = s"writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${subFeed.partitionValues.mkString(" ")}" else "")
-    logger.info(s"($id) start " + msg)
+    // sort partition values for logging
+    val sortedPartitionValues = mainOutput match {
+      case output: CanHandlePartitions => PartitionValues.sort(output.partitions, subFeed.partitionValues)
+      case _ => subFeed.partitionValues
+    }
+    logger.info(s"($id) start writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${sortedPartitionValues.mkString(" ")}" else ""))
   }
 
   protected def logWritingFinished(subFeed: S, metrics: Map[String,Any], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
