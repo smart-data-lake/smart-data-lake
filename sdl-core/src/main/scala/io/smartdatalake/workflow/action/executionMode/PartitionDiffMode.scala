@@ -112,6 +112,9 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                   throw new ConfigurationException(s"$actionId has set executionMode = 'PartitionDiffMode' but no common init was found in partition columns for ${input.id} and ${output.id}. Enable applyPartitionValuesTransform to transform partition values.")
                 }
               }
+              // define orderings
+              val outputOrdering = PartitionValues.getOrdering(outputPartitions)
+              val inputOrdering = PartitionValues.getOrdering(inputPartitions)
               // calculate missing partition values
               val filteredInputPartitionValues = partitionInput.listPartitions.map(_.filterKeys(inputPartitions))
               val filteredOutputPartitionValues = partitionOutput.listPartitions.map(_.filterKeys(outputPartitions))
@@ -119,13 +122,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                 partitionValuesTransform(filteredInputPartitionValues).mapValues(_.filterKeys(outputPartitions))
               } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
               val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).mapValues(_.map(_._2))
-              val outputPartitionValuesToBeProcessed = inputOutputPartitionValuesMap.values.toSet.diff(filteredOutputPartitionValues.toSet).toSeq
-              // sort and limit number of partitions processed
-              val outputOrdering = PartitionValues.getOrdering(outputPartitions)
-              var selectedOutputPartitionValues = nbOfPartitionValuesPerRun match {
-                case Some(n) => outputPartitionValuesToBeProcessed.sorted(outputOrdering).take(n)
-                case None => outputPartitionValuesToBeProcessed.sorted(outputOrdering)
-              }
+              var selectedOutputPartitionValues = inputOutputPartitionValuesMap.values.toSet.diff(filteredOutputPartitionValues.toSet).toSeq
               // reverse lookup input partitions as selection of output partitions might have changed
               var selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)
               // apply optional select expression
@@ -138,8 +135,12 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                   .getOrElse(selectedOutputPartitionValues)
                   .sorted(outputOrdering)
               } else selectedOutputPartitionValues
+              // sort and limit number of partitions processed
+              selectedOutputPartitionValues = nbOfPartitionValuesPerRun match {
+                case Some(n) => selectedOutputPartitionValues.sorted(outputOrdering).take(n)
+                case None => selectedOutputPartitionValues.sorted(outputOrdering)
+              }
               // reverse lookup input partitions as selection of output partitions might have changed
-              val inputOrdering = PartitionValues.getOrdering(inputPartitions)
               selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)
               data = data.copy(selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               // apply optional select additional input partitions expression
