@@ -135,7 +135,7 @@ If you have clear expectations of what your partition values should look like, y
 In it, you define a spark sql expression that is evaluated after the PartitionDiffMode is applied.
 If it evaluates to `true`, the Action will fail.
 
-In the condition, the following attributes are available amongst others to make the decision: `inputPartitionValues`, `outputPartitionValues` and `selectedPartitionValues`.
+In the condition, the following attributes are available amongst others to make the decision: `inputPartitionValues`, `outputPartitionValues`, `selectedInputPartitionValues` and `selectedOutputPartitionValues`.
 Use these to fail the run based on expected partitions or time conditions.
 
 Default is `false` meaning that the application of the PartitionDiffMode does not fail the action.
@@ -143,7 +143,7 @@ If there is no data to process, the following actions are skipped.
 
 Example - fail if partitions are not processed in strictly increasing order of partition column `dt`:
 ```
-  failCondition = "(size(selectedPartitionValues) > 0 and array_min(transform(selectedPartitionValues, x -> x.dt)) < array_max(transform(outputPartitionValues, x > x.dt)))"
+  failCondition = "(size(selectedInputPartitionValues) > 0 and array_min(transform(selectedInputPartitionValues, x -> x.dt)) < array_max(transform(outputOutputPartitionValues, x -> x.dt)))"
 ```
 
 Sometimes the `failCondition` can become quite complex with multiple terms concatenated by or-logic.
@@ -152,7 +152,7 @@ For each condition you can also define a description which will be inserted into
 
 ```
   failConditions = [{
-    expression = "(size(selectedPartitionValues) > 0 and array_min(transform(selectedPartitionValues, x -> x.dt)) < array_max(transform(outputPartitionValues, x > x.dt)))"
+    expression = "(size(selectedInputPartitionValues) > 0 and array_min(transform(selectedInputPartitionValues, x -> x.dt)) < array_max(transform(outputOutputPartitionValues, x -> x.dt)))"
     description = "fail if partitions are not processed in strictly increasing order of partition column dt"
   }]
 ```
@@ -163,7 +163,7 @@ Define a spark sql expression working with attributes of PartitionDiffModeExpres
 
 Example - only process the last selected partition:
 ```
-  selectExpression = "slice(selectedPartitionValues,-1,1)"
+  selectExpression = "slice(selectedInputPartitionValues,-1,1)"
 ```
 
 #### alternativeOutputId
