@@ -135,7 +135,7 @@ If you have clear expectations of what your partition values should look like, y
 In it, you define a spark sql expression that is evaluated after the PartitionDiffMode is applied.
 If it evaluates to `true`, the Action will fail.
 
-In the condition, the following attributes are available amongst others to make the decision: `inputPartitionValues`, `outputPartitionValues` and `selectedInputPartitionValues` and `selectedOutputPartitionValues`.
+In the condition, the following attributes are available amongst others to make the decision: `inputPartitionValues`, `outputPartitionValues`, `selectedInputPartitionValues` and `selectedOutputPartitionValues`.
 Use these to fail the run based on expected partitions or time conditions.
 
 Default is `false` meaning that the application of the PartitionDiffMode does not fail the action.
