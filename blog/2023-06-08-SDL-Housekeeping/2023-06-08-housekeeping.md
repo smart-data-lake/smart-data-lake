@@ -66,7 +66,7 @@ stage_json {
 
 Each time we start to process uploaded data, we use the `run_id` to keep track of all batch jobs and version of files delivered.
 If you use a state path (see [commandLine](../../docs/reference/commandLine)), 
-your runs automatically use `run_id`s and you can use it by extending your DataObject:
+your runs automatically generate a `run_id` to identify the run, and you can use it by extending your DataObject:
 
 ```
 stage_json {
