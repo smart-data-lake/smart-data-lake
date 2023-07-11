@@ -161,7 +161,7 @@ This is the else condition and simply returns the existing partition values if t
 
 :::info
 The housekeeping mode is applied after writing a DataObject.
-Keep in mind, that it is always executed.
+Keep in mind, that it is executed with every run.
 :::
 
 #### Compaction
