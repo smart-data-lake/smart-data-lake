@@ -97,17 +97,17 @@ This partition layout has many advantages in our case as we know exactly
 during which run a particular file was processed and which reporting unit uploaded it.
 In further stages we can clearly work with files that were processed in the current run and not touch any old `run_id`s. 
 
-But the drawbacks of this partition scheme becomes apparent after running for a longer time:
+For this use case, a few things are important to note:
   - Some reporting units don't upload data for days. You end up with only a few reporting_unit partitions per run_id.
   - File sizes are rather small (< 1 MiB), partition sizes end up very small too.
   - If you use hourly runs and run 24/7, you end up with 168 partitions per week, plus sub-partitions for reporting units.
   - Once files are correctly processed, we don't read the uploaded files anymore. 
     We still keep them as raw files should we ever need to re-process them.
 
-If you have actions working with all partitions, they will become very slow.
+The drawback becomes apparent when you have actions working with all partitions, they will become very slow.
 Spark doesn't like a lot of small partitions.
 
-To mitigate these drawbacks, we use SDLB's Housekeeping Feature.
+To mitigate that, we use SDLB's Housekeeping Feature.
 
 ## HousekeepingMode
 If you take a look at DataObject's parameters, you will see a `housekeepingMode`. 
