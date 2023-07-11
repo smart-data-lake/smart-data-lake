@@ -77,7 +77,7 @@ stage_json {
 }
 ```
 Note how we just use run_id as part of the schema without any further declaration.
-Since we use the state path, SDLB uses a `run_id` internally, and we can use it too.
+Since we use the state path, SDLB uses a `run_id` internally, and if it's referenced as partition column in a DataObject, processed data get automatically assigned the id of the current run.
 
 ## Drawback
 Let's take a look at the resulting partition layout of `stage_json`:
