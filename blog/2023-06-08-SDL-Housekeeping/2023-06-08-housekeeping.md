@@ -165,7 +165,7 @@ Keep in mind, that it is executed with every run.
 :::
 
 #### Compaction
-We don't want compact files in our case. 
+We don't want to compact files in our case. 
 But from the documentation you can see that compaction works very similarly:  
 You also work with attributes from `PartitionExpressionData` but instead of new partition values, 
 you return a boolean to indicate for each partition if it should be compacted or not. 
