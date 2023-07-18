@@ -250,7 +250,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def prefixHadoopPath(path: String, prefix: Option[String]): Path = {
     val hadoopPath = new Path(path)
     if (hadoopPath.isAbsoluteAndSchemeAuthorityNull || !hadoopPath.isAbsolute) {
-      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path)))
+      val hadoopPathPrefixed = prefix.map( p => new Path(p, path))
         .getOrElse(hadoopPath)
       HdfsUtil.addHadoopDefaultSchemaAuthority( hadoopPathPrefixed )
     }
@@ -287,10 +287,6 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    */
   def getHadoopFsWithConf(path: Path)(implicit hadoopConf: Configuration): FileSystem = {
     Environment.fileSystemFactory.getFileSystem(path, hadoopConf)
-  }
-
-  def addLeadingSeparator(path: String): String = {
-    if (path.startsWith(Path.SEPARATOR)) path else Path.SEPARATOR + path
   }
 
   def getHadoopPartitionLayout(partitionCols: Seq[String]): String = {

@@ -110,20 +110,25 @@ case class HiveTableDataObject(override val id: DataObjectId,
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) new Path(HiveUtil.existingTableLocation(table))
-        else HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
+        else getAbsolutePath
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
-      if(thisIsTableExisting && path.isDefined) {
+      if (thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
-        val definedPathNormalized = HiveUtil.normalizePath(path.get)
+        val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
           logger.warn(s"($id) Table ${table.fullName} exists already with different path ${path}. The table will be written with new path definition ${hadoopPathHolder}!")
       }
     }
     hadoopPathHolder
+  }
+
+  private def getAbsolutePath(implicit context: ActionPipelineContext) = {
+    val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
+    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // dont use "filesystem" to avoid loop
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
