@@ -25,7 +25,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
-import org.apache.hadoop.fs.{FileAlreadyExistsException, FileSystem, Path}
+import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem, Path}
 
 import java.io.{FileNotFoundException, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
@@ -187,6 +187,11 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * List partitions on data object's root path
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
+    getPartitionPathStatis
+      .map(path => extractPartitionValuesFromDirPath(path.getPath.toString))
+  }
+
+  def getPartitionPathStatis(implicit context: ActionPipelineContext): Seq[FileStatus] = {
     partitionLayout().map {
       partitionLayout =>
         // get search pattern for root directory
@@ -194,7 +199,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
         // list directories and extract partition values
         filesystem.globStatus(new Path(hadoopPath, pattern))
           .filter { fs => fs.isDirectory }
-          .map(path => extractPartitionValuesFromDirPath(path.getPath.toString))
           .toSeq
     }.getOrElse(Seq())
   }
@@ -314,7 +318,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
   }
 
-  protected def extractPartitionValuesFromDirPath(dirPath: String)(implicit context: ActionPipelineContext): PartitionValues = {
+  def extractPartitionValuesFromDirPath(dirPath: String)(implicit context: ActionPipelineContext): PartitionValues = {
     PartitionLayout.extractPartitionValues(partitionLayout().get, relativizePath(dirPath) + separator)
   }
 }
