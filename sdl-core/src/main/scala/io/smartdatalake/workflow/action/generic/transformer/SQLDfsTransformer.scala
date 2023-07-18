@@ -37,8 +37,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * (special characters are replaces by underscores).
  * The input data is available as temporary view in SQL. The input name is either an id of the input DataObject,
  * or the name of an output of the previous transformation if this is not the first transformation of the chain.
- * Also note that to create the name of temporary view, special characters are replaced by underscores and a postfix "_sdltemp" is added.
- * It is therefore recommended to use the special token ${inputViewName_<input name>}, that will be replaced with the name
+ * Also note that to create the name of temporary view, special characters are replaced by underscores and a postfix `_sdltemp` is added.
+ * It is therefore recommended to use the special token `%{inputViewName_<input name>}`, that will be replaced with the name
  * of the temporary view at runtime.
  *
  * Note that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB
@@ -49,9 +49,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param code           Map of output names and corresponding SQL code for transformation.
  *                       If this is the last transformation in the chain, the output name has to match an output DataObject id,
  *                       otherwise it can be any name which will then be available in the next transformation.
- *                       Use tokens %{<key>} to replace with runtimeOptions in SQL code.
- *                       Example: "select * from test where run = %{runId}"
- *                       The special token ${inputViewName_<input_name>} can be used to insert the name of temporary views.
+ *                       Use tokens `%{<key>}` to replace with runtimeOptions in SQL code.
+ *                       Example: `select * from test where run = %{runId}`
+ *                       The special token `%{inputViewName_<input_name>}` can be used to insert the name of temporary views.
  *                       The input name is either the id of an input DataObject, or the name of an output of the previous transformation
  *                       if this is not the first transformation of the chain.
  * @param options        Options to pass to the transformation
