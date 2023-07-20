@@ -180,7 +180,7 @@
             </activation>
             <properties>
                 <scala.minor.version>2.12</scala.minor.version>
-                <scala.version>${scala.minor.version}.18</scala.version>
+                <scala.version>${scala.minor.version}.15</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
             </properties>
         </profile>
         <profile>
@@ -461,7 +461,8 @@
         <!-- Sonar related -->
         <sonar.organization>smart-data-lake</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <scoverage.plugin.version>1.4.1</scoverage.plugin.version>
+        <scoverage.plugin.version>1.4.11</scoverage.plugin.version>
+        <scoverage.scalacPluginVersion>1.4.11</scoverage.scalacPluginVersion>
 
     </properties>
 
