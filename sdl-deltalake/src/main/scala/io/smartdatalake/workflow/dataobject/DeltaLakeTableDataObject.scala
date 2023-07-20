@@ -116,7 +116,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
-        if (thisIsTableExisting) new Path(session.sql(s"DESCRIBE DETAIL ${table.fullName}").head.getAs[String]("location"))
+        if (thisIsTableExisting) new Path(getDetails.head.getAs[String]("location"))
         else getAbsolutePath
       }
 
@@ -415,6 +415,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     HiveUtil.dropTable(table, hadoopPath, doPurge = false)
+  }
+
+  def getDetails(implicit session: SparkSession): DataFrame = {
+    DeltaTable.forName(session, table.fullName).detail()
   }
 
   override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject

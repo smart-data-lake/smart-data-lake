@@ -43,7 +43,7 @@ import java.nio.file.Files
 
 class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogger with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")

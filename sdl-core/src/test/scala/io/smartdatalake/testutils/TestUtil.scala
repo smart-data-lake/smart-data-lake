@@ -18,39 +18,36 @@
  */
 package io.smartdatalake.testutils
 
-import java.io.File
-import java.math.BigDecimal
-import java.nio.file.Files
-import java.sql.{Date, Timestamp}
-import java.time.{Instant, LocalDateTime}
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, defaultPersistDf}
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.SDLExecutionId
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
-import org.apache.sshd.common.NamedFactory
 import org.apache.sshd.common.file.nativefs.NativeFileSystemFactory
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
-import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.server.session.ServerSession
 import org.apache.sshd.server.subsystem.SubsystemFactory
-import org.apache.sshd.server.subsystem.sftp.SftpSubsystemFactory
+import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.scalacheck.{Arbitrary, Gen}
 
+import java.io.File
+import java.math.BigDecimal
+import java.nio.file.Files
+import java.sql.{Date, Timestamp}
+import java.time.{Instant, LocalDateTime}
 import scala.collection.JavaConverters._
 import scala.util.Try
 
@@ -59,7 +56,7 @@ import scala.util.Try
  */
 object TestUtil extends SmartDataLakeLogger {
 
-  def sparkSessionBuilder(withHive : Boolean = false, additionalSparkProperties: Map[String,StringOrSecret] = Map()) : SparkSession.Builder = {
+  def sparkSessionBuilder(additionalSparkProperties: Map[String,StringOrSecret] = Map()) : SparkSession.Builder = {
     // create builder
     val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
       case (builder, config) => builder.config(config._1, config._2.resolve())
@@ -69,25 +66,19 @@ object TestUtil extends SmartDataLakeLogger {
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
       .config("spark.sql.shuffle.partitions", "2")
     //.config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
-    // Enable hive support if available
-    if (withHive) Try {
-      val tmpDirOnFS = Files.createTempDirectory("derby-").toFile
-      tmpDirOnFS.deleteOnExit()
-      sys.props.put("derby.system.home", tmpDirOnFS.getAbsolutePath)
-      builder.enableHiveSupport()
-    }
+    // Configure hive metastore location
+    // Note that "builder.enableHiveSupport()" is not needed to work with hive metastore. In fact enableHiveSupport doesn't work with JDK11+.
+    val tmpDirOnFS = Files.createTempDirectory("derby-").toFile
+    tmpDirOnFS.deleteOnExit()
+    sys.props.put("derby.system.home", tmpDirOnFS.getAbsolutePath)
     builder.master("local")
   }
 
   // create SparkSession if needed
-  lazy val sessionHiveCatalog : SparkSession = sparkSessionBuilder(withHive = true).getOrCreate
-  lazy val sessionWithoutHive : SparkSession = sparkSessionBuilder().getOrCreate
+  lazy val session : SparkSession = sparkSessionBuilder().getOrCreate
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    getDefaultActionPipelineContext(sessionHiveCatalog) // initialize with Spark session incl. Hive support
-  }
-  def getDefaultActionPipelineContextWithoutHive(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    getDefaultActionPipelineContext(sessionWithoutHive) // initialize with Spark session without Hive support
+    getDefaultActionPipelineContext(session) // initialize with Spark session incl. Hive support
   }
 
   def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
@@ -252,7 +243,7 @@ object TestUtil extends SmartDataLakeLogger {
 
   // a few data frames
   def dfComplex: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     val rowsComplex: Seq[(Int, Seq[(String, String, Seq[String])])] = Seq(
       (1, Seq(("a", "A", Seq("a", "A")))),
       (2, Seq(("b", "B", Seq("b", "B")))),
@@ -263,9 +254,9 @@ object TestUtil extends SmartDataLakeLogger {
     rowsComplex.toDF("id","value")
   }
 
-  def dfEmptyNilSchema: DataFrame = sessionWithoutHive.createDataFrame(Seq.empty[Row].asJava, StructType(Nil))
+  def dfEmptyNilSchema: DataFrame = session.createDataFrame(Seq.empty[Row].asJava, StructType(Nil))
   def dfEmptyWithSchema: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     Seq.empty[String].toDF()
   }
 
@@ -279,7 +270,7 @@ object TestUtil extends SmartDataLakeLogger {
   val nullableMapField: StructField = StructField("mapwithnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = true))
   val notNullableMapField: StructField = StructField("mapwithoutnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = false))
   def dfEmptyWithStructuredSchema: DataFrame = {
-    sessionWithoutHive.createDataFrame(sessionWithoutHive.sparkContext.makeRDD(Seq.empty[Row]),
+    session.createDataFrame(session.sparkContext.makeRDD(Seq.empty[Row]),
       StructType(
         nullableStringField
           :: notNullableStringField
@@ -295,7 +286,7 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   def dfComplexWithNull: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     val rowsComplexWithNull: Seq[(Option[Int], Option[Seq[(String, String, Seq[String])]])] = Seq(
       (Some(1), Some(Seq(("a", "A", Seq("a", "A"))))),
       (Some(2), Some(Seq(("b", "B", Seq("b", "B"))))),
@@ -308,7 +299,7 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   def dfHierarchy: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     val rowsHierarchy: Seq[(String, String)] = Seq(("a","ab"), ("a","ac"), ("ac","aca"), ("b","ba"),
       ("c","ca"), ("ca","caa"), ("ca","cab"), ("c","cb"), ("cb","X"), ("c","cc"), ("cc","X"), ("X","Y"), ("Y","Z"))
     rowsHierarchy.toDF("parent", "child")
@@ -348,11 +339,11 @@ object TestUtil extends SmartDataLakeLogger {
         StructField("_timestamp", TimestampType, nullable = true) ::
         StructField("_string", StringType, nullable = true) ::
         Nil)
-    sessionHiveCatalog.createDataFrame(rows=rowsManyTypes.map(makeRowManyTypes).asJava, schema=schemaManyTypes): DataFrame
+    session.createDataFrame(rows=rowsManyTypes.map(makeRowManyTypes).asJava, schema=schemaManyTypes): DataFrame
   }
 
   def dfNonUnique: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     val rowsNonUnique: Seq[(String, String)] = Seq(("1let", "unilet"),
       ("2let", "doublet"), ("2let", "doublet"),
       ("3let", "triplet"), ("3let", "triplet"),("3let", "triplet"),
@@ -361,7 +352,7 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   def dfNonUniqueWithNull: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     val rowsNonUnique: Seq[(String, Option[String])] = Seq(("0let", None),
       ("1let", Some("unilet")),
       ("2let", Some("doublet")), ("2let", Some("doublet")),
@@ -371,7 +362,7 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   def dfTwoCandidateKeys: DataFrame = {
-    import sessionHiveCatalog.implicits._
+    import session.implicits._
     val rowsTwoCandidateKeys: Seq[(String, String, Int, Int, Int, Double)] = Seq(
       ("a", "a", 1, 1, 1, 17.3),
       ("a", "b", 1, 1, 2, 17.3),

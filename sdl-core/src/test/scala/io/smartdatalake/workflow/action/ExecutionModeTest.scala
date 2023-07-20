@@ -34,13 +34,13 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
 
-class ExecutionModeTest extends FunSuite with BeforeAndAfter {
+class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
@@ -54,28 +54,31 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter {
   // setup some data objects
   val srcTable = Table(Some("default"), "src1")
   val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  srcDO.dropTable
   instanceRegistry.register(srcDO)
-  val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
-  srcDO.writeSparkDataFrame(l1, Seq())
 
   val tgt1Table = Table(Some("default"), "tgt1", None, Some(Seq("lastname", "firstname")))
   val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), table = tgt1Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  tgt1DO.dropTable
   instanceRegistry.register(tgt1DO)
 
   val tgt2Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname", "firstname")))
   val tgt2DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  tgt2DO.dropTable
-  tgt2DO.writeSparkDataFrame(l1.where($"rating" <= 2), Seq())
   instanceRegistry.register(tgt2DO)
 
   val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath + s"/fileTestSrc", partitions = Seq("lastname"))
-  fileSrcDO.writeSparkDataFrame(l1, Seq())
   instanceRegistry.register(fileSrcDO)
 
   val fileEmptyDO = CsvFileDataObject("fileEmptyDO", tempPath + s"/fileTestEmpty", partitions = Seq("lastname"))
   instanceRegistry.register(fileEmptyDO)
+
+  override def beforeAll(): Unit = {
+    srcDO.dropTable
+    val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+    tgt1DO.dropTable
+    tgt2DO.dropTable
+    tgt2DO.writeSparkDataFrame(l1.where($"rating" <= 2), Seq())
+    fileSrcDO.writeSparkDataFrame(l1, Seq())
+  }
 
   test("PartitionDiffMode default") {
     val executionMode = PartitionDiffMode()

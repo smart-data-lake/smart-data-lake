@@ -95,19 +95,20 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.writeSparkDataFrame(df, Seq(PartitionValues(Map("type"->"ext"))))
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
-      .where($"col_name"==="Statistics").head.getAs[String](1)
+      .where($"col_name"==="Statistics").select($"data_type").as[String].head
     assert(statsStr.contains("3 rows"))
     // check partition statistics -> only partition type=ext,name=doe and type=ext,lastname=smith should have been analyzed
     val statsPart1Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='doe')")
-      .where($"col_name"==="Partition Statistics").head.getAs[String](1)
+      .where($"col_name"==="Partition Statistics").select($"data_type").as[String].head
     assert(statsPart1Str.contains("1 rows"))
     val statsPart2Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='smith')")
-      .where($"col_name"==="Partition Statistics").head.getAs[String](1)
+      .where($"col_name"==="Partition Statistics").select($"data_type").as[String].head
     assert(statsPart2Str.contains("1 rows"))
     // check no partition statistics for type=int,lastname=emma
+    session.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')").show
     val statsPart3Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')")
-      .where($"col_name"==="Partition Statistics").head.getAs[String](1)
-    assert(!statsPart3Str.contains("1 rows"))
+      .where($"col_name"==="Partition Statistics").select($"data_type").as[String].collect.headOption
+    assert(statsPart3Str.isEmpty)
     // check table contents
     assert(srcDO.getSparkDataFrame().count==3)
   }
@@ -120,19 +121,19 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.writeSparkDataFrame(df, Seq(PartitionValues(Map("type"->"ext", "lastname"->"doe")),PartitionValues(Map("type"->"ext", "lastname"->"smith"))))
     // check table statistics
     val statsStr = session.sql(s"describe extended ${srcTable.fullName}")
-      .where($"col_name"==="Statistics").head.getAs[String](1)
+      .where($"col_name"==="Statistics").select($"data_type").as[String].head
     assert(statsStr.contains("3 rows"))
     // check partition statistics -> only partition type=ext,name=doe and type=ext,lastname=smith should have been analyzed
     val statsPart1Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='doe')")
-      .where($"col_name"==="Partition Statistics").head.getAs[String](1)
+      .where($"col_name"==="Partition Statistics").select($"data_type").as[String].head
     assert(statsPart1Str.contains("1 rows"))
     val statsPart2Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='ext',lastname='smith')")
-      .where($"col_name"==="Partition Statistics").head.getAs[String](1)
+      .where($"col_name"==="Partition Statistics").select($"data_type").as[String].head
     assert(statsPart2Str.contains("1 rows"))
     // check no partition statistics for type=int,lastname=emma
     val statsPart3Str = session.sql(s"describe extended ${srcTable.fullName} partition(type='int',lastname='emma')")
-      .where($"col_name"==="Partition Statistics").head.getAs[String](1)
-    assert(!statsPart3Str.contains("1 rows"))
+      .where($"col_name"==="Partition Statistics").select($"data_type").as[String].collect().headOption
+    assert(statsPart3Str.isEmpty)
     // check table contents
     assert(srcDO.getSparkDataFrame().count==3)
   }

@@ -96,14 +96,13 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
     val globalConfig = GlobalConfig.from(config)
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val session: SparkSession = sparkSessionBuilder(withHive = true, globalConfig.sparkOptions.getOrElse(Map())).getOrCreate()
+    implicit val session: SparkSession = TestUtil.session
     import session.implicits._
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:actenc,ids:actdec")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 

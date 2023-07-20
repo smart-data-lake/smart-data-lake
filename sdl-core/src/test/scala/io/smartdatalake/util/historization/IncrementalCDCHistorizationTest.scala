@@ -33,7 +33,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
  */
 class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
-  private implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  private implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   test("New/updated record creates updateClose and insertNew records for merge statement") {

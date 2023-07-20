@@ -33,7 +33,7 @@ import org.scalatestplus.scalacheck.Checkers
   */
 class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogger {
 
-  implicit lazy val session: SparkSession = TestUtil.sessionWithoutHive
+  implicit lazy val session: SparkSession = TestUtil.session
 
   test("Schema with same column names and types need to be identical") {
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))

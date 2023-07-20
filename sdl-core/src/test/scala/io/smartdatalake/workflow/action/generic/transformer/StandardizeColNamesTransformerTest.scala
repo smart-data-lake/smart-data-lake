@@ -29,7 +29,7 @@ import org.scalatest.FunSuite
 
 class StandardizeColNamesTransformerTest extends FunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry = new InstanceRegistry()

@@ -40,7 +40,7 @@ import scala.util.{Failure, Success}
  */
 class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
