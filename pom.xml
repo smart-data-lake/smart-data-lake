@@ -301,15 +301,15 @@
         <scala.version>${scala.minor.version}.15</scala.version>
 
         <spark.version>3.4.1</spark.version>
-        <spark-extensions.version>3.4.0-SNAPSHOT</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark-extensions.version>3.4.0</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.4</spark.minor.version> <!-- this is used in sdl-snowflake -->
 
         <spark.version331>3.3.1</spark.version331> <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
         <!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
-        <slf4j.version>2.0.6</slf4j.version>
-        <log4j.version>2.19.0</log4j.version>
+        <slf4j.version>2.0.7</slf4j.version>
+        <log4j.version>2.20.0</log4j.version>
         <!-- make sure to update IsolatedClientLoader whenever this version is changed -->
         <hadoop.version>3.3.6</hadoop.version>
         <!-- Protobuf version for building with Hadoop/Yarn dependencies -->
@@ -820,6 +820,12 @@
                             </requireProperty>
                         </rules>
                     </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>3.1.0</version>
                 </plugin>
 
             </plugins>
