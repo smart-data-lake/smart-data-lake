@@ -187,11 +187,11 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * List partitions on data object's root path
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    getPartitionPathStatis
+    getPartitionPathsStatus
       .map(path => extractPartitionValuesFromDirPath(path.getPath.toString))
   }
 
-  def getPartitionPathStatis(implicit context: ActionPipelineContext): Seq[FileStatus] = {
+  def getPartitionPathsStatus(implicit context: ActionPipelineContext): Seq[FileStatus] = {
     partitionLayout().map {
       partitionLayout =>
         // get search pattern for root directory

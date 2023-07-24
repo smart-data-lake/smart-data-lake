@@ -85,7 +85,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
    */
   def partitionModDates(timezoneId: ZoneId = TimeZone.getDefault.toZoneId): Seq[(PartitionValues,LocalDateTime)] = dataObject match {
     case o: HadoopFileDataObject with CanHandlePartitions =>
-      o.getPartitionPathStatis(context)
+      o.getPartitionPathsStatus(context)
         .map( s => (o.extractPartitionValuesFromDirPath(s.getPath.toString)(context), LocalDateTime.ofInstant(Instant.ofEpochMilli(s.getModificationTime), timezoneId)))
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned or has no hadoop directory layout")
   }
