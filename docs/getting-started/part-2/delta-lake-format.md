@@ -88,7 +88,7 @@ Finally, adapt the action definition for `join-departures-airports`:
 - Adapted the existing action `join-departures-airports` to use the new table `int-departures`
 :::
 
-To run our data pipeline, first delete the data directory - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
+To run our data pipeline, first make sure data directory is empty - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
 Then you can execute the usual *docker run* command for all feeds:
 
 <Tabs groupId = "docker-podman-switch"
@@ -158,9 +158,8 @@ docker-compose up
 <TabItem value="podman">
 
 ```jsx
-podman-compose build
 mkdir -p data/_metastore
-podman-compose up
+./part2/podman-compose.sh 
 ```
 
 </TabItem>
