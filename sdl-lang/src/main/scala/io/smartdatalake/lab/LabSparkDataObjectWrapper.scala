@@ -91,6 +91,14 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   }
   def schema: StructType = dataObject.getSparkDataFrame()(context).schema
   def printSchema(): Unit = dataObject.getSparkDataFrame()(context).printSchema()
+  def refresh(): Unit = {
+    dataObject match {
+      case o: TableDataObject =>
+        context.sparkSession.catalog.refreshTable(o.table.fullName)
+      case _ => throw NotSupportedException(dataObject.id, "is not a TableDataObject")
+    }
+  }
+
 }
 
 case class NotSupportedException(id: ConfigObjectId, msg: String) extends Exception(s"$id} $msg")
