@@ -326,6 +326,15 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * Check if a folder is writable by creating a test file in given path and delete it again
+   */
+  def writeTest(path: Path, filename: String = System.currentTimeMillis.toString)(implicit filesystem: FileSystem): Unit = {
+    val file = new Path(path, filename)
+    touchFile(file)
+    filesystem.delete(file, true) // recursive=true
+  }
+
+  /**
    * Wrapper for Hadoop RemoteIterator to use it with Scala style
    */
   case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {

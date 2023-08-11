@@ -32,8 +32,9 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
   val currentStatePath: Path = new Path(hadoopStatePath, "current")
   val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
-  if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(hadoopStatePath)
+  if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(currentStatePath) // make sure current state directory exists
   filesystem.setWriteChecksum(false) // disable writing CRC files
+  HdfsUtil.writeTest(hadoopStatePath) // make sure state directory is writable
 
   /**
    * Save state to file
