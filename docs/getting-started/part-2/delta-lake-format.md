@@ -138,7 +138,8 @@ But state-of-the-art is to use notebooks like Jupyter for this.
 One of the most advanced notebooks for Scala code we found is Polynote, see [polynote.org](https://polynote.org/).
 
 We will now start Polynote in a docker container, and an external Metastore (Derby database) in another container to share the catalog between our experiments and the notebook.
-To do so you need to add additional files to the project. Change to the projects root directory and `unzip part2.additional-files.zip` into the project's root directoy, then run the following commands in the projects root directory:
+To do so, we will use the additional files in the subfolder `part2`. 
+Execute these commands:
 
 <Tabs groupId = "docker-podman-switch"
 defaultValue="docker"
@@ -149,9 +150,9 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker-compose build
+docker-compose build -f part2/docker-compose.yml
 mkdir -p data/_metastore
-docker-compose up
+docker-compose up -f part2/docker-compose.yml
 ```
 
 </TabItem>
@@ -170,6 +171,9 @@ You should now be able to access Polynote at `localhost:8192`.
 
 :::info Docker on Windows
 If you use Windows, please read our note on [Docker for Windows](../troubleshooting/docker-on-windows).
+You might notice that the commands for docker and podman differ at this point. 
+The latest version of podman-compose changed the behavior of creating pods, 
+which is why we have implemented a script `podman-compose.sh` to emulate podman-compose.
 :::
 
 But when you walk through the prepared notebook "SelectingData", you won't see any tables and data yet. 
