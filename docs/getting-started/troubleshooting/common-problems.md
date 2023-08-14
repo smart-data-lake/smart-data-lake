@@ -51,3 +51,8 @@ Use the container id to stop the container by typing:
 
     docker containter stop <container id>
 
+## ERROR 08001: java.net.ConnectException : Error connecting to server localhost on port 1527
+
+This likely happens during or after part 2 if you forget to add `--pod getting-started` to your podman command.
+Remember that SDL now needs to communicate with the Metastore that we are starting. 
+To allow this communication, you need to make sure that SDL and the metastore are running in the same pod.
