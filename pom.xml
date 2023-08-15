@@ -22,7 +22,7 @@
 
     <groupId>io.smartdatalake</groupId>
     <artifactId>sdl-parent</artifactId>
-    <version>2.5.0</version>
+    <version>2.5.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -127,6 +127,7 @@
                         <version>3.1.1</version>
                         <executions>
                             <execution>
+				<id>copy-libs-exec</id>
                                 <phase>package</phase>
                                 <goals>
                                     <goal>copy-dependencies</goal>
@@ -154,6 +155,7 @@
                         <version>3.1.1</version>
                         <executions>
                             <execution>
+				<id>copy-libs-with-exec</id>
                                 <phase>package</phase>
                                 <goals>
                                     <goal>copy-dependencies</goal>

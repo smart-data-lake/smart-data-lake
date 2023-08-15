@@ -22,9 +22,12 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, CanHandlePartitions, CanWriteSparkDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, CanHandlePartitions, CanWriteSparkDataFrame, DataObject, FileRefDataObject, HadoopFileDataObject, HasHadoopStandardFilestore, HiveTableDataObject, TableDataObject}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
+
+import java.time.{Instant, LocalDateTime, ZoneId}
+import java.util.TimeZone
 
 /**
  * A wrapper around a Spark DataObject simplifying the interface for interactive use.
@@ -54,6 +57,19 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }
   }
+
+  def dropPartitions(partitions: Seq[Map[String,String]]): Unit = dataObject match {
+    case o: CanHandlePartitions => o.deletePartitions(partitions.map(pv => PartitionValues(pv)))(context)
+    case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
+  }
+
+  def infos: Map[String,String] = {
+    Seq(
+      Some(dataObject).collect{case o: TableDataObject => ("table", o.table.fullName)},
+      Some(dataObject).collect{case o: FileRefDataObject => ("path", o.getPath(context))}
+    ).flatten.toMap
+  }
+
   def partitionColumns: Seq[String] = dataObject match {
     case o: CanHandlePartitions => o.partitions
     case _ => Seq()
@@ -63,8 +79,26 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
   def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head))
+
+  /**
+   * lists modification date of partition folders
+   */
+  def partitionModDates(timezoneId: ZoneId = TimeZone.getDefault.toZoneId): Seq[(PartitionValues,LocalDateTime)] = dataObject match {
+    case o: HadoopFileDataObject with CanHandlePartitions =>
+      o.getPartitionPathsStatus(context)
+        .map( s => (o.extractPartitionValuesFromDirPath(s.getPath.toString)(context), LocalDateTime.ofInstant(Instant.ofEpochMilli(s.getModificationTime), timezoneId)))
+    case _ => throw NotSupportedException(dataObject.id, "is not partitioned or has no hadoop directory layout")
+  }
   def schema: StructType = dataObject.getSparkDataFrame()(context).schema
   def printSchema(): Unit = dataObject.getSparkDataFrame()(context).printSchema()
+  def refresh(): Unit = {
+    dataObject match {
+      case o: TableDataObject =>
+        context.sparkSession.catalog.refreshTable(o.table.fullName)
+      case _ => throw NotSupportedException(dataObject.id, "is not a TableDataObject")
+    }
+  }
+
 }
 
 case class NotSupportedException(id: ConfigObjectId, msg: String) extends Exception(s"$id} $msg")

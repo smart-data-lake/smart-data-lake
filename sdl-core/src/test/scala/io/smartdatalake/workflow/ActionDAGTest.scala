@@ -401,41 +401,57 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // Action C reads DataObject tgtA
 
     // setup DataObjects
-    val feed = "actionpipeline"
-    val srcTable = Table(Some("default"), "ap_input")
-    val srcDO = HiveTableDataObject( "src", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
-
+    val srcD1 = MockDataObject("src1", partitions = Seq("lastname")).register
+    val srcD2 = MockDataObject("src2", partitions = Seq("lastname")).register
     val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
-    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1)
+    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
     val tgtCTable = Table(Some("default"), "tgt_c", None, Some(Seq("lastname","firstname")))
-    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, numInitialHdfsPartitions = 1)
+    val tgtCDO = HiveTableDataObject( "tgt_C", Some(tempPath+s"/${tgtCTable.fullName}"), table = tgtCTable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
     tgtCDO.dropTable
     instanceRegistry.register(tgtCDO)
 
     // prepare DAG
     val l1 = Seq(("doe","john",5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
+    srcD1.writeSparkDataFrame(l1)
+    val l2 = Seq(("peter", "pan", 3)).toDF("lastname", "firstname", "rating")
+    srcD2.writeSparkDataFrame(l2)
     val actions = Seq(
-      CopyAction("A", srcDO.id, tgtADO.id),
-      CopyAction("B", srcDO.id, tgtADO.id),
+      CopyAction("A", srcD1.id, tgtADO.id, executionMode = Some(PartitionDiffMode())),
+      CopyAction("B", srcD2.id, tgtADO.id),
       CopyAction("C", tgtADO.id, tgtCDO.id)
     )
     val dag = ActionDAGRun(actions)
 
-    // exec dag
+    // exec dag 1st run
     dag.prepare
     dag.init
     dag.exec(contextExec)
 
-    val r1 = tgtCDO.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect.toSeq
-    assert(r1 == Seq(5,5))
+    {
+      val r = tgtCDO.getSparkDataFrame()
+        .select($"rating")
+        .as[Int].collect.toSeq
+      assert(r == Seq(5, 3))
+    }
+
+    // exec dag 2st run - action A is skipped because of PartitionDiffMode, but Action C should run nevertheless
+    val l1_2 = Seq(("doe", "john", 6)).toDF("lastname", "firstname", "rating")
+    srcD1.writeSparkDataFrame(l1_2)
+    val l2_2 = Seq(("peter", "pan", 4)).toDF("lastname", "firstname", "rating")
+    srcD2.writeSparkDataFrame(l2_2)
+    dag.prepare
+    dag.init
+    dag.exec(contextExec)
+
+    {
+      val r = tgtCDO.getSparkDataFrame()
+        .select($"rating")
+        .as[Int].collect.toSeq
+      assert(r == Seq(5, 4)) // doe is not updated...
+    }
   }
 
 

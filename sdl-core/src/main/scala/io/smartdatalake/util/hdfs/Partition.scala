@@ -166,6 +166,11 @@ object PartitionValues {
   }
 
   def oneToOneMapping(partitionValues: Seq[PartitionValues]): Map[PartitionValues,PartitionValues] = partitionValues.map(x => (x,x)).toMap
+
+  def sort(partitionCols: Seq[String], partitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
+    val ordering = getOrdering(partitionCols)
+    partitionValues.sorted(ordering)
+  }
 }
 
 /**

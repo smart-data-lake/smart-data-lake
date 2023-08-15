@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.WithResource
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
@@ -34,6 +33,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 import java.io.PrintWriter
 import java.nio.file.{Files, Path => NioPath}
 import scala.io.Source
+import scala.util.Using
 
 class CustomFileActionTest extends FunSuite with BeforeAndAfter {
 
@@ -141,8 +141,8 @@ object CustomFileActionTest {
 class TestFileTransformer extends CustomFileTransformer {
   override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
     assert(options("test")=="true")
-    WithResource.execSource(Source.fromInputStream(input)) { src =>
-      WithResource.exec(new PrintWriter(output)) { os =>
+    Using.resource(Source.fromInputStream(input)) { src =>
+      Using.resource(new PrintWriter(output)) { os =>
         src.getLines().foreach { l =>
           // reduce to 2 cols
           val transformedLine = l.split(CustomFileActionTest.delimiter).take(2).mkString(CustomFileActionTest.delimiter)

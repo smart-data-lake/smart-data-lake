@@ -20,7 +20,8 @@
 package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.WithResource
+
+import scala.util.Using
 
 /**
  * Read a secret from a property file, where the filename is provided directly in the configuration entry.
@@ -51,7 +52,7 @@ class FileSecretProvider(file: String) extends SecretProvider {
 }
 object FileSecretProvider {
   def getSecretFromFile(file: String, name: String): String = {
-    val props = WithResource.execSource(scala.io.Source.fromFile(file))(_.getLines.toSeq)
+    val props = Using.resource(scala.io.Source.fromFile(file))(_.getLines.toSeq)
     val namePrefix = name + "="
     props.find(_.startsWith(namePrefix))
       .map(_.stripPrefix(namePrefix))

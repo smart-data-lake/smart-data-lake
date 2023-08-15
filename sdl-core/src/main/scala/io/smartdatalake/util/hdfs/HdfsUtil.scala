@@ -19,7 +19,7 @@
 package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -27,8 +27,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import java.io.IOException
 import java.net.URI
 import scala.collection.AbstractIterator
-import scala.io.Source
-import scala.util.Try
+import scala.io.{Codec, Source}
+import scala.util.{Try, Using}
 
 /**
  * Provides utility functions for HDFS.
@@ -184,13 +184,12 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
    * Rename single path as one hadoop operation (note it depends on the implementation if this is atomic).
    */
   def renamePath(path: Path, newPath: Path)(implicit fs: FileSystem ): Unit = {
+    // check if file already exists before rename, as error of fs.rename is not detailled enough (depending on hadoop fs implementation)
+    val fileStat = Try(fs.getFileStatus(newPath))
+    if (fileStat.isSuccess && fileStat.get.isFile) throw new FileAlreadyExistsException(s"Rename $path to $newPath failed. New file already exists.")
     if (fs.rename(path, newPath)) {
       logger.debug(s"Path $path renamed to $newPath")
-    } else {
-      val fileStat = Try(fs.getFileStatus(newPath))
-      if (fileStat.isSuccess && fileStat.get.isFile) throw new FileAlreadyExistsException(s"Rename $path to $newPath failed. New file already exists.")
-      else new IOException(s"Rename $path to $newPath failed. Reason unknown.")
-    }
+    } else new IOException(s"Rename $path to $newPath failed. Reason unknown.")
   }
 
   /**
@@ -251,7 +250,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   def prefixHadoopPath(path: String, prefix: Option[String]): Path = {
     val hadoopPath = new Path(path)
     if (hadoopPath.isAbsoluteAndSchemeAuthorityNull || !hadoopPath.isAbsolute) {
-      val hadoopPathPrefixed = prefix.map( p => new Path(p + HdfsUtil.addLeadingSeparator(path)))
+      val hadoopPathPrefixed = prefix.map( p => new Path(p, path))
         .getOrElse(hadoopPath)
       HdfsUtil.addHadoopDefaultSchemaAuthority( hadoopPathPrefixed )
     }
@@ -290,10 +289,6 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     Environment.fileSystemFactory.getFileSystem(path, hadoopConf)
   }
 
-  def addLeadingSeparator(path: String): String = {
-    if (path.startsWith(Path.SEPARATOR)) path else Path.SEPARATOR + path
-  }
-
   def getHadoopPartitionLayout(partitionCols: Seq[String]): String = {
     partitionCols.map(col => s"$col=%$col%${Path.SEPARATOR_CHAR}").mkString
   }
@@ -305,16 +300,14 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   def readHadoopFile(file: Path)(implicit filesystem: FileSystem): String = {
-    val is = filesystem.open(file)
-    Source.fromInputStream(is).getLines.mkString(sys.props("line.separator"))
+    Using.resource(filesystem.open(file)) { is =>
+      Source.fromInputStream(is)(Codec.UTF8).getLines.mkString(sys.props("line.separator"))
+    }
   }
 
   def writeHadoopFile(file: Path, content: String)(implicit filesystem: FileSystem): Unit = {
-    val os = filesystem.create(file, true)
-    try {
-      os.writeBytes(content)
-    } finally {
-      os.close()
+    Using.resource(filesystem.create(file, true)) { os =>
+      os.write(content.getBytes(Codec.UTF8.name))
     }
   }
 
@@ -329,8 +322,16 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   def touchFile(path: Path)(implicit filesystem: FileSystem): Unit = {
-    val os = filesystem.create(path, /*overwrite*/ true)
-    os.close()
+    Using.resource(filesystem.create(path, /*overwrite*/ true))(_ => Unit)
+  }
+
+  /**
+   * Check if a folder is writable by creating a test file in given path and deleting it again
+   */
+  def writeTest(path: Path, filename: String = System.currentTimeMillis.toString)(implicit filesystem: FileSystem): Unit = {
+    val file = new Path(path, filename)
+    touchFile(file)
+    filesystem.delete(file, true) // recursive=true
   }
 
   /**

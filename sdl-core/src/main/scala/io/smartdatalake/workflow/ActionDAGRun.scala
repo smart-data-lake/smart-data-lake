@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.{AppUtil, StateListener}
+import io.smartdatalake.app.{AppUtil, BuildVersionInfo, StateListener}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
@@ -155,7 +155,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       subFeeds =>
         if (subFeeds.size > 1) {
           logger.info(s"($actionId) Creating union of multiple SubFeeds as input for ${subFeeds.head.dataObjectId}")
-          subFeeds.reduce((s1, s2) => s1.union(s2))
+          // start with !skipped subFeeds to use more specific union function.
+          subFeeds.sortBy(_.isSkipped).reverse.reduce((s1, s2) => s1.union(s2))
         } else subFeeds.head
     }.values.toSeq
   }
@@ -233,7 +234,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    */
   def saveState(phase: ExecutionPhase, changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
-    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal)
+    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
+    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo)
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))
     }

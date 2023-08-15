@@ -42,7 +42,7 @@ jobs:
         restore-keys: ${{ runner.os }}-maven-
         
     - name: Maven Get Version
-      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
     - name: Set Release Version
       run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
     #- name: Printenv
@@ -50,8 +50,7 @@ jobs:
     #    printenv
     - name: Maven Set Release Version
       run: |
-        sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
-        sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" */pom.xml
+        mvn versions:set -B -DnewVersion=${MVN_RELEASE_VERSION} -f pom.xml
 
     - name: Maven deploy to sonatype for Scala 2.12
       uses: samuelmeuli/action-maven-publish@v1
@@ -93,6 +92,7 @@ jobs:
         # note that sdl-schema.json should be available in the location below from the previous maven build.
         mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
         git add static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
+        git rm --ignore-unmatch static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}-SNAPSHOT.json
         git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_RELEASE_VERSION}.json" # only if there is something to commit
         git push        
         
@@ -103,15 +103,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Develop Git Checkout
+    - name: Git Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+        token: ${{ secrets.PAT_ACTIONS }}
+    - name: Git Config
       run: |
-        git fetch origin ${GITHUB_HEAD_REF}
-        git checkout ${GITHUB_HEAD_REF}
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"    - name: Develop Git Checkout
+
+    - name: Maven Get Version
+      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+    - name: Set Release Version
+      run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
+
     - name: Git Merge to develop
       run: |
-        git merge origin/${GITHUB_BASE_REF}
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
-    
+        git merge origin/${{ github.base_ref }} --no-commit
+        git diff-index --quiet HEAD || git commit -m "Merge release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
+
     - name: Develop Get Next Version
       id: bump_version
       uses: christian-draeger/increment-semantic-version@1.0.1
@@ -120,8 +132,7 @@ jobs:
         version-fragment: bug
     - name: Develop Set Next Snapshot version
       run: |
-        sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
-        sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" */pom.xml
+        mvn versions:set -B -DnewVersion=${{ steps.bump_version.outputs.next-version }}-SNAPSHOT -f pom.xml
     - name: Develop Git Commit Snapshot
       run: |
         git commit -m "Increment to next SNAPSHOT release" -a

@@ -20,7 +20,7 @@
 package io.smartdatalake.util.hdfs
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileAlreadyExistsException, FileSystem, Path}
 import org.scalatest.FunSuite
 
 import java.nio.file.Files
@@ -81,5 +81,15 @@ class HdfsUtilTest extends FunSuite {
     assert(!filesystem.exists(subPath2))
     assert(!filesystem.exists(subPath1))
     assert(filesystem.exists(path1))
+  }
+
+  test("rename file, target already exists") {
+    val tempDir = Files.createTempDirectory("hdfsUtil")
+    val srcFile = new Path(tempDir.toString, "srcfile")
+    val tgtFile = new Path(tempDir.toString, "tgtfile")
+    implicit val filesystem: FileSystem = srcFile.getFileSystem(new Configuration())
+    HdfsUtil.touchFile(srcFile)
+    HdfsUtil.renamePath(srcFile, tgtFile)
+    intercept[FileAlreadyExistsException](HdfsUtil.renamePath(srcFile, tgtFile))
   }
 }
