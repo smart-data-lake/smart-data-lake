@@ -326,7 +326,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Check if a folder is writable by creating a test file in given path and delete it again
+   * Check if a folder is writable by creating a test file in given path and deleting it again
    */
   def writeTest(path: Path, filename: String = System.currentTimeMillis.toString)(implicit filesystem: FileSystem): Unit = {
     val file = new Path(path, filename)
