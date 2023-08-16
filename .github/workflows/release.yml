@@ -112,7 +112,7 @@ jobs:
     - name: Git Config
       run: |
         git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"    - name: Develop Git Checkout
+        git config --local user.name "GitHub Action"
 
     - name: Maven Get Version
       run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
