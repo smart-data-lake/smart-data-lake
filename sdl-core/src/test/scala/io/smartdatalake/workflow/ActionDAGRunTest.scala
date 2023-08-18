@@ -31,7 +31,7 @@ import org.scalatest.FunSuite
 
 class ActionDAGRunTest extends FunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   test("convert ActionDAGRunState to json and back") {

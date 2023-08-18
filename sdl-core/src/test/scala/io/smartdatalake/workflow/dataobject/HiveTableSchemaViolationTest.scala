@@ -33,7 +33,7 @@ import scala.collection.mutable._
 
 class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAndAfter with SmartDataLakeLogger {
 
-  protected implicit val session: SparkSession = sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry

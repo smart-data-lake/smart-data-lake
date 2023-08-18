@@ -24,9 +24,10 @@ import org.apache.spark.sql.SparkSession
 
 object DeltaLakeTestUtils {
   // set additional spark options for delta lake
-  private val additionalSparkProperties = new DeltaLakeModulePlugin().additionalSparkProperties()
+  private val additionalSparkProperties = new DeltaLakeModulePlugin().additionalSparkProperties() +
+    ("spark.databricks.delta.snapshotPartitions" -> "2") // improve performance for testing with small data sets
   def session : SparkSession = additionalSparkProperties
-    .foldLeft(TestUtil.sparkSessionBuilder(withHive = true)) {
+    .foldLeft(TestUtil.sparkSessionBuilder()) {
       case (builder, config) => builder.config(config._1, config._2)
     }.getOrCreate()
 }

@@ -43,7 +43,7 @@ import java.nio.file.Files
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
 class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with SmartDataLakeLogger {
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -204,6 +204,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
     // second dag run
     {
+      Thread.sleep(1000) // make sure to wait 1s
       val action1Delay1s = action1Delay10s.copy(
         executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - 1)"))))
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay1s))

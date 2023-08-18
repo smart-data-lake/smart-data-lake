@@ -49,7 +49,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
 
   val sdlb = new DefaultSmartDataLakeBuilder()
   implicit val instanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession = TestUtil.sessionHiveCatalog
+  implicit val sparkSession = TestUtil.session
   implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
 
   val tempDir = Files.createTempDirectory("test")

@@ -36,7 +36,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
  */
 class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
-  private implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  private implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   test("History unchanged with new columns but unchanged data") {

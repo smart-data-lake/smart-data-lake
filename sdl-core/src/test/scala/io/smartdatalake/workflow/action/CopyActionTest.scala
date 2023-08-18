@@ -40,7 +40,7 @@ import java.nio.file.{Files, Path => NioPath}
 
 class CopyActionTest extends FunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -86,9 +86,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // check output
     val r1 = session.table(s"${tgtTable.fullName}")
       .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r1.size == 2)
-    assert(r1.head == 4) // should be increased by 1 through TestDfTransformer
+      .as[Int].collect().toSet
+    assert(r1 == Set(4,6)) // should be increased by 1 through TestDfTransformer
 
     // check input deleted by incremental move mode
     assert(srcDO.getFileRefs(Seq()).isEmpty)

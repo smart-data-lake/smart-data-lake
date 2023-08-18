@@ -46,9 +46,9 @@ class TestDSTransformer extends CustomDsTransformer[InputDataSet, OutputDataSet]
 
 class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
 
-  import sessionHiveCatalog.implicits._
+  import session.implicits._
 
   private val tempDir = Files.createTempDirectory("testScalaClassSparkDs2To1TransformerTest")
   private val tempPath = tempDir.toAbsolutePath.toString

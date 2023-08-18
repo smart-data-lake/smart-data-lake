@@ -121,7 +121,7 @@ object ActionHelper extends SmartDataLakeLogger {
     Some(input.getDataFrame(partitionValues, subFeedType))
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
-    case e: AnalysisException if e.getMessage.contains("Table or view not found") => None
+    case e: AnalysisException if e.getMessage.contains("[TABLE_OR_VIEW_NOT_FOUND]") => None
     case _: NoDataToProcessWarning => None
   }
 

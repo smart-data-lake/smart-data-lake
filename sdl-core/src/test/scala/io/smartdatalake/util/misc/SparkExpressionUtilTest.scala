@@ -31,7 +31,7 @@ import org.scalatest.FunSuite
 
 class SparkExpressionUtilTest extends FunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
 
   private implicit val registry: InstanceRegistry = new InstanceRegistry
   private val context = TestUtil.getDefaultActionPipelineContext

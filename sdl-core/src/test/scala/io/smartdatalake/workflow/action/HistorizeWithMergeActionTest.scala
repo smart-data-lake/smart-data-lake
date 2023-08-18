@@ -37,7 +37,7 @@ import java.time.LocalDateTime
 
  class HistorizeWithMergeActionTest extends FunSuite with BeforeAndAfter {
 
-   protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+   protected implicit val session: SparkSession = TestUtil.session
    import session.implicits._
 
    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry

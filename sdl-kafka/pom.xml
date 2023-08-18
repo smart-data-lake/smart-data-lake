@@ -44,7 +44,7 @@
 
 	<properties>
 		<sdl-core.scope>compile</sdl-core.scope>
-		<confluent.version>6.2.1</confluent.version>
+		<confluent.version>7.3.2</confluent.version>
 	</properties>
 
 	<dependencyManagement>
@@ -102,6 +102,16 @@
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-schema-registry-client</artifactId>
 			<version>${confluent.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.yaml</groupId>
+					<artifactId>snakeyaml</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>

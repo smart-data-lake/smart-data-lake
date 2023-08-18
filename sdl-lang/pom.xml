@@ -69,6 +69,10 @@
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-annotations</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.jetty.websocket</groupId>
+                    <artifactId>websocket-client</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -77,6 +81,13 @@
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <exclusions>
+                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>

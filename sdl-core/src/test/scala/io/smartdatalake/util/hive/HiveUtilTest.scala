@@ -34,7 +34,7 @@ import java.nio.file.{Files, Path, Paths}
  */
 class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
-  implicit lazy val session: SparkSession = TestUtil.sessionHiveCatalog
+  implicit lazy val session: SparkSession = TestUtil.session
   import session.implicits._
 
   private val hiveTable = Table(Some("default"), "unittesttable")

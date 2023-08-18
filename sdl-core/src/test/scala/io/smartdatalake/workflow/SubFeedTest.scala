@@ -28,7 +28,7 @@ import org.scalatest.FunSuite
 
 class SubFeedTest extends FunSuite {
 
-  implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  implicit val session: SparkSession = TestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context1: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry)
 

@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
  */
 object SnowflakeDataObjectIT extends App {
 
-  implicit val sparkSession = TestUtil.sessionHiveCatalog
+  implicit val sparkSession = TestUtil.session
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
 

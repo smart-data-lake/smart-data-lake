@@ -34,7 +34,7 @@ import scala.reflect.runtime.universe.typeOf
 
 class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger{
 
-  protected implicit val session: SparkSession = sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -112,7 +112,7 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     val hiveTablePKidDO = createHiveTable(tableName= "hive_table_pk_id", dirPath= tempPath, df= dfNonUniqueWithNull, primaryKeyColumns= Some(Seq("id")))
     val hiveTableNoPKDO = createHiveTable(tableName= "hive_table_no_pk", dirPath= tempPath, df= dfTwoCandidateKeys)
-    val hiveTablePKidValueDO = createHiveTable(tableName= "hive_table_pk_id_Value", dirPath= tempPath, df= dfNonUniqueWithNull, primaryKeyColumns= Some(Seq("id","value")))
+    val hiveTablePKidValueDO = createHiveTable(tableName= "hive_table_pk_id_value", dirPath= tempPath, df= dfNonUniqueWithNull, primaryKeyColumns= Some(Seq("id","value")))
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]
@@ -133,16 +133,16 @@ class PKviolatorDOtest extends FunSuite with BeforeAndAfter with SmartDataLakeLo
 
     // PKviolators of hiveTablePKidValueDO
     val rows_expectedWithOutData = Seq(
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","0let"),TestKV("value",null))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","2let"),TestKV("value","doublet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","2let"),TestKV("value","doublet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","3let"),TestKV("value","triplet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","3let"),TestKV("value","triplet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","3let"),TestKV("value","triplet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet"))),
-      TestData("hive_table_pk_id_ValueDO","default","hive_table_pk_id_Value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet")))
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","0let"),TestKV("value",null))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","2let"),TestKV("value","doublet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","2let"),TestKV("value","doublet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","3let"),TestKV("value","triplet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","3let"),TestKV("value","triplet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","3let"),TestKV("value","triplet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet"))),
+      TestData("hive_table_pk_id_valueDO","default","hive_table_pk_id_value","id STRING,value STRING",Seq(TestKV("id","4let"),TestKV("value","quatriplet")))
     )
 
     val expected = SparkDataFrame(

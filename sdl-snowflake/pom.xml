@@ -92,6 +92,10 @@
 					<groupId>org.slf4j</groupId>
 					<artifactId>slf4j-simple</artifactId>
 				</exclusion>
+				<exclusion>
+					<groupId>net.snowflake</groupId>
+					<artifactId>snowflake-jdbc</artifactId>
+				</exclusion>
 			</exclusions>
 		</dependency>
 		<dependency>
