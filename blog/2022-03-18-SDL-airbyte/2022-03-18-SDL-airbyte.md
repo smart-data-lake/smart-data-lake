@@ -34,7 +34,7 @@ The [github connector](https://docs.airbyte.com/integrations/sources/github) is 
 ## Prerequisites
 After downloading and installing all necessary packages, the connector is briefly tested:
 * Python
-* [Podman including `podman-compose`](../../docs/getting-started/troubleshooting/docker-on-windows) or [Docker](https://www.docker.com/get-started)
+* [Podman](../../docs/getting-started/troubleshooting/docker-on-windows) or [Docker](https://www.docker.com/get-started)
 * [SDL example](https://github.com/smart-data-lake/getting-started/archive/refs/heads/master.zip), download and unpack: 
   ```Bash
   git clone https://github.com/smart-data-lake/getting-started.git SDL_airbyte
@@ -134,7 +134,7 @@ Now we are ready to go. My full [SDLB config file](application.conf) additionall
 ## Run and inspect results
 Since the data will be streamed into a `DeltaLakeTableDataObject`, the metastore container is necessary. Further, we aim to inspect the data using the Polynote notebook. Thus, first these containers are launched using (in the SDL example base directory):
 ```Bash
-podman-compose up
+./part2/podman-compose.sh #use the script from the getting-started guide
 podman pod ls
 ```
 With the second command we can verify the pod name and both running containers in it (should be three including the infra container).

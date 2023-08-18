@@ -35,7 +35,7 @@ docker build -t sdl-spark .
 <TabItem value="podman">
 
 ```jsx
-podman build -t sdl-spark .
+podman build -v ${PWD}/.mvnrepo:/mnt/.mvnrepo -t sdl-spark .
 ```
 
 </TabItem>

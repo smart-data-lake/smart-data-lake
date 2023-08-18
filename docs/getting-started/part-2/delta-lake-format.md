@@ -88,7 +88,7 @@ Finally, adapt the action definition for `join-departures-airports`:
 - Adapted the existing action `join-departures-airports` to use the new table `int-departures`
 :::
 
-To run our data pipeline, first delete the data directory - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
+To run our data pipeline, first make sure data directory is empty - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
 Then you can execute the usual *docker run* command for all feeds:
 
 <Tabs groupId = "docker-podman-switch"
@@ -138,7 +138,8 @@ But state-of-the-art is to use notebooks like Jupyter for this.
 One of the most advanced notebooks for Scala code we found is Polynote, see [polynote.org](https://polynote.org/).
 
 We will now start Polynote in a docker container, and an external Metastore (Derby database) in another container to share the catalog between our experiments and the notebook.
-To do so you need to add additional files to the project. Change to the projects root directory and `unzip part2.additional-files.zip` into the project's root directoy, then run the following commands in the projects root directory:
+To do so, we will use the additional files in the subfolder `part2`. 
+Execute these commands:
 
 <Tabs groupId = "docker-podman-switch"
 defaultValue="docker"
@@ -149,18 +150,17 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker-compose build
+docker-compose -f part2/docker-compose.yml build
 mkdir -p data/_metastore
-docker-compose up
+docker-compose -f part2/docker-compose.yml up
 ```
 
 </TabItem>
 <TabItem value="podman">
 
 ```jsx
-podman-compose build
 mkdir -p data/_metastore
-podman-compose up
+./part2/podman-compose.sh 
 ```
 
 </TabItem>
@@ -171,6 +171,9 @@ You should now be able to access Polynote at `localhost:8192`.
 
 :::info Docker on Windows
 If you use Windows, please read our note on [Docker for Windows](../troubleshooting/docker-on-windows).
+You might notice that the commands for docker and podman differ at this point. 
+The latest version of podman-compose changed the behavior of creating pods, 
+which is why we have implemented a script `podman-compose.sh` to emulate podman-compose.
 :::
 
 But when you walk through the prepared notebook "SelectingData", you won't see any tables and data yet. 
@@ -201,22 +204,18 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network part2_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
 ```
 
 </TabItem>
 <TabItem value="podman">
 
 ```jsx
-podman run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
 ```
 
 </TabItem>
 </Tabs>
-
-:::info Podman Hostname Specification
-Without specifying the hostname, the containter name (by default the docker/podman container ID) can not be resolved to localhost. If you need to name your container differently, the following arguments can be used alternatively: `--hostname myhost --add-host myhost:127.0.0.1 -rm ...`
-:::
 
 After you run your data pipeline again, you should now be able to see our DataObjects data in Polynote.
 No need to restart Polynote, just open it again and run all cells.

@@ -23,20 +23,13 @@ Install podman on WSL2 Ubuntu:
 Throughout this tutorial, we often refer to the commands `docker build` and `docker run`.
 Podman has identically named commands, which, for the purpose of this tutorial, do exactly the same thing.
 So with podman you can just type `podman build` and `podman run` instead.
+The podman commands that we provide in our tutorials all assume that they are executed either from a unix environment or from the WSL.
 
-## Using podman compose
-For [part 2 of this guide](../part-2/delta-lake-format.md), you need docker compose.
-For Windows, you can use the alternative podman compose.
-Install podman-compose for podman in WSL2:
+## Equivalent of docker-compose
+For [part 2 of this guide](../part-2/delta-lake-format.md), you need docker-compose.
+For composing multiple podman containers, you can just execute our custom script podman-compose.sh from the getting-started base directory.
 
-    sudo apt install python3-pip
-    sudo pip3 install podman-compose==0.1.11
-
-:::info podman version
-`podman-compose` with major 1 (tested up to 1.0.3) do not create pods automatically. Therewith, the used commands results in networking issues between the containers. Thus, we recommend to use the latest version with automatic pod creation, version 0.1.11. The behaviour may change in future versions. 
-:::
-
-After starting `podman-compose up` in the getting-started folder you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
+After running the script in the getting-started folder you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
 If the port is not accessible, you can use `wsl hostname -I` on Windows command line to get the IP adress of WSL, and then access Polynote over {ip-address}:8192.
 
 ## Known Issue with podman on WSL2 on Windows
