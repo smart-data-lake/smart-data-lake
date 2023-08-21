@@ -5368,7 +5368,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5378,18 +5378,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5714,43 +5714,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "SQLDfTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "code" : {
-                  "type" : "string",
-                  "description" : "SQL code for transformation.\nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.\nExample:`select * from test where run = %{runId}`\nThe special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary view name.\nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
-                },
-                "options" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  },
-                  "description" : "Options to pass to the transformation"
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  },
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
-                }
-              },
-              "title" : "SQLDfTransformer",
-              "required" : [ "code", "type" ],
-              "additionalProperties" : false,
-              "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix`_sdltemp`is added.\nIt is therefore recommended to use special token`%{inputViewName}`or`%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "ScalaClassSparkDsTransformer"
                 },
                 "name" : {
@@ -5784,6 +5747,43 @@
               "required" : [ "transformerClassName", "type" ],
               "additionalProperties" : false,
               "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] ."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "SQLDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "code" : {
+                  "type" : "string",
+                  "description" : "SQL code for transformation.\nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.\nExample:`select * from test where run = %{runId}`\nThe special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary view name.\nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "Options to pass to the transformation"
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
+                }
+              },
+              "title" : "SQLDfTransformer",
+              "required" : [ "code", "type" ],
+              "additionalProperties" : false,
+              "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix`_sdltemp`is added.\nIt is therefore recommended to use special token`%{inputViewName}`or`%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
             }, {
               "type" : "object",
               "properties" : {
@@ -5971,7 +5971,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5981,18 +5981,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -7175,9 +7175,11 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/Action/CopyAction"
+            }, {
               "$ref" : "#/definitions/Action/CustomFileAction"
             }, {
-              "$ref" : "#/definitions/Action/CustomScriptAction"
+              "$ref" : "#/definitions/Action/DeduplicateAction"
             }, {
               "$ref" : "#/definitions/Action/FileTransferAction"
             } ]
