@@ -221,19 +221,22 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'
 ```
 
 </TabItem>
 <TabItem value="podman">
 
 ```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel .*
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'
 ```
 
 </TabItem>
 </Tabs>
 
+:::warning
+Note the regex feed selection .* need to be specified in quotation marks (`'.*'` or `".*"`), otherwise our system would substitute the asterisk.
+:::
 
 
 ## Example of Common Mistake
