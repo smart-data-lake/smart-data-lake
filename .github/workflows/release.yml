@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Git Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         ref: ${{ github.base_ref }}
         fetch-depth: 0
@@ -31,11 +31,12 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
     - name: JDK 11 Set
-      uses: actions/setup-java@v1
-      with: 
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'zulu'
         java-version: 11
     - name: Maven Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -104,7 +105,7 @@ jobs:
 
     steps:
     - name: Git Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         ref: ${{ github.head_ref }}
         fetch-depth: 0
