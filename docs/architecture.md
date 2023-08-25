@@ -15,14 +15,27 @@ Find below an overview of requirements, versions and supported configurations.
 - Uses Maven 3+ as build system
 
 ## Versions and supported configuration
-SDLB currently maintains the following two major versions, which are published as Maven artifacts on maven central:
+SDLB is published as Maven artifacts on Maven Central. 
+The SDLB versions are build with specific versions of Apache Spark and other libraries.
+This page gives an overview of the respective versions.
 
-|SDL Version|Java/Scala/Hadoop Version|File Engine|Spark Engine|Snowflake/Snowpark Engine|Comments|
-| --------- | ----------------------- | --------- | ---------- | ----------------------- | ------ |
-|1.x, branch master/develop-spark2|Java 8, Scala 2.11 & 2.12|Hadoop 2.7.x|Spark 2.4.x|not supported|Delta lake has limited functionality in Spark 2.x|
-|2.x, branch master/develop-spark3|Java 8+, Scala 2.12|Hadoop 3.3.x (2.7.x)|Spark 3.2.x (3.1.x)|Snowpark 1.2.x|Delta lake, spark-snowflake and spark-extensions need specific library versions matching the corresponding spark minor version|
+### SDLB Version 1.X
+SDLB version 1.X used Apache Spark 2.X. 
+This branch of SDLB is no longer maintained.
+To profit from the latest development, please upgrade to a more recent version of SDLB.
 
-Configurations using alternative versions mentioned in parentheses can be build manually by setting corresponding maven profiles.
+### SDLB Version 2.X
+
+The following table gives an overview of dependency versions that are delivered with each major branch of SDLB.
+
+| SDL Version | Java/Scala/Hadoop Version | Hadoop Version | Spark Engine     | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
+|-------------|---------------------------|----------------|------------------|--------|---------------------------|-------------|---------|
+| 2.5.X       | Java 8+, Scala 2.12       | 3.3.2          | 3.3.2            | 2.17.2 | 2.11.0 / 1.6.2            | 2.2.0       | 1.1.0   |
+| 2.4.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.2            | 1.2.17 | 2.10.0 / 1.2.0            | 2.0.0       | -       |
+| 2.3.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.2            | 1.2.17 | 2.10.0 / 1.2.0            | 2.0.0       | -       |
+| 2.2.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.1            | 1.2.17 | 2.9.2 / 0.11.0            | 1.1.0       | -       |
+| 2.1.X       | Java 8+, Scala 2.12       | 2.7.4          | 3.1.1            | 1.2.17 | 2.8.4                     | 1.0.0       | -       |
+
 
 It's possible to customize dependencies and make Smart Data Lake Builder work with other version combinations, but this needs manual tuning of dependencies in your own maven project.
 
