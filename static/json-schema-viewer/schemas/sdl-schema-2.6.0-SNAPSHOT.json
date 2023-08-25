@@ -5660,25 +5660,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5710,6 +5691,25 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5900,17 +5900,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "FilterTransformer"
                 },
                 "name" : {
@@ -5934,6 +5923,17 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OptionsGenericDfTransformer"
+                }
+              },
+              "title" : "OptionsGenericDfTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -7177,11 +7177,11 @@
             "oneOf" : [ {
               "$ref" : "#/definitions/Action/CopyAction"
             }, {
-              "$ref" : "#/definitions/Action/CustomFileAction"
+              "$ref" : "#/definitions/Action/CustomDataFrameAction"
             }, {
-              "$ref" : "#/definitions/Action/DeduplicateAction"
+              "$ref" : "#/definitions/Action/CustomScriptAction"
             }, {
-              "$ref" : "#/definitions/Action/FileTransferAction"
+              "$ref" : "#/definitions/Action/HistorizeAction"
             } ]
           },
           "agent" : {
