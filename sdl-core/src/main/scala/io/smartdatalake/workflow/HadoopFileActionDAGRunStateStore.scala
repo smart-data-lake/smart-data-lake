@@ -69,7 +69,8 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
           logger.info("appended current run to index file")
         } catch {
           case _: UnsupportedOperationException =>
-            val currentContent = HdfsUtil.readHadoopFile(indexFile)
+            var currentContent = HdfsUtil.readHadoopFile(indexFile)
+            if (!currentContent.endsWith("\n")) currentContent = currentContent + "\n"
             HdfsUtil.writeHadoopFile(indexFile, currentContent + newContent)
             logger.info("recreated index file including current run (append not supported by filesystem implementation)")
         }
@@ -153,7 +154,8 @@ case class HadoopFileStateId(path: Path, appName: String, runId: Int, attemptId:
 
 private case class IndexEntry(name: String, runId: Int, attemptId: Int, feedSel: String,
                       runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, runEndTime: Option[LocalDateTime],
-                      status: RuntimeEventState, actionStatus: Map[RuntimeEventState,Int], buildVersion: Option[String], path: String) {
+                      status: RuntimeEventState, actionStatus: Map[RuntimeEventState,Int],
+                      buildVersion: Option[String], appVersion: Option[String], path: String) {
   def toJson(): String = {
     ActionDAGRunState.toJson(this)
   }
@@ -166,7 +168,8 @@ private object IndexEntry {
     IndexEntry(
       state.appConfig.appName, state.runId, state.attemptId, state.appConfig.feedSel,
       state.runStartTime, state.attemptStartTime, runEndTime,
-      state.finalState.get, actionsStatus, state.buildVersionInfo.map(_.version), relativePath
+      state.finalState.get, actionsStatus, state.buildVersionInfo.map(_.version),
+      state.appVersion, relativePath
     )
   }
 }
