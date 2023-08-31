@@ -37,7 +37,7 @@ import java.time.{Duration, LocalDateTime}
  */
 case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime,
                              actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean, runStateFormatVersion: Option[Int],
-                             buildVersionInfo: Option[BuildVersionInfo]) {
+                             buildVersionInfo: Option[BuildVersionInfo], appVersion: Option[String]) {
 
   def toJson: String = ActionDAGRunState.toJson(this)
 
@@ -76,7 +76,7 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 
 private[smartdatalake] object ActionDAGRunState {
 
-  val runStateFormatVersion: Int = 2
+  val runStateFormatVersion: Int = 3
 
   private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {
