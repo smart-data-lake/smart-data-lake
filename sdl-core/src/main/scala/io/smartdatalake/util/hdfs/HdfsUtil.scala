@@ -311,6 +311,12 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     }
   }
 
+  def appendHadoopFile(file: Path, content: String)(implicit filesystem: FileSystem): Unit = {
+    Using.resource(filesystem.append(file)) { os =>
+      os.write(content.getBytes(Codec.UTF8.name))
+    }
+  }
+
   def movePartition(basePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String)(implicit filesystem: FileSystem): Unit = {
     val partitionLayout = getHadoopPartitionLayout(existingPartition.keys.toSeq)
     val existingPartitionPath = new Path(basePath, existingPartition.getPartitionString(partitionLayout))

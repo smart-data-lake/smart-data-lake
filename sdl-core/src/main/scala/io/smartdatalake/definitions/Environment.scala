@@ -458,6 +458,20 @@ object Environment {
   }
   var _caseSensitive: Option[Boolean] = None
 
+  /**
+   * Whether HadoopFileActionDAGRunStateStore should update an index file.
+   * If true the information for a run are appended to the index file when the run is finished (final).
+   * The index file is needed by the UI if it reads directly from the filesystem.
+   * Default is false.
+   */
+  def hadoopFileStateStoreIndexAppend: Boolean = {
+    if (_hadoopFileStateStoreIndexAppend.isEmpty) {
+      _hadoopFileStateStoreIndexAppend = Some(EnvironmentUtil.getSdlParameter("hadoopFileStateStoreIndexAppend").exists(_.toBoolean))
+    }
+    _hadoopFileStateStoreIndexAppend.get
+  }
+  var _hadoopFileStateStoreIndexAppend: Option[Boolean] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

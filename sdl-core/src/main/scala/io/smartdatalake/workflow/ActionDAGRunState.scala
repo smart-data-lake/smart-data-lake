@@ -97,16 +97,24 @@ private[smartdatalake] object ActionDAGRunState {
     {case s: String => DataObjectId(s)},
     {case obj: DataObjectId => obj.id}
   ))
+  private val runtimeEventStateKeySerializer = Json4sCompat.getCustomKeySerializer[RuntimeEventState](formats => (
+    {case s: String => RuntimeEventState.withName(s)},
+    {case obj: RuntimeEventState => obj.toString}
+  ))
 
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
-    actionIdSerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer
+    actionIdSerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer
 
   // write state to Json
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
     writePretty(actionDAGRunState)
+  }
+
+  def toJson(entry: IndexEntry): String = {
+    writePretty(entry)
   }
 
   // read state from json

@@ -20,14 +20,17 @@
 package io.smartdatalake.workflow
 
 import java.time.{Duration, LocalDateTime}
-import io.smartdatalake.app.{BuildVersionInfo, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{AppUtil, BuildVersionInfo, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject._
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
+
+import java.nio.file.Files
 
 class ActionDAGRunTest extends FunSuite {
 
@@ -39,7 +42,8 @@ class ActionDAGRunTest extends FunSuite {
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"),
       results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo )
+    val appVersion = AppUtil.getManifestVersion
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
     val json = state.toJson
     println(json)
     // remove DataFrame from SparkSubFeed, it should not be serialized
@@ -53,5 +57,36 @@ class ActionDAGRunTest extends FunSuite {
     // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)
+  }
+
+  test("append to state index file") {
+    // enable writing index json
+    Environment._hadoopFileStateStoreIndexAppend = Some(true)
+
+    // prepare state
+    val df = Seq(("a", 1)).toDF("txt", "value")
+    val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(LocalDateTime.now()), duration = Some(Duration.ofMinutes(5)), msg = Some("test"),
+      results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test" -> 1)))), Map("test" -> 1, "test2" -> "abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
+    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
+    val appVersion = AppUtil.getManifestVersion
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = true, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion)
+
+    // prepare state store
+    val tempDir = Files.createTempDirectory("test")
+    val stateStore = HadoopFileActionDAGRunStateStore(tempDir.toString, "test", session.sparkContext.hadoopConfiguration)
+
+    // write first state
+    {
+      stateStore.saveState(state)
+      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
+      assert(index.split(HadoopFileActionDAGRunStateStore.indexEntryDelimiter).length == 1)
+    }
+
+    // write second state
+    {
+      stateStore.saveState(state)
+      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
+      assert(index.split(HadoopFileActionDAGRunStateStore.indexEntryDelimiter).length == 2)
+    }
   }
 }
