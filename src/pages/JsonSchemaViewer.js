@@ -1,28 +1,18 @@
-import React, {useEffect} from 'react';
+import React from 'react';
 import Layout from '@theme/Layout';
+import useIsBrowser from '@docusaurus/useIsBrowser';
 
 function JsonSchemaViewer() {
-  
-  const onLoad = () => {
-    const wrapper = document.getElementsByClassName("main-wrapper")[0]
-    wrapper.style.display = 'flex'
-  };
-  
-  return (
-    <Layout title="JsonSchemaViewer" >
-        <iframe
-          onLoad={onLoad}
-          id="JsonSchemaViewer"
-          src="/json-schema-viewer/index.html"
-          width="100%"
-          scrolling="no"
-          frameBorder="0"
-          style={{
-            flex: '1',
-          }}
-        ></iframe>
-    </Layout>    
-  );
+    // only load schema viewer in browser because the schema viewer does not support server side rendering
+    const SchemaViewerInBrowser = useIsBrowser ? require('../schema-viewer/SchemaViewerComponent').default : (<div />);
+
+    return (
+        <Layout title="JsonSchemaViewer" noFooter={true} wrapperClassName="schema-viewer-wrapper">
+            <div style={{flex: 1}}>
+                <SchemaViewerInBrowser  />
+            </div>
+        </Layout>
+    );
 }
 
 export default JsonSchemaViewer;

@@ -3,158 +3,242 @@ id: transformations
 title: Transformations
 ---
 
-:::warning
-This page is under review 
+## Overview
+On all Spark related actions, you can add one or multiple transformers that are used to transform data before handing 
+it over to the next action or writing the Data Object.
+If you define multiple transformers for one action, they are processed sequentially (output of one transformer becomes input of the next).
+This page describes the many out-of-the-box transformations and explains how to write your own. 
+
+In all cases, two types of transformers need to be distinguished:
+* **1-to-1**: One input Data Object is transformed into one output Data Object. 
+* **many-to-many**: One or more input Data Objects are transformed into (potentially) many output Data Object.
+
+:::info
+Although it's possible to create many output Data Object, it's encouraged to only create actions with one output Data Object.
+The resulting lineage of the pipelines will be clearer and impact analysis easier.
 :::
 
-## Spark Transformations
-To implement custom transformation logic, specify **transformers** attribute of an Action. 
-It allows you to chain several transformations in a linear process, where the output SubFeeds of one transformation are used as input for the next.
+#### Example
+As a simple example, we add a WhitelistTransformer to a CopyAction.
+This will result in only the given columns being selected from the input Data Object and any other columns being discarded.
 
-Depending on your Action type the transformations have different format (described later). The two types are:
-
-* **1-to-1** transformations (\*DfTransformer): One input DataFrame is transformed into one output DataFrame. This is the case for *CopyAction*, *DeduplicateAction* and *HistorizeAction*.
-* **many-to-many** transformations (\*DfsTransformer): Many input DataFrames can be transformed into many output DataFrames. This is the case for *CustomDataFrameAction*.
-
-The configuration allows you to use [*predefined standard transformations*](#predefined-transformations) or to define [*custom transformation*](#custom-transformations) in various languages.
-
-:::warning Deprecation Warning
- there has been a refactoring of transformations in Version 2.0.5. The attribute **transformer** is deprecated and will be removed in future versions. Use **transformers** instead.
-:::
-
-
-### Predefined Transformations
-Predefined transformations implement generic logic to be reused in different actions. 
-Depending on the transformer there are a couple of properties you can specify, see [Configuration Schema Viewer](../../JsonSchemaViewer).
-The following Transformers exist:
-
-* AdditionalColumnsTransformer (1-to-1): Add additional columns to the DataFrame by extracting information from the context
-* BlacklistTransformer (1-to-1): Apply a column blacklist to a DataFrame
-* ColNamesLowercaseTransformer (1-to-1): change column name to lower case column names in output
-* DataValidationTransformer (1-to-1): validates DataFrame with user defined set of rules and creates column with potential error messages
-* FilterTransformer (1-to-1): Filter DataFrame with expression
-* StandardizeDatatypesTransformer (1-to-1): Standardize data types of a DataFrame
-* WhitelistTransformer (1-to-1): Apply a column whitelist to a DataFrame
-* SparkRepartitionTransformer (1-to-1): Repartions a DataFrame
-
-* DfTransformerWrapperDfsTransformer (many-to-many): use 1-to-1 transformer as many-to-many transformer by specifying the SubFeeds it should be applied to
-<!-- TODO show one example of an predefined transformation -->
-
-
-### Custom Transformations
-*Custom transformers* provide an easy way to define your own data transformation logic in SQL, Scala/Java, and Python.
-The transformation can be defined within the configuration file or in a separate code file. 
-
-Additionally, static **options** and **runtimeOptions** can be defined within the custom transformers. *runtimeOptions* are extracted at runtime from the context.
-Specifying options allows to reuse a transformation in different settings. For an example see SQL example below.
-
-#### Scala/Java
-In general, Scala/Java transformations can be provided within the configuration file or in seperate source files. 
-You can use Spark Dataset API in Java/Scala to define custom transformations.
-If you have a Java project, create a class that extends CustomDfTransformer or CustomDfsTransformer and implement `transform` method.
-Then use **type = ScalaClassSparkDfTransformer** or **type = ScalaClassSparkDfsTransformer** and configure **className** attribute.
-
-If you work without Java project, it's still possible to define your transformation in Java/Scala and compile it at runtime.
-For a 1-to-1 transformation use **type = ScalaCodeSparkDfTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectName: String` as parameters and returns a `DataFrame`.
-For many-to-many transformations use **type = ScalaCodeSparkDfsTransformer** and configure **code** or **file** as a function that takes `session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]` with DataFrames per input DataObject as parameter, and returns a `Map[String,DataFrame]` with the DataFrame per output DataObject.
-
-Examples within the configuration file:
-Example 1-to-1: select 2 specific columns (`col1` and `col2`) from `stg-tbl1` into `int-tbl`:
 ```
-  myactionName {
-    metadata.feed = myfeedName
+SampleWhitelistAction {
     type = CopyAction
-    inputId = stg-tbl1
-    outputId = int-tbl1
-    transformer = {
-      scalaCode = """
-        import org.apache.spark.sql.{DataFrame, SparkSession}
-        import org.apache.spark.sql.functions.explode
-        (session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) => {
-          import session.implicits._
-          df.select("col1","col2")
-        }
-      """
-    }
-    ...
-```
-
-Example many-to-many: joining `stg-tbl1` and `stg-tbl2` using two indexes, note the mapping of DataFrames:
-
-```
-  myactionName {
-    metadata.feed = myfeedName
-    type = CustomDataFrameAction
-    inputIds = [stg-tbl1, stg-tbl2]
-    outputIds = [int-tab12]
+    inputId = someInput
+    outputId = someOutput
     transformers = [{
-      type = ScalaCodeSparkDfsTransformer
-      code = """
-        import org.apache.spark.sql.{DataFrame, SparkSession}
-        // define the function, with this fixed argument types)
-        (session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) => {
-          import session.implicits._
-          val df_in1 = dfs("stg-tbl1")         // here we map the input DataFrames
-          val df_in2 = dfs("stg-tbl2")
-          val df_res = df_in1.join(df_in2, $"tbl1_id" === $"tbl2_id", "left").drop("tbl2_id")
-        Map("int-tbl12" -> df_res)             // map output DataFrame
-        }
-      """
+        type = WhitelistTransformer
+        columnWhitelist = [includedColumn1,anotherColumn2]
     }]
-  }
+}
 ```
+Note the square brackets: _transformers_ is an array as you can define multiple transformers.
 
-See more examples at [sdl-examples](https://github.com/smart-data-lake/sdl-examples).
+The parameter `columnWhitelist` is dependent on the type of the transformer.
+For details about given parameters / options, please see the [Configuration Schema Viewer](../../JsonSchemaViewer).
 
-#### SQL
-You can use Spark SQL to define custom transformations.
-Input DataObjects are available as tables to select from. Use tokens %{&ltkey&gt} to replace with runtimeOptions in SQL code.
-For a 1-to-1 transformation use **type = SQLDfTransformer** and configure **code** as your SQL transformation statement.
-For many-to-many transformations use **type = SQLDfsTransformer** and configure **code** as a Map of "&ltoutputDataObjectId&gt, &ltSQL transformation statement&gt".
+## Predefined Transformations
+SDLB comes with commonly used transformers out-of-the-box.
 
-Example - using options in sql code for 1-to-1 transformation:
+The following predefined 1-to-1 transformations are supported:
+
+| Transformer | Description                                                                                           |
+| ----------- |-------------------------------------------------------------------------------------------------------|
+| AdditionalColumnsTransformer | Add additional columns to the DataFrame by extracting information from the context  or derive new columns from existing columns  |
+| BlacklistTransformer | Apply a column blacklist to discard columns                                                           |
+| DataValidationTransformer | validates DataFrame with a user defined set of rules and creates column with potential error messages |
+| DecryptColumnsTransformer | Decrypts specified columns using AES/GCM algorithm                                                    |
+| EncryptColumnsTransformer | Encrypts specified columns using AES/GCM algorithm                                                    |
+| FilterTransformer | Filter DataFrame with expression                                                                      |
+| SparkRepartitionTransformer | Repartitons a DataFrame                                                                                |
+| StandardizeColNamesTransformer | Used to standardize column names according to configurable rules                                      |
+| StandardizeSparkDatatypesTransformer| Standardize data types of a DataFrame (decimal to corresponding int / float)                          |
+| WhitelistTransformer | Apply a column whitelist to a DataFrame                                                               |
+
+
+## Custom Transformations
+When these predefined transformations are not enough, you can easily write your own _Custom Transformations_.
+SDLB currently supports SQL, Scala and Python transformations, depending on the complexity and needed libraries.
+
+The following custom transformations are available.
+
+| Transformer                      | Description                                               |
+|----------------------------------|-----------------------------------------------------------|
+| SQLDfTransformer                 | SQL Transformation 1-to-1                                 |
+| SQLDfsTransformer                | SQL Transformation many-to-many                           |
+| ScalaClassGenericDfTransformer   | Spark DataFrame transformation in Scala 1-to-1            |
+| ScalaClassGenericDfsTransformer  | Spark DataFrame transformation in Scala many-to-many      |
+| ScalaClassSnowparkDfTransformer  | Snowpark (Snowflake) transformation in Scala 1-to-1       |
+| ScalaClassSnowparkDfsTransformer | Snowpark (Snowflake) transformation in Scala many-to-many |
+| ScalaClassSparkDfTransformer     | Spark DataFrame transformation in Scala 1-to-1            |
+| ScalaClassSparkDfsTransformer    | Spark DataFrame transformation in Scala many-to-many      |
+| ScalaClassSparkDsTransformer     | Spark DataSet transformation in Scala 1-to-1              |
+| ScalaClassSparkDsNTo1Transformer | Spark DataFrame transformation in Scala many-to-one       |
+| ScalaNotebookSparkDfTransformer  | Loads custom code from a Notebook                         | 
+| PythonCodeSparkDfTransformer | Spark DataFrame transformation in Python 1-to-1 (using PySpark)  |
+| PythonCodeSparkDfsTransformer | Spark DataFrame transformation in Python many-to-many (using PySpark) |
+
+There are usually two variants, one for 1-to-1 transformations called _DfTransformer_ and one
+for many-to-many transformations called _DfsTransformer_.
+
+:::info
+The type of the transformer needs to match your action. 
+This is also apparent in the [Configuration Schema Viewer](../../JsonSchemaViewer):  
+1-to-1 transformers are listed under 1-to-1 actions, i.e. CopyAction.  
+Many-to-many transformers are only listed under many-to-many actions, i.e. CustomDataFrameAction.
+:::
+
+### SQL
+Spark SQL is probably the easiest way to write a custom transformation, directly in your HOCON configuration.
+All input Data Objects are available in the select statement with following naming:
+- special characters are replaced by an underscore
+- a postfix `_sdltemp` is added.
+So an input Data Object called `table-with-hyphen` becomes `table_with_hyphen_sdltemp` inside the SQL query.
+To simplify this you can also use the special token `%{inputViewName}` for 1-to-1 transformations, or `${inputViewName_<inputDataObjectName>}` for n-to-m transformations, that will be replaced with the correct name at runtime.
+
+##### SQL 1-to-1
+1-to-1 transformations use type SQLDfTransformer. 
+
+Let's assume we have an input Data Object called dataObject1. 
+We can then write a SQL transformation directly in our HOCON configuration:
 ```
 transformers = [{
   type = SQLDfTransformer
-  name = "test run"
-  description = "description of test run..."
-  sqlCode = "select id, cnt, '%{test}' as test, %{run_id} as last_run_id from dataObject1"
-  options = {
-    test = "test run"
-  }
-  runtimeOptions = {
-    last_run_id = "runId - 1" // runtime options are evaluated as spark SQL expressions against DefaultExpressionData
-  }
+  sqlCode = "select id, count(*) from %{inputViewName} group by id"
 }]
 ```
 
-Example - defining a many-to-many transformation:
+The SQL code gets executed in Spark SQL so you can use all available functions.
+
+##### SQL many-to-many
+Many-to-many transformations use SQLDfsTransformer (note the additional s in Dfs). 
+Now that we have multiple output Data Objects, we need to declare which SQL statements belongs to 
+which Data Object. 
+Therefore, we now have a map of objectIds and corresponding SQL statements:
 ```
 transformers = [{
   type = SQLDfsTransformer
   code = {
-    dataObjectOut1 = "select id,cnt from dataObjectIn1 where group = 'test1'",
-    dataObjectOut2 = "select id,cnt from dataObjectIn1 where group = 'test2'"
+    dataObjectOut1 = "select id, cnt from %{inputViewName_dataObjectIn1} where group = 'test1'",
+    dataObjectOut2 = "select id, cnt from %{inputViewName_dataObjectIn1} where group = 'test2'"
   }
 }
 ```
 
-See [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for details.
+### Scala
+Once transformations get more complex, it's more convenient to implement them in Scala code. 
+In custom Scala code, the whole Spark Dataset API is available. 
+It's of course also possible to include additional libraries for your code, 
+so anything you can do in Spark Scala, you can do with SDLB. 
 
-#### Python
-It's also possible to use Python to define a custom Spark transformation.
-For a 1-to-1 transformation use **type = PythonCodeDfTransformer** and configure **code** or **file** as a python function.
-PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
-Other variables available are
-* `inputDf`: Input DataFrame
-* `options`: Transformation options as Map[String,String]
-* `dataObjectId`: Id of input DataObject as String
+##### As Scala class
+If you have a Java/Scala project, it usually makes sense to create separate classes for your custom Scala code.
+Any classes in your classpath are picked up and can be referenced. 
 
-Output DataFrame must be set with `setOutputDf(df)`.
+To transform data in a 1-to-1 action, i.e. CopyAction:
+```
+  my_action {
+    type = CopyAction
+    inputId = stg_input
+    outputId = int_output
+    transformers = [{
+      type = ScalaClassSparkDfTransformer
+      className = io.package.MyFirstTransformer
+    }]
+  }
+```
+Now SDLB expects to find a class _MyFirstTransformer_ in the Scala package _io.package_. 
+The class needs to extend CustomDfTransformer and with that, overwrite the transform method from it:
+```
+class MyFirstTransformer extends CustomDfTransformer {
+    override def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame {
+        // manipulate df
+        val dfExtended = df.withColumn("newColumn", when($"df.desc".isNotNull, $"df.desc").otherwise(lit("na")))
+        dfExtended
+    }
+}
+```
+The _transform_ method you need to overwrite receives a single DataFrame called _df_.
+You can manipulate this DataFrame any way you want.
+In the end, you simply need to return a DataFrame back to SDLB.
 
-For now using Python for many-to-many transformations is not possible, although it would be not so hard to implement.
+Because a CopyAction is 1-to-1 only, the transformer also needs to extend the 1-to-1 `CustomDfTransformer`.
 
-Example - apply some python calculation as udf:
+If you have a many-to-many action and want to write a custom Scala transformer, you need to switch to a `CustomDataFrameAction`. 
+```
+my_many_to_many_action {
+  type = CustomDataFrameAction
+  inputIds = [df1,df2]
+  outputIds = [dfOut]
+  transformers = [{
+    type = ScalaClassSparkDfsTransformer
+    class-name = io.package.MySecondTransformer
+  }]
+}
+```
+
+In this case, your Scala class also needs to extend the many-to-many `CustomDfsTransformer` and overwrite the respective transform method:
+```
+class MySecondTransformer extends CustomDfsTransformer {
+    def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] {
+        // now you have multiple input DataFrames and can potentially return multiple DataFrames
+        val df1 = dfs("df1")
+        val df2 = dfs("df2")
+        val combined = df1.join(df2, $"df1.id"==$"df2.fk", "left")
+        Map("dfOut"->combined)
+    }
+}
+```
+The _transform_ method now gets a map with all your input DataFrames called _dfs_. 
+The key in _dfs_ contains the dataObjectId, in this example we have two inputs called _df1_ and _df2_, 
+we use it to extract the two DataFrames.
+Again, you can manipulate all DataFrames as needed and this time, return a map with all output Data Objects.
+As noted, it's best practice to only return one Data Object (many-to-one action) as in our example.
+
+
+:::info
+One thing that might be confusing at this point:
+
+CustomDataFrameAction is the type of the **action** itself. 
+Take a look at the  [Configuration Schema Viewer](../../JsonSchemaViewer): 
+You will see CustomDataFrameAction as a direct action type, similar to CopyAction or HistorizeAction.
+
+ScalaClassSparkDfsTransformer is the type of your **transformer**. 
+It needs to correspond to the action type. A 1-to-1 action, expects a 1-to-1 transformer.
+:::
+
+##### In Configuration
+If you don't work with a full Java/Scala project, it's still possible to define your transformations 
+in your HOCON configuration and compile it at runtime.
+In this case, use the transformer type ScalaCodeSparkDfTransformer.
+
+To include the Scala code inline:
+```
+myActionName {
+  type = CopyAction
+  inputId = stg-tbl1
+  outputId = int-tbl1
+  transformers = [{
+    type = ScalaCodeSparkDfTransformer
+    code = """
+      import org.apache.spark.sql.{DataFrame, SparkSession}
+      import org.apache.spark.sql.functions.explode
+      (session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) => {
+        import session.implicits._
+        df.select("col1","col2")
+      }
+    """
+  }]
+```
+Check the method signature in CustomDfTransformer and CustomDfsTransformer according to your requirements.
+
+
+### Python
+The transformer needs to use type `PythonCodeSparkDfTransformer` (1-to-1) or `PythonCodeSparkDfsTransformer` (many-to-many). 
+You can either provide it as separate file or inline as Python code again.
+
+Inline 1-to-1 example:
 ```
 transformers = [{
   type = PythonCodeDfTransformer 
@@ -168,14 +252,65 @@ transformers = [{
 }]
 ```
 
-Requirements:
-* Spark 2.4.x:
-    * Python version >= 3.4 an <= 3.7
-    * PySpark package matching your spark version
-* Spark 3.x:
-    * Python version >= 3.4
-    * PySpark package matching your spark version
+PySpark is initialized automatically and the PySpark session is available under the variables
+`sc`, `session` or `sqlContext`. 
+Some additional variables are also available:
+* `inputDf`: Input DataFrame
+* `dataObjectId`: Id of input DataObject as string
 
-See Readme of [sdl-examples](https://github.com/smart-data-lake/sdl-examples) for a working example and instructions to setup python environment for IntelliJ
+The output DataFrame needs to be set with `setOutputDf(df)`.
 
-How it works: under the hood a PySpark DataFrame is a proxy for a Java Spark DataFrame. PySpark uses Py4j to access Java objects in the JVM.
+And many-to-many inline example:
+```
+transformers = [{
+  type = PythonCodeDfsTransformer 
+  code = """
+    |dfResult = inputDfs[df1].join(inputDfs[df2], inputDfs[df1].id == inputDfs[df2].fk, "left") \
+    |  .select(inputDfs[df1].id, inputDfs[df1].desc, inputDfs[df2].desc)
+    |setOutputDf({"outputId": dfResult})
+  """
+}]
+```
+
+In this case, `inputDfs` is a dictionary (dict) and `setOutputDf` expects a dictionary.
+
+##### Requirements
+Running Python transformations needs some additional setup. 
+In general, Python >= 3.4 is required and PySpark package needs to be installed with a version matching your SDL spark version. Further environment variable PYTHONPATH needs to be set to your python environment `.../Lib/site-packages` directory, and pyspark command needs to be accessible from the PATH environment variable.
+
+
+### Options / RuntimeOptions
+So far these transformations have been quite static: 
+Code written can probably only be used for one specific action. 
+
+For custom transformers, you can therefore provide additional options:
+* `options`: static options provided in your HOCON configuration
+* `runtimeOptions`: extracted at runtime from the context. 
+
+
+
+##### In SQL
+If you want to use options in SQL, the syntax is %{key}:
+```
+transformers = [{
+  type = SQLDfTransformer
+  sqlCode = "select id, cnt, '%{test}' as test, %{last_run_id} as last_run_id from dataObject1"
+  options = {
+    test = "test run"
+  }
+  runtimeOptions = {
+    last_run_id = "runId - 1" // runtime options are evaluated as spark SQL expressions against DefaultExpressionData
+  }
+}]
+```
+
+##### In Scala
+If you check the signature of the `transform` method again, you can see that you get more than just the DataFrames
+you can manipulate.
+You also get a Map[String,String] called `options`. 
+This Map contains the combined `options` and `runtimeOptions`. 
+So in your custom class, you can read all options and runtimeOptions and use them accordingly to parametrize your code.
+
+##### In Python
+Similarly in Python, in addition to the variables `inputDf` and `dataObjectId` (resp. `inputsDfs'), you get a variable called `options`
+containing all `options` and `runtimeOptions`.

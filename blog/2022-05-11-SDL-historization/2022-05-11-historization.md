@@ -76,7 +76,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 * start the pod with the metastore and polynote: 
   ```Bash
   mkdir -p data/_metastore
-  podman-compose up
+  ./part2/podman-compose.sh #use the script from the getting-started guide
   ```
 * start the MS SQL server: 
   ```Bash

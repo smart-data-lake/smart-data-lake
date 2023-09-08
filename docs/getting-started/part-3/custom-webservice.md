@@ -74,9 +74,10 @@ Hence, our `CustomWebserviceDataObject` will enforce the rule that if the chosen
 
 Note that we changed the type to `CustomWebserviceDataObject`.
 This is a custom DataObject type, not included in standard Smart Data Lake Builder. 
-To make it work please go to the project's root directory and `unzip part3.additional-files.zip` into the project's root folder.
-It includes the following file for you:
+To make it work, please go to the project's root directory and copy the Scala class with 
+`cp part3/src/ ./ -r`:
 
+This copied the following file:
   - ./src/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala
   
 In this part we will work exclusively on the `CustomWebserviceDataObject.scala` file.
@@ -96,7 +97,7 @@ download-departures {
 The type is no longer `FileTransferAction` but a `CopyAction` instead, as our new `CustomWebserviceDataObject` converts the Json-Output of the Webservice into a Spark DataFrame.
 
 :::info
-`FileTransferAction`s are used, when your DataObjects reads an InputStream or writes an OutputStream like `WebserviceFileDataObject` or `SFtpFileRefDataObject`. 
+`FileTransferAction`s are used, when your DataObject reads an InputStream or writes an OutputStream like `WebserviceFileDataObject` or `SFtpFileRefDataObject`. 
 These transfer files one-to-one from input to output.  
 More often you work with one of the many provided `SparkAction`s like the `CopyAction` shown here. 
 They work by using Spark Data Frames under the hood. 
@@ -152,9 +153,9 @@ Having a look at the log, something similar should appear on your screen.
 ```
 
 It is important to notice that the two requests for each airport to the API were not send only once, but twice. 
-This stems from the fact that the method `getDataFrame` of the Data Object is called twice in the DAG execution of the Smart Data Lake Builder: 
+This stems from the fact that the method `getSparkDataFrame` of the Data Object is called twice in the DAG execution of the Smart Data Lake Builder: 
 Once during the Init Phase and once again during the Exec Phase. See [this page](/docs/reference/executionPhases) for more information on that. 
-Before we address and mitigate this behaviour in the next section, let's have a look at the `getDataFrame` method and the currently implemented logic:
+Before we address and mitigate this behaviour in the next section, let's have a look at the `getSparkDataFrame` method and the currently implemented logic:
 
 ```Scala
 // use the queryParameters from the config
@@ -187,7 +188,7 @@ We used such a column based function *from_json* to parse the response string wi
 At the end we return the freshly created data frame `departuresDf`.
 
 :::tip
-The return type of the response is `Array[Byte]`. To convert that to `Array[String]` a *User Defined Function* (also called *UDF*) `byte2String` has been used, which is declared inside the getDataFrame method.
+The return type of the response is `Array[Byte]`. To convert that to `Array[String]` a *User Defined Function* (also called *UDF*) `byte2String` has been used, which is declared inside the getSparkDataFrame method.
 This function is a nice example of how to write your own *UDF*.
 :::
 
