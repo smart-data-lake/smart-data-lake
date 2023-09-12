@@ -372,7 +372,7 @@ private[smartdatalake] object DataFrameUtil {
    * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
    */
   def removeNonStandardSQLNameChars(x: String): String = {
-    x.toLowerCase.replaceAll("[^a-z0-9_]", "")
+    x.toLowerCase.replaceAll("[\\- ]", "_").replaceAll("[^a-z0-9_]", "")
   }
 
   def getEmptyDataFrame(schema: StructType)(implicit session: SparkSession): DataFrame = {
