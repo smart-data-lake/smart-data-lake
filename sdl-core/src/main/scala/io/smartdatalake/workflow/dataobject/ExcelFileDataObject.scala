@@ -54,7 +54,7 @@ import org.apache.spark.sql.DataFrame
  * @param excelOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
  *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
+ *               Define the schema by using one of the schema providers DDL, DDLFile, jsonSchemaFile, xsdFile, caseClass, avroSchemaFile, javaBean.
  *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
  *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop. Default is numberOfTasksPerPartition = 1.
