@@ -45,12 +45,12 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
    */
   override def saveState(state: ActionDAGRunState): Unit = synchronized {
     // write state file
-    val fileName = saveStateToFile(state)
+    val (filename, filePath) = saveStateToFile(state)
     // if succeeded:
     // - delete temporary state file from current directory
     // - move previous failed attempt files from current to succeeded directory
     if (state.isSucceeded) {
-      filesystem.delete(new Path(currentStatePath, fileName), false)
+      filesystem.delete(new Path(currentStatePath, filename), false)
       getFiles(Some(currentStatePath))
         .filter( stateFile => stateFile.runId==state.runId && stateFile.attemptId<state.attemptId)
         .foreach { stateFile =>
@@ -61,7 +61,8 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     }
     // if final, update index file if enabled
     if (state.isFinal && Environment.hadoopFileStateStoreIndexAppend) {
-      val indexEntry = IndexEntry.from(state, fileName)
+      val relativeFile = hadoopStatePath.toUri.relativize(filePath.toUri).toString
+      val indexEntry = IndexEntry.from(state, relativeFile)
       val newContent = indexEntry.toJson + "\n" + indexEntryDelimiter + "\n" // add separator to next record
       if (filesystem.exists(indexFile)) {
         try {
@@ -81,7 +82,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     }
   }
 
-  def saveStateToFile(state: ActionDAGRunState): String = {
+  def saveStateToFile(state: ActionDAGRunState): (String, Path) = {
     val path = if (state.isSucceeded) succeededStatePath else currentStatePath
     val json = state.toJson
     val fileName = s"$appName${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.runId}${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.attemptId}.json"
@@ -89,7 +90,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     HdfsUtil.writeHadoopFile(file, json)
     logger.info(s"updated state into $file")
     // return
-    fileName
+    (fileName, file)
   }
 
   /**
