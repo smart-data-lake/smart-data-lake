@@ -369,10 +369,16 @@ private[smartdatalake] object DataFrameUtil {
   }
 
   /**
+   * Remove all hyphen and bancs from a string with underscores
+   */
+  def replaceHyphenAndBlancsWithUnderscores(x: String): String = {
+    x.replaceAll("[\\- ]", "_")
+  }
+  /**
    * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
    */
   def removeNonStandardSQLNameChars(x: String): String = {
-    x.toLowerCase.replaceAll("[\\- ]", "_").replaceAll("[^a-z0-9_]", "")
+    x.toLowerCase.replaceAll("[^a-z0-9_]", "")
   }
 
   def getEmptyDataFrame(schema: StructType)(implicit session: SparkSession): DataFrame = {
