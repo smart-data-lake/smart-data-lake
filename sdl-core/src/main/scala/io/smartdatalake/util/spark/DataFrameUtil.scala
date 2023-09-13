@@ -369,9 +369,9 @@ private[smartdatalake] object DataFrameUtil {
   }
 
   /**
-   * Remove all hyphen and bancs from a string with underscores
+   * Remove all hyphen and blanks from a string with underscores
    */
-  def replaceHyphenAndBlancsWithUnderscores(x: String): String = {
+  def replaceHyphenAndBlanksWithUnderscores(x: String): String = {
     x.replaceAll("[\\- ]", "_")
   }
   /**

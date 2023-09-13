@@ -44,8 +44,8 @@ class StandardizeColNamesTransformerTest extends FunSuite {
     assert(transformed.schema.columns == Seq("onedot", "twodots"))
   }
 
-  test("blancs in column names are replaces") {
-    val colNamesTransformer = StandardizeColNamesTransformer(replaceHyphenBlancsWithUnderscores = true)
+  test("blanks in column names are replaces") {
+    val colNamesTransformer = StandardizeColNamesTransformer(replaceHyphenBlanksWithUnderscores = true)
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("one dot", "two-do-ts"))
 
     val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
