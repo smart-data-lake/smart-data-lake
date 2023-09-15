@@ -32,22 +32,23 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Parameters below can be used to disable specific rules if needed.
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param replaceHyphenBlanksWithUnderscores If selected, replaces hyphen (-) and blanks ( ) with underscores (_), i.e. "value of property" -> "value_of_property"
  * @param camelCaseToLower If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest
  *                         Otherwise converts just to lower case.
  * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily
- * @param removeNonStandardSQLNameChars Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
+ * @param removeNonStandardSQLNameChars Remove all chars from a string which don't belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
+ * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_"
  */
 case class StandardizeColNamesTransformer(override val name: String = "colNamesLowercase",
                                           override val description: Option[String] = None,
-                                          camelCaseToLower: Boolean=true, normalizeToAscii: Boolean=true,
+                                          camelCaseToLower: Boolean=true,
+                                          normalizeToAscii: Boolean=true,
                                           removeNonStandardSQLNameChars: Boolean=true,
-                                          replaceHyphenBlanksWithUnderscores: Boolean=false)
+                                          replaceNonStandardSQLNameCharsWithUnderscores: Boolean=false)
   extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     df.standardizeColNames(camelCaseToLower, normalizeToAscii,
-      removeNonStandardSQLNameChars, replaceHyphenBlanksWithUnderscores)
+      removeNonStandardSQLNameChars, replaceNonStandardSQLNameCharsWithUnderscores)
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = StandardizeColNamesTransformer
 }

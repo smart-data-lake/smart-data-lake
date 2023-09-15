@@ -154,13 +154,14 @@ trait GenericDataFrame extends GenericTypedObject {
   def standardizeColNames(camelCaseToLower: Boolean = true,
                           normalizeToAscii: Boolean = true,
                           removeNonStandardSQLNameChars: Boolean = true,
-                          replaceHyphenBlanksWithUnderscores: Boolean = false)( implicit function: DataFrameFunctions): GenericDataFrame = {
+                          replaceNonStandardSQLNameCharsWithUnderscores: Boolean = false)( implicit function: DataFrameFunctions): GenericDataFrame = {
     def standardizeColName(name: String): String = {
+      assert(!(removeNonStandardSQLNameChars && replaceNonStandardSQLNameCharsWithUnderscores))
       var standardName = name
-      standardName = if (replaceHyphenBlanksWithUnderscores) DataFrameUtil.replaceHyphenAndBlanksWithUnderscores(standardName) else standardName
       standardName = if (normalizeToAscii) DataFrameUtil.normalizeToAscii(standardName) else standardName
       standardName = if (camelCaseToLower) DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(standardName) else standardName.toLowerCase
       standardName = if (removeNonStandardSQLNameChars) DataFrameUtil.removeNonStandardSQLNameChars(standardName) else standardName
+      standardName = if (replaceNonStandardSQLNameCharsWithUnderscores) DataFrameUtil.replaceNonSqlWithUnderscores(standardName) else standardName
       // return
       standardName
     }
