@@ -36,7 +36,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  *                         Otherwise converts just to lower case.
  * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily
  * @param removeNonStandardSQLNameChars Remove all chars from a string which don't belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
- * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_"
+ * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_". Note: removeNonStandardSQLNameChars needs to be disabled
  */
 case class StandardizeColNamesTransformer(override val name: String = "colNamesLowercase",
                                           override val description: Option[String] = None,
@@ -47,6 +47,8 @@ case class StandardizeColNamesTransformer(override val name: String = "colNamesL
   extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    assert(!(removeNonStandardSQLNameChars && replaceNonStandardSQLNameCharsWithUnderscores),
+      s"ERROR: cannot use removeNonStandardSQLNameChars and replaceNonStandardSQLNameCharsWithUnderscores at the same time in ${this.getClass.getSimpleName}")
     df.standardizeColNames(camelCaseToLower, normalizeToAscii,
       removeNonStandardSQLNameChars, replaceNonStandardSQLNameCharsWithUnderscores)
   }

@@ -45,8 +45,8 @@ class StandardizeColNamesTransformerTest extends FunSuite {
   }
 
   test("blanks in column names are replaces") {
-    val colNamesTransformer = StandardizeColNamesTransformer(replaceNonStandardSQLNameCharsWithUnderscores = true)
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("one dot", "two-do-ts", "value of property!in$$"))
+    val colNamesTransformer = StandardizeColNamesTransformer(removeNonStandardSQLNameChars=false, replaceNonStandardSQLNameCharsWithUnderscores = true)
+    val df = SparkDataFrame(Seq((1, 1, 1), (2, 2,2)).toDF("one dot", "two-do-ts", "value of property!in$$"))
 
     val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
