@@ -78,7 +78,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network part2_default sdl-spark:latest -c /mnt/config --feed-sel ids:historize-airports
 ```
 
 </TabItem>
@@ -224,7 +224,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network part2_default sdl-spark:latest -c /mnt/config --feed-sel ids:deduplicate-departures
 ```
 
 </TabItem>

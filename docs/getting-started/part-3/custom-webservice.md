@@ -270,7 +270,7 @@ values={[
 
 ```jsx
 mkdir data
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network part2_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
 ```
 
 </TabItem>
