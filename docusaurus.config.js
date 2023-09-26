@@ -54,6 +54,7 @@ const config = {
             },
             {to: 'blog', label: 'Blog', position: 'left'},
             {to: 'JsonSchemaViewer', label: 'SchemaViewer', position: 'left'},
+            {to: 'SDLVisualizer', label: 'SDL-Visual', position: 'left'},
             {
               href: 'https://github.com/smart-data-lake/smart-data-lake',
               label: 'GitHub',

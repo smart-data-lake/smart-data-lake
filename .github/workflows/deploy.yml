@@ -18,6 +18,25 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
 
+      #download sdl visualizer release
+      #Docs: https://github.com/suisei-cn/actions-download-file
+      - uses: suisei-cn/actions-download-file@v1.3.0  
+        id: downloadfile  # Remember to give an ID if you need the output filename
+        name: Download sdl-visualizer artifact
+        with:
+          url: "https://github.com/smart-data-lake/sdl-visualization/releases/latest/download/sdl-visualizer.zip"
+          target: ../static/sdl-viz/
+          
+      #- name: Download sdl-visualizer artifact
+      #  run: curl https://github.com/smart-data-lake/sdl-visualization/releases/latest/download/sdl-visualizer.zip -o ../static/sdl-viz/
+
+      - name: Unzip sdl-visualizer artifact
+        run: 7z x ../static/sdl-viz/sdl-visualizer.zip     
+      
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ../static/sdl-viz/
+          
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
       - name: Deploy to GitHub Pages
