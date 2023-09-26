@@ -31,7 +31,12 @@ jobs:
       #  run: curl https://github.com/smart-data-lake/sdl-visualization/releases/latest/download/sdl-visualizer.zip -o ../static/sdl-viz/
 
       - name: Unzip sdl-visualizer artifact
-        run: 7z x ../static/sdl-viz/sdl-visualizer.zip     
+        #run: 7z x ../static/sdl-viz/sdl-visualizer.zip  
+        uses: ihiroky/extract-action@v1
+        #Docs: https://github.com/marketplace/actions/extract-action
+        with:
+          file_path: ../static/sdl-viz/sdl-visualizer.zip  
+          extract_dir: ../static/sdl-viz/
       
       - name: Display structure of downloaded files
         run: ls -R
