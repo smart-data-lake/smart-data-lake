@@ -1,0 +1,17 @@
+{
+    "short_name": "SDLB config",
+    "name": "SDLB Configuration Viewer",
+    "icons": [
+        {
+            "src": "sdl_logo192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#000000",
+    "background_color": "#ffffff",
+    "backendConfig": "local;"
+
+}
