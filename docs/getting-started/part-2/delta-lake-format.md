@@ -150,9 +150,9 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker-compose -f part2/docker-compose.yml build
+docker-compose -f part2/docker-compose.yml -p getting-started build
 mkdir -p data/_metastore
-docker-compose -f part2/docker-compose.yml up
+docker-compose -f part2/docker-compose.yml -p getting-started up
 ```
 
 </TabItem>
@@ -204,7 +204,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network part2_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
 ```
 
 </TabItem>
