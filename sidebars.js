@@ -38,7 +38,7 @@ module.exports = {
         'reference/commandLine',
         {'SDLB objects' : [
           'reference/dataObjects',
-          'reference/agents',
+          'reference/actions',
         ]},
         {'Hocon Configuration' : [
           'reference/hoconOverview',

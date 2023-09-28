@@ -3,7 +3,7 @@ id: build
 title: Build SDL
 ---
 
-## Build from Source Codehlknsdfjkldsfjklfds
+## Build from Source Code
 In the [getting started guide](../getting-started/setup.md) we used Docker to get you up to speed quickly.
 If you take a closer look at the [Dockerfile](https://github.com/smart-data-lake/getting-started/blob/master/Dockerfile), 
 you will see that we simply execute Apache Maven for you to build the jar file and configure an appropriate entrypoint for the container. 
