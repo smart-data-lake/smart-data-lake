@@ -269,7 +269,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-mkdir -f data
+mkdir data
 docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
 ```
 
@@ -277,7 +277,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 <TabItem value="podman">
 
 ```jsx
-mkdir -f data
+mkdir data
 podman run --rm --hostname=localhost -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
 ```
 

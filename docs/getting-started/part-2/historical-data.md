@@ -100,6 +100,8 @@ The sampling rate is given by the frequency that our data pipeline is scheduled.
 
     dataIntAirports.getSparkDataFrame().printSchema
 
+Output:
+
     root
     |-- ident: string (nullable = true)
     |-- name: string (nullable = true)
