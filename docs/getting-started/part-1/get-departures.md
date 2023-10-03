@@ -36,7 +36,7 @@ Add the following lines to your configuration file:
     dataObjects {
       ext-departures {
         type = WebserviceFileDataObject
-        url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979"
+        url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1673760980&end=1673933780"
         readTimeoutMs=200000
       }
       stg-departures {
