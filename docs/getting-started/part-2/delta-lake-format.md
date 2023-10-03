@@ -70,8 +70,8 @@ Let's start by changing the existing definitions for `int-airports`, `btl-depart
         table {
             db = "default"
             name = "btl_distances"
+        }
     }
-}
 
 Then create a new, similar data object `int-departures`: 
 
