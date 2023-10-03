@@ -44,7 +44,7 @@ Smart Data Lake Builder supports this by the DeltaLakeTableDataObject, and this 
 ## DeltaLakeTableDataObject
 
 Switching to Delta Lake format is easy with Smart Data Lake Builder, just replace `CsvFileDataObject` with `DeltaLakeTableDataObject` and define the table's db and name.
-Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`
+Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`:
 
     int-airports {
         type = DeltaLakeTableDataObject
