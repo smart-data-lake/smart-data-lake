@@ -100,7 +100,7 @@ Finally, adapt the action definition for `join-departures-airports`:
 * change `stg_departures` to `int_departures` in the first SQLDfsTransformer (watch out, you need to replace the string 4 times)
 
 :::info Explanation
-- We changed `int-airports` from CSV to Delta Lake format
+- We changed `int-airports`, `btl-departures-arrivals-airports` and `btl-distances` from CSV to Delta Lake format
 - Created an additional table `int-departures`
 - Created an action `prepare-departures`  to fill the new integration layer table `int-departures`
 - Adapted the existing action `join-departures-airports` to use the new table `int-departures`
