@@ -44,14 +44,32 @@ Smart Data Lake Builder supports this by the DeltaLakeTableDataObject, and this 
 ## DeltaLakeTableDataObject
 
 Switching to Delta Lake format is easy with Smart Data Lake Builder, just replace `CsvFileDataObject` with `DeltaLakeTableDataObject` and define the table's db and name.
-Let's start by changing the existing definition for `int-airports`:
+Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`:
 
     int-airports {
         type = DeltaLakeTableDataObject
         path = "~{id}"
         table = {
-            db = default
-            name = int_airports
+            db = "default"
+            name = "int_airports"
+        }
+    }
+
+    btl-departures-arrivals-airports {
+        type = DeltaLakeTableDataObject
+        path = "~{id}"
+        table {
+            db = "default"
+            name = "btl_departures_arrivals_airports"
+        }
+    }
+    
+    btl-distances {
+        type = DeltaLakeTableDataObject
+        path = "~{id}"
+        table {
+            db = "default"
+            name = "btl_distances"
         }
     }
 
@@ -82,7 +100,7 @@ Finally, adapt the action definition for `join-departures-airports`:
 * change `stg_departures` to `int_departures` in the first SQLDfsTransformer (watch out, you need to replace the string 4 times)
 
 :::info Explanation
-- We changed `int-airports` from CSV to Delta Lake format
+- We changed `int-airports`, `btl-departures-arrivals-airports` and `btl-distances` from CSV to Delta Lake format
 - Created an additional table `int-departures`
 - Created an action `prepare-departures`  to fill the new integration layer table `int-departures`
 - Adapted the existing action `join-departures-airports` to use the new table `int-departures`
