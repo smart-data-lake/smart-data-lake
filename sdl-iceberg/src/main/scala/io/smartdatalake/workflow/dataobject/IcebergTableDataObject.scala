@@ -238,7 +238,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     if (isTableExisting) {
       val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
-      if (allowSchemaEvolution && existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
+      if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
       else validateSchema(SparkSchema(saveModeTargetDf.schema), existingSchema, "write")
     }
   }
