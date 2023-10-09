@@ -324,7 +324,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): MetricsMap = {
     try {
       // create & write to temp-table
-      val tableSchema = connection.catalog.getSchemaFromTable(table.fullName)
+      val tableSchema = getExistingSchema.get
       val metrics = writeToTempTable(df, tableSchema)
       overwriteTableWithTempTableInTransaction(partitionValues)
       // return
