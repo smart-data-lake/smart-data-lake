@@ -36,7 +36,7 @@ SampleWhitelistAction {
 Note the square brackets: _transformers_ is an array as you can define multiple transformers.
 
 The parameter `columnWhitelist` is dependent on the type of the transformer.
-For details about given parameters / options, please see the [Configuration Schema Viewer](../../JsonSchemaViewer).
+For details about given parameters / options, please see the [Configuration Schema Viewer](../../json-schema-viewer).
 
 ## Predefined Transformations
 SDLB comes with commonly used transformers out-of-the-box.
@@ -84,7 +84,7 @@ for many-to-many transformations called _DfsTransformer_.
 
 :::info
 The type of the transformer needs to match your action. 
-This is also apparent in the [Configuration Schema Viewer](../../JsonSchemaViewer):  
+This is also apparent in the [Configuration Schema Viewer](../../json-schema-viewer):  
 1-to-1 transformers are listed under 1-to-1 actions, i.e. CopyAction.  
 Many-to-many transformers are only listed under many-to-many actions, i.e. CustomDataFrameAction.
 :::
@@ -201,7 +201,7 @@ As noted, it's best practice to only return one Data Object (many-to-one action)
 One thing that might be confusing at this point:
 
 CustomDataFrameAction is the type of the **action** itself. 
-Take a look at the  [Configuration Schema Viewer](../../JsonSchemaViewer): 
+Take a look at the  [Configuration Schema Viewer](../../json-schema-viewer): 
 You will see CustomDataFrameAction as a direct action type, similar to CopyAction or HistorizeAction.
 
 ScalaClassSparkDfsTransformer is the type of your **transformer**. 

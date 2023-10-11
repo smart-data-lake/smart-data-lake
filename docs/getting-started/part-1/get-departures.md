@@ -36,7 +36,7 @@ Add the following lines to your configuration file:
     dataObjects {
       ext-departures {
         type = WebserviceFileDataObject
-        url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1673760980&end=1673933780"
+        url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653"
         readTimeoutMs=200000
       }
       stg-departures {
@@ -44,6 +44,13 @@ Add the following lines to your configuration file:
         path = "~{id}"
       }
     }
+
+:::caution
+Note that the API Call **may freeze** as the timestamps provided under **begin=1696854853&end=1697027653** get older. When that's the case, simply replace them with more recent timestamps.
+You can go on https://www.epochconverter.com/ and set "end" to the current time in seconds and "begin" to the current time in seconds minus 2 days.
+At this stage in the guide, the capabilitites of our dataObject  ext-departures are somewhat limited as you need to provide to it the exact url of the data you want to download.
+In part 3 of this guide we will make our dataObject much smarter and these steps won't be needed anymore
+:::
 
 Here, we first created the DataObjects section. This section will contain our DataObjects of our pipeline.
 Inside, we defined two DataObjects to start with.
@@ -157,8 +164,8 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 After executing it, you will see the file *data/stg_departures/result.json* has been replaced with the output of your pipeline.
 
 :::caution
-Since both web servers are freely available on the internet, they might be overloaded by traffic.
-If the download fails because of a timeout, wait a couple of minutes and try again.
+Since both web servers are freely available on the internet, **a rate limiting applies**. https://opensky-network.org/ will stop responding if you make too many calls.
+If the download fails because of a timeout, wait a couple of minutes and try again. In the worst case, it should work again on the next day.
 If the download still won't work (or if you just get empty files), you can copy the contents of the folder *data-fallback-download*
 into your data folder. This will allow you to execute all steps starting from [Select Columns](select-columns.md)
 :::

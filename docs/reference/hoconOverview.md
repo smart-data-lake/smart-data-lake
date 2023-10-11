@@ -15,7 +15,7 @@ Data pipelines are defined with four sections:
 
 The settings are structured in a hierarchy. 
 
-The [**Configuration Schema Viewer**](../../JsonSchemaViewer) presents all available options in each category with all the available parameters for each element. 
+The [**Configuration Schema Viewer**](../../json-schema-viewer) presents all available options in each category with all the available parameters for each element. 
 
 Furthermore, there are the following general (Hocon) features:
 
