@@ -3,7 +3,7 @@ id: schema-viewer-navigation
 title: Schema Viewer Navigation
 ---
 
-In this section, we will guide you through the intricacies of navigating the [Schema Viewer](https://smartdatalake.ch/json-schema-viewer/), a powerful tool designed to help you understand the structure and relationships of the SDLB Api.
+In this section, we will guide you through on navigating the [Schema Viewer](https://smartdatalake.ch/json-schema-viewer/), a powerful tool designed to help you understand the structure and relationships of the SDLB API.
 
 ## User Interface
 In the Schema Viewer, the user interface is comprised of three main elements, each serving a distinct purpose to enhance your experience and efficiency.
