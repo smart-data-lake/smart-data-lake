@@ -165,7 +165,7 @@ After executing it, you will see the file *data/stg_departures/result.json* has 
 
 :::caution
 Since both web servers are freely available on the internet, **a rate limiting applies**. https://opensky-network.org/ will stop responding if you make too many calls.
-If the download fails because of a timeout, wait a couple of minutes and try again. In the worst case, it should work again on the next day.
+If the download fails because of a timeout, wait a couple of minutes and try again. In the worst case, it will only work again the following day.
 If the download still won't work (or if you just get empty files), you can copy the contents of the folder *data-fallback-download*
 into your data folder. This will allow you to execute all steps starting from [Select Columns](select-columns.md)
 :::
