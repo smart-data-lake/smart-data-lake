@@ -1,11 +1,11 @@
 ---
 id: schema-viewer-navigation
-title: Schema Viewer Navigation
+title: Schema Viewer Usage
 ---
 
 In this section, we will guide you on navigating the [Schema Viewer](https://smartdatalake.ch/json-schema-viewer/), a powerful tool designed to help you understand the structure and relationships of the SDLB API. Additionally, we will delve into the process of mapping the schema logic to the configuration file, allowing you to effectively write SDLB pipelines.
 
-## User Interface
+## User interface
 In the Schema Viewer, the user interface is comprised of three main elements, each serving a distinct purpose to enhance your experience and efficiency.
 
 ![Image of schema viewer](../images/schema-viewer-ui.png)
@@ -21,8 +21,8 @@ In the Schema Viewer, the user interface is comprised of three main elements, ea
 | 🔵 Collabsed      	|  Items indicated by a blue bullet in the schema can be expanded by clicking on the bullet to reveal more information or sub-elements.           	|
 | ⚪️ Required*      	|    Elements containing an asterisk (`*`) in their name are mandatory and need to be included in the config file.        	|
 | 🔵 Object{}       	|  The `Object` type is an element that contains other parameters grouped together and is mentioned in the schema browser with braces `{}`. You'll find an example in the next section.   	|
-| 🔵 Array[type]    	|  The `Array` element is a list containing other elements of a specific type ex. strings, integers or objects. Square brackets `[]` are used to display array types in the schema browser. You'll find an example in the next section.              	|
-| ⚪️ Property(type) 	|   Properties, denoted with parentheses `()` are elements that contain data of a specific type ex. string, boolean, interger, enumerations etc.        	|
+| 🔵 Array[type]    	|  The `Array` element is a list containing other elements of a specific type e.g. strings, integers or objects. Square brackets `[]` are used to display array types in the schema browser. You'll find an example in the next section.              	|
+| ⚪️ Property(type) 	|   Properties, denoted with parentheses `()` are elements that contain data of a specific type e.g. string, boolean, interger, enumerations etc.        	|
 | ⚪️ <span style='color: orange'>Deprecated</span>     	|    Deprecated elements, while no longer recommended for use, still exist for backward compatibility with older systems or applications. Migration of deprecated elements is advised, as they may potentially be removed in newer versions, posing a risk to continued compatibility.        	|
 <!-- TODO add link to the example for object and array  --> 
 
@@ -33,6 +33,137 @@ The Schema Browser offers two intuitive methods for navigation. First, you can e
 
 Once you've made a selection from the search results, the Schema Browser will automatically expand to reveal the corresponding schema object. Simultaneously, it will display informative contextual text associated with the selected element. This feature ensures that you not only find the element you were looking for but also gain a deeper understanding of its purpose and functionality, all within a single interaction.
 
-Alternatively, you can navigate the Schema Browser by interacting directly with the visual representation. Each schema element is denoted by a bullet. By clicking on the blue bullets, you can easily expand the tree structure to reveal the hierarchical relationships. Clicking (1) on the bullet text (ex. JdbcTableDataObject) triggers the immediate display of the corresponding schema information (2).
+Alternatively, you can navigate the Schema Browser by interacting directly with the visual representation. Each schema element is denoted by a bullet. By clicking on the blue bullets, you can easily expand the tree structure to reveal the hierarchical relationships. Clicking (1) on the bullet text (e.g. JdbcTableDataObject) triggers the immediate display of the corresponding schema information (2).
 
 ![Image of schema viewer information](../images/schema-viewer-information.png)
+
+## Mapping schema to config file
+
+Generally speaking you can take this as a reference, the naming convention for elements in the configuration file generally mirrors the nomenclature of the elements in the schema browser, with some notable omissions. These omissions include the element specifications such as `{}`, `[mapOf]`, `[oneOf]`, `[]`, or `(type)`. Let's delve into the specifics of each element designation.
+
+When an element's name concludes with `{}`, it signifies an object capable of possessing properties and nested elements that require a designated key.
+
+Example from schema browser (schema{}->global{}):
+```
+global {
+  spark-options {
+    "spark.sql.shuffle.partitions" = 2
+    "spark.databricks.delta.snapshotPartitions" = 2
+  } # this a the nested element in global
+  synchronousStreamingTriggerIntervalSec = 2 # this is a property of global{}
+}
+
+...
+
+```
+
+Elements denoted by names ending in `[mapOf]` indicate the existence of a map, specifically a key-value pair of distinct sub-elements, with the element itself lacking any properties.
+
+Example from schema browser (schema{}->dataObjects[mapOf]*):
+```
+dataObjects {
+  ext-departures {
+    type = WebserviceFileDataObject
+    url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653"
+    readTimeoutMs=200000
+  } # first key-value pair
+
+  ext-airports {
+    type = WebserviceFileDataObject
+    url = "https://davidmegginson.github.io/ourairports-data/airports.csv"
+    followRedirects = true
+    readTimeoutMs=200000
+  } # second key-value pair
+}
+
+...
+
+```
+It is worth noting that the `WebserviceFileDataObject` element appears twice, each time with distinct keys. Initially, it is employed for downloading departure dates, and subsequently for acquiring airport information data.
+
+In contrast to `[mapOf]` elements, elements marked by `[oneOf]` can only accommodate a single nested element. These elements function as a specialized type of property, demanding the inclusion of one specific sub-element.
+
+Example from schema browser (schema{}->actions[mapOf]*->CopyAction{}->executionMode[oneOf]):
+```
+actions {
+  select-airport-cols {
+    type = CopyAction
+    executionMode = { type = DataObjectStateIncrementalMode } # [oneOf] element executionMode containing the nested element of type DataObjectStateIncrementalMode
+    ...
+  }
+}
+
+...
+
+```
+
+
+Arrays or lists use the square brackets notation `[]` in an elements name. They are used for example in the transformer element for creating transformation pipelines that are processed sequentially. 
+
+Example from schema browser (schema{}->actions[mapOf]*->CustomDataFrameAction{}->transformers[]):
+```
+actions {
+  join-departures-airports {
+    type = CustomDataFrameAction
+    inputIds = [int-departures, int-airports]
+    outputIds = [btl-departures-arrivals-airports]
+    transformers = [{
+      type = SQLDfsTransformer
+      code = {
+        btl-connected-airports = """
+          select int_departures.estdepartureairport, int_departures.estarrivalairport,
+            airports.*
+          from int_departures join int_airports airports on int_departures.estArrivalAirport = airports.ident
+        """
+       }
+      },
+      {
+        type = SQLDfsTransformer
+        code = {
+          btl-departures-arrivals-airports = """
+            select btl_connected_airports.estdepartureairport, btl_connected_airports.estarrivalairport,
+              btl_connected_airports.name as arr_name, btl_connected_airports.latitude_deg as arr_latitude_deg, btl_connected_airports.longitude_deg as arr_longitude_deg,
+              airports.name as dep_name, airports.latitude_deg as dep_latitude_deg, airports.longitude_deg as dep_longitude_deg
+            from btl_connected_airports join int_airports airports on btl_connected_airports.estdepartureairport = airports.ident
+          """
+        }
+      }
+    ] # transformer array element containing two SQLDfsTransformer elements
+
+    ...
+
+
+  }
+}
+
+...
+
+```
+
+
+
+Finally, elements ending with `(type)`  denote properties that contain values of a predetermined type, such as string, integer, or other specified data types.
+
+:::info There is a special property called (const). It is found on the type property of an object.  This particular property is required to contain the class name of the parent element e.g. SQLDfsTransformer. :::
+
+
+Example from schema browser (schema{}->actions[mapOf]*->CustomDataFrameAction{}->type(const)/name(string)):
+```
+actions {
+  join-departures-airports {
+    type = CustomDataFrameAction
+    inputIds = [int-departures, int-airports]
+    outputIds = [btl-departures-arrivals-airports]
+    transformers = [{
+      type = SQLDfsTransformer # special property type of type (const)
+      name = "First transformer" # simple property of type (string)
+      ... 
+      },
+      ...
+    ] 
+  }
+}
+
+...
+
+```
