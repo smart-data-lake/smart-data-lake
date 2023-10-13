@@ -22,7 +22,7 @@ In the Schema Viewer, the user interface is comprised of three main elements, ea
 | ⚪️ Required*      	|    Elements containing an asterisk (`*`) in their name are mandatory and need to be included in the config file.        	|
 | 🔵 Object{}       	|  The `Object` type is an element that contains other parameters grouped together and is mentioned in the schema browser with braces `{}`. You'll find an example in the next section.   	|
 | 🔵 Array[type]    	|  The `Array` element is a list containing other elements of a specific type e.g. strings, integers or objects. Square brackets `[]` are used to display array types in the schema browser. You'll find an example in the next section.              	|
-| ⚪️ Property(type) 	|   Properties, denoted with parentheses `()` are elements that contain data of a specific type e.g. string, boolean, interger, enumerations etc.        	|
+| ⚪️ Property(type) 	|   Properties, denoted with parentheses `()` are elements that contain data of a specific type e.g. string, boolean, integer, enumerations etc.        	|
 | ⚪️ <span style='color: orange'>Deprecated</span>     	|    Deprecated elements, while no longer recommended for use, still exist for backward compatibility with older systems or applications. Migration of deprecated elements is advised, as they may potentially be removed in newer versions, posing a risk to continued compatibility.        	|
 <!-- TODO add link to the example for object and array  --> 
 
