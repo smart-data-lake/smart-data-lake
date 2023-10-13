@@ -150,7 +150,6 @@ actions {
 
 Finally, elements ending with `(type)`  denote properties that contain values of a predetermined type, such as string, integer, or other specified data types.
 
-:::info There is a special property called (const). It is found on the type property of an object.  This particular property is required to contain the class name of the parent element e.g. SQLDfsTransformer. :::
 
 
 Example from schema browser (schema{}->actions[mapOf]*->CustomDataFrameAction{}->type(const)/name(string)):
