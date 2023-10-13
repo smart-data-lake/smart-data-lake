@@ -5,6 +5,13 @@ title: Schema Viewer Usage
 
 In this section, we will guide you on navigating the [Schema Viewer](https://smartdatalake.ch/json-schema-viewer/), a powerful tool designed to help you understand the structure and relationships of the SDLB API. Additionally, we will delve into the process of mapping the schema logic to the configuration file, allowing you to effectively write SDLB pipelines.
 
+## What is Schema Viewer?
+The Schema Viewer serves as a fundamental instrument for schema exploration. The primary aim of the Schema Viewer is to facilitate the process of identifying and exploring `dataObjects` and `actions` within the SDLB API. It empowers users to search for specific data structures, comprehend their relationships, and obtain a comprehensive overview of the available data types, properties, and their interconnections.
+
+Understanding the relationships between various schema elements is crucial for building comprehensive SDLB pipelines. The Schema Viewer provides visual representations and navigation options that make it easier to see how different elements are connected, helping you design your data flow efficiently.
+
+Another key functions of the Schema Viewer is to help you map the schema logic to your configuration files. By visualizing the API schema, you can identify the appropriate elements and their properties, streamlining the process of creating configuration files for SDLB pipelines.
+
 ## User interface
 In the Schema Viewer, the user interface is comprised of three main elements, each serving a distinct purpose to enhance your experience and efficiency.
 
