@@ -97,7 +97,7 @@ There is a special property called (const). It is found on the type property of 
 ```
 actions {
   select-airport-cols {
-    type = CopyAction
+    type = CopyAction # special property of type (const)
     executionMode = { type = DataObjectStateIncrementalMode } # [oneOf] element executionMode containing the nested element of type DataObjectStateIncrementalMode
     ...
   }
