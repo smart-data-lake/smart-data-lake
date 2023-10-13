@@ -90,6 +90,10 @@ It is worth noting that the `WebserviceFileDataObject` element appears twice, ea
 In contrast to `[mapOf]` elements, elements marked by `[oneOf]` can only accommodate a single nested element. These elements function as a specialized type of property, demanding the inclusion of one specific sub-element.
 
 Example from schema browser (schema{}->actions[mapOf]*->CopyAction{}->executionMode[oneOf]):
+
+:::info 
+There is a special property called (const). It is found on the type property of an object.  This particular property is required to contain the class name of the parent element e.g. CopyAction. 
+:::
 ```
 actions {
   select-airport-cols {
