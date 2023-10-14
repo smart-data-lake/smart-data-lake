@@ -24,6 +24,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.json4s.{JArray, JLong, JNothing, JNull, JString, JValue}
+import org.json4s.JsonAST.{JBool, JObject, JValue}
 
 import scala.reflect.runtime.universe.Type
 
@@ -251,6 +253,7 @@ trait GenericSchema extends GenericTypedObject {
   def columnExists(colName: String): Boolean = {
     GenericSchemaUtil.columnExists(this, colName)
   }
+  def toJson: JArray = JArray(fields.map(_.toJson).toList)
 }
 
 /**
@@ -284,9 +287,18 @@ trait GenericField extends GenericTypedObject {
   def name: String
   def dataType: GenericDataType
   def nullable: Boolean
+  def comment: Option[String]
   def makeNullable: GenericField
   def toLowerCase: GenericField
   def removeMetadata: GenericField
+  def toJson: JObject = {
+    JObject(
+      "name" -> JString(name),
+      "dataType" -> dataType.toJson,
+      "nullable" -> JBool(nullable),
+      "comment" -> comment.map(JString).getOrElse(JNothing)
+    )
+  }
 }
 
 /**
@@ -301,6 +313,7 @@ trait GenericDataType extends GenericTypedObject {
   def toLowerCase: GenericDataType
   def removeMetadata: GenericDataType
   def isNumeric: Boolean
+  def toJson: JValue
 }
 
 /**
@@ -309,6 +322,10 @@ trait GenericDataType extends GenericTypedObject {
 trait GenericStructDataType { this: GenericDataType =>
   def fields: Seq[GenericField]
   def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField],Seq[GenericField]) => T): T
+  def toJson: JValue = JObject(
+    "dataType" -> JString("struct"),
+    "fields" -> JArray(fields.map(_.toJson).toList)
+  )
 }
 
 /**
@@ -318,6 +335,10 @@ trait GenericArrayDataType { this: GenericDataType =>
   def elementDataType: GenericDataType
   def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
   def containsNull: Boolean // Indicates array might contain null entries
+  def toJson: JValue = JObject(
+    "dataType" -> JString("array"),
+    "elementType" -> elementDataType.toJson
+  )
 }
 
 /**
@@ -329,6 +350,11 @@ trait GenericMapDataType { this: GenericDataType =>
   def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
   def withOtherValueType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
   def valueContainsNull: Boolean // Indicates if map values might be set to null
+  def toJson: JValue = JObject(
+    "dataType" -> JString("map"),
+    "keyType" -> keyDataType.toJson,
+    "valueType" -> valueDataType.toJson,
+  )
 }
 
 /**
