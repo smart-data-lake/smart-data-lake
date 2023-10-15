@@ -8,7 +8,7 @@ In this section, we will guide you on navigating the [Schema Viewer](https://sma
 ## What is Schema Viewer?
 The Schema Viewer serves as a fundamental instrument for schema exploration. The primary aim of the Schema Viewer is to facilitate the process of identifying and exploring `dataObjects` and `actions` within the SDLB API. It empowers users to search for specific data structures, comprehend their relationships, and obtain a comprehensive overview of the available data types, properties, and their interconnections.
 
-Understanding the relationships between various schema elements is crucial for building comprehensive SDLB pipelines. The Schema Viewer provides visual representations and navigation options that make it easier to see how different elements are connected, helping you design your data flow efficiently.
+Understanding the relationships between various schema elements is crucial for building comprehensive SDLB pipelines. The Schema Viewer provides visual representations and navigation options that make it easier to see how different elements are connected, helping you design your data pipeline efficiently.
 
 Another key functions of the Schema Viewer is to help you map the schema logic to your configuration files. By visualizing the configuration schema, you can identify the appropriate elements and their properties, streamlining the process of creating configuration files for SDLB pipelines.
 
