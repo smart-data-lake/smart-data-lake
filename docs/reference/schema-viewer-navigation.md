@@ -55,8 +55,7 @@ Example from schema browser (schema{}->global{}):
 ```
 global {
   spark-options {
-    "spark.sql.shuffle.partitions" = 2
-    "spark.databricks.delta.snapshotPartitions" = 2
+    ...
   } # this a the nested element in global
   synchronousStreamingTriggerIntervalSec = 2 # this is a property of global{}
 }
