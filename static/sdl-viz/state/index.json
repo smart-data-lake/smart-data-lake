@@ -1,0 +1,16 @@
+{
+    "name": "manual_671_prepareinit",
+    "runId": 1,
+    "attemptId": 1,
+    "feedSel": ".*",
+    "runStartTime": "2023-06-08T10:22:26.344865100",
+    "attemptStartTime": "2023-06-08T10:22:26.346865500",
+    "runEndTime": "2023-06-08T10:22:58.546515",
+    "status": "SUCCEEDED",
+    "actionsStatus": {
+        "SUCCEEDED": 2
+    },
+    "buildVersion": "2.5.1-SNAPSHOT",
+    "appVersion": null,
+    "path": "template.json"
+}
