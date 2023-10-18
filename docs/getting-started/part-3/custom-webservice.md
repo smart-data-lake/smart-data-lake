@@ -70,7 +70,7 @@ This copied the following file:
   - ./src/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala
 
 :::info
-The *begin* and *end* are now automatically set to today's timestamp minus 2 days and today's timestamp, respectively.
+The *begin* and *end* are now automatically set to tho weeks ago minus 2 days and two weeks ago, respectively.
 They can still be overridden if you want to try out fixed timestamps. For example, you could also write
 ```
 {

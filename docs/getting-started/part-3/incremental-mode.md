@@ -144,7 +144,8 @@ The `<attemptId>` is usually 1, but gets increased by one if Smart Data Lake Bui
 Now we want to achieve the following query logic:
 
 The starting point are the query parameters provided in the configuration file and no previous state. 
-During the first execution, we query the departures for the two airports in the given time window. 
+During the first execution, we query the departures for the two airports in the given time window.
+If no begin and end time are provided, we take the interval of [2 weeks and 2 days ago] -> [2 weeks ago] as a starting point.
 Afterwards, the `end`-parameter of the current query will be stored as `begin`-parameter for the next query.
 Now the true incremental phase starts as we can now get the state of the last successful run. 
 We query the flight-data API to get data from the last successful run up until now.
