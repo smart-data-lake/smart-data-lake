@@ -47,6 +47,7 @@ module.exports = {
         ]},
         'reference/dag',
         'reference/schema',
+        'reference/schema-viewer-navigation',
         'reference/dataQuality',
         'reference/executionPhases',
         'reference/executionEngines',
