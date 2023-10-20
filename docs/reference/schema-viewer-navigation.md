@@ -13,7 +13,7 @@ Understanding the relationships between various schema elements is crucial for b
 Another key functions of the Schema Viewer is to help you map the schema logic to your configuration files. By visualizing the configuration schema, you can identify the appropriate elements and their properties, streamlining the process of creating configuration files for SDLB pipelines.
 
 ## User interface
-In the Schema Viewer, the user interface is comprised of three main elements, each serving a distinct purpose to enhance your experience and efficiency.
+In the Schema Viewer, the user interface is comprised of the following main elements, each serving a distinct purpose to enhance your experience and efficiency.
 
 ![Image of schema viewer](../images/schema-viewer-ui.png)
 
