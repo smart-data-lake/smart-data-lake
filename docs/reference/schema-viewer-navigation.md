@@ -93,11 +93,11 @@ In contrast to `[mapOf]` elements, elements marked by `[oneOf]` can only accommo
 Example from schema browser (schema{}->actions[mapOf]*->CopyAction{}->executionMode[oneOf]):
 
 :::info 
-There is a special property called (const). It is found on the type property of an object.  This particular property is required to contain the class name of the parent element e.g. CopyAction. 
+There is a special property called (const). It is found on the type property of an object. This particular property is required to contain the class name of the parent element, e.g. CopyAction or CsvFileDataObject. Additionally, for elements that possess the type property, the custom or user-defined name of the object is typically found in front of the block. This custom name is often referred to as the objectID.
 :::
 ```
 actions {
-  select-airport-cols {
+  select-airport-cols { # objectID 
     type = CopyAction # special property of type (const)
     executionMode = { type = DataObjectStateIncrementalMode } # [oneOf] element executionMode containing the nested element of type DataObjectStateIncrementalMode
     ...
