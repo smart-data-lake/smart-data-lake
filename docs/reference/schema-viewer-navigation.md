@@ -153,24 +153,18 @@ actions {
 
 
 
-Finally, elements ending with `(type)`  denote properties that contain values of a predetermined type, such as string, integer, or other specified data types.
+Finally, elements ending with a _type_ in brackets, e.g. `persist(boolean)` or `name(string)` denote properties that contain values of a predetermined _type_, such as string, integer, boolean or other specified data types.
 
 
 
-Example from schema browser (schema{}->actions[mapOf]*->CustomDataFrameAction{}->type(const)/name(string)):
+Example from schema browser (schema{}->actions[mapOf]*->CustomDataFrameAction{}->persist(boolean)):
 ```
 actions {
   join-departures-airports {
     type = CustomDataFrameAction
     inputIds = [int-departures, int-airports]
     outputIds = [btl-departures-arrivals-airports]
-    transformers = [{
-      type = SQLDfsTransformer # special property type of type (const)
-      name = "First transformer" # simple property of type (string)
-      ... 
-      },
-      ...
-    ] 
+    persist = true # property of type boolean
   }
 }
 
