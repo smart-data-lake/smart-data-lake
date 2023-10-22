@@ -25,6 +25,7 @@ import org.apache.commons.lang.NotImplementedException
 import org.json4s._
 import org.json4s.jackson.Serialization
 
+import scala.collection.immutable.AbstractMap
 import scala.collection.immutable.ListMap
 
 /**
@@ -48,9 +49,10 @@ private[smartdatalake] sealed trait JsonTypeDef extends JsonExtractor
 
 /**
  * Definition of a json object
+ * @param properties: ListMap ensures that property ordering is kept. It has to be lazy to break recursive conversion.
  */
 private[smartdatalake] case class JsonObjectDef(
-                          properties: ListMap[String,JsonTypeDef],
+                          properties: LazyListMapWrapper[String,JsonTypeDef],
                           title: String,
                           required: Seq[String] = Seq(),
                           additionalProperties: Boolean = false,
@@ -233,4 +235,16 @@ private[smartdatalake] object JsonExtractor {
     }
     (deserializer, serializer)
   })
+}
+
+/**
+ * LazyListMapWrapper is used to break recursive conversion.
+ */
+private[smartdatalake] class LazyListMapWrapper[A,B](createFn: () => ListMap[A,B]) extends AbstractMap[A,B] with Map[A,B] with Serializable {
+  private lazy val wrappedList: ListMap[A,B] = createFn()
+  override def size: Int = wrappedList.size
+  def get(key: A): Option[B] = wrappedList.get(key) // removed in 2.9: orElse Some(default(key))
+  def iterator: Iterator[(A, B)] = wrappedList.iterator
+  override def +[V1 >: B](kv: (A, V1)): Map[A, V1] = wrappedList + kv
+  override def -(key: A): Map[A, B] = wrappedList - key
 }

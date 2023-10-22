@@ -107,8 +107,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     def fromGenericTypeDef(typeDef: GenericTypeDef): JsonObjectDef = {
       val typeProperty = if(typeDef.baseTpe.isDefined) Seq(("type", JsonConstDef(typeDef.name))) else Seq()
       val attributes = getTypeAttributesForJsonSchema(typeDef)
-      val jsonAttributes = typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a)))
-      val properties = ListMap(jsonAttributes:_*)
+      // to break recursive conversion this has to be a function and evaluated lazy. Otherwise there might happen a stack overflow with ProxyAction.
+      val properties = new LazyListMapWrapper(() => ListMap((typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a)))):_*))
       val required = typeProperty.map(_._1) ++ attributes.filter(_.isRequired).map(_.name)
       jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
     }
@@ -126,6 +126,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       convertedCaseClasses.getOrElseUpdate(cls, {
         logger.debug(s"Converting case class ${cls.fullName}")
         val typeDef = GenericTypeUtil.typeDefForClass(cls.toType)
+        // this might result in stack overflow because ProxyAction includes an Action again.
+        // It is solved by using lazy property processing, see type LazyListMapWrapper of JsonSchemaObj.properties.
         fromGenericTypeDef(typeDef)
       })
     }
@@ -208,7 +210,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
 
     def addTypeProperty(jsonDef: JsonObjectDef, className: String): JsonObjectDef = {
       val typeName = if (className.startsWith("io.smartdatalake")) className.split('.').last else className
-      jsonDef.copy(properties = ListMap("type" -> JsonConstDef(typeName)) ++ jsonDef.properties, required = jsonDef.required :+ "type")
+      jsonDef.copy(properties = new LazyListMapWrapper(() => ListMap("type" -> JsonConstDef(typeName)) ++ jsonDef.properties), required = jsonDef.required :+ "type")
     }
 
     private val mirror = scala.reflect.runtime.currentMirror
