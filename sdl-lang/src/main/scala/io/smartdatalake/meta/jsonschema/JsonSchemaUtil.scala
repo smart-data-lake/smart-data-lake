@@ -21,7 +21,7 @@ package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config.{ExcludeFromSchemaExport, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, ScaladocUtil, jsonschema}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -59,6 +59,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     // get generic type definitions
     val typeDefs = GenericTypeUtil.typeDefs(reflections)
       .filter(_.isFinal) // only case classes
+      .filter(typeDef => ! (typeDef.tpe <:< typeOf[ExcludeFromSchemaExport])) // remove classes that should not be shown in the schema
 
     // define registry and converter
     val registry = new DefinitionRegistry

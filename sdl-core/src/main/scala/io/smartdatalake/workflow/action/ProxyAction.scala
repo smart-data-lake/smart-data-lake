@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
+import io.smartdatalake.config.{ExcludeFromSchemaExport, FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.CustomCodeUtil
@@ -40,7 +40,7 @@ import org.apache.spark.sql.types.StructType
  * If the execution of @wrappedAction is successful, the ProxyAction will return an empty SparkSubFeed by the correct schema.
  *
  */
-case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action {
+case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action with ExcludeFromSchemaExport {
 
   override def factory: FromConfigFactory[Action] = wrappedAction.factory
 
