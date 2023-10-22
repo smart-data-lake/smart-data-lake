@@ -50,6 +50,10 @@
                     <groupId>org.apache.hadoop</groupId>
                     <artifactId>hadoop-client-api</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-client-runtime</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <!-- then we need to include hadoop client on our own: https://github.com/apache/hadoop/blob/trunk/hadoop-client-modules/hadoop-client-api/pom.xml -->
@@ -82,10 +86,11 @@
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <exclusions>
+                <!-- this is to exclude hadoop-annations, which is shaded into hadoop-client-api -->
                 <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
                 <exclusion>
                     <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-annotations</artifactId>
+                    <artifactId>hadoop-client-runtime</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -112,6 +117,14 @@
             <artifactId>sdl-kafka_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <optional>true</optional>
+            <exclusions>
+                <!-- this is to exclude hadoop-annations, which is shaded into hadoop-client-api -->
+                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-client-runtime</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
