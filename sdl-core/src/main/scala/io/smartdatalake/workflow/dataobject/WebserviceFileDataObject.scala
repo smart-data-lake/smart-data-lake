@@ -41,7 +41,8 @@ case class HttpProxyConfig(host: String, port: Int)
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
 /**
- * [[DataObject]] to call webservice and return response as InputStream
+ * [[DataObject]] to call webservice and return response as InputStream.
+ * The corresponding Action to process the response should be a FileTransferAction.
  * This is implemented as FileRefDataObject because the response is treated as some file content.
  * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
  * All possible query parameter values must be given in configuration.
