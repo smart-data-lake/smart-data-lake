@@ -29,7 +29,8 @@ import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutp
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 
 /**
- * [[Action]] to transfer files between SFtp, Hadoop and local Fs.
+ * [[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.
+ * The Filetype of the Input DataObject and Output DataObject should be the same for this Action. If you want different Filetypes for input and output, use the CopyAction instead.
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
