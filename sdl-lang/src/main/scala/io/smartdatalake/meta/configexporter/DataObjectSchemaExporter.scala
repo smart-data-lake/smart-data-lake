@@ -10,8 +10,10 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.json4s.jackson.JsonMethods.pretty
 import scopt.OptionParser
 
-import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import java.time.LocalDateTime
+import scala.io.Source
+import scala.util.Using
 
 case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
                                           exportPath: String = "./schema",
@@ -51,7 +53,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
   }
 
   /**
-   * Takes as input a SDL Config and exports the schema of all DataObjects for the visualizer.
+   * Takes as input an SDL Config and exports the schema of all DataObjects for the visualizer.
    */
   def main(args: Array[String]): Unit = {
     val exporterConfig = DataObjectSchemaExporterConfig()
@@ -66,11 +68,8 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
         logger.info(s"Writing ${schemas.size} data object schemas to json files in path ${exporterConfig.exportPath}")
         val path = Paths.get(exporterConfig.exportPath)
         Files.createDirectories(path)
-        schemas.foreach{
-          case (dataObjectId, jsonStr) =>
-            val file = path.resolve(s"${dataObjectId.id}.${System.currentTimeMillis() / 1000}.json")
-            logger.debug(s"Writing file $file")
-            Files.write(file, jsonStr.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        schemas.foreach {
+          case (dataObjectId, jsonStr) => writeSchemaIfChanged(dataObjectId, jsonStr, path)
         }
 
       case None =>
@@ -90,6 +89,25 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
           val df = dataObject.getDataFrame(Seq(), dataObject.getSubFeedSupportedTypes.head)
           val schemaJson = df.schema.toJson
           (dataObject.id, pretty(schemaJson))
+    }
+  }
+
+  def writeSchemaIfChanged(dataObjectId: DataObjectId, newSchema: String, path: Path): Unit = {
+    val indexFile = path.resolve(s"${dataObjectId.id}.index")
+    val newSchemaFilename = s"${dataObjectId.id}.${System.currentTimeMillis() / 1000}.json"
+    val newSchemaFile = path.resolve(newSchemaFilename)
+    // get latest schema
+    val lastIndexEntry = Using(Source.fromFile(indexFile.toFile)) {
+      _.getLines().toSeq.filter(_.trim.nonEmpty).lastOption
+    }.toOption.flatten
+    val lastestSchemaFile = lastIndexEntry.map(path.resolve).map(_.toFile)
+    val latestSchema = lastestSchemaFile.map(f => Using(Source.fromFile(f)) {
+      _.getLines().mkString(System.lineSeparator)
+    }.get)
+    if (!latestSchema.contains(newSchema)) {
+      logger.info(s"Writing schema file $newSchemaFile and updating index")
+      Files.write(newSchemaFile, newSchema.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+      Files.write(indexFile, (newSchemaFilename + System.lineSeparator).getBytes, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
     }
   }
 }

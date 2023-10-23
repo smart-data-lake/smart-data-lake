@@ -19,11 +19,16 @@
 
 package io.smartdatalake.meta.configexporter
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import org.apache.commons.io.FileUtils
 import org.json4s.StringInput
 import org.json4s.jackson.JsonMethods
 import org.scalatest.FunSuite
 
 import java.io.File
+import java.nio.file.{Files, Path, Paths}
+import scala.io.Source
+import scala.util.Using
 
 class DataObjectSchemaExporterTest extends FunSuite {
 
@@ -102,10 +107,35 @@ class DataObjectSchemaExporterTest extends FunSuite {
     assert(actualFields == expectedFields)
   }
 
-  test("test main with includes and excludes") {
+  test("test main with includes and excludes, dont update if same") {
     val path = "target/schema"
-    new File(path).delete()
+    FileUtils.deleteDirectory(new File(path))
     DataObjectSchemaExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getPath, "-p", path, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
-    assert(new File(path).listFiles().map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    assert(new File(path).listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    assert(new File(path).listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+  }
+
+  test("schema file is not updated if unchanged") {
+    val dataObjectId = DataObjectId("test")
+    val path = Paths.get("target/schemaUpdate")
+    FileUtils.deleteDirectory(path.toFile)
+    Files.createDirectories(path)
+    // first write
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), "abc", path)
+    assert(readIndex(dataObjectId, path).length==1)
+    Thread.sleep(1000)
+    // second write -> no update
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), "abc", path)
+    assert(readIndex(dataObjectId, path).length == 1)
+    Thread.sleep(1000)
+    // third write -> update
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), "abcd", path)
+    assert(readIndex(dataObjectId, path).length == 2)
+  }
+
+  def readIndex(dataObjectId: DataObjectId, path: Path): Seq[String] = {
+    Using(Source.fromFile(path.resolve(s"${dataObjectId.id}.index").toFile)) {
+      _.getLines().toList.filter(_.trim.nonEmpty)
+    }.get
   }
 }

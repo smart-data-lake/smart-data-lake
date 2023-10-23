@@ -26,17 +26,19 @@ import java.io.File
 class ConfigJsonExporterTest extends FunSuite {
 
   test("export config") {
-    val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath))
+    val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter").getPath), descriptionPath = Some(getClass.getResource("/dagexporter/description").getPath))
     val actualOutput = ConfigJsonExporter.exportConfigJson(exporterConfig)
-    assert(actualOutput.contains("origin"))
-    assert(actualOutput.contains("dagexporter/dagexporterTest.conf"))
+    println(actualOutput)
+    assert(actualOutput.contains("_origin"))
+    assert(actualOutput.contains("dagexporterTest.conf"))
     assert(actualOutput.contains("lineNumber"))
     assert(actualOutput.contains("actionId1"))
+    assert(actualOutput.contains("_columnDescription"))
   }
 
   test("test main") {
     val fileName = "target/exportedConfig.json"
-    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getPath, "-f", fileName))
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-f", fileName))
     assert(new File(fileName).exists())
   }
 
