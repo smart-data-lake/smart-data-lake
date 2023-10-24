@@ -758,8 +758,8 @@
                         <filereports>
                             ${project.artifactId}.txt
                         </filereports>
-                        <stdout>WT
-                        </stdout>  <!-- without color, show reminder of failed and canceled tests with short stack traces, see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
+                        <stdout>WFT
+                        </stdout>  <!-- without color, show full stack traces, show reminder of failed and canceled tests with short stack traces see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
                         <environmentVariables>
                             <SPARK_LOCAL_IP>127.0.0.1
                             </SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
@@ -1589,6 +1589,20 @@
                     <exclusion>
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-log4j12</artifactId>
+                    </exclusion>
+                    <!-- exclusions according to https://github.com/apache/hadoop/blob/trunk/hadoop-client-modules/hadoop-client-api/pom.xml -->
+                    <exclusion>
+                        <groupId>javax.xml.bind</groupId>
+                        <artifactId>jaxb-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>xml-apis</groupId>
+                        <artifactId>xml-apis</artifactId>
+                    </exclusion>
+                    <!-- avoid duplicate -->
+                    <exclusion>
+                        <groupId>org.eclipse.jetty.websocket</groupId>
+                        <artifactId>websocket-client</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>
@@ -2824,6 +2838,21 @@
                 <artifactId>spark-core_${scala.minor.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
+                <exclusions>
+                    <!--
+                      Exclude hadoop-client-runtime from spark-core 3.4, as this is a shaded version with relocation.
+                      We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                      hadoop-client library is not shaded and included below.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -2870,7 +2899,21 @@
                     </exclusion>
                     <exclusion>
                         <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-slf4j-impl</artifactId>                    </exclusion>
+                        <artifactId>log4j-slf4j-impl</artifactId>
+                    </exclusion>
+                    <!--
+                      Exclude hadoop-client-runtime from spark-core 3.4, as this is a shaded version with relocation.
+                      We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                      hadoop-client library is not shaded and included below.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>

@@ -43,54 +43,17 @@
             <artifactId>spark-core_${scala.minor.version}</artifactId>
             <version>${spark.version}</version>
             <scope>${spark.deps.scope}</scope>
-            <exclusions>
-                <!-- this is to exclude hadoop-annations, which is shaded into hadoop-client-api -->
-                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client-runtime</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
-        <!-- then we need to include hadoop client on our own: https://github.com/apache/hadoop/blob/trunk/hadoop-client-modules/hadoop-client-api/pom.xml -->
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>javax.xml.bind</groupId>
-                    <artifactId>jaxb-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>xml-apis</groupId>
-                    <artifactId>xml-apis</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-annotations</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.jetty.websocket</groupId>
-                    <artifactId>websocket-client</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
         <!-- all modules needed to create configuration schema, but not as transitive dependencies (-> optional=true) -->
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <exclusions>
-                <!-- this is to exclude hadoop-annations, which is shaded into hadoop-client-api -->
                 <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
                 <exclusion>
                     <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client-runtime</artifactId>
+                    <artifactId>hadoop-annotations</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
