@@ -28,7 +28,6 @@ class ConfigJsonExporterTest extends FunSuite {
   test("export config") {
     val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter").getPath), descriptionPath = Some(getClass.getResource("/dagexporter/description").getPath))
     val actualOutput = ConfigJsonExporter.exportConfigJson(exporterConfig)
-    println(actualOutput)
     assert(actualOutput.contains("_origin"))
     assert(actualOutput.contains("dagexporterTest.conf"))
     assert(actualOutput.contains("lineNumber"))

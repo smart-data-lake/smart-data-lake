@@ -44,7 +44,7 @@
 
 	<properties>
 		<sdl-core.scope>compile</sdl-core.scope>
-		<confluent.version>7.3.2</confluent.version>
+		<confluent.version>7.5.1</confluent.version>
 	</properties>
 
 	<dependencyManagement>
@@ -86,6 +86,17 @@
 			<artifactId>spark-sql-kafka-0-10_${scala.minor.version}</artifactId>
 			<version>${spark.version}</version>
 			<scope>runtime</scope>
+			<exclusions>
+				<!-- hadoop-client is referenced directly by sdl-core -->
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client-runtime</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client-api</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.kafka</groupId>
@@ -243,7 +254,6 @@
 				</exclusion>
 			</exclusions>
 		</dependency>
-
 	</dependencies>
 
 	<build>
