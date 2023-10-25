@@ -24,9 +24,8 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, HousekeepingMode, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
-import org.apache.spark.sql.SparkSession
 
 /**
  * A dummy [[Action]] for unit tests.
@@ -41,6 +40,7 @@ case class TestAction(override val id: ActionId,
                       outputId: DataObjectId,
                       arg1: Option[String],
                       executionMode: Option[ExecutionMode] = None,
+                      housekeepingMode: Option[HousekeepingMode] = None,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
