@@ -22,7 +22,6 @@ import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
-import io.smartdatalake.util.misc.SchemaProviderType.SchemaProviderType
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.{SecretProviderConfig, StringOrSecret}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
@@ -31,8 +30,7 @@ import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.Expectation
+import io.smartdatalake.workflow.dataobject.{Expectation, HousekeepingMode}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -159,6 +157,15 @@ trait ConfigImplicits {
   implicit val executionModeReader: ConfigReader[ExecutionMode] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ExecutionMode](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[HousekeepingMode]] values.
+   * Note that Expectation must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val housekeepingModeReader: ConfigReader[HousekeepingMode] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[HousekeepingMode](c.getConfig(p))
   }
 
   /**
