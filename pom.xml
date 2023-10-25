@@ -449,7 +449,8 @@
         <snowflake-snowpark.version>1.9.0</snowflake-snowpark.version>
         <keycloak.version>22.0.1</keycloak.version>
         <delta.version>2.4.0</delta.version>
-        <iceberg.version>1.4.1</iceberg.version>
+        <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
+        <iceberg.version>1.3.1</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
@@ -1217,6 +1218,13 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
                 <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <!-- SPARK-38885: After Netty 4.1.76, add the following `Netty` dependencies explicitly
             to ensure `./dev/test-dependencies.sh` produce the same results on Linux and MacOS.
