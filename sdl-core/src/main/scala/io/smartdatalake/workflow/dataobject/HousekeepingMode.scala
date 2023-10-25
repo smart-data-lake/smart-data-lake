@@ -19,8 +19,9 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.config.ConfigurationException
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{ExpressionEvaluationException, SparkExpressionUtil}
@@ -28,7 +29,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 
 import java.sql.Timestamp
 
-sealed trait HousekeepingMode {
+trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigHolder{
   private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
   private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
 }
@@ -63,6 +64,13 @@ case class PartitionRetentionMode(retentionCondition: String, description: Optio
         partitionedDataObject.deletePartitions(pvsToDelete)
         logger.info(s"(${dataObject.id}) Housekeeping cleaned partitions ${pvsToDelete.mkString(", ")}" )
     }
+  }
+  override def factory: FromConfigFactory[HousekeepingMode] = PartitionRetentionMode
+}
+
+object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PartitionRetentionMode = {
+    extract[PartitionRetentionMode](config)
   }
 }
 
@@ -130,6 +138,13 @@ case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[Str
           logger.info(s"(${dataObject.id}) Housekeeping compacted partitions ${pvsToCompact.mkString(", ")}")
         }
     }
+  }
+  override def factory: FromConfigFactory[HousekeepingMode] = PartitionArchiveCompactionMode
+}
+
+object PartitionArchiveCompactionMode extends FromConfigFactory[HousekeepingMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PartitionArchiveCompactionMode = {
+    extract[PartitionArchiveCompactionMode](config)
   }
 }
 
