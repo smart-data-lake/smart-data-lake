@@ -3965,7 +3965,7 @@
         "title" : "WebserviceFileDataObject",
         "required" : [ "type", "url" ],
         "additionalProperties" : false,
-        "description" : "[[DataObject]] to call webservice and return response as InputStream\nThis is implemented as FileRefDataObject because the response is treated as some file content.\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\nAll possible query parameter values must be given in configuration."
+        "description" : "[[DataObject]] to call webservice and return response as InputStream.\nThe corresponding Action to process the response should be a FileTransferAction.\nThis is implemented as FileRefDataObject because the response is treated as some file content.\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\nAll possible query parameter values must be given in configuration."
       },
       "XmlFileDataObject" : {
         "type" : "object",
@@ -5341,7 +5341,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5351,18 +5351,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5668,6 +5668,25 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5699,62 +5718,6 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "ScalaClassSparkDsTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "transformerClassName" : {
-                  "type" : "string",
-                  "description" : "class name implementing trait[[CustomDsTransformer]]"
-                },
-                "options" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  },
-                  "description" : "Options to pass to the transformation"
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  },
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
-                }
-              },
-              "title" : "ScalaClassSparkDsTransformer",
-              "required" : [ "transformerClassName", "type" ],
-              "additionalProperties" : false,
-              "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] ."
             }, {
               "type" : "object",
               "properties" : {
@@ -5792,6 +5755,43 @@
               "required" : [ "code", "type" ],
               "additionalProperties" : false,
               "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix`_sdltemp`is added.\nIt is therefore recommended to use special token`%{inputViewName}`or`%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "ScalaClassSparkDsTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "transformerClassName" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomDsTransformer]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "Options to pass to the transformation"
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
+                }
+              },
+              "title" : "ScalaClassSparkDsTransformer",
+              "required" : [ "transformerClassName", "type" ],
+              "additionalProperties" : false,
+              "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] ."
             }, {
               "type" : "object",
               "properties" : {
@@ -5979,7 +5979,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5989,18 +5989,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -7008,7 +7008,7 @@
         "title" : "FileTransferAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "[[Action]] to transfer files between SFtp, Hadoop and local Fs."
+        "description" : "[[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.\nAs data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.\nIf you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back."
       },
       "HistorizeAction" : {
         "type" : "object",
@@ -7183,9 +7183,17 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/Action/CopyAction"
+              "$ref" : "#/definitions/Action/CustomDataFrameAction"
+            }, {
+              "$ref" : "#/definitions/Action/CustomFileAction"
             }, {
               "$ref" : "#/definitions/Action/CustomScriptAction"
+            }, {
+              "$ref" : "#/definitions/Action/DeduplicateAction"
+            }, {
+              "$ref" : "#/definitions/Action/FileTransferAction"
+            }, {
+              "$ref" : "#/definitions/Action/HistorizeAction"
             } ]
           },
           "agent" : {
