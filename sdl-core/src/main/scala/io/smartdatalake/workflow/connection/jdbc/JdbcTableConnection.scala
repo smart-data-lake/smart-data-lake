@@ -92,6 +92,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
       val result = func(stmt)
       if (doCommit && !autoCommit) conn.commit()
       result
+    } catch {
+      case e: Exception =>
+        conn.rollback()
+        throw e
     } finally {
       if (stmt != null) stmt.close()
     }
