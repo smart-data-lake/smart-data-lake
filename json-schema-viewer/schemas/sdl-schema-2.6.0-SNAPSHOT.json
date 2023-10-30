@@ -5341,7 +5341,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "WhitelistTransformer"
+                  "const" : "BlacklistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5351,18 +5351,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnWhitelist" : {
+                "columnBlacklist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to keep from DataFrame"
+                  "description" : "List of columns to exclude from DataFrame"
                 }
               },
-              "title" : "WhitelistTransformer",
-              "required" : [ "columnWhitelist", "type" ],
+              "title" : "BlacklistTransformer",
+              "required" : [ "columnBlacklist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column whitelist to a DataFrame."
+              "description" : "Apply a column blacklist to a DataFrame."
             }, {
               "type" : "object",
               "properties" : {
@@ -5668,25 +5668,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5718,6 +5699,25 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5979,7 +5979,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "BlacklistTransformer"
+                  "const" : "WhitelistTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5989,18 +5989,18 @@
                   "type" : "string",
                   "description" : "Optional description of the transformer"
                 },
-                "columnBlacklist" : {
+                "columnWhitelist" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
                   },
-                  "description" : "List of columns to exclude from DataFrame"
+                  "description" : "List of columns to keep from DataFrame"
                 }
               },
-              "title" : "BlacklistTransformer",
-              "required" : [ "columnBlacklist", "type" ],
+              "title" : "WhitelistTransformer",
+              "required" : [ "columnWhitelist", "type" ],
               "additionalProperties" : false,
-              "description" : "Apply a column blacklist to a DataFrame."
+              "description" : "Apply a column whitelist to a DataFrame."
             } ],
             "description" : "Configuration for a GenericDfTransformerDef to be applied"
           },
@@ -7183,15 +7183,9 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/Action/CustomDataFrameAction"
-            }, {
-              "$ref" : "#/definitions/Action/CustomFileAction"
-            }, {
-              "$ref" : "#/definitions/Action/CustomScriptAction"
+              "$ref" : "#/definitions/Action/CopyAction"
             }, {
               "$ref" : "#/definitions/Action/DeduplicateAction"
-            }, {
-              "$ref" : "#/definitions/Action/FileTransferAction"
             }, {
               "$ref" : "#/definitions/Action/HistorizeAction"
             } ]
