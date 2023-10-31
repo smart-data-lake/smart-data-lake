@@ -43,7 +43,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
   /**
    * Stores jobID and jobDescription indexed by stage ids.
    */
-  val jobInfoLookupTable: mutable.Map[Int, JobInfo] = mutable.Map.empty
+  val stageIdToJobInfo: mutable.Map[Int, JobInfo] = mutable.Map.empty
 
   // parses job group
   private val jobGroupRegex = (s"${Regex.quote(context.appConfig.appName)} $actionId runId=([0-9]+) attemptId=([0-9]+)").r.unanchored
@@ -66,7 +66,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
     jobInfo.foreach { i =>
       if (dataObjectId.isEmpty || i.dataObjectId.contains(dataObjectId.get)) {
         runningJobs(i.id) = i
-        jobStart.stageIds.foreach(stageId => jobInfoLookupTable(stageId) = i)
+        jobStart.stageIds.foreach(stageId => stageIdToJobInfo(stageId) = i)
       }
     }
   }
@@ -84,7 +84,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
     // extract basic job information
     val stageId = stageCompleted.stageInfo.stageId
-    jobInfoLookupTable.get(stageId).foreach { jobInfo =>
+    stageIdToJobInfo.get(stageId).foreach { jobInfo =>
       // extract useful information/metrics
       val taskMetrics = stageCompleted.stageInfo.taskMetrics
       val shuffleReadMetrics = taskMetrics.shuffleReadMetrics
@@ -136,7 +136,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
   /**
    * Wait for Spark metrics and return main metrics from latest job.
    */
-  def waitForMetrics(timeoutSec: Int = 10): MetricsMap = {
+  def waitForLastMetrics(timeoutSec: Int = 10): MetricsMap = {
     waitForSparkMetrics(timeoutSec).sortBy(_.jobInfo.id).lastOption.map(_.getMainInfos).getOrElse(Map())
   }
 }
@@ -152,7 +152,7 @@ object SparkStageMetricsListener {
     // exec spark code
     sparkCode
     // return metrics
-    stageMetricsListener.map(_.waitForMetrics()).getOrElse(Map())
+    stageMetricsListener.map(_.waitForLastMetrics()).getOrElse(Map())
   }
 }
 
