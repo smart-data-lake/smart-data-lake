@@ -18,16 +18,18 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, GenericMetrics}
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
+import java.time.ZoneOffset
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
@@ -42,11 +44,11 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
 
   def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
 
-  def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+  def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): MetricsMap
 
-  private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
+  private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = throw new RuntimeException("writeDataFrameToPath not implemented")
 
-  override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
+  override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     df match {
       case sparkDf: SparkDataFrame => writeSparkDataFrame(sparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
@@ -57,13 +59,6 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
     df match {
       case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
-    }
-  }
-
-  override private[smartdatalake] def writeSubFeed(subFeed: DataFrameSubFeed, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
-    subFeed match {
-      case sparkSubFeed: SparkSubFeed => writeSparkDataFrame(sparkSubFeed.dataFrame.get.inner, partitionValues, isRecursiveInput, saveModeOptions)
-      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${subFeed.getClass.getSimpleName} in method writeSubFeed")
     }
   }
 
@@ -82,7 +77,11 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
       case sparkDataFrame: SparkDataFrame =>
         // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
         // Note: no partition values supported when writing streaming target
-        def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = writeSparkDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
+        def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = {
+          val metrics = writeSparkDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
+          val actionMetrics = GenericMetrics(s"streaming-microBatchWriter", System.currentTimeMillis()/1000, metrics)
+          context.currentAction.get.addAsyncMetrics(None, Some(id), actionMetrics)
+        }
         sparkDataFrame.inner
           .writeStream
           .trigger(trigger)

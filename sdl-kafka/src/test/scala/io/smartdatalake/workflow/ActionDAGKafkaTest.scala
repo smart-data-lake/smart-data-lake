@@ -48,9 +48,10 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
   private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
 
-  KafkaTestUtil.start
+  KafkaTestUtil.start()
 
   before {
     instanceRegistry.clear()
@@ -80,9 +81,9 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // exec dag
-    dag.prepare
-    dag.init
-    dag.exec
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
 
     // check result
     val dfR1 = tgt2DO.getSparkDataFrame(Seq())
@@ -124,8 +125,8 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // first dag run
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -137,8 +138,8 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
     // second dag run - no data to process
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -152,8 +153,8 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     val df2 = Seq(("r2", TestPerson("doe", "john 2", 10))).toDF("key", "value")
     srcDO.writeSparkDataFrame(df2, Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -194,8 +195,8 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     // first dag run
     {
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay10s))
-      dag.prepare
-      dag.init
+      dag.prepare(contextPrep)
+      dag.init(contextInit)
       dag.exec(contextExec)
     }
 
@@ -208,8 +209,8 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
       val action1Delay1s = action1Delay10s.copy(
         executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - 1)"))))
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay1s))
-      dag.prepare
-      dag.init
+      dag.prepare(contextPrep)
+      dag.init(contextInit)
       dag.exec(contextExec)
     }
 

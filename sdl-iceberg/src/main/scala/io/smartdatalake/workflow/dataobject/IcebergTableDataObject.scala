@@ -23,11 +23,13 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
@@ -45,6 +47,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 /**
  * [[DataObject]] of type IcebergTableDataObject.
@@ -235,7 +238,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     if (isTableExisting) {
       val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
-      if (allowSchemaEvolution && existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
+      if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
       else validateSchema(SparkSchema(saveModeTargetDf.schema), existingSchema, "write")
     }
   }
@@ -249,7 +252,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
@@ -260,7 +263,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * Writes DataFrame to HDFS/Parquet and creates Iceberg table.
    */
   def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
-                    (implicit context: ActionPipelineContext): Unit = {
+                    (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     val dfPrepared = if (createTableOnly) {
@@ -275,8 +278,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       .format("iceberg")
       .options(options)
       .option("path", hadoopPath.toString)
-    if (isTableExisting) {
-      // check schema
+    val sparkMetrics = if (isTableExisting) {
+      // check scheme
       if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       // update table property "spark.accept-any-schema" to allow schema evolution. This disables Spark schema checks as they dont allow missing columns. Iceberg schema checks still apply.
       updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, allowSchemaEvolution.toString, TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
@@ -284,7 +287,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       if (finalSaveMode == SDLSaveMode.Merge) {
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
-      } else {
+      } else SparkStageMetricsListener.execWithMetrics(this.id, {
         // V2 writer can be used if table is existing, it supports overwriting given partitions
         val dfWriterV2 = saveModeTargetDf
           .writeTo(table.fullName)
@@ -297,8 +300,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           }
           SDLSaveMode.execV2(finalSaveMode, dfWriterV2, partitionValues)
         }
-      }
-    } else {
+      })
+    } else SparkStageMetricsListener.execWithMetrics(this.id, {
       if (partitions.isEmpty) {
         dfWriter.saveAsTable(table.fullName)
       } else {
@@ -306,13 +309,29 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           .partitionBy(partitions: _*)
           .saveAsTable(table.fullName)
       }
-    }
+    })
+
+    // get iceberg snapshot summary / stats
+    val summary = getIcebergTable.currentSnapshot().summary().asScala
+    assert(summary("spark.app.id") == session.sparkContext.applicationId, s"($id) current iceberg snapshot is not written by this spark application (spark.app.id should be ${summary("spark.app.id")}. Is there someone else writing to this table?!")
+    val icebergMetrics = (summary - "spark.app.id")
+      // normalize names lowercase with underscore
+      .map{case(k,v) => (k.replace("-","_"), Try(v.toLong).getOrElse(v))}
+      // standardize naming
+      // Unfortunately this is not possible yet for merge operation, as we only get added/deleted records. Added records contain inserted + updated rows, deleted records probably updated + deleted rows...
+      .map{
+        case ("added_records", v) if finalSaveMode != SDLSaveMode.Merge => ("rows_inserted", v)
+        case (k,v) => (k,v)
+      }
 
     // vacuum delta lake table
     vacuum
 
     // fix acls
     if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
+
+    // return
+    sparkMetrics ++ icebergMetrics
   }
 
   private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
@@ -333,13 +352,15 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): Unit = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
     try {
       // write data to temp table
-      writeToTempTable(df)
+      val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
+        writeToTempTable(df)
+      )
       // override missing columns with null value, as Iceberg needs all target columns be included in insert statement
       val targetCols = session.table(table.fullName).schema.fieldNames
       val missingCols = targetCols.diff(df.columns)
@@ -354,6 +375,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptionsExt).map(e => e._1+"="+e._2).mkString(" ")}")
       logger.debug(s"($id) merge statement: $mergeStmt")
       context.sparkSession.sql(mergeStmt)
+      // return
+      metrics
     } finally {
       // cleanup temp table
       val tmpTableIdentifier = TableIdentifier.of((getIdentifier.namespace :+ tmpTable.name):_*)

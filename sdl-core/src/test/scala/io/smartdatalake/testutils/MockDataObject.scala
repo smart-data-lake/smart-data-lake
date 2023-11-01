@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSubFeed}
@@ -50,7 +51,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
     dataFrameMock.getOrElse(throw NoDataToProcessWarning("mock", s"($id) dataFrameMock not initialized"))
   }
 
-  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
     assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
     val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) {
@@ -71,6 +72,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
       dataFrameMock = Some(df)
       partitionValuesMock = inferredPartitionValues
     }
+    Map("records_written" -> df.count)
   }
 
   def register(implicit instanceRegistry: InstanceRegistry): MockDataObject = {

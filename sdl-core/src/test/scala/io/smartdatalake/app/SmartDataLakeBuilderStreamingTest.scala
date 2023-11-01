@@ -21,16 +21,17 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -143,7 +144,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       val resultActionsState = runState.actionsState.mapValues(_.state)
       val expectedActionsState = Map((action1.id , RuntimeEventState.SKIPPED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues.isEmpty)
+      assert(runState.actionsState.head._2.results.head.partitionValues.isEmpty)
     }
   }
 
@@ -222,15 +223,15 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     val action1InfoSdl1 = action1.getRuntimeInfo(Some(SDLExecutionId(1))).get
     assert(action1InfoSdl1.state == RuntimeEventState.SUCCEEDED) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
-    assert(action1InfoSdl1.results.head.mainMetrics.isEmpty) // no metrics for SDL execution 1 of streaming actions
+    assert(getFirstMetrics(action1InfoSdl1)("records_written") == 1)
     val action1InfoSdl2 = action1.getRuntimeInfo(Some(SDLExecutionId(2))).get
     assert(action1InfoSdl2.state == RuntimeEventState.STREAMING) // State for SDL execution 2 is reported as STREAMING by streaming action
     val action1InfoStream1 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(0))).get
     assert(action1InfoStream1.state == RuntimeEventState.SUCCEEDED)
-    assert(action1InfoStream1.results.head.mainMetrics("records_written") == 1)
+    assert(getFirstMetrics(action1InfoStream1)("records_written") == 1)
     val action1InfoStream2 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(1))).get
     assert(action1InfoStream2.state == RuntimeEventState.SUCCEEDED)
-    assert(action1InfoStream2.results.head.mainMetrics("records_written") == 1)
+    assert(getFirstMetrics(action1InfoStream2)("records_written") == 1)
 
     // check state after streaming is terminated
     {
@@ -243,7 +244,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       val resultActionsState = runState.actionsState.mapValues(s => (s.executionId,s.state))
       val expectedActionsState = Map((action1.id, (SDLExecutionId(1), RuntimeEventState.SUCCEEDED))) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState(action1.id).results.head.mainMetrics.isEmpty) // no metrics for SDL execution 1 of streaming actions
+      assert(getFirstMetrics(runState.actionsState(action1.id))("records_written") == 1)
     }
   }
 
@@ -675,6 +676,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102", "20190101"))
   }
+
+  def getFirstMetrics(info: RuntimeInfo): MetricsMap = info.results.head.metrics.getOrElse(Map())
 }
 
 /**

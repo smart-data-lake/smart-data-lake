@@ -72,7 +72,7 @@ case class CustomFileAction(override val id: ActionId,
     outputSubFeed.copy(fileRefMapping = Some(output.translateFileRefs(inputFileRefs)))
   }
 
-  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[FileSubFeed] = {
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
@@ -110,7 +110,7 @@ case class CustomFileAction(override val id: ActionId,
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->fileRefMapping.size.toLong) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    WriteSubFeedResult(subFeed, Some(fileRefMapping.isEmpty), Some(metrics))
+    subFeed.withMetrics(metrics)
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {

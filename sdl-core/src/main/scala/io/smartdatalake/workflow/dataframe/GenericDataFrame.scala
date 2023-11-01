@@ -231,7 +231,7 @@ trait GenericSchema extends GenericTypedObject {
     SchemaConverter.convert(this, toSubFeedType)
   }
   def equalsSchema(schema: GenericSchema): Boolean = {
-    diffSchema(schema).nonEmpty || schema.diffSchema(this).nonEmpty
+    diffSchema(schema).isEmpty && schema.diffSchema(this).isEmpty
   }
   def diffSchema(schema: GenericSchema): Option[GenericSchema]
   def columns: Seq[String]

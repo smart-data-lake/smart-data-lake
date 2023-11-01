@@ -27,11 +27,9 @@ import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTr
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{SQLExpectation, _}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
-import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkException
 import org.apache.spark.sql.functions.{lit, substring}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -215,17 +213,17 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(r1 == Seq("jonson")) // only one record has rating 5 (see where condition)
 
     // check expectation value in metrics
-    val metrics1 = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
+    val metrics1 = tgtSubFeed1.metrics.get
     assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "countAll" -> 1, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None))
 
     // add another record & process
     val l2 = Seq(("dau", "peter", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())
     action1.reset
-    action1.exec(Seq(srcSubFeed))(contextExec).head
+    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed))(contextExec).head
 
     // check expectation value in metrics - countAll should be 2 now, but count should stay 1
-    val metrics2 = action1.getRuntimeMetrics()(tgtDO.id).get.getMainInfos
+    val metrics2 = tgtSubFeed2.metrics.get
     assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#dau" -> 1, "countAll" -> 2, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None))
 
     // fail constraint evaluation

@@ -24,11 +24,13 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
@@ -37,6 +39,8 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.util.Try
 
 /**
  * [[DataObject]] of type DeltaLakeTableDataObject.
@@ -216,7 +220,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
@@ -229,7 +233,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
-                    (implicit context: ActionPipelineContext): Unit = {
+                    (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     val dfPrepared = if (createTableOnly) {
@@ -239,17 +243,20 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
+    val userMetadata = s"${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}"
+    session.conf.set("spark.databricks.delta.commitInfo.userMetadata", userMetadata)
     val dfWriter = saveModeTargetDf.write
       .format("delta")
       .options(options)
       .option("path", hadoopPath.toString)
+      .option("userMetadata", userMetadata)
 
-    if (isTableExisting) {
+    val sparkMetrics = if (isTableExisting) {
       if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
-      } else {
+      } else SparkStageMetricsListener.execWithMetrics(this.id, {
         if (partitions.isEmpty) {
           dfWriter
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
@@ -272,18 +279,40 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
               .save() // it seems generally more stable to work without Table API
           }
         }
-      }
-    } else {
+      })
+    } else SparkStageMetricsListener.execWithMetrics(this.id,
       dfWriter
         .partitionBy(partitions: _*)
         .saveAsTable(table.fullName)
-    }
+    )
+
+    // get delta table operational metrics
+    val dfHistory = DeltaTable.forName(session, table.fullName).history(1)
+    if (logger.isDebugEnabled) dfHistory.show(false)
+    val latestHistoryEntry = dfHistory.select("operationMetrics", "userMetadata").head
+    assert(latestHistoryEntry.getString(1) == userMetadata, s"($id) current delta lake history entry is not written by this spark application (userMetadata should be $userMetadata). Is there someone else writing to this table?!")
+    val deltaMetrics = dfHistory.select("operationMetrics").head.getMap[String,String](0)
+      // normalize names lowercase with underscore
+      .map{case (k,v) => (DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
+      // standardize naming
+      .map{
+        case ("num_output_rows", v) => "rows_inserted" -> v
+        case ("num_updated_rows", v) => "rows_updated" -> v
+        case ("num_deleted_rows", v) => "rows_deleted" -> v
+        case ("num_target_rows_inserted", v) => "rows_inserted" -> v
+        case ("num_target_rows_updated", v) => "rows_updated" -> v
+        case ("num_target_rows_deleted", v) => "rows_deleted" -> v
+        case (k,v) => k -> v
+      }
 
     // vacuum delta lake table
     vacuum
 
     // fix acls
     if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
+
+    // return
+    sparkMetrics ++ deltaMetrics
   }
 
   /**
@@ -293,7 +322,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    *
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): Unit = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
@@ -334,7 +363,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       // execute delta lake statement
-      mergeStmt.execute()
+      SparkStageMetricsListener.execWithMetrics(this.id,
+        mergeStmt.execute()
+      )
     }
   }
 

@@ -28,6 +28,7 @@ import io.smartdatalake.util.json.DefaultFlatteningParser
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
@@ -97,12 +98,14 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
-    super.writeSparkDataFrameToPath(df, path, finalSaveMode)
+    val metrics = super.writeSparkDataFrameToPath(df, path, finalSaveMode)
     // add file extension to files, as spark-xml does not out-of-the-box
     filesystem.globStatus(new Path(path, "part-*"), (path: Path) => !path.getName.contains("."))
       .foreach(f => filesystem.rename(f.getPath, f.getPath.suffix(fileName.replace("*", ""))))
+    // return
+    metrics
   }
 
   override def factory: FromConfigFactory[DataObject] = XmlFileDataObject

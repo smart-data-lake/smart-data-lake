@@ -23,13 +23,14 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.{DataFrameActionImpl, RuntimeEventState, SparkStreamingExecutionId}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, GenericMetrics, InitSubFeed}
-import org.apache.spark.sql.streaming.StreamingQueryListener
+import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, ExecutionPhase, InitSubFeed}
+import org.apache.spark.sql.streaming.{StreamingQueryListener, StreamingQueryProgress}
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant, LocalDateTime, ZoneId}
 import java.util.UUID
 import java.util.concurrent.Semaphore
+import scala.collection.mutable
 
 /**
  * Collect metrics for Spark streaming queries
@@ -47,18 +48,14 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
   }
   override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
     if (event.progress.id == id) {
-      val noData = event.progress.durationMs.size == 2 // if only 2 phases have run, there was no data...
-      logger.info(s"(${event.progress.name}) streaming query ${if (noData) "had no data" else "made progress"}: batchId=${event.progress.batchId} duration=${Duration.ofMillis(event.progress.batchDuration)}")
       val executionId = SparkStreamingExecutionId(event.progress.batchId)
       val endTstmp = LocalDateTime.ofInstant(Instant.parse(event.progress.timestamp), ZoneId.systemDefault) // String is in UTC. It must be converted to local timezone.
       val startTstmp = endTstmp.minus(event.progress.batchDuration, ChronoUnit.MILLIS) // start time is not stored in event...
       action.addRuntimeEvent(executionId, ExecutionPhase.Exec, RuntimeEventState.STARTED, tstmp = startTstmp)
-      if (!noData) {
-        if (event.progress.sink.numOutputRows >= 0) { // -1 if reporting metrics is not supported by sink
-          // if there are streaming metrics, they have highest prio (9999)
-          val metrics = GenericMetrics(s"streaming-${event.progress.batchId}", 9999, Map("batchDuration" -> event.progress.batchDuration / 1000, "records_written" -> event.progress.sink.numOutputRows))
-          action.addRuntimeMetrics(Some(SparkStreamingExecutionId(event.progress.batchId)), Some(dataObjectId), metrics)
-        }
+      val streamingMetrics = SparkStreamingMetrics(event.progress)
+      logger.info(s"(${event.progress.name}) streaming query ${if (streamingMetrics.noData) "had no data" else "made progress"}: batchId=${event.progress.batchId} ${streamingMetrics.getAsText}")
+      if (!streamingMetrics.noData) {
+        action.addAsyncMetrics(Some(SparkStreamingExecutionId(event.progress.batchId)), Some(dataObjectId), streamingMetrics)
         action.addRuntimeEvent(executionId, ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, tstmp = endTstmp, results = Seq(InitSubFeed(dataObjectId, partitionValues = Seq()))) // dummy results provided for runtime info
       }
       releaseFirstProgressWaitLock()
@@ -66,9 +63,9 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
   }
   override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = {
     if (event.id == id) {
-      logger.info(s"($queryName) streaming query terminated ${event.exception.map(e => s" exception=$e").getOrElse(" normally")}")
+      logger.info(s"($queryName) streaming query terminated ${event.exception.map(e => s"exception=$e").getOrElse("normally")}")
       context.sparkSession.streams.removeListener(this) // self-unregister
-      action.notifyStreamingQueryTerminated
+      action.notifySparkStreamingQueryTerminated
       releaseFirstProgressWaitLock()
     }
     Environment.stopStreamingGracefully = true // stop synchronous actions
@@ -78,5 +75,22 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
       firstProgressWaitLock.foreach(_.release())
       isFirstProgress = false
     }
+  }
+}
+
+case class SparkStreamingMetrics(progress: StreamingQueryProgress) extends ActionMetrics {
+
+  val noData: Boolean = (progress.durationMs.size <= 2) // if only 2 phases have run, there was no data...
+
+  override val getId: String = s"streaming-${progress.batchId}"
+
+  override val getOrder: Long = Instant.parse(progress.timestamp).getEpochSecond
+
+  override def getMainInfos: Map[String, Any] = {
+    val metrics = mutable.Map[String, Any]("batch_duration" -> progress.batchDuration, "no_data" -> noData)
+    if (progress.sink.numOutputRows >= 0) { // -1 if reporting metrics is not supported by sink
+      metrics += ("records_written" -> progress.sink.numOutputRows)
+    }
+    metrics.toMap
   }
 }

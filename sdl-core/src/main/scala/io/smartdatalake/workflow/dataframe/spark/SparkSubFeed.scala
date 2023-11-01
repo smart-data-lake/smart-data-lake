@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
@@ -49,7 +50,8 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val isSkipped: Boolean = false,
                         override val isDummy: Boolean = false,
                         override val filter: Option[String] = None,
-                        @transient override val observation: Option[DataFrameObservation] = None
+                        @transient override val observation: Option[DataFrameObservation] = None,
+                        override val metrics: Option[MetricsMap] = None
                        )
   extends DataFrameSubFeed {
   @transient
@@ -146,6 +148,9 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = partitionValues, filter = filter)
       .applyFilter
   }
+  override def withMetrics(metrics: MetricsMap): SparkSubFeed = this.copy(metrics = Some(metrics))
+  def appendMetrics(metrics: MetricsMap): SparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+
 }
 
 object SparkSubFeed extends DataFrameSubFeedCompanion {

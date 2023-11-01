@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
@@ -43,7 +43,8 @@ class ActionDAGRunTest extends FunSuite {
     val duration = Duration.ofMinutes(5)
     val endTime = startTime.plus(duration)
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
-      results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
+      results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))), metrics = Some(Map("test"->1, "test2"->"abc")))),
+      dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
     val appVersion = AppUtil.getManifestVersion
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
@@ -51,11 +52,10 @@ class ActionDAGRunTest extends FunSuite {
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
       .mapValues(actionState => actionState
-        .copy(results = actionState.results.map( result => result
-          .copy(subFeed = result.subFeed match {
-            case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
-            case subFeed => subFeed
-          })))))
+        .copy(results = actionState.results.map {
+          case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
+          case subFeed => subFeed
+        })))
     // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)
@@ -71,7 +71,8 @@ class ActionDAGRunTest extends FunSuite {
     val duration = Duration.ofMinutes(5)
     val endTime = startTime.plus(duration)
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
-      results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test" -> 1)))), Map("test" -> 1, "test2" -> "abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
+      results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test" -> 1))), metrics = Some(Map("test" -> 1, "test2" -> "abc")))),
+      dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
     val appVersion = AppUtil.getManifestVersion
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = true, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion)

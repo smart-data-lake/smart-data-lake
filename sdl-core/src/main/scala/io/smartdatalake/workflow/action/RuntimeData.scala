@@ -20,9 +20,9 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.{ActionMetrics, DataObjectState, ExecutionPhase, GenericMetrics, InitSubFeed, SubFeed}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import io.smartdatalake.workflow._
 
 import java.time.{Duration, LocalDateTime}
 import scala.collection.mutable
@@ -34,19 +34,21 @@ private[smartdatalake] trait RuntimeData {
   // collect execution data
   protected val executions: mutable.Buffer[ExecutionData[ExecutionId]] = mutable.Buffer()
   protected var currentExecution: Option[ExecutionData[ExecutionId]] = None
+  protected var lastExecution: Option[ExecutionData[ExecutionId]] = None
   // the number of executions to keep to implement housekeeping
   def numberOfExecutionToKeep: Int
   protected def doHousekeeping(): Unit = {
     if (executions.size > numberOfExecutionToKeep) executions.remove(0) // remove first element
   }
   def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit
-  def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metric: ActionMetrics): Unit
+  def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metric: ActionMetrics): Unit = throw new NotImplementedError()
   def currentExecutionId: Option[ExecutionId] = currentExecution.map(_.id)
-  def getLatestEventState: Option[RuntimeEventState] = currentExecution.flatMap(_.getLatestEvent.map(_.state))
-  def isLatestExecutionFinal: Option[Boolean] = getLatestEventState.map(RuntimeEventState.isFinal)
+  def lastExecutionId: Option[ExecutionId] = lastExecution.map(_.id)
+  def getLatestEventState: Option[RuntimeEventState] = lastExecution.flatMap(_.getLatestEvent.map(_.state))
   def clear(): Unit = {
     executions.clear
     currentExecution = None
+    lastExecution = None
   }
 
   /**
@@ -54,7 +56,7 @@ private[smartdatalake] trait RuntimeData {
    * If ExecutionId is empty, metrics for the current existing ExecutionId is returned.
    */
   def getEvents(executionIdOpt: Option[ExecutionId] = None): Seq[RuntimeEvent] = {
-    if (executionIdOpt.isEmpty) currentExecution.map(_.getEvents).getOrElse(Seq())
+    if (executionIdOpt.isEmpty) lastExecution.map(_.getEvents).getOrElse(Seq())
     else executions.find(_.id == executionIdOpt.get).map(_.getEvents).getOrElse(Seq())
   }
 
@@ -63,17 +65,8 @@ private[smartdatalake] trait RuntimeData {
    * If ExecutionId is empty, metrics for the current existing ExecutionId is returned.
    */
   def getMetrics(dataObjectId: DataObjectId, executionIdOpt: Option[ExecutionId] = None): Option[ActionMetrics] = {
-    if (executionIdOpt.isEmpty) currentExecution.flatMap(_.getLatestMetric(dataObjectId))
-    else executions.find(_.id == executionIdOpt.get).flatMap(_.getLatestMetric(dataObjectId))
-  }
-
-  /**
-   * Get the latest metrics for a specific DataObject and current ExecutionId and mark it as final.
-   * The method remembers the call per ExecutionId and DataObject to warn about late arriving metrics.
-   * This method is for internal use only!
-   */
-  def getFinalMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
-    currentExecution.flatMap(_.getFinalMetric(dataObjectId))
+    if (executionIdOpt.isEmpty) lastExecution.flatMap(_.getLatestMetrics(dataObjectId))
+    else executions.find(_.id == executionIdOpt.get).flatMap(_.getLatestMetrics(dataObjectId))
   }
 
   /**
@@ -83,7 +76,7 @@ private[smartdatalake] trait RuntimeData {
   def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId] = None): Option[RuntimeInfo] = {
     if(executions.isEmpty) None
     else {
-      if (executionIdOpt.isEmpty) currentExecution.flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
+      if (executionIdOpt.isEmpty) lastExecution.flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
       else executions.find(_.id == executionIdOpt.get).flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
     }
   }
@@ -91,35 +84,28 @@ private[smartdatalake] trait RuntimeData {
 
 /**
  * Easy implementation of RuntimeData for synchronous Actions
+ * Note that this does not support collecting metrics, as these are passed on directly in the corresponding SubFeed for synchronous Actions.
  */
 private[smartdatalake] case class SynchronousRuntimeData(override val numberOfExecutionToKeep: Int) extends RuntimeData {
   override def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit = {
-    assert(currentExecutionId.forall(_ <= executionId), s"ExecutionId $executionId smaller than currentExecutionId $currentExecutionId")
-    if (currentExecutionId.forall(_ < executionId)) {
+    assert(lastExecutionId.forall(_ <= executionId), s"ExecutionId $executionId smaller than currentExecutionId $lastExecutionId")
+    if (lastExecutionId.forall(_ < executionId)) {
       currentExecution = Some(ExecutionData(executionId))
+      lastExecution = currentExecution
       executions.append(currentExecution.get)
     }
     currentExecution.get.addEvent(event)
     doHousekeeping()
   }
-  override def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metric: ActionMetrics): Unit = {
-    assert(executionId.nonEmpty, "ExecutionId must be defined")
-    assert(currentExecutionId.forall(_ == executionId.get), s"New metric's ExecutionId $executionId is different than current ExecutionId $currentExecutionId")
-    if (currentExecutionId.forall(_ < executionId.get)) {
-      currentExecution = Some(ExecutionData(executionId.get))
-      executions.append(currentExecution.get)
-    }
-    currentExecution.get.addMetric(dataObjectId, metric)
-  }
 }
+
 /**
- * Asynchronous Actions might receive Events & Metrics with synchronous ExecutionId.
+ * Asynchronous Actions might receive Events with synchronous ExecutionId.
  * The synchronous events are created by initial synchronous Execution. There are asynchronous Events for the same Execution.
  * The implementation keeps both, but currentExecution will always be the asynchronous Execution.
- * The synchronous metrics are created by Spark Streaming with foreachBatch and must be assigned to the corresponding asynchronous Execution.
  */
 private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfExecutionToKeep: Int) extends RuntimeData {
-  // temporarily hold metrics with SDLExecutionId or without executionId
+  // temporarily hold metrics without executionId
   private val unassignedMetrics: mutable.Buffer[(DataObjectId,ActionMetrics)] = mutable.Buffer()
   // keep track of first SDLExecutionId for logic in getRuntimeInfo
   private var firstSDLExecutionId: Option[SDLExecutionId] = None
@@ -135,36 +121,37 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
         }
         if (execution.nonEmpty) execution.get.addEvent(event)
       case _ =>
-        assert(currentExecutionId.forall(_ <= executionId), "ExecutionId smaller than currentExecutionId")
-        if (currentExecutionId.forall(_ < executionId)) {
+        assert(lastExecutionId.forall(_ <= executionId), "ExecutionId smaller than currentExecutionId")
+        if (lastExecutionId.forall(_ < executionId)) {
           currentExecution = Some(ExecutionData(executionId))
+          lastExecution = currentExecution
           executions.append(currentExecution.get)
         }
         currentExecution.get.addEvent(event)
         // add unassigned synchronous metrics
-        unassignedMetrics.foreach { case (d, m) => currentExecution.get.addMetric(d, m) }
+        unassignedMetrics.foreach { case (d, m) => currentExecution.get.addMetrics(d, m) }
         unassignedMetrics.clear
+        // remove current execution on final state. This is needed for handling unassigned Metrics.
+        if (RuntimeEventState.isFinal(event.state)) currentExecution = None
         doHousekeeping()
     }
   }
-  override def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metric: ActionMetrics): Unit = {
-    // special handling of synchronous metrics: add to corresponding asynchronous execution
-    if (executionId.isEmpty || executionId.get.isInstanceOf[SDLExecutionId]) {
-      if (currentExecution.isEmpty || isLatestExecutionFinal.getOrElse(true)) unassignedMetrics.append((dataObjectId, metric))
-      else currentExecution.get.addMetric(dataObjectId, metric) // add to current asynchronous execution data
-    } else {
-      assert(currentExecutionId.forall(_ == executionId.get), s"New metric received for other than current ExecutionId: currentExecutionId=$currentExecutionId executionId=$executionId")
-      currentExecution.get.addMetric(dataObjectId, metric)
-    }
+  override def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = {
+    assert(!executionId.exists(_.isInstanceOf[SDLExecutionId]), "Can not handle synchronous metrics")
+    assert(currentExecutionId.isEmpty || executionId.isEmpty || currentExecutionId == executionId, s"New metric received for other than current ExecutionId: currentExecutionId=$currentExecutionId executionId=$executionId")
+    if (currentExecution.isEmpty) unassignedMetrics.append((dataObjectId, metrics))
+    else currentExecution.get.addMetrics(dataObjectId, metrics)
+    // also add to firstSDLExecution if not final
+    firstSDLExecutionId.flatMap(id => executions.find(_.id == id))
+      .filterNot(_.isFinal).foreach(_.addMetrics(dataObjectId, metrics))
   }
   override def clear(): Unit = {
     super.clear()
-    unassignedMetrics.clear
     firstSDLExecutionId = None
   }
   override def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId]): Option[RuntimeInfo] = {
+    // report state as STREAMING after first SDLexecutionId only. This allows to skip first execution in recovery if SUCCEEDED.
     if (executionIdOpt.exists(_.isInstanceOf[SDLExecutionId])) {
-      // report state as STREAMING after first SDLexecutionId only. This allows to skip first execution in recovery if SUCCEEDED.
       if (executionIdOpt == firstSDLExecutionId) super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, executionIdOpt)
       else super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, None).map(_.copy(state = RuntimeEventState.STREAMING))
     } else {
@@ -178,36 +165,30 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
  */
 private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
   private val events: mutable.Buffer[RuntimeEvent] = mutable.Buffer()
-  private val metrics: mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]] = mutable.Map()
-  private val metricsDelivered = mutable.Set[DataObjectId]()
+  private val metricsMap: mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]] = mutable.Map()
   def isAsynchronous: Boolean = !id.isInstanceOf[SDLExecutionId]
   def addEvent(event: RuntimeEvent): Unit = events.append(event)
-  def addMetric(dataObjectId: DataObjectId, metric: ActionMetrics): Unit = {
-    val dataObjectMetrics = metrics.getOrElseUpdate(dataObjectId, mutable.Buffer[ActionMetrics]())
-    dataObjectMetrics.append(metric)
-    if (metricsDelivered.contains(dataObjectId))
-      throw LateArrivingMetricException(s"Late arriving metrics for $dataObjectId detected. Final metrics have already been delivered.")
+  def addMetrics(dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = {
+    val dataObjectMetrics = metricsMap.getOrElseUpdate(dataObjectId, mutable.Buffer[ActionMetrics]())
+    dataObjectMetrics.append(metrics)
   }
   def getEvents: Seq[RuntimeEvent] = events
   def getLatestEvent: Option[RuntimeEvent] = {
     events.lastOption
   }
-  def getLatestMetric(dataObjectId: DataObjectId): Option[ActionMetrics] = {
-    // combine latest metric for all types
-    val metricsMap = metrics.get(dataObjectId).map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
-    metricsMap.map(GenericMetrics("latest", 1, _))
+  def isFinal: Boolean = {
+    getLatestEvent.exists(e => RuntimeEventState.isFinal(e.state))
   }
-  def getFinalMetric(dataObjectId: DataObjectId): Option[ActionMetrics] = {
-    val latestMetrics = getLatestMetric(dataObjectId)
-      .orElse {
-        // wait some time and retry, because the metrics might be delivered by another thread...
-        Thread.sleep(500)
-        getLatestMetric(dataObjectId)
-      }
-    // remember for which data object final metrics has been delivered, so that we can warn on late arriving metrics!
-    metricsDelivered += dataObjectId
-    // return
-    latestMetrics
+
+  /**
+   * Get the latest metrics for this ExecutionData.
+   * This should not be used directly, as it does not include metrics included in SubFeeds.
+   * Use getRuntimeInfo instead, and extract metrics from results.
+   */
+  private[action] def getLatestMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
+    // combine latest metric for all types
+    val metrics = metricsMap.get(dataObjectId).map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
+    metrics.map(GenericMetrics("latest", 1, _))
   }
   def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState]): Option[RuntimeInfo] = {
     assert(events.nonEmpty, "Cannot getRuntimeInfo if events are empty")
@@ -226,18 +207,20 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     val startEventLastPhase = events.reverseIterator.find(event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase)
     // Duration of last successful phase
     val duration = startEventLastPhase.map(start => Duration.between(start.tstmp, lastEvent.tstmp))
-    val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) lastResults.toSeq.flatten
+    val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) {
+      // enrich with potential metrics
+      lastResults.toSeq.flatten.map(subFeed => subFeed.appendMetrics(getLatestMetrics(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())))
+    }
+    // TODO: why fake results? partitionValues should be preserved!
     else outputIds.map(outputId => InitSubFeed(outputId, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
-    val results = outputSubFeeds.map(subFeed => ResultRuntimeInfo(subFeed, getLatestMetric(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())))
     Some(RuntimeInfo(id, lastEvent.state,
       startTstmp = execStartEvent.map(_.tstmp), endTstmp = execEndEvent.map(_.tstmp),
       duration = duration,
       startTstmpPrepare = prepareStartEvent.map(_.tstmp), endTstmpPrepare = prepareEndEvent.map(_.tstmp),
       startTstmpInit = initStartEvent.map(_.tstmp), endTstmpInit = initEndEvent.map(_.tstmp),
-      msg = lastEvent.msg, results = results, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
+      msg = lastEvent.msg, results = outputSubFeeds, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
   }
 }
-private[smartdatalake] case class LateArrivingMetricException(msg: String) extends Exception(msg)
 
 /**
  * A structure to collect runtime event information
@@ -301,7 +284,7 @@ case class RuntimeInfo(
                        endTstmp: Option[LocalDateTime] = None,
                        duration: Option[Duration] = None,
                        msg: Option[String] = None,
-                       results: Seq[ResultRuntimeInfo] = Seq(),
+                       results: Seq[SubFeed] = Seq(),
                        dataObjectsState: Seq[DataObjectState] = Seq(),
                        inputIds: Seq[DataObjectId] = Seq(),
                        outputIds: Seq[DataObjectId] = Seq()
@@ -312,4 +295,3 @@ case class RuntimeInfo(
   def hasCompleted: Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
   override def toString: String = duration.map(d => s"$state $d").getOrElse(state.toString)
 }
-case class ResultRuntimeInfo(subFeed: SubFeed, mainMetrics: Map[String, Any])
