@@ -63,7 +63,7 @@
                 <groupId>org.json</groupId>
                 <artifactId>json</artifactId>
                 <!-- version 20180813 referenced by azure-relay is vulnerable -->
-                <version>20230227</version>
+                <version>20231013</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
