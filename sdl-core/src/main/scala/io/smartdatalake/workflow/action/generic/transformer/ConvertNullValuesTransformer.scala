@@ -37,7 +37,7 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 case class ConvertNullValuesTransformer(override val name: String = "ConvertNullValuesTransformer", override val description: Option[String] = None, columnWhitelist: Option[Seq[String]] = None, columnBlacklist: Option[Seq[String]] = None, valueForString: String = "na", valueForNumber: Int = -1 ) extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    // Add implementation here
+    require((columnWhitelist.isEmpty != columnBlacklist.isEmpty) || (columnWhitelist.isEmpty && columnBlacklist.isEmpty), "Conflicting parameters. Please use either columnWhitelist or columnBlacklist, as simultaneous application is not supported.")
     df
   }
 
