@@ -36,7 +36,7 @@ class ConvertNullValuesTransformerTest extends FunSuite {
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  test("exclusive white- or blacklisting check") {
+  test("exclusive include- or excludeColumns") {
 
     // prepare
     val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("column1"), excludeColumns = Seq("column2"))
