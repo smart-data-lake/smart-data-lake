@@ -26,7 +26,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 
 /**
- *
+ * Convert null values in a dataframe
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
  * @param columnWhitelist   Optional list of columns to include into the transformation
