@@ -89,7 +89,23 @@ class ConvertNullValuesTransformerTest extends FunSuite {
   test("excludeColumns set") {
     // prepare
     val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("column1", "column2"))
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
     val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Some(-1.0)), (Option.empty[String], Option.empty[Int], Some(-1.0)))
+    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
+    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
+
+    // execute
+    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformedDf.collect == resultDf.collect)
+  }
+
+  test("custom string value check") {
+    // prepare
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(valueForString = "n/a")
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
+    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("n/a"), Some(2), Some(-1.0)), (Some("n/a"), Some(-1), Some(-1.0)))
     val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
     val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
 
