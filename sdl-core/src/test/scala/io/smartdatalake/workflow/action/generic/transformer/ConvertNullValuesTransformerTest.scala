@@ -30,6 +30,7 @@ import org.scalatest.FunSuite
 class ConvertNullValuesTransformerTest extends FunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry = new InstanceRegistry()
@@ -38,16 +39,16 @@ class ConvertNullValuesTransformerTest extends FunSuite {
   test("exclusive white- or blacklisting check") {
 
     // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(columnWhitelist = Seq("column1"), columnBlacklist = Seq("column2"))
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("column1"), excludeColumns = Seq("column2"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
 
     // execute
-    val thrown = intercept[IllegalArgumentException]{
+    val thrown = intercept[IllegalArgumentException] {
       convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
     }
 
     // check
     assert(thrown.isInstanceOf[IllegalArgumentException])
-    assert(thrown.getMessage == "requirement failed: Conflicting parameters. Please use either columnWhitelist or columnBlacklist, as simultaneous application is not supported.")
+    assert(thrown.getMessage == "requirement failed: Conflicting parameters. Please use either includeColumns or excludeColumns, as simultaneous application is not supported.")
   }
 }

@@ -29,15 +29,15 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
  * Convert null values in a dataframe
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
- * @param columnWhitelist   Optional list of columns to include into the transformation
- * @param columnBlacklist   Optional list of columns to exclude from the transformation
+ * @param includeColumns   Optional list of columns to include into the transformation
+ * @param excludeColumns   Optional list of columns to exclude from the transformation
  * @param valueForString    Value to add for string values, default value is "na"
  * @param valueForNumber    Value to add for number values, default value is -1
  */
-case class ConvertNullValuesTransformer(override val name: String = "ConvertNullValuesTransformer", override val description: Option[String] = None, columnWhitelist: Seq[String] = Seq(), columnBlacklist: Seq[String] = Seq(), valueForString: String = "na", valueForNumber: Int = -1 ) extends GenericDfTransformer {
+case class ConvertNullValuesTransformer(override val name: String = "ConvertNullValuesTransformer", override val description: Option[String] = None, includeColumns: Seq[String] = Seq(), excludeColumns: Seq[String] = Seq(), valueForString: String = "na", valueForNumber: Int = -1 ) extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    require((columnWhitelist.isEmpty != columnBlacklist.isEmpty) || (columnWhitelist.isEmpty && columnBlacklist.isEmpty), "Conflicting parameters. Please use either columnWhitelist or columnBlacklist, as simultaneous application is not supported.")
+    require((includeColumns.isEmpty != excludeColumns.isEmpty) || (includeColumns.isEmpty && excludeColumns.isEmpty), "Conflicting parameters. Please use either includeColumns or excludeColumns, as simultaneous application is not supported.")
     df
   }
 
