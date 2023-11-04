@@ -2,14 +2,17 @@ package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config.{ConfigRenderOptions, ConfigValueFactory}
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
+import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import scala.collection.JavaConverters._
 import scala.io.Source
-import scala.util.Using
+import scala.util.{Failure, Try, Using}
 
 case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, filename: String = "exportedConfig.json", enrichOrigin: Boolean = true, descriptionPath: Option[String] = None)
 
@@ -69,7 +72,6 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
     sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config,key) => config.withoutPath(key))
     // enrich origin of first class config objects
-    logger.info(exporterConfig.configPaths.mkString(", "))
     val descriptionRegex = "(.*): ([0-9]+)(-[0-9]+)?".r
     val configSectionsToEnrich =  Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
     if (exporterConfig.enrichOrigin) {
@@ -96,22 +98,24 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     }
     // enrich optional column description from description files
     val columnDescriptionRegex = "\\s*@column\\s+[\"`']?([^\\s]*?)[\"`']?+\\s+(.*)".r.anchored
-    exporterConfig.descriptionPath.map(p => Paths.get(p.stripPrefix("/"))).foreach { path =>
-      path.resolve(ConfigParser.CONFIG_SECTION_DATAOBJECTS).toFile.listFiles().toSeq.map { f =>
-        val dataObjectId = f.getName.split('.').head
-        val descriptions = Using(Source.fromFile(f)) {
-          _.getLines().collect {
+    exporterConfig.descriptionPath.foreach { path =>
+      val hadoopPath = new Path(path, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
+      implicit val filesystem: FileSystem = hadoopPath.getFileSystem(defaultHadoopConf)
+      logger.info(s"Searching DataObject description files in $hadoopPath")
+      RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory).toSeq
+      .map { p =>
+        val dataObjectId = p.getPath.getName.split('.').head
+        val descriptions = HdfsUtil.readHadoopFile(p.getPath).lines().iterator().asScala
+          .collect {
             case columnDescriptionRegex(name, description) =>
               (name, description.trim)
           }.toMap
-        }.get
         if (descriptions.nonEmpty) {
           sdlConfig = sdlConfig.withValue(s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
         }
       }
     }
     // render config as json
-    val sdlConfigToExport = if (exporterConfig.enrichOrigin) sdlConfig else sdlConfig
-    sdlConfigToExport.root.render(ConfigRenderOptions.concise())
+    sdlConfig.root.render(ConfigRenderOptions.concise())
   }
 }
