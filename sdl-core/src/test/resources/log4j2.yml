@@ -62,3 +62,7 @@ Configuration:
         level: ERROR
       - name: org.apache.hadoop.util.NativeCodeLoader
         level: ERROR
+      - name: org.apache.kafka.clients.admin.AdminClientConfig
+        level: ERROR
+      - name: io.smartdatalake.app.BuildVersionInfo
+        level: ERROR
