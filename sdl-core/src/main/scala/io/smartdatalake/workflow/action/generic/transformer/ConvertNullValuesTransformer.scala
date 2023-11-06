@@ -18,11 +18,12 @@
  */
 
 package io.smartdatalake.workflow.action.generic.transformer
+
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 
 /**
@@ -39,6 +40,25 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     require((includeColumns.isEmpty != excludeColumns.isEmpty) || (includeColumns.isEmpty && excludeColumns.isEmpty), "Conflicting parameters. Please use either includeColumns or excludeColumns, as simultaneous application is not supported.")
     df
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
+
+    val columnNames = df.schema.columns
+
+    // Iterate over the columns
+    val dfNew = columnNames.foldLeft(df) {
+      (acc, columnName) =>
+        // Get correct substitution value
+        val substitutionValue = df.schema.getDataType(columnName).typeName match {
+          case "integer" => valueForNumber
+          case "string" => valueForString
+          case "double" => valueForNumber
+          case _ => None
+        }
+        acc.withColumn(columnName, coalesce(col(columnName), lit(substitutionValue).cast(df.schema.getDataType(columnName))))
+    }
+
+    dfNew
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = ConvertNullValuesTransformer
