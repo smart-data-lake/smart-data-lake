@@ -60,7 +60,11 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
           case "double" => valueForNumber
           case _ => None
         }
-        acc.withColumn(columnName, coalesce(col(columnName), lit(substitutionValue).cast(df.schema.getDataType(columnName))))
+        if (substitutionValue != None) {
+          acc.withColumn(columnName, coalesce(col(columnName), lit(substitutionValue).cast(df.schema.getDataType(columnName))))
+        } else {
+          acc
+        }
     }
 
     dfNew
