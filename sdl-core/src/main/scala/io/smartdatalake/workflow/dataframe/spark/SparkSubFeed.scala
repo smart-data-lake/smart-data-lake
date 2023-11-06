@@ -285,4 +285,9 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   def apply( dataFrame: SparkDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues]): SparkSubFeed = {
     SparkSubFeed(Some(dataFrame), dataObjectId: DataObjectId, partitionValues)
   }
+
+  override def coalesce(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
+  }
 }
