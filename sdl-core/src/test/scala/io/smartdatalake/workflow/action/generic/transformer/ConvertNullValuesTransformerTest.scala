@@ -131,4 +131,19 @@ class ConvertNullValuesTransformerTest extends FunSuite {
     assert(transformedDf.collect == resultDf.collect)
   }
 
+  test("ignore other than string / number types columns") {
+    // prepare
+    val convertNullValuesTransformer = ConvertNullValuesTransformer()
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double], Option[Float], Option[Boolean])] = Seq((Some("1"), Option.empty[Int], Some(3.0), Option.empty[Float], Option.empty[Boolean]), (Option.empty[String], Some(2), Option.empty[Double], Option.empty[Float], Option.empty[Boolean]), (Option.empty[String], Option.empty[Int], Option.empty[Double], Some(9.0f), Some(false)))
+    val resultSeq: Seq[(Option[String], Option[Int], Option[Double], Option[Float], Option[Boolean])] = Seq((Some("1"), Some(-1), Some(3.0), Some(-1.0f), Option.empty[Boolean]), (Some("na"), Some(2), Some(-1.0), Some(-1.0f), Option.empty[Boolean]), (Some("na"), Some(-1), Some(-1.0), Some(9.0f), Some(false)))
+    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3", "column4", "column5"))
+    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3", "column4", "column5"))
+
+    // execute
+    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformedDf.collect == resultDf.collect)
+  }
+
 }
