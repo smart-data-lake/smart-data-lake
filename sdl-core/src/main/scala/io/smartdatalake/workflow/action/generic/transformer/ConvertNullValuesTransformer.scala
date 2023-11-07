@@ -55,15 +55,13 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
       (acc, columnName) =>
         // Get correct substitution value
         val substitutionValue = df.schema.getDataType(columnName) match {
-          case dt if dt.isNumeric => valueForNumber
-          case dt if dt.typeName == "string" => valueForString
+          case dt if dt.isNumeric => Some(valueForNumber)
+          case dt if dt.typeName == "string" => Some(valueForString)
           case _ => None
         }
-        if (substitutionValue != None) {
-          acc.withColumn(columnName, coalesce(col(columnName), lit(substitutionValue).cast(df.schema.getDataType(columnName))))
-        } else {
-          acc
-        }
+        substitutionValue
+          .map(v => acc.withColumn(columnName, coalesce(col(columnName), lit(v).cast(df.schema.getDataType(columnName)))))
+          .getOrElse(acc)
     }
 
     dfNew
