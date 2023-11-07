@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
+import com.snowflake.snowpark.custom.SnowparkUtils
 import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -30,7 +31,7 @@ import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{Type, runtimeMirror, typeOf}
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
@@ -244,15 +245,7 @@ trait SnowparkDataType extends GenericDataType {
   override def makeNullable: SnowparkDataType
   override def toLowerCase: SnowparkDataType
   override def removeMetadata: SnowparkDataType = this // metadata is not existing in Snowpark
-  override def isNumeric: Boolean = {
-    val mirror = runtimeMirror(getClass.getClassLoader)
-    val classSymbol = mirror.staticClass(inner.getClass.getName)
-
-    val parentClassName = "com.snowflake.snowpark.types.NumericType"
-    val parentClassSymbol = mirror.staticClass(parentClassName)
-
-    classSymbol.baseClasses.contains(parentClassSymbol)
-  }
+  override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
 }
 case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
   override def makeNullable: SnowparkDataType = this
