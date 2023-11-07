@@ -23,7 +23,6 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.util.spark.DataFrameUtil.{normalizeToAscii, strCamelCase2LowerCaseWithUnderscores}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.Type
@@ -295,6 +294,7 @@ trait GenericDataType extends GenericTypedObject {
   def makeNullable: GenericDataType
   def toLowerCase: GenericDataType
   def removeMetadata: GenericDataType
+  def isNumeric: Boolean
 }
 
 /**
