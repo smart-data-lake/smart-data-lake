@@ -56,7 +56,7 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
         // Get correct substitution value
         val substitutionValue = df.schema.getDataType(columnName) match {
           case dt if dt.isNumeric => Some(valueForNumber)
-          case dt if dt.typeName == "string" => Some(valueForString)
+          case dt if dt.typeName.toLowerCase == "string" => Some(valueForString)
           case _ => None
         }
         substitutionValue
