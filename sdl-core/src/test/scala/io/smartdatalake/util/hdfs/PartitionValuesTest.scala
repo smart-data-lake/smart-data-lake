@@ -58,6 +58,14 @@ class PartitionValuesTest extends FunSuite {
         Seq(PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->1)))
     )
 
+    // more columns considered for ordering than available: ordering on available columns
+    val orderingDtCntTest = PartitionValues.getOrdering(Seq("dt","cnt","test"))
+    assert(
+      partValSeq.sorted(orderingDtCntTest)
+        ==
+        Seq(PartitionValues(Map("dt"->"20170101","cnt"->2)),PartitionValues(Map("dt"->"20181201","cnt"->1)),PartitionValues(Map("dt"->"20181201","cnt"->2)))
+    )
+
   }
 
   test("check expected partition values") {
