@@ -138,6 +138,6 @@ Therefore, SDLB gets a 404 and will fail the execution. The exception could be c
 ## Summary
 
 Congratulation, you just completed implementing a nice incremental loading mechanism!
+At the end, your departures.conf file should look something like [this](https://github.com/smart-data-lake/getting-started/tree/master/config/departures.conf.part-3b-solution)
 
-That's it from getting-started for now. We hope you enjoyed your first steps with SDLB. 
-For further information, check the rest of the documentation and the blog on this page!
+In the next step we are going to have a look at descriptive metadata...
