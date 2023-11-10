@@ -127,7 +127,23 @@ We will come back to the concept of feeds as our pipeline gets more complex.
 
 :::info
 Metadata is not just used to select the right feeds.
-Metadata can also help a lot in documenting your data pipelines and making its data lineage understandable and discoverable. 
+Metadata can also help a lot in documenting your data pipelines and making its data lineage understandable and discoverable. For instance, we can edit metadata in the dataobject  `ext-departures` with following configuration:
+
+```
+  ext-departures {
+    type = WebserviceFileDataObject
+    url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653"
+    readTimeoutMs=200000
+    metadata = {
+          name = "Flight Departures Web Download"
+          description = "OpenSky Network flight departures"
+          layer = "extern"
+          subjectArea = "flight data"
+          tags = ["aviation", "flight", "departures"]
+    }
+  }
+```
+Now let us check [UI](https://ui-demo.smartdatalake.ch/#/config/dataObjects/ext-departures), where the given information in metadata are visualized for `ext-departures`.
 :::
 
 
