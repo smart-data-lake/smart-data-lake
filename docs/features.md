@@ -108,5 +108,5 @@ More details on the roadmap will follow shortly.
 * Comprehensive data flow dashboard
 * Config viewer with data catalog and DAG 
 * User-friendly and interactive interface
-* [UI Demo](https://ui-demo.smartdatalake.ch/) with [getting-started](/getting-started/setup) use case to start with 
+* [UI Demo](https://ui-demo.smartdatalake.ch/) with [getting-started](getting-started/setup) use case to start with 
 

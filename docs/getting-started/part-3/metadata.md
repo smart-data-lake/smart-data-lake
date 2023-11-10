@@ -77,6 +77,6 @@ actionName {
 Feeds in metadata are instrumental in selecting the right actions to run. During SDL execution, actions corresponding to certain feeds can be specified. Multiple actions can be associated with the same feed, allowing for more granular control over the execution of the data pipeline.
 
 ## Try it out
-Now let us experiment with editing metadata for DataObjects and Actions from the [solution](../config-examples/application-part3-download-incremental-mode.conf) in the previous section. Customize metadata based on your understanding of different data, and modify feeds to run parts of the data pipeline selectively. The final configuration file could resemble [this](../config-examples/application-part3-with-metadata.conf).
+Now let us experiment with editing metadata for DataObjects and Actions from the [solution](../config-examples/application-part3-download-incremental-mode.conf) in the previous section. Customize metadata based on your understanding of different data, and modify feeds to run parts of the data pipeline selectively. The final configuration file could resemble [this](../config-examples/application-part3-with-meatdata.conf).
 
 In conclusion, metadata is the unsung hero of Smart Data Lake management, enabling organizations to not only organize and process data efficiently but also to ensure data quality and support advanced analytics. With its versatile applications, metadata proves to be a important player in the evolving landscape of data management.
