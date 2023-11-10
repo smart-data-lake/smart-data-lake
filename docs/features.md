@@ -105,7 +105,8 @@ More details on the roadmap will follow shortly.
 * Delete, or archive & compact partitions according to configurable expressions
 
 ## UI Tool 
-* Comprehensive ata flow ashboard
+* Comprehensive data flow dashboard
 * Config viewer with data catalog and DAG 
-* User-friendly and interactive interface 
+* User-friendly and interactive interface
+* [UI Demo](https://ui-demo.smartdatalake.ch/) with [getting-started](/getting-started/setup) use case to start with 
 
