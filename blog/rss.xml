@@ -4,10 +4,77 @@
         <title>Smart Data Lake Builder Blog</title>
         <link>https://www.smartdatalake.ch/blog</link>
         <description>Smart Data Lake Builder Blog</description>
-        <lastBuildDate>Thu, 08 Jun 2023 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Sun, 17 Sep 2023 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Data Mesh with SDL]]></title>
+            <link>https://www.smartdatalake.ch/blog/sdl-data-mesh</link>
+            <guid>sdl-data-mesh</guid>
+            <pubDate>Sun, 17 Sep 2023 00:00:00 GMT</pubDate>
+            <description><![CDATA[Build a Data Mesh with SDL]]></description>
+            <content:encoded><![CDATA[<p>Data Mesh is an emerging concept gaining momentum across organizations.
+It is often described as a <em>sociotechnical</em> paradigm because a paradigm shift towards Data Mesh does not simply involve
+technological changes but also has sociological implications.
+As such, discussing a technical framework like Smart Data Lake Builder and analyzing how well it fits the
+Data Mesh paradigm can inherently only be part of the whole picture.
+Nevertheless, we want to do the exercise here to see how a technological framework can support the adoption.</p><p>In this article, we'll explore how the Smart Data Lake Builder aligns with the four principles as outlined by
+<a href="https://martinfowler.com/articles/data-mesh-principles.html" target="_blank" rel="noopener noreferrer">Zhamak Dehghani</a>
+and assess which key concepts it supports. </p><p>Please note that we expect some familiarity with the Data Mesh principles to follow along.
+There are plenty of resources (books from <a href="https://www.oreilly.com/library/view/data-mesh/9781492092384/" target="_blank" rel="noopener noreferrer">O'Reilly</a>
+and <a href="https://www.manning.com/books/data-mesh-in-action" target="_blank" rel="noopener noreferrer">Manning</a>,
+<a href="https://martinfowler.com/articles/data-mesh-principles.html" target="_blank" rel="noopener noreferrer">articles</a>
+and <a href="https://www.datamesh-architecture.com/" target="_blank" rel="noopener noreferrer">dedicated websites</a>) if you want to dive deeper into the topic.</p><h2 class="anchor anchorWithStickyNavbar_LWe7" id="domain-ownership">Domain Ownership<a class="hash-link" href="#domain-ownership" title="Direct link to heading">​</a></h2><p><em>Individual domains or business units are responsible for the data they generate and maintain,
+fostering a sense of ownership and accountability.</em></p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="scale-out-complexity">Scale Out Complexity<a class="hash-link" href="#scale-out-complexity" title="Direct link to heading">​</a></h3><p>With a Data Mesh, your data organization can scale out as the centralized data team gets reduced.
+With increased usage, you will have more data sources, more consumers, more interfaces and with that,
+a large variety of systems and technologies. </p><p><em>SDLB</em> comes with a large set of connectors out-of-the-box with the addition of
+<a href="https://airbyte.com/connectors?connector-type=Sources" target="_blank" rel="noopener noreferrer">Airbyte</a> source connectors.
+Anything missing can be easily implemented as the whole ecosystem is open and builds on open standards.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="continuous-change">Continuous change<a class="hash-link" href="#continuous-change" title="Direct link to heading">​</a></h3><p>Data Mesh embraces continuous change in your Data Products.
+Changing source systems or additional requirements all require you to adapt (quickly).</p><p><em>SDLB</em> is built for changes.
+With built-in schema evolution, changing schemas can be handled automatically.
+Thanks to the declarative approach, adding additional data objects can be done in minutes
+and the dependencies don't need to be defined by hand.</p><h2 class="anchor anchorWithStickyNavbar_LWe7" id="data-as-a-product">Data as a Product<a class="hash-link" href="#data-as-a-product" title="Direct link to heading">​</a></h2><p><em>Data is treated as a product, with clear documentation, standardized interfaces,
+and well-defined quality measures to ensure its usability and value.</em></p><p>It's important to note that in the end, data products can be implemented in different technologies
+as long as they adhere to the agreed upon interfaces.</p><p>Again, there are different aspects where <em>SDLB</em> can help.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="data-quality">Data Quality<a class="hash-link" href="#data-quality" title="Direct link to heading">​</a></h3><p>A Data Product has well-defined quality measures and should define Service-Level Objectives (SLOs).</p><p><em>SDLB</em> builds data quality into your pipelines.
+It supports <a href="/docs/reference/dataQuality#constraints">constraints</a> and
+<a href="/docs/reference/dataQuality#expectations">expectations</a>
+that are evaluated each time a pipeline is executed instead of having downstream checks after the execution.</p><p><em>SDLB</em> also gathers metrics with every run.
+With the metrics gathered, you can detect anomalies like number of records or bytes written.
+These are often helpful in finding latent problems in your data pipeline.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="schema-enforcement">Schema enforcement<a class="hash-link" href="#schema-enforcement" title="Direct link to heading">​</a></h3><p>As another aspect of quality, you expect your source system to adhere to the agreed interface.</p><p><em>SDLB</em> supports schema validation for all its data objects.
+In your configuration, you can (optionally) define a schema and enforce it.
+This saves you from surprises if an upstream system suddenly changes the schema of a data object you use.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="lineage">Lineage<a class="hash-link" href="#lineage" title="Direct link to heading">​</a></h3><p>To provide transparency about the origin and transformations of data in your Data Product,
+a lineage diagram can greatly help.</p><p><em>SDLB</em> is a metadata driven framework.
+You define Data Objects, you define Actions between them. That's it.
+SDLB will figure out the dependencies at runtime but they can also be easily displayed from static configurations.
+This is done i.e. in our <a href="https://github.com/smart-data-lake/sdl-visualization" target="_blank" rel="noopener noreferrer">sdl-visualization</a>, see also the <a href="https://ui-demo.smartdatalake.ch/" target="_blank" rel="noopener noreferrer">UI-Demo</a>.
+SDL configuration files can be easily displayed and analyzed.
+This provides the needed transparency of a Data Product. </p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="interfaces">Interfaces<a class="hash-link" href="#interfaces" title="Direct link to heading">​</a></h3><p><em>SDLB</em> offers many standard Data Objects for all kinds of interfaces.
+With the declarative approach and schema enforcement, you can make sure that your data always adheres to the
+defined interface specification.</p><p>Often in Cloud Environments, we work with Delta or Iceberg Tables today.
+These open standards are a powerful tool to share your Data Product, even in multicloud deployments.</p><h2 class="anchor anchorWithStickyNavbar_LWe7" id="self-serve-infrastructure-platform">Self-Serve infrastructure platform<a class="hash-link" href="#self-serve-infrastructure-platform" title="Direct link to heading">​</a></h2><p><em>Data infrastructure is designed to be self-serve, enabling teams to access and manage their data autonomously without
+relying on central data teams.</em></p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="mobilize-more-developers">Mobilize more developers<a class="hash-link" href="#mobilize-more-developers" title="Direct link to heading">​</a></h3><p>With increased usage of the Mesh, you need more developers in your domain teams building Data Products.</p><p><em>SDLB</em> has an easy to learn, declarative approach that new users can learn quickly.
+It supports SQL, Scala and Python for the definition of transformations so your developers can still
+use the language they are most comfortable in.
+Complex logic and transformations like historization and deduplication are either built-in or can be extended
+in a generic way so your developers can leverage them easily.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="support-your-domain-teams">Support your domain teams<a class="hash-link" href="#support-your-domain-teams" title="Direct link to heading">​</a></h3><p>The self-serve infrastructure should support your domain team to quickly build new Data Products.</p><p><em>SDLB</em> is ideal to integrate into DevOps pipelines as all configurations are written in textfile based HOCON format.
+Even if you have custom code, it will be written in SQL, Scala or Python which also integrates well
+in any existing DevOps environments.
+It is designed to support code reviews, automated testing and deployment.
+With the right templates, your domain teams can set up new Data Products quickly.</p><h2 class="anchor anchorWithStickyNavbar_LWe7" id="federated-governance">Federated governance<a class="hash-link" href="#federated-governance" title="Direct link to heading">​</a></h2><p><em>Governance of data and its quality is distributed across domains, with a focus on collaboration, standardized practices,
+and federated decision-making processes to maintain data integrity and trust.</em></p><p>While many of the concepts for a federated governance are on an organizational level and not on a technical level,
+<em>SDLB</em> can again help on various points.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="data-catalogs">Data Catalogs<a class="hash-link" href="#data-catalogs" title="Direct link to heading">​</a></h3><p>When it comes to Data Catalogs, there is no open, agreed upon standard (yet). </p><p><em>SDLB</em>'s configuration files are open and can be visualized as mentioned before.
+The concepts of Data Objects and Actions are very similar to many Data Catalog notations and
+with that, they also integrate nicely in existing solutions.
+There is i.e. an exporter to <a href="https://atlas.apache.org/#/" target="_blank" rel="noopener noreferrer">Apache Atlas</a> which also builds the basis of
+<a href="https://azure.microsoft.com/en-us/products/purview" target="_blank" rel="noopener noreferrer">Azure Purview</a>.</p><h3 class="anchor anchorWithStickyNavbar_LWe7" id="encryption">Encryption<a class="hash-link" href="#encryption" title="Direct link to heading">​</a></h3><p>One aspect with increasing importance is privacy and compliance.
+For these topics, it helps to have a unified, generic implementation to prevent your domain teams to each
+start their own implementation. </p><p><em>SDLB</em> now supports encrypted columns that help i.e. with PII data (Personally Identifiable Information).</p><h1>Summary</h1><p>There are a lot of aspects to consider when adopting a Data Mesh, many of which are on a technical level.
+While you want to give your domain teams the independence to choose the technologies they know best,
+you still want a framework that is easy to learn, quick to adapt and open to work with any other Data Product.
+This article hopefully gave you a basic overview of how Smart Data Lake Builder can help you.</p>]]></content:encoded>
+            <category>data mesh</category>
+        </item>
         <item>
             <title><![CDATA[Housekeeping]]></title>
             <link>https://www.smartdatalake.ch/blog/sdl-housekeeping</link>
