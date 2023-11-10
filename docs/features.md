@@ -103,3 +103,9 @@ More details on the roadmap will follow shortly.
 
 ## Housekeeping
 * Delete, or archive & compact partitions according to configurable expressions
+
+## UI Tool 
+* Comprehensive ata flow ashboard
+* Config viewer with data catalog and DAG 
+* User-friendly and interactive interface 
+
