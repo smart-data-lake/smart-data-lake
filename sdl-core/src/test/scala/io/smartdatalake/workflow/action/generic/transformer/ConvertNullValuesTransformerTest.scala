@@ -21,10 +21,12 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.internal.SQLConf
 import org.scalatest.FunSuite
 
 class ConvertNullValuesTransformerTest extends FunSuite {
@@ -144,6 +146,162 @@ class ConvertNullValuesTransformerTest extends FunSuite {
 
     // check
     assert(transformedDf.collect == resultDf.collect)
+  }
+
+  test("no error for existing include columns (case insensitive)") {
+
+    // prepare
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "COLUMn3"))
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
+    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("na"), Some(2), Some(-1.0)), (Some("na"), Some(-1), Some(-1.0)))
+    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
+    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
+
+    // execute
+    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformedDf.collect == resultDf.collect)
+
+  }
+
+  test("error for non existing include columns (case insensitive)") {
+    // prepare
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "column3")) // column3 does not exists
+    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
+
+    // execute
+    val thrown = intercept[IllegalArgumentException] {
+      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+  }
+
+  test("no error for existing include columns (case sensitive)") {
+
+    // prepare
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "COLUMn3"))
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
+    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("na"), Some(2), Some(-1.0)), (Some("na"), Some(-1), Some(-1.0)))
+    val df = SparkDataFrame(initSeq.toDF("coluMN1", "colUMn2", "COLUMn3"))
+    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
+
+    // execute
+    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformedDf.collect == resultDf.collect)
+
+    // cleanup
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+
+  }
+
+  test("error for non existing include columns (case sensitive)") {
+    // prepare
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "column2"))
+    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
+
+    // execute
+    val thrown = intercept[IllegalArgumentException] {
+      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+
+    // cleanup
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
+  test("no error for existing exclude columns (case insensitive)") {
+
+    // prepare
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "colUMn2"))
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
+    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Some(-1.0)), (Option.empty[String], Option.empty[Int], Some(-1.0)))
+    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
+    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
+
+    // execute
+    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformedDf.collect == resultDf.collect)
+
+  }
+
+  test("error for non existing exclude columns (case insensitive)") {
+    // prepare
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "colUMn2", "column3")) // column3 does not exists
+    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
+
+    // execute
+    val thrown = intercept[IllegalArgumentException] {
+      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+  }
+
+  test("no error for existing exclude columns (case sensitive)") {
+
+    // prepare
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("colUMN1", "coLUmn2"))
+    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
+    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Some(-1.0)), (Option.empty[String], Option.empty[Int], Some(-1.0)))
+    val df = SparkDataFrame(initSeq.toDF("colUMN1", "coLUmn2", "column3"))
+    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
+
+    // execute
+    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    // check
+    assert(transformedDf.collect == resultDf.collect)
+
+    // cleanup
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+
+  }
+
+  test("error for non existing exclude columns (case sensitive)") {
+    // prepare
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "column2"))
+    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
+
+    // execute
+    val thrown = intercept[IllegalArgumentException] {
+      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+
+    // cleanup
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
 }
