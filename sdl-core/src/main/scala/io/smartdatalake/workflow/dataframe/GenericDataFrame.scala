@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
+import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -245,6 +245,12 @@ trait GenericSchema extends GenericTypedObject {
   def makeNullable: GenericSchema
   def toLowerCase: GenericSchema
   def removeMetadata: GenericSchema
+  def filterColumns(columnsFilterList: Seq[String], includeColumns: Boolean = true): Seq[String] = {
+    GenericSchemaUtil.filterColumns(this, columnsFilterList, includeColumns)
+  }
+  def columnExists(colName: String): Boolean = {
+    GenericSchemaUtil.columnExists(this, colName)
+  }
 }
 
 /**

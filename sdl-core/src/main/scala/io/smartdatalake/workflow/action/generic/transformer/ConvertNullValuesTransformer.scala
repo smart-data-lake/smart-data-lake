@@ -39,14 +39,23 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     require((includeColumns.isEmpty != excludeColumns.isEmpty) || (includeColumns.isEmpty && excludeColumns.isEmpty), "Conflicting parameters. Please use either includeColumns or excludeColumns, as simultaneous application is not supported.")
+
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
     // Filter column names
     val columnNames = (includeColumns, excludeColumns) match {
       case p if p._1.isEmpty && p._2.isEmpty => df.schema.columns
-      case p if p._1.nonEmpty && p._2.isEmpty => df.schema.columns.filter(includeColumns.contains)
-      case p if p._1.isEmpty && p._2.nonEmpty => df.schema.columns.filterNot(excludeColumns.contains)
+      case p if p._1.nonEmpty && p._2.isEmpty => {
+        // Check if the columns exist and return the filtered list
+        includeColumns.foreach(v => require(df.schema.columnExists(v), s"[${v}] does not exist in dataframe. Available columns are [${df.schema.columns.mkString(", ")}]."))
+        df.schema.filterColumns(includeColumns)
+      }
+      case p if p._1.isEmpty && p._2.nonEmpty => {
+        // Check if the columns exist and return the filtered list
+        excludeColumns.foreach(v => require(df.schema.columnExists(v), s"[${v}] does not exist in dataframe. Available columns are [${df.schema.columns.mkString(", ")}]."))
+        df.schema.filterColumns(excludeColumns, includeColumns = false)
+      }
       case _ => throw new IllegalArgumentException("includeColumns and excludeColumns are set. Use only one of the parameters at a time. ")
     }
 
