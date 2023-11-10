@@ -146,7 +146,7 @@ Metadata can also help a lot in documenting your data pipelines and making its d
 If we check [UI Demo](https://ui-demo.smartdatalake.ch/#/config/dataObjects/ext-departures), the given information in metadata are visualized for `ext-departures`.
 
 ![ext-deparures-config](ext-deparures-config.png)
-To have more idea about our UI Tool, please read our [bolg](../../../blog/2023-11-09-UI-Demo/2023-11-09-UI-Demo.md).
+To have more idea about our UI Tool, please read the [bolg](../../../blog/2023-11-09-UI-Demo/2023-11-09-UI-Demo.md).
 :::
 
 
