@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow
 
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -152,9 +153,10 @@ case class HadoopFileStateId(path: Path, appName: String, runId: Int, attemptId:
   def getSortAttrs: (Int, Int) = (runId, attemptId)
 }
 
+private case class IndexActionEntry(state: RuntimeEventState, dataObjects: Seq[DataObjectId])
 private case class IndexEntry(name: String, runId: Int, attemptId: Int, feedSel: String,
                       runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, runEndTime: Option[LocalDateTime],
-                      status: RuntimeEventState, actionStatus: Map[RuntimeEventState,Int],
+                      status: RuntimeEventState, actions: Map[ActionId,IndexActionEntry],
                       buildVersion: Option[String], appVersion: Option[String], path: String) {
   def toJson: String = {
     val str = ActionDAGRunState.toJson(this)
@@ -166,11 +168,12 @@ private object IndexEntry {
   def from(state: ActionDAGRunState, relativePath: String) = {
     implicit val localDateTimeOrdering: Ordering[LocalDateTime] = _ compareTo _
     val runEndTime = state.actionsState.values.flatMap(_.endTstmp).toSeq.sorted.lastOption
-    val actionsStatus = state.actionsState.values.groupBy(_.state).mapValues(_.size)
+    val actionsState = state.actionsState.mapValues(a => IndexActionEntry(a.state, a.dataObjectsState.map(_.dataObjectId)))
     IndexEntry(
       state.appConfig.appName, state.runId, state.attemptId, state.appConfig.feedSel,
       state.runStartTime, state.attemptStartTime, runEndTime,
-      state.finalState.get, actionsStatus, state.buildVersionInfo.map(_.version),
+      state.finalState.get, actionsState,
+      state.buildVersionInfo.map(_.version),
       state.appVersion, relativePath
     )
   }
