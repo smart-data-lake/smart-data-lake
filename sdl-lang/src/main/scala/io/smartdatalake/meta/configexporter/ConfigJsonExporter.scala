@@ -103,7 +103,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory).toSeq
       .map { p =>
         val dataObjectId = p.getPath.getName.split('.').head
-        val descriptions = HdfsUtil.readHadoopFile(p.getPath).lines().iterator().asScala
+        val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator
           .collect {
             case columnDescriptionRegex(name, description) =>
               (name, description.trim)

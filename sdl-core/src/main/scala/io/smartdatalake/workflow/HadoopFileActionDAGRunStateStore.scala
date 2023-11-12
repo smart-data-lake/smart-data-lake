@@ -22,7 +22,6 @@ package io.smartdatalake.workflow
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.HadoopFileActionDAGRunStateStore.indexEntryDelimiter
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
@@ -32,7 +31,7 @@ import java.time.LocalDateTime
 private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: String, appName: String, hadoopConf: Configuration) extends ActionDAGRunStateStore[HadoopFileStateId] with SmartDataLakeLogger {
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
-  private val indexFile = new Path(hadoopStatePath, "index.json")
+  private val indexFile = new Path(hadoopStatePath, "index")
   val currentStatePath: Path = new Path(hadoopStatePath, "current")
   val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
@@ -63,7 +62,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     if (state.isFinal && Environment.hadoopFileStateStoreIndexAppend) {
       val relativeFile = hadoopStatePath.toUri.relativize(filePath.toUri).toString
       val indexEntry = IndexEntry.from(state, relativeFile)
-      val newContent = indexEntry.toJson + "\n" + indexEntryDelimiter + "\n" // add separator to next record
+      val newContent = indexEntry.toJson + "\n"
       if (filesystem.exists(indexFile)) {
         try {
           HdfsUtil.appendHadoopFile(indexFile, newContent)
@@ -157,8 +156,10 @@ private case class IndexEntry(name: String, runId: Int, attemptId: Int, feedSel:
                       runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, runEndTime: Option[LocalDateTime],
                       status: RuntimeEventState, actionStatus: Map[RuntimeEventState,Int],
                       buildVersion: Option[String], appVersion: Option[String], path: String) {
-  def toJson(): String = {
-    ActionDAGRunState.toJson(this)
+  def toJson: String = {
+    val str = ActionDAGRunState.toJson(this)
+    assert(str.linesIterator.size == 1) // index entry should be serialized to one json line!
+    str
   }
 }
 private object IndexEntry {
@@ -177,5 +178,4 @@ private object IndexEntry {
 
 private[smartdatalake] object HadoopFileActionDAGRunStateStore {
   val fileNamePartSeparator = "."
-  val indexEntryDelimiter = "---"
 }

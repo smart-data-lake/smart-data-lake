@@ -32,6 +32,8 @@ import org.scalatest.FunSuite
 import java.nio.file.Files
 import java.time.{Duration, LocalDateTime}
 
+import scala.collection.JavaConverters._
+
 class ActionDAGRunTest extends FunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
@@ -84,15 +86,15 @@ class ActionDAGRunTest extends FunSuite {
     // write first state
     {
       stateStore.saveState(state)
-      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
-      assert(index.split(HadoopFileActionDAGRunStateStore.indexEntryDelimiter).length == 1)
+      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index").toString)(session.sparkContext.hadoopConfiguration)
+      assert(index.linesIterator.count(_.trim.nonEmpty) == 1)
     }
 
     // write second state
     {
       stateStore.saveState(state)
-      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
-      assert(index.split(HadoopFileActionDAGRunStateStore.indexEntryDelimiter).length == 2)
+      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index").toString)(session.sparkContext.hadoopConfiguration)
+      assert(index.linesIterator.count(_.trim.nonEmpty) == 2)
     }
   }
 }

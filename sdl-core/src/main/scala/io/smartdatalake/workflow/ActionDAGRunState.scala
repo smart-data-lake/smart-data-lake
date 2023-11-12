@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, Runtime
 import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization.{read, writePretty}
+import org.json4s.jackson.Serialization.{read, write, writePretty}
 import org.reflections.Reflections
 
 import java.time.{Duration, LocalDateTime}
@@ -114,7 +114,8 @@ private[smartdatalake] object ActionDAGRunState {
   }
 
   def toJson(entry: IndexEntry): String = {
-    writePretty(entry)
+    // index entry should be written compact in one line (not pretty)
+    write(entry)
   }
 
   // read state from json
