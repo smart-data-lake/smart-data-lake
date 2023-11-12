@@ -36,6 +36,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicExceptio
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
+import java.sql.Timestamp
 import scala.collection.JavaConverters._
 
 /**
@@ -218,7 +219,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
     // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"Analyze table ${table.fullName}.")
-      HiveUtil.analyze(table, partitions, partitionValues)
+      val simpleColumns = SparkSchema(dfPrepared.schema).filter(_.dataType.isSimpleType).columns
+      HiveUtil.analyze(table, simpleColumns, partitions, partitionValues)
     }
 
     // make sure empty partitions are created as well
@@ -294,6 +296,51 @@ case class HiveTableDataObject(override val id: DataObjectId,
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     HiveUtil.dropTable(table, hadoopPath, filesystem = Some(filesystem))
+  }
+
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      val pathStats = HdfsUtil.getPathStats(hadoopPath)(filesystem)
+      val lastModifiedAt = pathStats.get(TableStatsType.LastModifiedAt.toString).map(_.asInstanceOf[Long])
+      var catalogStats = HiveUtil.getCatalogStats(table)(context.sparkSession)
+      val lastAnalyzedAt = catalogStats.get(TableStatsType.LastAnalyzedAt.toString).map(_.asInstanceOf[Long])
+      // analyze only if table is modified after it was last analyzed
+      if (update && lastModifiedAt.isDefined && (lastAnalyzedAt.isEmpty || lastAnalyzedAt.exists(lastModifiedAt.get > _))) {
+        HiveUtil.analyzeTable(table)(context.sparkSession)
+      }
+      val columnStats = getColumnStats(update, lastModifiedAt)
+      // get catalog stats again, as they might have changed through analyzeTable or getColumnStats
+      catalogStats = HiveUtil.getCatalogStats(table)(context.sparkSession)
+      pathStats ++ getPartitionStats ++ HiveUtil.getCatalogStats(table)(context.sparkSession) + (TableStatsType.Columns.toString -> columnStats)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get table stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map(TableStatsType.Info.toString -> e.getMessage)
+    }
+  }
+
+  override def getColumnStats(update: Boolean = false, lastModifiedAt: Option[Long] = None)(implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = {
+    try {
+      val catalogStats = HiveUtil.getCatalogStats(table)(context.sparkSession)
+      val lastAnalyzedColumnsAt = catalogStats.get(TableStatsType.LastAnalyzedColumnsAt.toString).map(_.asInstanceOf[Long])
+      // analyze only if table is modified after it was last analyzed
+      if (update && lastModifiedAt.isDefined && (lastAnalyzedColumnsAt.isEmpty || lastAnalyzedColumnsAt.exists(lastModifiedAt.get > _))) {
+        val sizeInBytes = catalogStats(TableStatsType.TableSizeInBytes.toString).asInstanceOf[BigInt]
+        val metadata = context.sparkSession.sessionState.catalog.getTableMetadata(table.tableIdentifier)
+        val simpleColumns = SparkSchema(metadata.schema).filter(_.dataType.isSimpleType).columns
+        if (sizeInBytes <= Environment.analyzeTableColumnMaxBytesThreshold) {
+          HiveUtil.analyzeTableColumns(table, simpleColumns)(context.sparkSession)
+        } else {
+          logger.warn(s"($id) Columns stats not calculated because table size ($sizeInBytes Bytes) is bigger than setting analyzeTableColumnMaxBytesThreshold (${Environment.analyzeTableColumnMaxBytesThreshold} Bytes)")
+        }
+      }
+      // get columns stats from table
+      HiveUtil.getCatalogColumnStats(table)(context.sparkSession)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map()
+    }
   }
 
   override def factory: FromConfigFactory[DataObject] = HiveTableDataObject

@@ -19,23 +19,31 @@
 
 package io.smartdatalake.meta.configexporter
 
+import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.ColumnStatsType
+import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
+import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataobject.HiveTableDataObject
 import org.apache.commons.io.FileUtils
-import org.json4s.StringInput
-import org.json4s.jackson.JsonMethods
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.json4s.{Formats, NoTypeHints, StringInput}
+import org.json4s.jackson.{JsonMethods, Serialization}
 import org.scalatest.FunSuite
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths}
-import scala.io.Source
-import scala.util.Using
+import java.nio.file.{Files, Paths}
 
 class DataObjectSchemaExporterTest extends FunSuite {
 
+  val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
+
   test("export simple schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath), includeRegex = "dataObjectCsv1")
-    val actualOutput = DataObjectSchemaExporter.exportSchemas(exporterConfig).head
-    assert(actualOutput._1.id == "dataObjectCsv1")
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectCsv1", exportPath = "./target/schema")
+    DataObjectSchemaExporter.exportSchemas(exporterConfig)
+    val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectCsv1", "schema", Paths.get(exporterConfig.exportPath))
 
     val expectedFieldsJson = """
       |  [ {
@@ -53,14 +61,14 @@ class DataObjectSchemaExporterTest extends FunSuite {
       |  } ]
       |""".stripMargin
     val expectedFields = JsonMethods.parse(StringInput(expectedFieldsJson)).values
-    val actualFields = JsonMethods.parse(StringInput(actualOutput._2)).values
+    val actualFields = JsonMethods.parse(StringInput(actualOutput.get)).values
     assert(actualFields == expectedFields)
   }
 
   test("export complex schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath), includeRegex = "dataObjectParquet6")
-    val actualOutput = DataObjectSchemaExporter.exportSchemas(exporterConfig).head
-    assert(actualOutput._1.id == "dataObjectParquet6")
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", exportPath = "./target/schema")
+    DataObjectSchemaExporter.exportSchemas(exporterConfig)
+    val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectParquet6", "schema", Paths.get(exporterConfig.exportPath))
     val expectedFieldsJson =
       """
         |  [ {
@@ -103,14 +111,14 @@ class DataObjectSchemaExporterTest extends FunSuite {
         |  } ]
         |""".stripMargin
     val expectedFields = JsonMethods.parse(StringInput(expectedFieldsJson)).values
-    val actualFields = JsonMethods.parse(StringInput(actualOutput._2)).values
+    val actualFields = JsonMethods.parse(StringInput(actualOutput.get)).values
     assert(actualFields == expectedFields)
   }
 
   test("test main with includes and excludes, dont update if same") {
     val path = "target/schema"
     FileUtils.deleteDirectory(new File(path))
-    DataObjectSchemaExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getPath, "-p", path, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
+    DataObjectSchemaExporter.main(Array("-c", configPath, "-p", path, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
     assert(new File(path).listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
     assert(new File(path).listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
   }
@@ -121,21 +129,38 @@ class DataObjectSchemaExporterTest extends FunSuite {
     FileUtils.deleteDirectory(path.toFile)
     Files.createDirectories(path)
     // first write
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), "abc", path)
-    assert(readIndex(dataObjectId, path).length==1)
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), SparkSchema(StructType(Seq(StructField("a", StringType)))), path)
+    assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length==1)
     Thread.sleep(1000)
     // second write -> no update
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), "abc", path)
-    assert(readIndex(dataObjectId, path).length == 1)
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), SparkSchema(StructType(Seq(StructField("a", StringType)))), path)
+    assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 1)
     Thread.sleep(1000)
     // third write -> update
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), "abcd", path)
-    assert(readIndex(dataObjectId, path).length == 2)
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), SparkSchema(StructType(Seq(StructField("a", IntegerType)))), path)
+    assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 2)
   }
 
-  def readIndex(dataObjectId: DataObjectId, path: Path): Seq[String] = {
-    Using(Source.fromFile(path.resolve(s"${dataObjectId.id}.index").toFile)) {
-      _.getLines().toList.filter(_.trim.nonEmpty)
-    }.get
+  test("export statistics ") {
+    val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(Seq(configPath))
+    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(registry)
+    val session = context.sparkSession
+    import session.implicits._
+    // prepare data object
+    val hiveDO = registry.get[HiveTableDataObject](DataObjectId("dataObjectHive14"))
+    hiveDO.dropTable
+    val df = Seq(("ext", "doe", "john", ComplexTypeTest("a", 5)), ("ext", "smith", "peter", ComplexTypeTest("a", 3)), ("int", "emma", "brown", ComplexTypeTest("a", 7)))
+      .toDF("type", "lastname", "firstname", "complex")
+    hiveDO.writeSparkDataFrame(df, Seq())
+    // export
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectHive14", exportPath = "./target/schema")
+    DataObjectSchemaExporter.exportSchemas(exporterConfig)
+    // read stats and check
+    implicit val formats: Formats = Serialization.formats(NoTypeHints)
+    val latestStats = DataObjectSchemaExporter.getLatestData(hiveDO.id, "stats", Paths.get(exporterConfig.exportPath))
+      .map(Serialization.read[Map[String, Any]]).get
+    assert(latestStats.apply("columns").asInstanceOf[Map[String,Any]]
+      .apply("lastname").asInstanceOf[Map[String,Any]]
+      .apply(ColumnStatsType.DistinctCount.toString) == 3)
   }
 }

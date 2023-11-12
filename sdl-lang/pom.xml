@@ -127,6 +127,27 @@
             <artifactId>scalatest_${scala.minor.version}</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--		 sdl-core test utils-->
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-core_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+            <classifier>test-jar</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.tomakehurst</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>2.25.1</version>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 

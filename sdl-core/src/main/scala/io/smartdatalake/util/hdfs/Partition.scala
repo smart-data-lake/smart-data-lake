@@ -172,6 +172,14 @@ object PartitionValues {
     val ordering = getOrdering(partitionCols)
     partitionValues.sorted(ordering)
   }
+
+  def fromString(str: String): PartitionValues = {
+    val elements = str.split('/').map { e =>
+      val Array(k,v) = e.split('=')
+      (k,v)
+    }.toMap
+    PartitionValues(elements)
+  }
 }
 
 /**

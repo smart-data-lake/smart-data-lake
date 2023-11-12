@@ -68,11 +68,15 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
 
-  def infos: Map[String,String] = {
+  /**
+   * Returns information about this DataObject, such as statistics, table name, ...
+   * @param updateStats if true, more costly operations such as "analyze table" are executed before returning results.
+   */
+  def infos(updateStats: Boolean = false): Map[String,String] = {
     Seq(
       Some(dataObject).collect{case o: TableDataObject => ("table", o.table.fullName)},
       Some(dataObject).collect{case o: FileRefDataObject => ("path", o.getPath(context))}
-    ).flatten.toMap
+    ).flatten.toMap ++ dataObject.getStats(updateStats)(context).mapValues(_.toString)
   }
 
   def partitionColumns: Seq[String] = dataObject match {

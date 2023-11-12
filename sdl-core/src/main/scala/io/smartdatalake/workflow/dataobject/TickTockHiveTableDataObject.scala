@@ -194,7 +194,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
-      HiveUtil.analyze(table, partitions, partitionValues)
+      val simpleColumns = SparkSchema(dfPrepared.schema).filter(_.dataType.isSimpleType).columns
+      HiveUtil.analyze(table, simpleColumns, partitions, partitionValues)
     }
 
     // return

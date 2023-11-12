@@ -22,14 +22,12 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 /**
  * This is the root trait for every DataObject.
@@ -126,6 +124,22 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
     implicit val registryImpl: InstanceRegistry = registry
     getConnection[T](connectionId)
   }
+
+  /**
+   * Returns statistics about this DataObject from the catalog. Depending on it's type this can be (see also [[io.smartdatalake.definitions.TableStatsType]])
+   * - sizeInBytes
+   * - numFiles
+   * - numRows
+   * - numPartitions, minPartition, maxPartition
+   * - createdAt
+   * - lastModifiedAt
+   * - lastCommitMsg
+   * - location
+   * - columns -> column statistics
+   * @param update if true, more costly operations such as "analyze table" are executed before returning results.
+   * @return a map with statistics about this DataObject
+   */
+  def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String,Any] = Map()
 
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"

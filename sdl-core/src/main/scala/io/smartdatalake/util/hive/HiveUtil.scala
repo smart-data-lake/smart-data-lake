@@ -18,9 +18,10 @@
  */
 package io.smartdatalake.util.hive
 
-import io.smartdatalake.definitions.{Environment, HiveTableLocationSuffix, OutputType}
+import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
+import io.smartdatalake.util.misc.PerformanceUtils.measureTime
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataobject.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -28,6 +29,7 @@ import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 import java.net.URI
+import java.time.Instant
 import scala.sys.process.{ProcessLogger, _}
 import scala.util.{Failure, Success, Try}
 
@@ -35,18 +37,6 @@ import scala.util.{Failure, Success, Try}
  * Provides utility functions for Hive.
  */
 private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
-
-  /**
-   * Creates a String by concatenating all column names of a table. 
-   * Columns are seperated by ','.
-   *
-   * @param table Hive table
-   */
-  def tableColumnsString(table: Table)(implicit session: SparkSession): String = {
-    import session.implicits._ // Workaround for
-    val tableSchema = execSqlStmt(s"show columns in ${table.fullName}")
-    tableSchema.map(c => c(0).toString.replace(" ","").toLowerCase).collect.mkString(",")
-  }
 
   /**
    * Deletes a Hive table
@@ -72,8 +62,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    */
   def analyzeTable(table: Table)(implicit session: SparkSession): Unit = {
     val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS"
-    Try(execSqlStmt(stmt)) match {
-      case Success(_) => logger.info(s"Gathered table-level statistics on table ${table.fullName}")
+    Try(measureTime(execSqlStmt(stmt))) match {
+      case Success((_,t)) =>
+        alterTableProperties(table, Map(TableStatsType.LastAnalyzedAt.toString -> Instant.now().toEpochMilli))
+        logger.info(s"Gathered table-level statistics on table ${table.fullName} in $t seconds")
       case Failure(throwable) => logger.error(throwable.getMessage)
         throw new AnalyzeTableException(s"Error running: $stmt")
     }
@@ -85,12 +77,15 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param table Hive table
    * @param columns Columns to collect statistics from
    */
-  def analyzeTableColumns(table: Table, columns: String)(implicit session: SparkSession): Unit = {
-    val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS FOR COLUMNS $columns"
-    Try(execSqlStmt(stmt)) match {
-      case Success(_) => logger.info(s"Gathered column-level statistics on table ${table.fullName}")
-      case Failure(throwable) => logger.error(throwable.getMessage)
-        throw new AnalyzeTableException(s"Error running: $stmt")
+  def analyzeTableColumns(table: Table, columns: Seq[String] = Seq(), partitionValue: Option[PartitionValues] = None )(implicit session: SparkSession): Unit = {
+    val columnsClause = if (columns.nonEmpty) s"COLUMNS ${columns.mkString(",")}" else "ALL COLUMNS"
+    val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS FOR $columnsClause"
+    Try(measureTime(execSqlStmt(stmt))) match {
+      case Success((_,t)) =>
+        alterTableProperties(table, Map(TableStatsType.LastAnalyzedColumnsAt.toString -> Instant.now().toEpochMilli))
+        logger.info(s"Gathered column-level statistics on table ${table.fullName} in $t seconds")
+      case Failure(e) => logger.error(s"${e.getClass.getSimpleName}: ${e.getMessage}")
+        throw new AnalyzeTableException(s"Error ${e.getClass.getSimpleName} ${e.getMessage} running: $stmt")
     }
   }
 
@@ -137,8 +132,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       val stmt = s"ANALYZE TABLE ${table.fullName} PARTITION($partitionSpec) COMPUTE STATISTICS"
       Try(execSqlStmt(stmt)) match {
         case Success(_) => logger.info(s"Gathered partition-level statistics for $partitionSpec on table ${table.fullName}")
-        case Failure(throwable) => logger.error(throwable.getMessage)
-          throw new AnalyzeTableException(s"Error running: $stmt")
+        case Failure(e) => logger.error(s"${e.getClass.getSimpleName}: ${e.getMessage}")
+          throw new AnalyzeTableException(s"Error ${e.getClass.getSimpleName} ${e.getMessage} running: $stmt")
       }
     }
   }
@@ -443,19 +438,33 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * Collects table statistics for table or table with partitions
    *
    * @param table Hive table
+   * @param columns: Columns to analyse
    * @param partitionCols Partitioned columns
    * @param partitionValues Partition values
    */
-  def analyze(table: Table, partitionCols: Seq[String], partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
-    // If partitions are present, statistics can't be collected for the table itself
-    // only for partitions or columns
-    val columns = tableColumnsString(table)
-    if (partitionCols.isEmpty){
-      analyzeTableColumns(table, columns)
+  def analyze(table: Table, columns: Seq[String], partitionCols: Seq[String], partitionValues: Seq[PartitionValues] = Seq())(implicit session: SparkSession): Unit = {
+    if (partitionCols.isEmpty) {
       analyzeTable(table)
+      val stats = getCatalogStats(table)
+      val sizeInBytes = stats(TableStatsType.TableSizeInBytes.toString).asInstanceOf[BigInt]
+      if (sizeInBytes <= Environment.analyzeTableColumnMaxBytesThreshold) {
+        analyzeTableColumns(table, columns)
+      } else {
+        logger.warn(s"Column stats for table ${table.fullName} not calculated because table size ($sizeInBytes Bytes) is bigger than setting analyzeTableColumnMaxBytesThreshold (${Environment.analyzeTableColumnMaxBytesThreshold} Bytes)")
+      }
     } else {
       analyzeTablePartitions(table, partitionCols, partitionValues)
-      analyzeTableColumns(table, columns)
+      // sum size for all partitions
+      val sizeInBytes = listPartitions(table, partitionCols)
+        .map(pv => getCatalogPartitionStats(table, pv))
+        .flatMap(s => s.get(TableStatsType.TableSizeInBytes.toString).map(_.asInstanceOf[BigInt])).sum
+      // Note that computing column statistics for selected partitions only is *not* supported by Spark, it will always analyze the whole table
+      // see also log "WARN SparkSqlAstBuilder - Partition specification is ignored when collecting column statistics" when calling ANALYZE TABLE with PARTITION and COLUMN clause.
+      if (sizeInBytes <= Environment.analyzeTableColumnMaxBytesThreshold) {
+        analyzeTableColumns(table, columns)
+      } else {
+        logger.warn(s"Column stats for table ${table.fullName} not calculated because table size ($sizeInBytes Bytes) is bigger than setting analyzeTableColumnMaxBytesThreshold (${Environment.analyzeTableColumnMaxBytesThreshold} Bytes)")
+      }
     }
   }
 
@@ -643,6 +652,83 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     HdfsUtil.moveFiles( existingPartitionPathWithFilenameGlobs, newPartitionPath, addPrefixIfExisting = true)(filesystem)
     dropPartition(table, tablePath, existingPartition, filesystem)
     execSqlStmt(s"ALTER TABLE ${table.fullName} ADD IF NOT EXISTS PARTITION ($newPartitionDef)")
+  }
+
+  /**
+   * Note: this works only for tables in the Hive Metastore
+   */
+  def getCatalogStats(table: Table)(implicit session: SparkSession): Map[String,Any] = {
+    val metadata = session.sessionState.catalog.getTableMetadata(table.tableIdentifier)
+    val catalogStats = metadata.stats.map( stats =>
+      Seq(stats.rowCount.map(v => TableStatsType.NumRows.toString -> v), Some(TableStatsType.TableSizeInBytes.toString -> stats.sizeInBytes)).flatten.toMap
+    ).getOrElse(Map())
+    val lastAnalyzedAt = metadata.properties.get(TableStatsType.LastAnalyzedAt.toString).map(v => v.toLong)
+    val lastAnalyzedColumnsAt = metadata.properties.get(TableStatsType.LastAnalyzedColumnsAt.toString).map(v => v.toLong)
+    val otherStats = Seq(Some(TableStatsType.CreatedAt.toString -> metadata.createTime), lastAnalyzedAt.map(v =>  TableStatsType.LastAnalyzedAt.toString -> v), lastAnalyzedColumnsAt.map(v =>  TableStatsType.LastAnalyzedColumnsAt.toString -> v)).flatten.toMap
+    otherStats ++ catalogStats
+  }
+
+  /**
+   * Note: this works only for tables in the Hive Metastore
+   */
+  def getCatalogPartitionStats(table: Table, partitionValues: PartitionValues)(implicit session: SparkSession): Map[String, Any] = {
+    val metadata = session.sessionState.catalog.getPartition(table.tableIdentifier, partitionValues.getMapString)
+    val catalogStats = metadata.stats.map(stats =>
+      Seq(stats.rowCount.map(v => TableStatsType.NumRows.toString -> v), Some(TableStatsType.TableSizeInBytes.toString -> stats.sizeInBytes)).flatten.toMap
+    ).getOrElse(Map())
+    catalogStats + (TableStatsType.CreatedAt.toString -> metadata.createTime)
+  }
+
+  /**
+   * Note: this works only for tables in the Hive Metastore
+   */
+  def getCatalogColumnStats(table: Table)(implicit session: SparkSession): Map[String, Map[String, Any]] = {
+    session.sessionState.catalog.getTableMetadata(table.tableIdentifier).stats.toSeq.flatMap(_.colStats).toMap
+      .mapValues (
+        stats => Seq(
+          stats.distinctCount.map(ColumnStatsType.DistinctCount.toString -> _),
+          stats.nullCount.map(ColumnStatsType.NullCount.toString -> _),
+          stats.avgLen.map(ColumnStatsType.AvgLen.toString -> _),
+          stats.maxLen.map(ColumnStatsType.MaxLen.toString -> _),
+          stats.min.map(ColumnStatsType.Min.toString -> _),
+          stats.max.map(ColumnStatsType.Max.toString -> _)
+        ).flatten.toMap
+      )
+  }
+
+  /**
+   * Note: this works only for tables in the Hive Metastore
+   */
+  def getCatalogPartitionColumnStats(table: Table, partitionValues: PartitionValues)(implicit session: SparkSession): Map[String, Map[String, Any]] = {
+    session.sessionState.catalog.getPartition(table.tableIdentifier, partitionValues.getMapString).stats.toSeq.flatMap(_.colStats).toMap
+      .mapValues(
+        stats => Seq(
+          stats.distinctCount.map(ColumnStatsType.DistinctCount.toString -> _),
+          stats.nullCount.map(ColumnStatsType.NullCount.toString -> _),
+          stats.avgLen.map(ColumnStatsType.AvgLen.toString -> _),
+          stats.maxLen.map(ColumnStatsType.MaxLen.toString -> _),
+          stats.min.map(ColumnStatsType.Min.toString -> _),
+          stats.max.map(ColumnStatsType.Max.toString -> _)
+        ).flatten.toMap
+      )
+  }
+
+  /**
+   * Query partitions from catalog
+   *
+   * Note that for Hive Metastore (HMD) this might not be the best solution, as it depends on up-to-date partition metadata in HMS!
+   * We can do a directory listing for Hive tables. But for Delta Lake directory listing is not suitable, as there might be directories contain only outdated records.
+   * In this case using the catalog is more efficient than quering them using a Spark DataFrame.
+   *
+   * @return
+   */
+  def getPartitionValuesFromCatalog(table: Table)(implicit session: SparkSession): Seq[PartitionValues] = {
+    val metadata = session.sessionState.catalog.listPartitions(table.tableIdentifier)
+    metadata.map(p => PartitionValues(p.spec))
+  }
+
+  def alterTableProperties(table: Table, properties: Map[String,Any])(implicit session: SparkSession): Unit = {
+    execSqlStmt(s"ALTER TABLE ${table.fullName} SET TBLPROPERTIES(${properties.map{case(k,v) => s"$k = '$v'"}.mkString(",")})")
   }
 
 }
