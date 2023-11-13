@@ -30,11 +30,11 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-    - name: JDK 11 Set
+    - name: JDK 17 Set
       uses: actions/setup-java@v2
       with:
         distribution: 'zulu'
-        java-version: 11
+        java-version: 17
     - name: Maven Cache
       uses: actions/cache@v3
       with:

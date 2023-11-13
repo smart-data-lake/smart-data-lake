@@ -28,11 +28,11 @@ jobs:
     - uses: actions/checkout@v3
       with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-    - name: Set up JDK 11
+    - name: Set up JDK 17
       uses: actions/setup-java@v2
       with:
         distribution: 'zulu'
-        java-version: 11
+        java-version: 17
     - name: Cache SonarCloud packages
       uses: actions/cache@v3
       with:
@@ -75,11 +75,11 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"          
-      - name: Set up JDK 11
+      - name: Set up JDK 17
         uses: actions/setup-java@v2
         with:
           distribution: 'zulu'
-          java-version: 11
+          java-version: 17
       - name: Cache Maven
         uses: actions/cache@v3
         with:
