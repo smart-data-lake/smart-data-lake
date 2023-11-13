@@ -28,28 +28,29 @@ In a first step, we want to make the airport data more understandable by removin
 Since we don't introduce any business logic into the transformation, 
 the resulting data object will reside in the integration layer and thus will be called *int-airports*.
 Put this in the existing `dataObjects` section:
-
-      int-airports {
-        type = CsvFileDataObject
-        path = "~{id}"
-      }
-
+```
+  int-airports {
+    type = CsvFileDataObject
+    path = "~{id}"
+  }
+```
 ## Define select-airport-cols action
 
 Next, add these lines in the existing actions section:
-
-      select-airport-cols {
-        type = CopyAction
-        inputId = stg-airports
-        outputId = int-airports
-        transformers = [{
-            type = SQLDfTransformer
-            code = "select ident, name, latitude_deg, longitude_deg from stg_airports"
-        }]
-        metadata {
-          feed = compute
-        }
-      }
+```
+  select-airport-cols {
+    type = CopyAction
+    inputId = stg-airports
+    outputId = int-airports
+    transformers = [{
+        type = SQLDfTransformer
+        code = "select ident, name, latitude_deg, longitude_deg from stg_airports"
+    }]
+    metadata {
+      feed = compute
+    }
+  }
+```
 A couple of things to note here:
 
 - We just defined a new action called *select-airport-cols*. 
@@ -166,7 +167,7 @@ podman run --rm sdl-spark:latest --help
 </Tabs>
 
 to see all options that are available. For your convenience, here is the current output of the help command:
-
+```
       -f, --feed-sel <operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]
                                Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
                                Operations:
@@ -207,7 +208,7 @@ to see all options that are available. For your convenience, here is the current
       -u, --username <value>   Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
       -k, --keytab-path <value>
                                Path to the Kerberos keytab file for authentication in local mode.
-
+```
 
 One popular option is to use regular expressions to execute multiple feeds together.
 In our case, we can run the entire data pipeline with the following command : 
@@ -234,7 +235,7 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 </TabItem>
 </Tabs>
 
-:::warning
+:::danger
 Note the regex feed selection .* need to be specified in quotation marks (`'.*'` or `".*"`), otherwise our system would substitute the asterisk.
 :::
 
@@ -258,15 +259,15 @@ You can do that with the option [jsonOptions](https://smartdatalake.ch/json-sche
 which allows you to directly pass on settings to Spark.
 
 In our case, we would end up with a faulty DataObject that looks like this:
-
-      stg-airports {
-        type = JsonFileDataObject
-        path = "~{id}"
-        jsonOptions {
-          "mode"="failfast"
-        }
-      }
-
+```
+  stg-airports {
+    type = JsonFileDataObject
+    path = "~{id}"
+    jsonOptions {
+      "mode"="failfast"
+    }
+  }
+```
 This time, it will fail with this error message:
 
     Exception in thread "main" io.smartdatalake.workflow.TaskFailedException: Task select-airport-cols failed. 

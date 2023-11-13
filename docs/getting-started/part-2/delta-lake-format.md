@@ -45,7 +45,7 @@ Smart Data Lake Builder supports this by the DeltaLakeTableDataObject, and this 
 
 Switching to Delta Lake format is easy with Smart Data Lake Builder, just replace `CsvFileDataObject` with `DeltaLakeTableDataObject` and define the table's db and name.
 Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`:
-
+```
     int-airports {
         type = DeltaLakeTableDataObject
         path = "~{id}"
@@ -72,9 +72,9 @@ Let's start by changing the existing definitions for `int-airports`, `btl-depart
             name = "btl_distances"
         }
     }
-
+```
 Then create a new, similar data object `int-departures`: 
-
+```
     int-departures {
         type = DeltaLakeTableDataObject
         path = "~{id}"
@@ -83,9 +83,9 @@ Then create a new, similar data object `int-departures`:
             name = int_departures
         }
     }
-    
+```
 Next, create a new action `prepare-departures` in the `actions` section to fill the new table with the data:
-
+```
     prepare-departures {
         type = CopyAction
         inputId = stg-departures
@@ -94,7 +94,7 @@ Next, create a new action `prepare-departures` in the `actions` section to fill 
             feed = compute
         }
     }
-
+```
 Finally, adapt the action definition for `join-departures-airports`:
 * change `stg-departures` to `int-departures` in inputIds
 * change `stg_departures` to `int_departures` in the first SQLDfsTransformer (watch out, you need to replace the string 4 times)
@@ -199,7 +199,7 @@ Can you guess why?
 This is because your last pipeline run used an internal metastore, and not the external metastore we started with docker-compose yet.
 To configure Spark to use our external metastore, add the following spark properties to the application.conf under global.spark-options. 
 You probably don't have a global section in your application.conf yet, so here is the full block you need to add at the top of the file:
-
+```
     global {
       spark-options {
         "spark.hadoop.javax.jdo.option.ConnectionURL" = "jdbc:derby://metastore:1527/db;create=true"
@@ -208,7 +208,7 @@ You probably don't have a global section in your application.conf yet, so here i
         "spark.hadoop.javax.jdo.option.ConnectionPassword" = "1234"
       }
     }
-
+```
 This instructs Spark to use the external metastore you started with docker-compose. 
 Your Smart Data Lake container doesn't have access to the other containers just yet. 
 So when you run your data pipeline again, you need to add a parameter `--network`/`--pod` to join the virtual network where the metastore is located:

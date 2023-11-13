@@ -1,3 +1,6 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ---
 id: transformations
 title: Transformations
@@ -290,7 +293,7 @@ For custom transformers, you can therefore provide additional options:
 
 
 ##### In SQL
-If you want to use options in SQL, the syntax is %{key}:
+If you want to use options in SQL, the syntax is %\{key}:
 ```
 transformers = [{
   type = SQLDfTransformer
@@ -312,5 +315,5 @@ This Map contains the combined `options` and `runtimeOptions`.
 So in your custom class, you can read all options and runtimeOptions and use them accordingly to parametrize your code.
 
 ##### In Python
-Similarly in Python, in addition to the variables `inputDf` and `dataObjectId` (resp. `inputsDfs'), you get a variable called `options`
+Similarly in Python, in addition to the variables `inputDf` and `dataObjectId` (resp. `inputsDfs`), you get a variable called `options`
 containing all `options` and `runtimeOptions`.
