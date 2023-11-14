@@ -30,6 +30,14 @@ object GenericSchemaUtil {
     else schema.columns.contains(colName.toLowerCase)
   }
 
+  /**
+   * Filters columns based on the provided criteria.
+   *
+   * @param schema            The generic schema containing columns.
+   * @param columnsFilterList The list of columns to include or exclude.
+   * @param includeColumns    If true, includes specified columns; if false, excludes them.
+   * @return A sequence of filtered column names.
+   */
   def filterColumns(schema: GenericSchema, columnsFilterList: Seq[String], includeColumns: Boolean = true): Seq[String] = {
     val columns = schema.columns
     val filteredColumns =
