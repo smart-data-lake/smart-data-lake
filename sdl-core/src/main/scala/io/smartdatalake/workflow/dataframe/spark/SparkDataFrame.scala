@@ -26,9 +26,9 @@ import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.apache.spark.sql._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
@@ -250,6 +250,7 @@ trait SparkDataType extends GenericDataType {
   override def toLowerCase: SparkDataType
   override def removeMetadata: SparkDataType
   override def isSimpleType: Boolean = false
+  override def isNumeric: Boolean = inner.isInstanceOf[NumericType]
 }
 case class SparkSimpleDataType(inner: DataType) extends SparkDataType {
   override def makeNullable: SparkDataType = this

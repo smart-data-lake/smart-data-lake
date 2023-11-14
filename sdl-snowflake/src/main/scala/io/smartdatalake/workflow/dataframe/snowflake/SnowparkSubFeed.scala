@@ -272,4 +272,9 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
     SnowparkSchema(StructType(fields.map(_.asInstanceOf[SnowparkField].inner)))
   }
+
+  override def coalesce(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SnowparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
 }

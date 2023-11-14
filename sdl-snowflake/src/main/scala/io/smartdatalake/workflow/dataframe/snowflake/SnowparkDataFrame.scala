@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
+import com.snowflake.snowpark.custom.SnowparkUtils
 import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -244,6 +245,7 @@ trait SnowparkDataType extends GenericDataType {
   override def makeNullable: SnowparkDataType
   override def toLowerCase: SnowparkDataType
   override def removeMetadata: SnowparkDataType = this // metadata is not existing in Snowpark
+  override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
 }
 case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
   override def makeNullable: SnowparkDataType = this

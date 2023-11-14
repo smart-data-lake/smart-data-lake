@@ -19,11 +19,11 @@
 
 package io.smartdatalake.workflow.snowflake
 
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
-import org.scalatest.FunSuite
-import org.apache.spark.sql.{types => spark}
 import com.snowflake.snowpark.{types => snowpark}
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkSchema, SnowparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import org.apache.spark.sql.{types => spark}
+import org.scalatest.FunSuite
 
 import scala.reflect.runtime.universe.typeOf
 
@@ -83,5 +83,21 @@ class SnowparkSchemaConverterTest extends FunSuite {
     // convert back to spark schema and check
     val convertedSparkSchema = convertedSnowparkSchema.convert(typeOf[SparkSubFeed])
     assert(sparkSchema == convertedSparkSchema)
+  }
+
+  test("test isNumeric function on snowflake dataframe") {
+
+    val expectedSnowparkSchema = SnowparkSchema(
+      snowpark.StructType(Seq(
+        snowpark.StructField("a", snowpark.StringType, false),
+        snowpark.StructField("b", snowpark.IntegerType, true),
+        snowpark.StructField("c", snowpark.DecimalType(10, 3), true),
+      ))
+    )
+
+    assert(expectedSnowparkSchema.getDataType("a").isNumeric == false)
+    assert(expectedSnowparkSchema.getDataType("b").isNumeric == true)
+    assert(expectedSnowparkSchema.getDataType("c").isNumeric == true)
+
   }
 }
