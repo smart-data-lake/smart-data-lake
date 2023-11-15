@@ -38,7 +38,7 @@ trait EncryptDecrypt {
   def keyAsBytes: Array[Byte]
 
   val cryptUDF: UserDefinedFunction = udf(encrypt _)
-  private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
+  private val ALGORITHM_STRING: String = "AES/GCM/NoPadding"
   private val IV_SIZE = 128
   private val TAG_BIT_LENGTH = 128
 
