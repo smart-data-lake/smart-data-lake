@@ -46,6 +46,13 @@ you probably stopped execution during init phase.
 Continue execution and make sure you're in the exec phase before taking a look at data in your DataFrame.
 :::
 
+#### How does the Init Phase work for Spark Actions?
+
+During the Init Phase, the whole Spark DAG is evaluated by executing all the code of the SDLB Actions, but without executing any Spark Action
+such as show, count, write... See [this spark tutorial for more on Spark Actions]( https://supergloo.com/spark-scala/spark-actions).
+This is how in the Init Phase SDLB is able to check your lineage for Spark Actions. Basically, it relies on Spark to check the execution DAG under the hood.
+If you add Spark-Actions in your Custom Transformers (which is considered bad practice in most cases), you basically break that mechanism.
+
 #### Watch the log output
 The stages are also clearly marked in the log output.
 Here is the sample output of [part-3 of the gettings-started guide](../getting-started/part-3/custom-webservice.md) again with a few things removed:

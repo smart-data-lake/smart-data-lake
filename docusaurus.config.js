@@ -53,7 +53,8 @@ const config = {
               position: 'left',
             },
             {to: 'blog', label: 'Blog', position: 'left'},
-            {to: 'JsonSchemaViewer', label: 'SchemaViewer', position: 'left'},
+            {to: 'json-schema-viewer', label: 'SchemaViewer', position: 'left'},
+            {href: 'https://ui-demo.smartdatalake.ch/', label: 'UI-Demo', position: 'left'},
             {
               href: 'https://github.com/smart-data-lake/smart-data-lake',
               label: 'GitHub',

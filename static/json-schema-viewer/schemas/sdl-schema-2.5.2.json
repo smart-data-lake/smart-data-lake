@@ -1,8 +1,8 @@
 {
   "type" : "object",
   "$schema" : "http://json-schema.org/draft-07/schema#",
-  "version" : "2.6.0-SNAPSHOT",
-  "id" : "sdl-schema-2.6.0-SNAPSHOT.json#",
+  "version" : "2.5.2",
+  "id" : "sdl-schema-2.5.2.json#",
   "definitions" : {
     "ExecutionMode" : {
       "CustomMode" : {
@@ -1683,7 +1683,7 @@
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional data object schema. If defined, any automatic schema inference is avoided.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, DDLFile, jsonSchemaFile, xsdFile, caseClass, avroSchemaFile, javaBean.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional data object schema. If defined, any automatic schema inference is avoided.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
           },
           "schemaMin" : {
             "type" : "string",
@@ -3965,7 +3965,7 @@
         "title" : "WebserviceFileDataObject",
         "required" : [ "type", "url" ],
         "additionalProperties" : false,
-        "description" : "[[DataObject]] to call webservice and return response as InputStream.\nThe corresponding Action to process the response should be a FileTransferAction.\nThis is implemented as FileRefDataObject because the response is treated as some file content.\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\nAll possible query parameter values must be given in configuration."
+        "description" : "[[DataObject]] to call webservice and return response as InputStream\nThis is implemented as FileRefDataObject because the response is treated as some file content.\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\nAll possible query parameter values must be given in configuration."
       },
       "XmlFileDataObject" : {
         "type" : "object",
@@ -4505,48 +4505,6 @@
         "additionalProperties" : false,
         "description" : "Apply a column blacklist to a DataFrame."
       },
-      "ConvertNullValuesTransformer" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "ConvertNullValuesTransformer"
-          },
-          "name" : {
-            "type" : "string",
-            "description" : "Name of the transformer"
-          },
-          "description" : {
-            "type" : "string",
-            "description" : "Optional description of the transformer"
-          },
-          "includeColumns" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            },
-            "description" : "Optional list of columns to include into the transformation"
-          },
-          "excludeColumns" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            },
-            "description" : "Optional list of columns to exclude from the transformation"
-          },
-          "valueForString" : {
-            "type" : "string",
-            "description" : "Value to add for string values, default value is \\\"na\\\""
-          },
-          "valueForNumber" : {
-            "type" : "integer",
-            "description" : "Value to add for number values, default value is -1"
-          }
-        },
-        "title" : "ConvertNullValuesTransformer",
-        "required" : [ "type" ],
-        "additionalProperties" : false,
-        "description" : "Convert null values in a dataframe"
-      },
       "DataValidationTransformer" : {
         "type" : "object",
         "properties" : {
@@ -5076,11 +5034,7 @@
           },
           "removeNonStandardSQLNameChars" : {
             "type" : "boolean",
-            "description" : "Remove all chars from a string which don\\'t belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
-          },
-          "replaceNonStandardSQLNameCharsWithUnderscores" : {
-            "type" : "boolean",
-            "description" : "If selected, replaces all chars from a string which don\\'t belong to lowercase SQL standard naming characters with underscores (_), i.e. \\\"value of property!in$$\\\" -> \\\"value_of_property_in_\\\". Note: removeNonStandardSQLNameChars needs to be disabled"
+            "description" : "Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
           }
         },
         "title" : "StandardizeColNamesTransformer",
@@ -5409,6 +5363,37 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "StandardizeColNamesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "camelCaseToLower" : {
+                  "type" : "boolean",
+                  "description" : "If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest\nOtherwise converts just to lower case."
+                },
+                "normalizeToAscii" : {
+                  "type" : "boolean",
+                  "description" : "If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily"
+                },
+                "removeNonStandardSQLNameChars" : {
+                  "type" : "boolean",
+                  "description" : "Remove all chars from a string which dont belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
+                }
+              },
+              "title" : "StandardizeColNamesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).\nParameters below can be used to disable specific rules if needed."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "DataValidationTransformer"
                 },
                 "name" : {
@@ -5439,41 +5424,6 @@
               "required" : [ "rules", "type" ],
               "additionalProperties" : false,
               "description" : "Apply validation rules to a DataFrame and collect potential violation error messages in a new column."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "StandardizeColNamesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "camelCaseToLower" : {
-                  "type" : "boolean",
-                  "description" : "If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest\nOtherwise converts just to lower case."
-                },
-                "normalizeToAscii" : {
-                  "type" : "boolean",
-                  "description" : "If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily"
-                },
-                "removeNonStandardSQLNameChars" : {
-                  "type" : "boolean",
-                  "description" : "Remove all chars from a string which don\\'t belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc"
-                },
-                "replaceNonStandardSQLNameCharsWithUnderscores" : {
-                  "type" : "boolean",
-                  "description" : "If selected, replaces all chars from a string which don\\'t belong to lowercase SQL standard naming characters with underscores (_), i.e. \\\"value of property!in$$\\\" -> \\\"value_of_property_in_\\\". Note: removeNonStandardSQLNameChars needs to be disabled"
-                }
-              },
-              "title" : "StandardizeColNamesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).\nParameters below can be used to disable specific rules if needed."
             }, {
               "type" : "object",
               "properties" : {
@@ -5710,25 +5660,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5760,6 +5691,25 @@
               "required" : [ "encryptColumns", "type" ],
               "additionalProperties" : false,
               "description" : "Encryption of specified columns using AES/GCM algorithm."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "StandardizeSparkDatatypesTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                }
+              },
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5950,43 +5900,13 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "ConvertNullValuesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "Name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                },
-                "includeColumns" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "string"
-                  },
-                  "description" : "Optional list of columns to include into the transformation"
-                },
-                "excludeColumns" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "string"
-                  },
-                  "description" : "Optional list of columns to exclude from the transformation"
-                },
-                "valueForString" : {
-                  "type" : "string",
-                  "description" : "Value to add for string values, default value is \\\"na\\\""
-                },
-                "valueForNumber" : {
-                  "type" : "integer",
-                  "description" : "Value to add for number values, default value is -1"
+                  "const" : "OptionsGenericDfTransformer"
                 }
               },
-              "title" : "ConvertNullValuesTransformer",
+              "title" : "OptionsGenericDfTransformer",
               "required" : [ "type" ],
               "additionalProperties" : false,
-              "description" : "Convert null values in a dataframe"
+              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -6014,17 +5934,6 @@
               "required" : [ "filterClause", "type" ],
               "additionalProperties" : false,
               "description" : "Apply a filter condition to a DataFrame."
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "OptionsGenericDfTransformer"
-                }
-              },
-              "title" : "OptionsGenericDfTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.\nThis trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.\nThis is mainly used by custom transformers."
             }, {
               "type" : "object",
               "properties" : {
@@ -6429,8 +6338,6 @@
                 "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
-              }, {
-                "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
@@ -6894,8 +6801,6 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
               }, {
-                "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
@@ -7095,7 +7000,7 @@
         "title" : "FileTransferAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "[[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.\nAs data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.\nIf you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back."
+        "description" : "[[Action]] to transfer files between SFtp, Hadoop and local Fs."
       },
       "HistorizeAction" : {
         "type" : "object",
@@ -7122,8 +7027,6 @@
                 "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
-              }, {
-                "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
@@ -7271,501 +7174,10 @@
             "const" : "ProxyAction"
           },
           "wrappedAction" : {
-            "oneOf" : [ {
-              "$ref" : "#/definitions/Action/CustomDataFrameAction"
-            }, {
-              "$ref" : "#/definitions/Action/CustomScriptAction"
-            }, {
-              "$ref" : "#/definitions/Action/HistorizeAction"
-            } ]
+            "$ref" : "#/definitions/Action/CustomDataFrameAction"
           },
           "agent" : {
             "oneOf" : [ {
-              "type" : "object",
-              "properties" : {
-                "type" : {
-                  "const" : "JettyAgent"
-                },
-                "url" : {
-                  "type" : "string"
-                },
-                "connections" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "oneOf" : [ {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "HiveTableConnection"
-                        },
-                        "db" : {
-                          "type" : "string",
-                          "description" : "hive db"
-                        },
-                        "pathPrefix" : {
-                          "type" : "string",
-                          "description" : "optional schema, authority and base path for tables directory on hadoop."
-                        },
-                        "acl" : {
-                          "type" : "object",
-                          "properties" : {
-                            "permission" : {
-                              "type" : "string",
-                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
-                            },
-                            "acls" : {
-                              "type" : "array",
-                              "items" : {
-                                "type" : "object",
-                                "properties" : {
-                                  "aclType" : {
-                                    "type" : "string",
-                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
-                                  },
-                                  "name" : {
-                                    "type" : "string",
-                                    "description" : ": the name of the user/group for which an ACL definition is being added"
-                                  },
-                                  "permission" : {
-                                    "type" : "string",
-                                    "description" : ": the permission (rwx syntax) to be granted"
-                                  }
-                                },
-                                "title" : "AclElement",
-                                "required" : [ "aclType", "name", "permission" ],
-                                "additionalProperties" : false,
-                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
-                              },
-                              "description" : ": a sequence of[[AclElement]] s"
-                            }
-                          },
-                          "title" : "AclDef",
-                          "required" : [ "permission", "acls" ],
-                          "additionalProperties" : false,
-                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "HiveTableConnection",
-                      "required" : [ "db", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for hive tables"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "DeltaLakeTableConnection"
-                        },
-                        "catalog" : {
-                          "type" : "string",
-                          "description" : "optional catalog to be used for this connection"
-                        },
-                        "db" : {
-                          "type" : "string",
-                          "description" : "hive db"
-                        },
-                        "pathPrefix" : {
-                          "type" : "string",
-                          "description" : "schema, authority and base path for tables directory on hadoop"
-                        },
-                        "acl" : {
-                          "type" : "object",
-                          "properties" : {
-                            "permission" : {
-                              "type" : "string",
-                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
-                            },
-                            "acls" : {
-                              "type" : "array",
-                              "items" : {
-                                "type" : "object",
-                                "properties" : {
-                                  "aclType" : {
-                                    "type" : "string",
-                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
-                                  },
-                                  "name" : {
-                                    "type" : "string",
-                                    "description" : ": the name of the user/group for which an ACL definition is being added"
-                                  },
-                                  "permission" : {
-                                    "type" : "string",
-                                    "description" : ": the permission (rwx syntax) to be granted"
-                                  }
-                                },
-                                "title" : "AclElement",
-                                "required" : [ "aclType", "name", "permission" ],
-                                "additionalProperties" : false,
-                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
-                              },
-                              "description" : ": a sequence of[[AclElement]] s"
-                            }
-                          },
-                          "title" : "AclDef",
-                          "required" : [ "permission", "acls" ],
-                          "additionalProperties" : false,
-                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
-                        },
-                        "checkDeltaLakeSparkOptions" : {
-                          "type" : "boolean"
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "DeltaLakeTableConnection",
-                      "required" : [ "db", "pathPrefix", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for DeltaLake tables"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "HadoopFileConnection"
-                        },
-                        "pathPrefix" : {
-                          "type" : "string",
-                          "description" : "schema, authority and base path for accessing files on hadoop"
-                        },
-                        "acl" : {
-                          "type" : "object",
-                          "properties" : {
-                            "permission" : {
-                              "type" : "string",
-                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
-                            },
-                            "acls" : {
-                              "type" : "array",
-                              "items" : {
-                                "type" : "object",
-                                "properties" : {
-                                  "aclType" : {
-                                    "type" : "string",
-                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
-                                  },
-                                  "name" : {
-                                    "type" : "string",
-                                    "description" : ": the name of the user/group for which an ACL definition is being added"
-                                  },
-                                  "permission" : {
-                                    "type" : "string",
-                                    "description" : ": the permission (rwx syntax) to be granted"
-                                  }
-                                },
-                                "title" : "AclElement",
-                                "required" : [ "aclType", "name", "permission" ],
-                                "additionalProperties" : false,
-                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
-                              },
-                              "description" : ": a sequence of[[AclElement]] s"
-                            }
-                          },
-                          "title" : "AclDef",
-                          "required" : [ "permission", "acls" ],
-                          "additionalProperties" : false,
-                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "HadoopFileConnection",
-                      "required" : [ "pathPrefix", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for files on hadoop"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "SFtpFileRefConnection"
-                        },
-                        "host" : {
-                          "type" : "string",
-                          "description" : "sftp host"
-                        },
-                        "port" : {
-                          "type" : "integer",
-                          "description" : "port of sftp service, default is 22"
-                        },
-                        "authMode" : {
-                          "oneOf" : [ {
-                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-                          } ],
-                          "description" : "authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported."
-                        },
-                        "proxy" : {
-                          "type" : "object",
-                          "properties" : {
-                            "host" : {
-                              "type" : "string",
-                              "description" : "proxy host"
-                            },
-                            "port" : {
-                              "type" : "integer",
-                              "description" : "proxy port"
-                            },
-                            "proxyType" : {
-                              "type" : "string",
-                              "description" : "Type of proxy: HTTP or SOCKS. Default is HTTP.",
-                              "enum" : [ "DIRECT", "HTTP", "SOCKS" ]
-                            }
-                          },
-                          "title" : "JavaNetProxyConfig",
-                          "required" : [ "host", "port" ],
-                          "additionalProperties" : false,
-                          "description" : "Proxy configuration to create java.net.Proxy instance."
-                        },
-                        "ignoreHostKeyVerification" : {
-                          "type" : "boolean",
-                          "description" : "do not validate host key if true, default is false"
-                        },
-                        "maxParallelConnections" : {
-                          "type" : "integer",
-                          "description" : "number of parallel sftp connections created by an instance of this connection"
-                        },
-                        "connectionPoolMaxIdleTimeSec" : {
-                          "type" : "integer",
-                          "description" : "timeout to close unused connections in the pool"
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "SFtpFileRefConnection",
-                      "required" : [ "host", "authMode", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "SFTP Connection information"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "KafkaConnection"
-                        },
-                        "brokers" : {
-                          "type" : "string",
-                          "description" : "comma separated list of kafka bootstrap server incl. port, e.g. \\\"host1:9092,host2:9092:"
-                        },
-                        "schemaRegistry" : {
-                          "type" : "string",
-                          "description" : "url of schema registry service, e.g. \\\"https://host2\\\""
-                        },
-                        "options" : {
-                          "type" : "object",
-                          "additionalProperties" : {
-                            "type" : "string"
-                          },
-                          "description" : "Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)"
-                        },
-                        "authMode" : {
-                          "oneOf" : [ {
-                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-                          } ]
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "KafkaConnection",
-                      "required" : [ "brokers", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for kafka"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "SnowflakeConnection"
-                        },
-                        "url" : {
-                          "type" : "string",
-                          "description" : "snowflake connection url"
-                        },
-                        "warehouse" : {
-                          "type" : "string",
-                          "description" : "Snowflake namespace"
-                        },
-                        "database" : {
-                          "type" : "string",
-                          "description" : "Snowflake database"
-                        },
-                        "role" : {
-                          "type" : "string",
-                          "description" : "Snowflake role"
-                        },
-                        "authMode" : {
-                          "oneOf" : [ {
-                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-                          } ],
-                          "description" : "optional authentication information: for now BasicAuthMode is supported."
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "SnowflakeConnection",
-                      "required" : [ "url", "warehouse", "database", "role", "authMode", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for Snowflake databases.\nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "JdbcTableConnection"
-                        },
-                        "url" : {
-                          "type" : "string",
-                          "description" : "jdbc connection url"
-                        },
-                        "driver" : {
-                          "type" : "string",
-                          "description" : "class name of jdbc driver"
-                        },
-                        "authMode" : {
-                          "oneOf" : [ {
-                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-                          } ],
-                          "description" : "optional authentication information: for now BasicAuthMode is supported."
-                        },
-                        "db" : {
-                          "type" : "string",
-                          "description" : "jdbc database"
-                        },
-                        "maxParallelConnections" : {
-                          "type" : "integer",
-                          "description" : "max number of parallel jdbc connections created by an instance of this connection, default is 3\nNote that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection\nused by SDL for validating metadata or pre/postSQL."
-                        },
-                        "connectionPoolMaxIdleTimeSec" : {
-                          "type" : "integer",
-                          "description" : "timeout to close unused connections in the pool"
-                        },
-                        "connectionPoolMaxWaitTimeSec" : {
-                          "type" : "integer",
-                          "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        },
-                        "autoCommit" : {
-                          "type" : "boolean",
-                          "description" : "flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.\nDefault is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.",
-                          "deprecated" : true
-                        },
-                        "connectionInitSql" : {
-                          "type" : "string",
-                          "description" : "SQL statement to be executed every time a new connection is created, for example to set session parameters"
-                        }
-                      },
-                      "title" : "JdbcTableConnection",
-                      "required" : [ "url", "driver", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for jdbc tables.\nIf authentication is needed, user and password must be provided."
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
-                          "const" : "SplunkConnection"
-                        },
-                        "host" : {
-                          "type" : "string",
-                          "description" : ""
-                        },
-                        "port" : {
-                          "type" : "integer",
-                          "description" : ""
-                        },
-                        "authMode" : {
-                          "oneOf" : [ {
-                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-                          }, {
-                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-                          } ],
-                          "description" : ""
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "SplunkConnection",
-                      "required" : [ "host", "port", "authMode", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for splunk queries"
-                    } ]
-                  }
-                }
-              },
-              "title" : "JettyAgent",
-              "required" : [ "url", "connections", "type" ],
-              "additionalProperties" : false
-            }, {
               "type" : "object",
               "properties" : {
                 "type" : {
@@ -7908,62 +7320,6 @@
                       "type" : "object",
                       "properties" : {
                         "type" : {
-                          "const" : "HadoopFileConnection"
-                        },
-                        "pathPrefix" : {
-                          "type" : "string",
-                          "description" : "schema, authority and base path for accessing files on hadoop"
-                        },
-                        "acl" : {
-                          "type" : "object",
-                          "properties" : {
-                            "permission" : {
-                              "type" : "string",
-                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
-                            },
-                            "acls" : {
-                              "type" : "array",
-                              "items" : {
-                                "type" : "object",
-                                "properties" : {
-                                  "aclType" : {
-                                    "type" : "string",
-                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
-                                  },
-                                  "name" : {
-                                    "type" : "string",
-                                    "description" : ": the name of the user/group for which an ACL definition is being added"
-                                  },
-                                  "permission" : {
-                                    "type" : "string",
-                                    "description" : ": the permission (rwx syntax) to be granted"
-                                  }
-                                },
-                                "title" : "AclElement",
-                                "required" : [ "aclType", "name", "permission" ],
-                                "additionalProperties" : false,
-                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
-                              },
-                              "description" : ": a sequence of[[AclElement]] s"
-                            }
-                          },
-                          "title" : "AclDef",
-                          "required" : [ "permission", "acls" ],
-                          "additionalProperties" : false,
-                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
-                        },
-                        "metadata" : {
-                          "$ref" : "#/definitions/Others/ConnectionMetadata"
-                        }
-                      },
-                      "title" : "HadoopFileConnection",
-                      "required" : [ "pathPrefix", "type" ],
-                      "additionalProperties" : false,
-                      "description" : "Connection information for files on hadoop"
-                    }, {
-                      "type" : "object",
-                      "properties" : {
-                        "type" : {
                           "const" : "SFtpFileRefConnection"
                         },
                         "host" : {
@@ -8036,6 +7392,62 @@
                       "required" : [ "host", "authMode", "type" ],
                       "additionalProperties" : false,
                       "description" : "SFTP Connection information"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HadoopFileConnection"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for accessing files on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HadoopFileConnection",
+                      "required" : [ "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for files on hadoop"
                     }, {
                       "type" : "object",
                       "properties" : {
@@ -8248,6 +7660,491 @@
                 }
               },
               "title" : "AzureRelayAgent",
+              "required" : [ "url", "connections", "type" ],
+              "additionalProperties" : false
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "JettyAgent"
+                },
+                "url" : {
+                  "type" : "string"
+                },
+                "connections" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "oneOf" : [ {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HiveTableConnection"
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "hive db"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "optional schema, authority and base path for tables directory on hadoop."
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HiveTableConnection",
+                      "required" : [ "db", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for hive tables"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "DeltaLakeTableConnection"
+                        },
+                        "catalog" : {
+                          "type" : "string",
+                          "description" : "optional catalog to be used for this connection"
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "hive db"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for tables directory on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "checkDeltaLakeSparkOptions" : {
+                          "type" : "boolean"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "DeltaLakeTableConnection",
+                      "required" : [ "db", "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for DeltaLake tables"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SFtpFileRefConnection"
+                        },
+                        "host" : {
+                          "type" : "string",
+                          "description" : "sftp host"
+                        },
+                        "port" : {
+                          "type" : "integer",
+                          "description" : "port of sftp service, default is 22"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "authentication information: for now BasicAuthMode and PublicKeyAuthMode are supported."
+                        },
+                        "proxy" : {
+                          "type" : "object",
+                          "properties" : {
+                            "host" : {
+                              "type" : "string",
+                              "description" : "proxy host"
+                            },
+                            "port" : {
+                              "type" : "integer",
+                              "description" : "proxy port"
+                            },
+                            "proxyType" : {
+                              "type" : "string",
+                              "description" : "Type of proxy: HTTP or SOCKS. Default is HTTP.",
+                              "enum" : [ "DIRECT", "HTTP", "SOCKS" ]
+                            }
+                          },
+                          "title" : "JavaNetProxyConfig",
+                          "required" : [ "host", "port" ],
+                          "additionalProperties" : false,
+                          "description" : "Proxy configuration to create java.net.Proxy instance."
+                        },
+                        "ignoreHostKeyVerification" : {
+                          "type" : "boolean",
+                          "description" : "do not validate host key if true, default is false"
+                        },
+                        "maxParallelConnections" : {
+                          "type" : "integer",
+                          "description" : "number of parallel sftp connections created by an instance of this connection"
+                        },
+                        "connectionPoolMaxIdleTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout to close unused connections in the pool"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SFtpFileRefConnection",
+                      "required" : [ "host", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "SFTP Connection information"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "HadoopFileConnection"
+                        },
+                        "pathPrefix" : {
+                          "type" : "string",
+                          "description" : "schema, authority and base path for accessing files on hadoop"
+                        },
+                        "acl" : {
+                          "type" : "object",
+                          "properties" : {
+                            "permission" : {
+                              "type" : "string",
+                              "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+                            },
+                            "acls" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "properties" : {
+                                  "aclType" : {
+                                    "type" : "string",
+                                    "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                                  },
+                                  "name" : {
+                                    "type" : "string",
+                                    "description" : ": the name of the user/group for which an ACL definition is being added"
+                                  },
+                                  "permission" : {
+                                    "type" : "string",
+                                    "description" : ": the permission (rwx syntax) to be granted"
+                                  }
+                                },
+                                "title" : "AclElement",
+                                "required" : [ "aclType", "name", "permission" ],
+                                "additionalProperties" : false,
+                                "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                              },
+                              "description" : ": a sequence of[[AclElement]] s"
+                            }
+                          },
+                          "title" : "AclDef",
+                          "required" : [ "permission", "acls" ],
+                          "additionalProperties" : false,
+                          "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "HadoopFileConnection",
+                      "required" : [ "pathPrefix", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for files on hadoop"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "KafkaConnection"
+                        },
+                        "brokers" : {
+                          "type" : "string",
+                          "description" : "comma separated list of kafka bootstrap server incl. port, e.g. \\\"host1:9092,host2:9092:"
+                        },
+                        "schemaRegistry" : {
+                          "type" : "string",
+                          "description" : "url of schema registry service, e.g. \\\"https://host2\\\""
+                        },
+                        "options" : {
+                          "type" : "object",
+                          "additionalProperties" : {
+                            "type" : "string"
+                          },
+                          "description" : "Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ]
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "KafkaConnection",
+                      "required" : [ "brokers", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for kafka"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SnowflakeConnection"
+                        },
+                        "url" : {
+                          "type" : "string",
+                          "description" : "snowflake connection url"
+                        },
+                        "warehouse" : {
+                          "type" : "string",
+                          "description" : "Snowflake namespace"
+                        },
+                        "database" : {
+                          "type" : "string",
+                          "description" : "Snowflake database"
+                        },
+                        "role" : {
+                          "type" : "string",
+                          "description" : "Snowflake role"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "optional authentication information: for now BasicAuthMode is supported."
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SnowflakeConnection",
+                      "required" : [ "url", "warehouse", "database", "role", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for Snowflake databases.\nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session"
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "JdbcTableConnection"
+                        },
+                        "url" : {
+                          "type" : "string",
+                          "description" : "jdbc connection url"
+                        },
+                        "driver" : {
+                          "type" : "string",
+                          "description" : "class name of jdbc driver"
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : "optional authentication information: for now BasicAuthMode is supported."
+                        },
+                        "db" : {
+                          "type" : "string",
+                          "description" : "jdbc database"
+                        },
+                        "maxParallelConnections" : {
+                          "type" : "integer",
+                          "description" : "max number of parallel jdbc connections created by an instance of this connection, default is 3\nNote that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection\nused by SDL for validating metadata or pre/postSQL."
+                        },
+                        "connectionPoolMaxIdleTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout to close unused connections in the pool"
+                        },
+                        "connectionPoolMaxWaitTimeSec" : {
+                          "type" : "integer",
+                          "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        },
+                        "autoCommit" : {
+                          "type" : "boolean",
+                          "description" : "flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.\nDefault is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.",
+                          "deprecated" : true
+                        },
+                        "connectionInitSql" : {
+                          "type" : "string",
+                          "description" : "SQL statement to be executed every time a new connection is created, for example to set session parameters"
+                        }
+                      },
+                      "title" : "JdbcTableConnection",
+                      "required" : [ "url", "driver", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for jdbc tables.\nIf authentication is needed, user and password must be provided."
+                    }, {
+                      "type" : "object",
+                      "properties" : {
+                        "type" : {
+                          "const" : "SplunkConnection"
+                        },
+                        "host" : {
+                          "type" : "string",
+                          "description" : ""
+                        },
+                        "port" : {
+                          "type" : "integer",
+                          "description" : ""
+                        },
+                        "authMode" : {
+                          "oneOf" : [ {
+                            "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+                          }, {
+                            "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+                          } ],
+                          "description" : ""
+                        },
+                        "metadata" : {
+                          "$ref" : "#/definitions/Others/ConnectionMetadata"
+                        }
+                      },
+                      "title" : "SplunkConnection",
+                      "required" : [ "host", "port", "authMode", "type" ],
+                      "additionalProperties" : false,
+                      "description" : "Connection information for splunk queries"
+                    } ]
+                  }
+                }
+              },
+              "title" : "JettyAgent",
               "required" : [ "url", "connections", "type" ],
               "additionalProperties" : false
             } ]

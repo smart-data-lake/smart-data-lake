@@ -26,7 +26,7 @@ You know that Tom lives near Bern, Switzerland. A quick web search shows you tha
 *LSZB*. Let's focus on some specific time period for now to have reproducible results.
 You end up with the following REST-URL:
 
-    https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979
+    https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653
 
 When you run this in your web-browser, you will get a response in the JSON Format.
 For each record, it contains the ICAO identifier of the airport where the plane is flying to in the field

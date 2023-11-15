@@ -44,14 +44,32 @@ Smart Data Lake Builder supports this by the DeltaLakeTableDataObject, and this 
 ## DeltaLakeTableDataObject
 
 Switching to Delta Lake format is easy with Smart Data Lake Builder, just replace `CsvFileDataObject` with `DeltaLakeTableDataObject` and define the table's db and name.
-Let's start by changing the existing definition for `int-airports`:
+Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`:
 
     int-airports {
         type = DeltaLakeTableDataObject
         path = "~{id}"
         table = {
-            db = default
-            name = int_airports
+            db = "default"
+            name = "int_airports"
+        }
+    }
+
+    btl-departures-arrivals-airports {
+        type = DeltaLakeTableDataObject
+        path = "~{id}"
+        table {
+            db = "default"
+            name = "btl_departures_arrivals_airports"
+        }
+    }
+    
+    btl-distances {
+        type = DeltaLakeTableDataObject
+        path = "~{id}"
+        table {
+            db = "default"
+            name = "btl_distances"
         }
     }
 
@@ -82,7 +100,7 @@ Finally, adapt the action definition for `join-departures-airports`:
 * change `stg_departures` to `int_departures` in the first SQLDfsTransformer (watch out, you need to replace the string 4 times)
 
 :::info Explanation
-- We changed `int-airports` from CSV to Delta Lake format
+- We changed `int-airports`, `btl-departures-arrivals-airports` and `btl-distances` from CSV to Delta Lake format
 - Created an additional table `int-departures`
 - Created an action `prepare-departures`  to fill the new integration layer table `int-departures`
 - Adapted the existing action `join-departures-airports` to use the new table `int-departures`
@@ -100,7 +118,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-mkdir -f data
+mkdir data
 docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
 docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
 ```
@@ -109,7 +127,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 <TabItem value="podman">
 
 ```jsx
-mkdir -f data
+mkdir data
 podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
 podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
 ```
@@ -150,9 +168,9 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker-compose -f part2/docker-compose.yml build
+docker-compose -f part2/docker-compose.yml -p getting-started build
 mkdir -p data/_metastore
-docker-compose -f part2/docker-compose.yml up
+docker-compose -f part2/docker-compose.yml -p getting-started up
 ```
 
 </TabItem>
@@ -204,7 +222,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network part2_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
 ```
 
 </TabItem>

@@ -20,7 +20,9 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
-case class DepartureQueryParameters(airport: String, begin: Long, end: Long)
+
+// Default to the interval of [2 weeks and 2 days ago] -> [2 weeks ago]
+case class DepartureQueryParameters(airport: String, begin: Long = System.currentTimeMillis()/1000 - 1209600 - 172800L, end: Long = System.currentTimeMillis()/1000 - 1209600 )
 
 case class State(airport: String, nextBegin: Long)
 

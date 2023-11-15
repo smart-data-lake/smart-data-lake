@@ -18,14 +18,14 @@ Every SDLB job collects metrics for each Action and output-DataObject. They are 
 Metrics are also stored in the state file, and if you want to sync them to monitoring system in real-time, the StateListener can be implemented. It gets notified about action new events and metrics as soon as they are available. To configure state listeners set config attribute `global.stateListeners = [{className = ...}]`.
 
 ## Constraints
-Constraints can be defined on DataObjects to validate data on row-level. They work similar as database constraints and are validated when by an Action when writing data into a DataObject. If a constraints validation fails, an Exception is thrown and the Action stops. No further data is written to the DataObject, and if the DataObject implements transactional write (Hive, DeltaLake, Jdbc, ...), no data at all is stored in the output DataObject.
+Constraints can be defined on DataObjects to validate data on row-level. They work similar as database constraints and are validated by an Action when writing data into a DataObject. If a constraints validation fails, an Exception is thrown and the Action stops. No further data is written to the DataObject, and if the DataObject implements transactional write (Hive, DeltaLake, Jdbc, ...), no data at all is stored in the output DataObject.
 
 To define a constraint an arbitrary SQL expression is evaluated for each row, if it returns false the constraint validation fails. To return a meaningful error message you should configure a useful name and the columns that should be included in the text. See the following example:
 ```
 dataObjects {
   testDataObject {
     ...
-    constraints [{
+    constraints = [{
       name = A shold be smaller than B
       description = "If A is bigger than B we have a problem because of ..."
       expression = "a < b"
@@ -54,6 +54,6 @@ dataObjects {
       description = "percentage of records having no data should be less than 0.1"
       aggExpression = "count(data) / count(*)"
       expectation = "< 0.1"
-    }
+    }]
 }
 ```

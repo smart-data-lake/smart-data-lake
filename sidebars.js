@@ -47,6 +47,7 @@ module.exports = {
         ]},
         'reference/dag',
         'reference/schema',
+        'reference/schema-viewer-navigation',
         'reference/dataQuality',
         'reference/executionPhases',
         'reference/executionEngines',
@@ -67,7 +68,7 @@ module.exports = {
     {
       type: 'link',
       label: 'Configuration Schema Viewer', // The link label
-      href: '/JsonSchemaViewer', // The internal path
+      href: '/json-schema-viewer', // The internal path
     },
   ],
 };

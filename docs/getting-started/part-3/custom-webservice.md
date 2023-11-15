@@ -45,12 +45,8 @@ ext-departures {
   nRetry = 5
   queryParameters = [{
     airport = "LSZB"
-    begin = 1641393602
-    end = 1641483739
   },{
     airport = "EDDF"
-    begin = 1641393602
-    end = 1641483739
   }]
   timeouts {
     connectionTimeoutMs = 200000
@@ -65,13 +61,6 @@ The connection timeout corresponds to the time we wait until the connection is e
 If the request cannot be answered in the times configured, we try to automatically resend the request. 
 How many times a failed request will be resend, is controlled by the `nRetry` parameter.
 
-:::info
-The *begin* and *end* can now be configured for each airport separatly. 
-The configuration expects unix timestamps, if you don't know what that means, have a look at this [website](https://www.unixtimestamp.com/).
-The webservice from opensky-network.org will not respond if the interval is larger than a week. 
-Hence, our `CustomWebserviceDataObject` will enforce the rule that if the chosen interval is larger, we query only the next four days given the *begin* configuration.
-:::
-
 Note that we changed the type to `CustomWebserviceDataObject`.
 This is a custom DataObject type, not included in standard Smart Data Lake Builder. 
 To make it work, please go to the project's root directory and copy the Scala class with 
@@ -79,6 +68,20 @@ To make it work, please go to the project's root directory and copy the Scala cl
 
 This copied the following file:
   - ./src/scala/io/smartdatalake/workflow/dataobject/CustomWebserviceDataObject.scala
+
+:::info
+The *begin* and *end* are now automatically set to two weeks ago minus 2 days and two weeks ago, respectively.
+They can still be overridden if you want to try out fixed timestamps. For example, you could also write
+```
+{
+airport = "LSZB"
+ begin = 1696854853   # 29.08.2021
+ end = 1697027653     # 30.08.2021
+}
+```
+However, as noted previously, when you request older data it may be that the webservice does not respond, so we recommend not to specify begin and end anymore.
+Can you spot which line of code in `CustomWebserviceDataObject` is reponsible for setting the defaults?
+:::
   
 In this part we will work exclusively on the `CustomWebserviceDataObject.scala` file.
 
@@ -143,13 +146,13 @@ Having a look at the log, something similar should appear on your screen.
 2021-11-10 14:00:32 INFO  ActionDAGRun$ActionEventListener:228 - Action~download-departures[CopyAction]: Prepare started
 2021-11-10 14:00:32 INFO  ActionDAGRun$ActionEventListener:237 - Action~download-departures[CopyAction]: Prepare succeeded
 2021-11-10 14:00:32 INFO  ActionDAGRun$ActionEventListener:228 - Action~download-departures[CopyAction]: Init started
-2021-11-10 14:00:33 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979
-2021-11-10 14:00:33 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=EDDF&begin=1630200800&end=1630310979
+2021-11-10 14:00:33 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653
+2021-11-10 14:00:33 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=EDDF&begin=1696854853&end=1697027653
 2021-11-10 14:00:35 INFO  ActionDAGRun$ActionEventListener:237 - Action~download-departures[CopyAction]: Init succeeded
 2021-11-10 14:00:35 INFO  ActionDAGRun$ActionEventListener:228 - Action~download-departures[CopyAction]: Exec started
 2021-11-10 14:00:35 INFO  CopyAction:158 - (Action~download-departures) getting DataFrame for DataObject~ext-departures
-2021-11-10 14:00:36 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979
-2021-11-10 14:00:37 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=EDDF&begin=1630200800&end=1630310979
+2021-11-10 14:00:36 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653
+2021-11-10 14:00:37 INFO  CustomWebserviceDataObject:69 - Success for request https://opensky-network.org/api/flights/departure?airport=EDDF&begin=1696854853&end=1697027653
 ```
 
 It is important to notice that the two requests for each airport to the API were not send only once, but twice. 
@@ -269,7 +272,7 @@ values={[
 <TabItem value="docker">
 
 ```jsx
-mkdir -f data
+mkdir data
 docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
 ```
 
@@ -277,7 +280,7 @@ docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 <TabItem value="podman">
 
 ```jsx
-mkdir -f data
+mkdir data
 podman run --rm --hostname=localhost -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest --config /mnt/config --feed-sel ids:download-deduplicate-departures
 ```
 
