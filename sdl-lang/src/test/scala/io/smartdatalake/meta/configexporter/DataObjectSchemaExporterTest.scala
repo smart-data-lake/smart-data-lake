@@ -29,19 +29,24 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.HiveTableDataObject
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.json4s.{Formats, NoTypeHints, StringInput}
 import org.json4s.jackson.{JsonMethods, Serialization}
-import org.scalatest.FunSuite
+import org.json4s.{Formats, NoTypeHints, StringInput}
+import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.io.File
 import java.nio.file.{Files, Paths}
 
-class DataObjectSchemaExporterTest extends FunSuite {
+class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
 
   val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
+  val exportPath = "./target/schema"
+
+  before {
+    FileUtils.deleteDirectory(new File(exportPath))
+  }
 
   test("export simple schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectCsv1", exportPath = "./target/schema")
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", exportPath = exportPath)
     DataObjectSchemaExporter.exportSchemas(exporterConfig)
     val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectCsv1", "schema", Paths.get(exporterConfig.exportPath))
 
@@ -69,7 +74,7 @@ class DataObjectSchemaExporterTest extends FunSuite {
   }
 
   test("export complex schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", exportPath = "./target/schema")
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", exportPath = exportPath)
     DataObjectSchemaExporter.exportSchemas(exporterConfig)
     val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectParquet6", "schema", Paths.get(exporterConfig.exportPath))
     val expectedFieldsJson =
@@ -121,11 +126,9 @@ class DataObjectSchemaExporterTest extends FunSuite {
   }
 
   test("test main with includes and excludes, dont update if same") {
-    val path = "target/schema"
-    FileUtils.deleteDirectory(new File(path))
-    DataObjectSchemaExporter.main(Array("-c", configPath, "-p", path, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
-    assert(new File(path).listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
-    assert(new File(path).listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    DataObjectSchemaExporter.main(Array("-c", configPath, "-p", exportPath, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
+    assert(new File(exportPath).listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    assert(new File(exportPath).listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
   }
 
   test("schema file is not updated if unchanged") {
@@ -146,7 +149,7 @@ class DataObjectSchemaExporterTest extends FunSuite {
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 2)
   }
 
-  test("export statistics ") {
+  test("export statistics") {
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(Seq(configPath))
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(registry)
     val session = context.sparkSession

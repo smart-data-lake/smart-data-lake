@@ -306,8 +306,12 @@ case class HiveTableDataObject(override val id: DataObjectId,
       val lastAnalyzedAt = catalogStats.get(TableStatsType.LastAnalyzedAt.toString).map(_.asInstanceOf[Long])
       // analyze only if table is modified after it was last analyzed
       if (update && lastModifiedAt.isDefined && (lastAnalyzedAt.isEmpty || lastAnalyzedAt.exists(lastModifiedAt.get > _))) {
-        logger.info(s"compute statistics: update=$update lastModifiedAt=$lastModifiedAt lastAnalyzedAt=$lastAnalyzedAt")
-        HiveUtil.analyzeTable(table)(context.sparkSession)
+        logger.info(s"($id) compute statistics: update=$update lastModifiedAt=$lastModifiedAt lastAnalyzedAt=$lastAnalyzedAt")
+        try {
+          HiveUtil.analyzeTable(table)(context.sparkSession)
+        } catch {
+          case ex: Exception => logger.warn(s"($id) failed to compute statistics ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        }
       }
       val columnStats = getColumnStats(update, lastModifiedAt)
       // get catalog stats again, as they might have changed through analyzeTable or getColumnStats
