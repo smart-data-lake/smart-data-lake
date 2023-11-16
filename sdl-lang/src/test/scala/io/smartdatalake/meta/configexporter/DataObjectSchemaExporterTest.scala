@@ -46,7 +46,9 @@ class DataObjectSchemaExporterTest extends FunSuite {
     val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectCsv1", "schema", Paths.get(exporterConfig.exportPath))
 
     val expectedFieldsJson = """
-      |  [ {
+      | {
+      | "schema": [
+      |  {
       |    "name" : "a",
       |    "dataType" : "string",
       |    "nullable" : true
@@ -58,7 +60,8 @@ class DataObjectSchemaExporterTest extends FunSuite {
       |    "name" : "c",
       |    "dataType" : "string",
       |    "nullable" : true
-      |  } ]
+      |  }
+      | ]}
       |""".stripMargin
     val expectedFields = JsonMethods.parse(StringInput(expectedFieldsJson)).values
     val actualFields = JsonMethods.parse(StringInput(actualOutput.get)).values
@@ -70,8 +73,9 @@ class DataObjectSchemaExporterTest extends FunSuite {
     DataObjectSchemaExporter.exportSchemas(exporterConfig)
     val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectParquet6", "schema", Paths.get(exporterConfig.exportPath))
     val expectedFieldsJson =
-      """
-        |  [ {
+      """ {
+        | "schema": [
+        |  {
         |    "name" : "a",
         |    "dataType" : "string",
         |    "nullable" : true
@@ -108,7 +112,8 @@ class DataObjectSchemaExporterTest extends FunSuite {
         |      } ]
         |    },
         |    "nullable" : true
-        |  } ]
+        |  }
+        | ]}
         |""".stripMargin
     val expectedFields = JsonMethods.parse(StringInput(expectedFieldsJson)).values
     val actualFields = JsonMethods.parse(StringInput(actualOutput.get)).values
@@ -129,15 +134,15 @@ class DataObjectSchemaExporterTest extends FunSuite {
     FileUtils.deleteDirectory(path.toFile)
     Files.createDirectories(path)
     // first write
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), SparkSchema(StructType(Seq(StructField("a", StringType)))), path)
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", StringType))))), None, path)
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length==1)
     Thread.sleep(1000)
     // second write -> no update
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), SparkSchema(StructType(Seq(StructField("a", StringType)))), path)
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", StringType))))), None, path)
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 1)
     Thread.sleep(1000)
     // third write -> update
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), SparkSchema(StructType(Seq(StructField("a", IntegerType)))), path)
+    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", IntegerType))))), None, path)
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 2)
   }
 

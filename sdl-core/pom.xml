@@ -190,12 +190,10 @@
         <dependency>
             <groupId>com.github.kxbmap</groupId>
             <artifactId>configs_${scala.minor.version}</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.scala-lang.modules</groupId>
-                    <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
-                </exclusion>
-            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
         </dependency>
 
         <dependency>

@@ -3,28 +3,29 @@ package io.smartdatalake.meta.configexporter
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
-import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{ProductUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataobject.CanCreateDataFrame
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, SparkFileDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods.pretty
 import org.json4s.jackson.Serialization
-import org.json4s.{Formats, NoTypeHints}
+import org.json4s.{Formats, JObject, NoTypeHints}
 import scopt.OptionParser
 
 import java.io.File
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import java.time.LocalDateTime
 import scala.io.Source
-import scala.util.Using
+import scala.util.{Failure, Success, Try, Using}
+import scala.collection.compat._
 
 case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
                                           exportPath: String = "./schema",
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
                                           updateStats: Boolean = true,
-                                          descriptionPath: Option[String] = None,
                                           master: String = "local[2]"
                                          )
 
@@ -72,6 +73,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       case Some(exporterConfig) =>
 
         // export data object schemas to json format
+        logger.info(s"starting with configuration ${ProductUtil.formatObj(exporterConfig)}")
         exportSchemas(exporterConfig)
 
       case None =>
@@ -92,27 +94,58 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     logger.info(s"Writing ${dataObjects.size} data object schemas to json files in path ${config.exportPath}")
 
     // get and write Schemas
-    dataObjects.foreach {
-      case dataObject: CanCreateDataFrame =>
-        val df = dataObject.getDataFrame(Seq(), dataObject.getSubFeedSupportedTypes.head)
-        writeSchemaIfChanged(dataObject.id, df.schema, path)
-    }
+    val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>
+      try {
+        logger.info(s"get schema for ${dataObject.id} (${dataObject.getClass.getSimpleName})")
+        val exportedSchema = dataObject match {
+          case dataObject: SparkFileDataObject =>
+            val schema = Try(dataObject.getSchema)
+            val info = schema match {
+              case Success(Some(s)) => None
+              case Success(None) => Some(s"${dataObject.id} of type ${dataObject.getClass.getSimpleName} did not return a schema")
+              case Failure(ex) => Some(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+            }
+            Some((schema.toOption.flatten, info, schema.isSuccess))
+          case dataObject: CanCreateDataFrame =>
+            val schema = Try(dataObject.getDataFrame(Seq(), dataObject.getSubFeedSupportedTypes.head).schema)
+            val info = schema.failed.toOption.map(ex => s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+            Some((schema.toOption, info, schema.isSuccess))
+          case _ => None
+        }
+        exportedSchema.foreach {
+          case (schema, info, _) =>
+            info.foreach(logger.warn)
+            writeSchemaIfChanged(dataObject.id, schema, info, path)
+        }
+        // return true if no exception
+        exportedSchema.forall(_._3)
+      }
+    }.maxOption
+    require(!atLeastOneSchemaSuccessful.contains(false), "Schema export failed for all DataObjects!")
 
     // get and write Stats
     dataObjects.foreach { dataObject =>
-      val stats = dataObject.getStats(config.updateStats)
-      writeStatsIfChanged(dataObject.id, stats, path)
+      try {
+        logger.info(s"get statistics for ${dataObject.id}")
+        val stats = dataObject.getStats(config.updateStats)
+        writeStatsIfChanged(dataObject.id, stats, path)
+      } catch {
+        case ex: Exception =>
+          logger.warn(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      }
     }
   }
 
-  def writeSchemaIfChanged(dataObjectId: DataObjectId, newSchemaJson: GenericSchema, path: Path): Unit = {
-    val newSchemaStr =  pretty(newSchemaJson.toJson)
+  def writeSchemaIfChanged(dataObjectId: DataObjectId, newSchema: Option[GenericSchema], info: Option[String], path: Path): Unit = {
+    assert(newSchema.isDefined || info.isDefined)
+    val newContentJson = JObject(Seq(info.toSeq.map("info" -> JString(_)), newSchema.toSeq.map("schema" -> _.toJson)).flatten:_*)
+    val newContentStr =  pretty(newContentJson)
     val indexFile = getIndexPath(dataObjectId, "schema", path)
     val (newFilename, newFile) = getDataPath(dataObjectId, "schema", path)
     val latestSchema = getLatestData(dataObjectId, "schema", path)
-    if (!latestSchema.contains(newSchemaStr)) {
+    if (!latestSchema.contains(newContentStr)) {
       logger.info(s"Writing schema file $newFile and updating index")
-      Files.write(newFile, newSchemaStr.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+      Files.write(newFile, newContentStr.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
       Files.write(indexFile, (newFilename + System.lineSeparator).getBytes, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
     }
   }
