@@ -140,7 +140,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path $path. The table will use the existing path definition $hadoopPathHolder!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
