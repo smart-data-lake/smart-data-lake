@@ -19,20 +19,26 @@
 
 package io.smartdatalake.meta.configexporter
 
+import org.json4s.StringInput
+import org.json4s.jackson.JsonMethods
 import org.scalatest.FunSuite
 
 import java.io.File
+import org.json4s.JsonDSL._
+import org.json4s._
 
 class ConfigJsonExporterTest extends FunSuite {
 
   test("export config") {
     val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter").getPath), descriptionPath = Some(getClass.getResource("/dagexporter/description").getPath))
     val actualOutput = ConfigJsonExporter.exportConfigJson(exporterConfig)
-    assert(actualOutput.contains("_origin"))
-    assert(actualOutput.contains("dagexporterTest.conf"))
-    assert(actualOutput.contains("lineNumber"))
-    assert(actualOutput.contains("actionId1"))
-    assert(actualOutput.contains("_columnDescription"))
+    val actualJsonOutput = JsonMethods.parse(StringInput(actualOutput))
+    assert((actualJsonOutput \ "actions").children.size === 8)
+    assert((actualJsonOutput \ "dataObjects").children.size === 14)
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(66))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))
   }
 
   test("test main") {

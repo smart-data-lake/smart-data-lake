@@ -1,6 +1,7 @@
 package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config.{ConfigRenderOptions, ConfigValueFactory}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
@@ -70,8 +71,12 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
     sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config,key) => config.withoutPath(key))
     // enrich origin of first class config objects
-    val descriptionRegex = "(.*): ([0-9]+)(-[0-9]+)?".r
+    val descriptionRegex = """([^\s,]*):\s*([0-9]+)(-[0-9]+)?""".r.unanchored
     val configSectionsToEnrich =  Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
+    val configBasePaths = exporterConfig.configPaths.map(new Path(_)).map{
+        case p if p.getName.endsWith(".conf") => p.getParent.toString // if it is a file, take its parent folder as base path
+        case p => p.toString
+      }
     if (exporterConfig.enrichOrigin) {
       sdlConfig = configSectionsToEnrich.filter(sdlConfig.hasPath).foldLeft(sdlConfig) {
         case (config, sectionKey) =>
@@ -80,38 +85,47 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
               val objectConfig = config.getConfig(s"$sectionKey.$objectKey")
               // parse origins description, as we can not access the detailed private properties
               // note that currently endLineNumber is not filled by Hocon parser, even though it is foreseen in the code.
-              val (path, lineNumber, endLineNumber) = objectConfig.origin.description() match {
+              objectConfig.origin.description() match {
                 case descriptionRegex(path, lineNumber, endLineNumber) =>
-                  val relativePath = exporterConfig.configPaths.find(path.contains)
+                  // relativize path
+                  val relativePath = configBasePaths.find(path.contains)
                     .map(configPath => path.split(configPath).last.dropWhile("\\/".contains(_))).getOrElse(path)
-                  (relativePath, lineNumber.toInt, Option(endLineNumber).map(_.toInt))
+                  // add to config
+                  val origin = Seq(
+                    Some("path" -> relativePath),
+                    Some("lineNumber" -> lineNumber.toInt),
+                    Option(endLineNumber).map("endLineNumber" -> _.toInt)
+                  ).flatten.toMap
+                  config.withValue(s"$sectionKey.$objectKey._origin", ConfigValueFactory.fromMap(origin.asJava))
               }
-              val config1 = config
-                .withValue(s"$sectionKey.$objectKey._origin.path", ConfigValueFactory.fromAnyRef(path))
-                .withValue(s"$sectionKey.$objectKey._origin.lineNumber", ConfigValueFactory.fromAnyRef(lineNumber))
-              if (endLineNumber.isDefined) config1.withValue(s"$sectionKey.$objectKey._origin.endLineNumber", ConfigValueFactory.fromAnyRef(endLineNumber.get))
-              else config1
           }
       }
     }
-    // enrich optional column description from description files
-    val columnDescriptionRegex = "\\s*@column\\s+[\"`']?([^\\s]*?)[\"`']?+\\s+(.*)".r.anchored
+    // enrich optional column description from description files.r
+    val columnDescriptionRegex = """\s*@column\s+["`']?([^\s"`']+)["`']?\s+(.*)""".r.anchored
     exporterConfig.descriptionPath.foreach { path =>
       val hadoopPath = new Path(path, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
       implicit val filesystem: FileSystem = hadoopPath.getFileSystem(defaultHadoopConf)
       logger.info(s"Searching DataObject description files in $hadoopPath")
-      RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory).toSeq
-      .map { p =>
-        val dataObjectId = p.getPath.getName.split('.').head
-        val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator
-          .collect {
-            case columnDescriptionRegex(name, description) =>
-              (name, description.trim)
-          }.toMap
-        if (descriptions.nonEmpty) {
-          sdlConfig = sdlConfig.withValue(s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
+      RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory)
+        .filter(_.getPath.getName.endsWith(".md")).toSeq // only markdown files
+        .foreach { p =>
+          val dataObjectId = p.getPath.getName.split('.').head
+          val dataObjectPath = s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId"
+          if (sdlConfig.hasPath(dataObjectPath)) {
+            val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator
+              .collect {
+                case columnDescriptionRegex(name, description) =>
+                  (name, description.trim)
+              }.filter(_._2.nonEmpty).toMap
+            if (descriptions.nonEmpty) {
+              logger.info(s"(${DataObjectId(dataObjectId)}) Merging ${descriptions.size} column descriptions")
+              sdlConfig = sdlConfig.withValue(s"$dataObjectPath._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
+            }
+          } else {
+            logger.error(s"(${DataObjectId(dataObjectId)}) Markdown file found, but DataObject does not exist in configuration")
+          }
         }
-      }
     }
     // render config as json
     sdlConfig.root.render(ConfigRenderOptions.concise())

@@ -7,4 +7,4 @@ Ein paar Spalten Beschreibungen
 ## Stammdaten 2
 Und noch ein paar Beschreibungen in einem Array
 @column `c.c1` Beschreibung C1
-@column `c.c2` {kW} Kilowattstunden Gesamt C2
+@column `c.c2` Beschreibung C2
