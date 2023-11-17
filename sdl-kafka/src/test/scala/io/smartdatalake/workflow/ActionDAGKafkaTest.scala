@@ -190,7 +190,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
     val delaySecs = 10
     val action1Delay10s = CopyAction("a", srcDO.id, tgt1DO.id,
-      executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - 10)"))))
+      executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - $delaySecs)"))))
 
     // first dag run
     {
@@ -205,9 +205,10 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
     // second dag run
     {
-      Thread.sleep(1000) // make sure to wait 1s
+      val delaySecs = 1
+      Thread.sleep(delaySecs*1000 + 500) // make sure to wait 1s
       val action1Delay1s = action1Delay10s.copy(
-        executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - 1)"))))
+        executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - $delaySecs)"))))
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay1s))
       dag.prepare(contextPrep)
       dag.init(contextInit)

@@ -33,9 +33,8 @@ import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.Pa
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-import sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl
 
-import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.{InvocationTargetException, ParameterizedType}
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
@@ -127,7 +126,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
           throw targetException
       }
 
-    val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedTypeImpl].getActualTypeArguments.head.getTypeName
+    val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedType].getActualTypeArguments.head.getTypeName
     val columsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
     val resAsDF = res.asInstanceOf[Dataset[_]].toDF
