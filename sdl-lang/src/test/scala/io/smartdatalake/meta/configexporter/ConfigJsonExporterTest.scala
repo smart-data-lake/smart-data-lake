@@ -39,6 +39,7 @@ class ConfigJsonExporterTest extends FunSuite {
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))
+    assert((actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "b.[].b1").asInstanceOf[JString].s.linesIterator.toSeq === Seq("Beschreibung B1","2nd line B1 text"))
   }
 
   test("test main") {

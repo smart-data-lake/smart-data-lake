@@ -3,6 +3,7 @@ Ein paar Spalten Beschreibungen
 @column `a` Beschreibung A
 @column `b` Die Beschreibung für B
 @column `b.[].b1` Beschreibung B1
+2nd line B1 text
 
 ## Stammdaten 2
 Und noch ein paar Beschreibungen in einem Array

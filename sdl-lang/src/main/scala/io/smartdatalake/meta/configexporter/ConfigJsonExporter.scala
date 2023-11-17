@@ -113,11 +113,21 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
           val dataObjectId = p.getPath.getName.split('.').head
           val dataObjectPath = s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId"
           if (sdlConfig.hasPath(dataObjectPath)) {
-            val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator
-              .collect {
-                case columnDescriptionRegex(name, description) =>
-                  (name, description.trim)
-              }.filter(_._2.nonEmpty).toMap
+            val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator.foldLeft((Seq[(String,String)](), false)) {
+                // if new column description tag, add new column description
+                case ((descriptions,_), columnDescriptionRegex(name, description)) =>
+                  (descriptions :+ (name, description.trim), true)
+                // if new header tag and column description open, close column description
+                case ((descriptions, true), line) if line.startsWith("#") =>
+                  (descriptions, false)
+                // if last column description open, add line to last column description text
+                case ((descriptions,true), line) =>
+                  val (lastName, lastDesc) = descriptions.last
+                  (descriptions.init :+ (lastName, (lastDesc + System.lineSeparator() + line.trim).trim), true)
+                // if last column description closed, ignore line
+                case ((descriptions,false), _) =>
+                  (descriptions, false)
+            }._1.filter(_._2.nonEmpty).toMap
             if (descriptions.nonEmpty) {
               logger.info(s"(${DataObjectId(dataObjectId)}) Merging ${descriptions.size} column descriptions")
               sdlConfig = sdlConfig.withValue(s"$dataObjectPath._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
