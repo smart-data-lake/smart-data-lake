@@ -55,6 +55,7 @@ module.exports = {
         'reference/transformations',
         //'reference/schemaEvolution',
         //'reference/housekeeping',
+            'reference/agents',
         'reference/streaming',
         {'Deployment' : [
           'reference/deploymentOptions',
