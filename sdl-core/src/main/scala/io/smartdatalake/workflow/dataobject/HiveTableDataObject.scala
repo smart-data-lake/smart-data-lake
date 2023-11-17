@@ -333,7 +333,9 @@ case class HiveTableDataObject(override val id: DataObjectId,
         val sizeInBytes = catalogStats(TableStatsType.TableSizeInBytes.toString).asInstanceOf[BigInt]
         val metadata = context.sparkSession.sessionState.catalog.getTableMetadata(table.tableIdentifier)
         val simpleColumns = SparkSchema(metadata.schema).filter(_.dataType.isSimpleType).columns
+        // analyze only if table is not too large (analyzing all columns is expensive)
         if (sizeInBytes <= Environment.analyzeTableColumnMaxBytesThreshold) {
+          logger.info(s"($id) compute column statistics: update=$update lastModifiedAt=$lastModifiedAt lastAnalyzedAt=$lastAnalyzedColumnsAt sizeInBytes=$sizeInBytes")
           HiveUtil.analyzeTableColumns(table, simpleColumns)(context.sparkSession)
         } else {
           logger.warn(s"($id) Columns stats not calculated because table size ($sizeInBytes Bytes) is bigger than setting analyzeTableColumnMaxBytesThreshold (${Environment.analyzeTableColumnMaxBytesThreshold} Bytes)")
