@@ -1,10 +1,10 @@
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ---
 id: build
 title: Build SDL
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 ## Build from Source Code
 In the [getting started guide](../getting-started/setup.md) we used Docker to get you up to speed quickly.

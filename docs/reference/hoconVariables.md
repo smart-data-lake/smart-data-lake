@@ -1,10 +1,10 @@
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ---
 id: hoconVariables
 title: Hocon Variables
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Variables
 Variables can be used to serve various goals. On the one hand, we want to prevent repeating specifications, keep specifications flexible, but also want to be able to change settings at call time. 

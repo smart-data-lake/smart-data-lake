@@ -1,10 +1,10 @@
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ---
 id: commandLine
 title: Command Line
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Launch Java application using Spark-Submit
 SmartDataLakeBuilder is a java application. 
