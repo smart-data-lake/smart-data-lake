@@ -8,9 +8,7 @@ function JsonSchemaViewer() {
 
     return (
         <Layout title="JsonSchemaViewer" noFooter={true} wrapperClassName="schema-viewer-wrapper">
-            <div style={{height: "100vh"}}>
-                <SchemaViewerInBrowser  />
-            </div>
+            <SchemaViewerInBrowser />
         </Layout>
     );
 }

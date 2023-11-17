@@ -26,5 +26,6 @@
 
 .schema-viewer-wrapper {
   display: flex;
-  max-height: calc(100vh - var(--ifm-navbar-height));
+  height: calc(100vh - var(--ifm-navbar-height));
+  overflow-y: hidden;
 }
