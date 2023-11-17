@@ -179,7 +179,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false")
       props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
       props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
-      options.get("groupIdPrefix").foreach(prefix => props.put(ConsumerConfig.GROUP_ID_CONFIG, prefix + context.application))
+      instanceOptions.get("groupIdPrefix").foreach(prefix => props.put(ConsumerConfig.GROUP_ID_CONFIG, prefix + context.application))
       instanceOptions
         .filter { case (k,v) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
         .foreach { case (k,v) => props.put(k.stripPrefix(connection.KafkaConfigOptionPrefix),v)}
