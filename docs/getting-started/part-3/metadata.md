@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 In this part, we are going to dive into the role of descriptive metadata in Smart Data Lake Builder (SDLB) and demonstrate how to define this additional metadata for SDLB objects using the configuration file [solution](../config-examples/application-part3-download-incremental-mode.conf) presented in part 3.
 Descriptive metadata, in the context of SDLB, refers to additional configuration attributes and markdown files that goes beyond the basic "id" of DataObjects and Actions. It is mainly about adding descriptions and tags to configuration object, and other attributes that help manage and explore data effectively. 
 
-While metadata attributes are optional, they can be very useful in many situations, as it is the case of *feeds* for actions.
+While metadata configuration attributes are optional, they can be very useful in many situations.
 
 ## Metadata in DataObject
 SDLB has file-based metadata feature, allowing users to provide additional information when defining DataObjects in the configuration file. This serves as more than just documentation, offering a comprehensive understanding and management of DataObjects by providing detailed descriptions, as well as labels for layers, subject areas, and tags
