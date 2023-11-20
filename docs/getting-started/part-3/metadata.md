@@ -8,7 +8,8 @@ import TabItem from '@theme/TabItem';
 
 ## Goal
 
-In this part, we are going to dive into the role of metadata in the Smart Data Lake Builder (SDLB) and demonstrates how to define metadata for SDLB objects using the configuration file [solution](../config-examples/application-part3-download-incremental-mode.conf) presented in part 3. Metadata, in the context of Smart Data Lake, refers to additional information that goes beyond the basic name and description of DataObjects and Actions. It includes details such as feeds for Actions, tags associated with the component, and other attributes that help manage and explore data effectively. 
+In this part, we are going to dive into the role of descriptive metadata in Smart Data Lake Builder (SDLB) and demonstrate how to define this additional metadata for SDLB objects using the configuration file [solution](../config-examples/application-part3-download-incremental-mode.conf) presented in part 3.
+Descriptive metadata, in the context of SDLB, refers to additional configuration attributes and markdown files that goes beyond the basic "id" of DataObjects and Actions. It is mainly about adding descriptions and tags to configuration object, and other attributes that help manage and explore data effectively. 
 
 While metadata attributes are optional, they can be very useful in many situations, as it is the case of *feeds* for actions.
 
