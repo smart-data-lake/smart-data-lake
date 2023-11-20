@@ -37,7 +37,7 @@ If we check [UI Demo](https://ui-demo.smartdatalake.ch/#/config/dataObjects/ext-
 
 ![ext-deparures-config](ext-deparures-config.png)
 
-For a deeper understanding of our visualization tool, please refer to our [bolg](../../../blog/sdl-uidemo).
+For a deeper understanding of our visualization tool, please refer to this [blog entry](../../../blog/sdl-uidemo).
 :::
 
 ## Metadata in Action
