@@ -723,9 +723,6 @@
                                     </includes>
                                 </artifactSet>
                                 <transformers>
-                                    <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                        <resource>reference.conf</resource>
-                                    </transformer>
                                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                         <manifestEntries>
                                             <Main-Class>io.smartdatalake.app.LocalSmartDataLakeBuilder</Main-Class>
@@ -734,16 +731,16 @@
                                         </manifestEntries>
                                     </transformer>
                                     <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                                    <transformer implementation="io.github.edwgiz.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer" />
+                                    <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer" />
                                 </transformers>
                             </configuration>
                         </execution>
                     </executions>
                     <dependencies>
                         <dependency>
-                            <groupId>io.github.edwgiz</groupId>
-                            <artifactId>log4j-maven-shade-plugin-extensions</artifactId>
-                            <version>${log4j.version}</version>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                            <version>0.1.0</version>
                         </dependency>
                     </dependencies>
                 </plugin>
@@ -866,6 +863,7 @@
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-tags_${scala.binary.version}</artifactId>
                 <version>${spark.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -1026,11 +1024,13 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>${commons-lang3.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-text</artifactId>
                 <version>1.10.0</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>commons-lang</groupId>
@@ -1041,11 +1041,13 @@
                 <groupId>commons-io</groupId>
                 <artifactId>commons-io</artifactId>
                 <version>${commons-io.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>commons-codec</groupId>
                 <artifactId>commons-codec</artifactId>
                 <version>${commons-codec.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -1077,6 +1079,7 @@
                 <artifactId>commons-logging</artifactId>
                 <!-- Hive uses commons-logging 1.1.3 from 0.13 to 1.2 -->
                 <version>1.1.3</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.ivy</groupId>
@@ -1087,6 +1090,7 @@
                 <groupId>com.google.code.findbugs</groupId>
                 <artifactId>jsr305</artifactId>
                 <version>${jsr305.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
@@ -1151,6 +1155,7 @@
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-core</artifactId>
                 <version>${log4j.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <!-- API bridge between log4j 1 and 2 -->
@@ -1409,6 +1414,7 @@
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-compiler</artifactId>
                 <version>${scala.version}</version>
+                <scope>${scala.deps.scope}</scope>
                 <exclusions>
                     <exclusion>
                         <groupId>org.scala-lang.modules</groupId>
@@ -1420,11 +1426,13 @@
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-reflect</artifactId>
                 <version>${scala.version}</version>
+                <scope>${scala.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-library</artifactId>
                 <version>${scala.version}</version>
+                <scope>${scala.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.scala-lang.modules</groupId>
@@ -1594,6 +1602,7 @@
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro</artifactId>
                 <version>${avro.version}</version>
+                <scope>${spark.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.avro</groupId>

@@ -111,19 +111,17 @@
             <scope>${spark.deps.scope}</scope>
         </dependency>
 
-        <!-- this needs to have compile scope, if it's runtime it doesnt compile anymore -->
         <!-- this is an unused declared dependency, but it's needed to override scope -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-tags_${scala.minor.version}</artifactId>
             <version>${spark.version}</version>
-            <scope>compile</scope>
+            <scope>${spark.deps.scope}</scope>
         </dependency>
 
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>${commons-io.version}</version>
         </dependency>
 
         <dependency>
