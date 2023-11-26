@@ -3,6 +3,7 @@ package io.smartdatalake.meta.configexporter
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
+import io.smartdatalake.util.misc.FileUtil.readFile
 import io.smartdatalake.util.misc.{ProductUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -95,31 +96,29 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
 
     // get and write Schemas
     val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>
-      try {
-        logger.info(s"get schema for ${dataObject.id} (${dataObject.getClass.getSimpleName})")
-        val exportedSchema = dataObject match {
-          case dataObject: SparkFileDataObject =>
-            val schema = Try(dataObject.getSchema)
-            val info = schema match {
-              case Success(Some(s)) => None
-              case Success(None) => Some(s"${dataObject.id} of type ${dataObject.getClass.getSimpleName} did not return a schema")
-              case Failure(ex) => Some(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
-            }
-            Some((schema.toOption.flatten, info, schema.isSuccess))
-          case dataObject: CanCreateDataFrame =>
-            val schema = Try(dataObject.getDataFrame(Seq(), dataObject.getSubFeedSupportedTypes.head).schema)
-            val info = schema.failed.toOption.map(ex => s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
-            Some((schema.toOption, info, schema.isSuccess))
-          case _ => None
-        }
-        exportedSchema.foreach {
-          case (schema, info, _) =>
-            info.foreach(logger.warn)
-            writeSchemaIfChanged(dataObject.id, schema, info, path)
-        }
-        // return true if no exception
-        exportedSchema.forall(_._3)
+      logger.info(s"get schema for ${dataObject.id} (${dataObject.getClass.getSimpleName})")
+      val exportedSchema = dataObject match {
+        case dataObject: SparkFileDataObject =>
+          val schema = Try(dataObject.getSchema)
+          val info = schema match {
+            case Success(Some(s)) => None
+            case Success(None) => Some(s"${dataObject.id} of type ${dataObject.getClass.getSimpleName} did not return a schema")
+            case Failure(ex) => Some(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+          }
+          Some((schema.toOption.flatten, info, schema.isSuccess))
+        case dataObject: CanCreateDataFrame =>
+          val schema = Try(dataObject.getDataFrame(Seq(), dataObject.getSubFeedSupportedTypes.head).schema)
+          val info = schema.failed.toOption.map(ex => s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+          Some((schema.toOption, info, schema.isSuccess))
+        case _ => None
       }
+      exportedSchema.foreach {
+        case (schema, info, _) =>
+          info.foreach(logger.warn)
+          writeSchemaIfChanged(dataObject.id, schema, info, path)
+      }
+      // return true if no exception
+      exportedSchema.forall(_._3)
     }.maxOption
     require(!atLeastOneSchemaSuccessful.contains(false), "Schema export failed for all DataObjects!")
 
@@ -183,11 +182,5 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     val filename = s"${dataObjectId.id}.$tpe.${System.currentTimeMillis() / 1000}.json"
     val file = path.resolve(filename)
     (filename, file)
-  }
-
-  private def readFile(file: File): String = {
-    Using(Source.fromFile(file)) {
-      _.getLines().mkString(System.lineSeparator)
-    }.get
   }
 }

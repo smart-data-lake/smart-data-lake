@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -31,7 +32,6 @@ import org.scalatest.FunSuite
 
 import java.nio.file.Files
 import java.time.{Duration, LocalDateTime}
-
 import scala.collection.JavaConverters._
 
 class ActionDAGRunTest extends FunSuite {
@@ -61,6 +61,12 @@ class ActionDAGRunTest extends FunSuite {
     // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)
+  }
+
+  test("read old state version") {
+    val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
+    val migratedState = ActionDAGRunState.fromJson(stateContent)
+    assert(migratedState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion)
   }
 
   test("append to state index file") {
