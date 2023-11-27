@@ -8,36 +8,36 @@ import styles from './styles.module.css';
 
 const features = [
   {
-    title: 'Powered by Apache Spark',
-    imageUrl: 'img/Apache_Spark_logo.svg',
+    title: 'Automated',
+    imageUrl: 'img/idx_automated.png',
     description: (
       <>
-        Smart Data Lake Builder builds on top of Apache Spark and as such
-          brings a rich functionality toolset out of the box.
+        Smart Data Lake Builder automates your data pipelines
+        and abstracts tedious tasks so you can maximize your efficiency.
       </>
     ),
   },
   {
-    title: 'Meta data driven',
-    imageUrl: 'img/checklist.svg',
+    title: 'Declarative',
+    imageUrl: 'img/idx_declarative.png',
     description: (
       <>
-        Metadata defines your pipelines. <br></br>
-        Smart Data Lake Builder will do
-            the magic to optimally execute them.
+        A declarative, metadata driven approach
+        simplifies development by supporting low-code configuration pipelines
+        up to complex code integration in the language of your choice.
       </>
     ),
   },
   {
-    title: 'Open Ecosystem',
-    imageUrl: 'img/chain.svg',
+    title: 'Open',
+    imageUrl: 'img/idx_open.png',
     description: (
       <>
-        No vendor lock-in as we're building on open source.
-          See <code>docs</code> and get started right away.
+        Build with the support of many open source projects and distributed freely under GPL-3.0. <br/>
+        No vendor lock-in, flexible deployment modes from local over on-prem to public hyperscalers.
       </>
     ),
-  },
+  }
 ];
 
 function Feature({imageUrl, title, description}) {
