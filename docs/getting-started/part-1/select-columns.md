@@ -235,8 +235,8 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 </TabItem>
 </Tabs>
 
-:::danger
-Note the regex feed selection .* need to be specified in quotation marks (`'.*'` or `".*"`), otherwise our system would substitute the asterisk.
+:::warning
+Note the regex feed selection `.*` need to be specified in quotation marks (`'.*'` or `".*"`), otherwise our system would substitute the asterisk.
 :::
 
 

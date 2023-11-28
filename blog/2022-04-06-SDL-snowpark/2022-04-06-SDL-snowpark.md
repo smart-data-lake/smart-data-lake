@@ -12,7 +12,7 @@ hide_table_of_contents: false
 
 This article shows how to create one unified data pipeline that uses Spark to ingest data into Snowflake, and Snowpark to transform data inside Snowflake.
 
-\<!--truncate-->
+<!--truncate-->
 
 Recent developments in Smart Data Lake Builder (SDLB) included refactorings to integrate alternative execution engines to Spark.
 In particular [Snowpark](https://docs.snowflake.com/en/developer-guide/snowpark/index.html) integration was implemented, a Spark like DataFrame API for implementing transformations in Snowflake.
@@ -63,39 +63,39 @@ We will use Spark to fill Staging and Integration Layer, and Snowpark for transf
 
 First we have add SDLBs Snowflake library to the projects pom.xml dependencies section:
 ```
-  \<dependencies>
+  <dependencies>
     ....
-    \<dependency>
-      \<groupId>io.smartdatalake\</groupId>
-      \<artifactId>sdl-snowflake_$\{scala.minor.version}\</artifactId>
-      \<version>$\{project.parent.version}\</version>
-    \</dependency>
+    <dependency>
+      <groupId>io.smartdatalake</groupId>
+      <artifactId>sdl-snowflake_${scala.minor.version}</artifactId>
+      <version>${project.parent.version}</version>
+    </dependency>
     ...
-  \</dependencies>
+  </dependencies>
 ```
 Then SDLB version needs to be updated to version 2.3.0-SNAPSHOT at least in the parent section:
 ```
-  \<parent>
-    \<groupId>io.smartdatalake\</groupId>
-    \<artifactId>sdl-parent\</artifactId>
-    \<version>2.3.0-SNAPSHOT\</version>
-  \</parent>
+  <parent>
+    <groupId>io.smartdatalake</groupId>
+    <artifactId>sdl-parent</artifactId>
+    <version>2.3.0-SNAPSHOT</version>
+  </parent>
 ```
 ## Define Snowflake connection
 
 To define the Snowflake connection in config/application.conf, add connections section with connection "sf-con", and fill in informations according to prerequisits:
 ```
-  connections \{
-    sf-con \{
+  connections {
+    sf-con {
       type = SnowflakeTableConnection
-      url = "\<accountUrl>",
+      url = "<accountUrl>",
       warehouse = "COMPUTE_WH",
       database = "testdb",
       role = "ACCOUNTADMIN",
-      authMode = \{
+      authMode = {
         type = BasicAuthMode
-        userVariable = "CLEAR#\<username>"
-        passwordVariable = "CLEAR#\<pwd>"
+        userVariable = "CLEAR#<username>"
+        passwordVariable = "CLEAR#<pwd>"
     }
   }
 ```
@@ -103,28 +103,28 @@ To define the Snowflake connection in config/application.conf, add connections s
 
 Now we can change the DataObject type to SnowflakeTableDataObject and the new Snowflake connection, adding the definition of the table:
 ```
-  int-airports \{
+  int-airports {
     type = SnowflakeTableDataObject
     connectionId = sf-con
-    table \{
+    table {
       db = "test"
       name = "int_airports"
     }
   }
 
-  btl-departures-arrivals-airports \{
+  btl-departures-arrivals-airports {
     type = SnowflakeTableDataObject
     connectionId = sf-con
-    table \{
+    table {
       db = "test"
       name = "btl_departures_arrivals_airports"
     }
   }
 
-  btl-distances \{
+  btl-distances {
     type = SnowflakeTableDataObject
     connectionId = sf-con
-    table \{
+    table {
       db = "test"
       name = "btl_distances"
     }
@@ -138,13 +138,13 @@ The new SDLB version introduced some naming changes:
 - The CustomSparkAction can now also process Snowpark-DataFrames and is therefore renamed to CustomDataFrameAction.
 - The ScalaClassDfTransformer was specific for Spark. In the new SDLB version there is a specific scala-class DataFrame transformer for Spark and Snowpark, e.g. ScalaClassSparkDfTransformer and ScalaClassSnowparkDfTransformer. And there is even a ScalaClassGenericDfTransformer to implement transformations using a unified API. In our case we will migrate the transformation to use Snowpark and set the type to ScalaClassSnowparkDfTransformer.
 ```
-  join-departures-airports \{
+  join-departures-airports {
     type = CustomSparkAction -> CustomDataFrameAction
     ...
 
-  compute-distances \{
+  compute-distances {
     ...
-    transformers = [\{
+    transformers = [{
       type = ScalaClassDfTransformer -> ScalaClassSnowparkDfTransformer
 ```
 There is no need to change the SQL transformtions of join-departures-airport, as the SQL should run on Snowpark aswell.
@@ -152,17 +152,17 @@ There is no need to change the SQL transformtions of join-departures-airport, as
 On the other hand the ComputeDistanceTransformer was implemented with the Spark DataFrame API. We need to migrate it to Snowpark DataFrame API to run this Action with Snowpark. Luckily the API's are very similar. Often it's sufficient to change the import statement, the class we're extending and the session parameters type:
 ```
   import com.snowflake.snowpark.functions._
-  import com.snowflake.snowpark.\{DataFrame, Session}
+  import com.snowflake.snowpark.{DataFrame, Session}
   import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 
-  class ComputeDistanceTransformer extends CustomSnowparkDfTransformer \{
-    def transform(session: Session, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame = \{
+  class ComputeDistanceTransformer extends CustomSnowparkDfTransformer {
+    def transform(session: Session, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame = {
       ...
 ```
 If you have UDFs in your code, it gets trickier. The UDF Code gets serialized to Snowflake, details see [Snowpark UDFs](https://docs.snowflake.com/en/developer-guide/snowpark/scala/creating-udfs.html). Special care must be taken to minimize the scope the UDF is defined in. Thats why we move the function into the companion object.
 ```
-  object ComputeDistanceTransformer \{
-    def calculateDistanceInKilometer(depLat: Double, depLng: Double, arrLat: Double, arrLng: Double): Double = \{
+  object ComputeDistanceTransformer {
+    def calculateDistanceInKilometer(depLat: Double, depLng: Double, arrLat: Double, arrLng: Double): Double = {
       val AVERAGE_RADIUS_OF_EARTH_KM = 6371
       val latDistance = Math.toRadians(depLat - arrLat)
       val lngDistance = Math.toRadians(depLng - arrLng)
@@ -170,8 +170,8 @@ If you have UDFs in your code, it gets trickier. The UDF Code gets serialized to
       val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       AVERAGE_RADIUS_OF_EARTH_KM * c
     }
-    def getCalculateDistanceInKilometerUdf(session: Session) = \{
-      // using only udf(...) function results in "SnowparkClientException: Error Code: 0207, Error message: No default Session found. Use \<session>.udf.registerTemporary() to explicitly refer to a session."
+    def getCalculateDistanceInKilometerUdf(session: Session) = {
+      // using only udf(...) function results in "SnowparkClientException: Error Code: 0207, Error message: No default Session found. Use <session>.udf.registerTemporary() to explicitly refer to a session."
       session.udf.registerTemporary(ComputeDistanceTransformer.calculateDistanceInKilometer _)
     }
   }
@@ -191,15 +191,15 @@ Lets build an update SDLB docker image with the updated SDLB version:
 Then compile the code with the UDF:
 ```
   mkdir .mvnrepo
-  podman run -v $\{PWD}:/mnt/project -v $\{PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
+  podman run -v ${PWD}:/mnt/project -v ${PWD}/.mvnrepo:/mnt/.mvnrepo maven:3.6.0-jdk-11-slim -- mvn -f /mnt/project/pom.xml "-Dmaven.repo.local=/mnt/.mvnrepo" package
 ```
 Download initial data with `--feed-sel download`:
 ```
-  podman run --rm -v $\{PWD}/data:/mnt/data -v $\{PWD}/target:/mnt/lib -v $\{PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+  podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
 ```
 Compute with `--feed-sel compute`:
 ```
-  podman run --rm -v $\{PWD}/data:/mnt/data -v $\{PWD}/target:/mnt/lib -v $\{PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
+  podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
 ```
 If the SDLB run was SUCCESSFUL, you should now see TEST.BTL_DISTANCES table in Snowpark.
 To check that Spark was used for Action select-airport-cols and Snowpark for Action compute-distances, look for the following logs, e.g. SnowparkSubFeed for Action~compute-distances: 
@@ -216,10 +216,10 @@ An Action determines the engine to use in Init-phase by checking the supported t
 
 Add a DataObject int-departures:
 ```
-  int-departures \{
+  int-departures {
     type = SnowflakeTableDataObject
     connectionId = sf-con
-    table \{
+    table {
       db = "test"
       name = "int_departures"
     }
@@ -227,11 +227,11 @@ Add a DataObject int-departures:
 ```
 Add an Action copy-departures:
 ```
-  copy-departures \{
+  copy-departures {
     type = CopyAction
     inputId = stg-departures
     outputId = int-departures
-    metadata \{
+    metadata {
       feed = compute
     }
   }
@@ -242,7 +242,7 @@ Fix inputs of Action join-departures-airports:
 ```
 ... and code of the first SQL transformer:
 ```
-  code = \{
+  code = {
     btl-connected-airports = """
       select int_departures.estdepartureairport, int_departures.estarrivalairport, airports.*
       from int_departures join int_airports airports on int_departures.estArrivalAirport = airports.ident
