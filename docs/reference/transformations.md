@@ -293,7 +293,7 @@ For custom transformers, you can therefore provide additional options:
 
 
 ##### In SQL
-If you want to use options in SQL, the syntax is %{key}:
+If you want to use options in SQL, the syntax is %\{key}:
 ```
 transformers = [{
   type = SQLDfTransformer

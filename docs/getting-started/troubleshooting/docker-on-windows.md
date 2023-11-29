@@ -30,7 +30,7 @@ For [part 2 of this guide](../part-2/delta-lake-format.md), you need docker-comp
 For composing multiple podman containers, you can just execute our custom script podman-compose.sh from the getting-started base directory.
 
 After running the script in the getting-started folder you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
-If the port is not accessible, you can use `wsl hostname -I` on Windows command line to get the IP adress of WSL, and then access Polynote over {ip-address}:8192.
+If the port is not accessible, you can use `wsl hostname -I` on Windows command line to get the IP adress of WSL, and then access Polynote over \{ip-address}:8192.
 
 ## Known Issue with podman on WSL2 on Windows
 
