@@ -9,7 +9,7 @@ import styles from './styles.module.css';
 const features = [
   {
     title: 'Automated',
-    imageUrl: 'img/idx_automated.png',
+    imageUrl: 'img/idx_automated_200px.png',
     description: (
       <>
         Smart Data Lake Builder automates your data pipelines
@@ -19,7 +19,7 @@ const features = [
   },
   {
     title: 'Declarative',
-    imageUrl: 'img/idx_declarative.png',
+    imageUrl: 'img/idx_declarative_200px.png',
     description: (
       <>
         A declarative, metadata driven approach
@@ -30,7 +30,7 @@ const features = [
   },
   {
     title: 'Open',
-    imageUrl: 'img/idx_open.png',
+    imageUrl: 'img/idx_open_200px.png',
     description: (
       <>
         Build with the support of many open source projects and distributed freely under GPL-3.0. <br/>
