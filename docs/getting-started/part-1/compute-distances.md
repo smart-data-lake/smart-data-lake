@@ -14,10 +14,12 @@ so that our railway enthusiast Tom can see which planes could be replaced by rai
 ## Define output object
 Let's define our final output object for this part:
 
-      btl-distances {
-        type = CsvFileDataObject
-        path = "~{id}"
-      }
+```
+  btl-distances {
+    type = CsvFileDataObject
+    path = "~{id}"
+  }
+```
 
 
 ## Define compute_distances action
@@ -44,18 +46,20 @@ It also adds a column *could_be_done_by_rail* to the output that simply checks i
 
 In order to wire this CustomTransformation into our config, we add the following action:
 
-      compute-distances {
-        type = CopyAction
-        inputId = btl-departures-arrivals-airports
-        outputId = btl-distances
-        transformers = [{
-          type = ScalaClassSparkDfTransformer
-          className = com.sample.ComputeDistanceTransformer
-        }]
-        metadata {
-          feed = compute
-        }
-      }
+```
+  compute-distances {
+    type = CopyAction
+    inputId = btl-departures-arrivals-airports
+    outputId = btl-distances
+    transformers = [{
+      type = ScalaClassSparkDfTransformer
+      className = com.sample.ComputeDistanceTransformer
+    }]
+    metadata {
+      feed = compute
+    }
+  }
+```
 
 We used a CopyAction and told it to execute the code in the class *com.sample.ComputeDistanceTransformer* to transform the data.
 We could also have used a CustomDataFrameAction like in the previous step, 
@@ -129,7 +133,7 @@ Under *data/btl-distances* you can now see the final result.
 ### The Execution DAG of the compute feed
 
 In the console, you probably started noticing some pretty ASCII Art that looks like this:
-
+```
                          ┌─────┐
                          │start│
                          └┬──┬─┘
@@ -149,7 +153,7 @@ In the console, you probably started noticing some pretty ASCII Art that looks l
        ┌────────────────────────────────────────┐
        │compute_distances SUCCEEDED PT1.160045S│
        └────────────────────────────────────────┘
-
+```
 This is the Execution *DAG* of our data pipeline. 
 SDL internally builds a Directed Acyclic Graph (DAG) to analyze all dependencies between your actions. 
 Because it's acyclic, it cannot have loops, so it's impossible to define an action that depends on an output of subsequent actions.
@@ -194,7 +198,7 @@ podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/con
 </Tabs>        
 
 The successful execution DAG looks like this
-
+```
                                             ┌─────┐
                                             │start│
                                             └─┬─┬─┘
@@ -218,7 +222,7 @@ The successful execution DAG looks like this
                            ┌───────────────────────────────────────┐
                            │compute_distances SUCCEEDED PT1.404391S│
                            └───────────────────────────────────────┘
-
+```
 SDL was able to determine that download-airports and download-departures can be executed in parallel,
 independently from each other. It's only at join-departures-airports and beyond that both Data Sources are needed.
 
@@ -231,7 +235,7 @@ Per default, it's set to 1.
 If you set the option *readTimeoutMs=0* in the DataObject *ext-departures*  it's possible that the *download-departures* action fails.
 That's because SDL abandons the download because the REST-Service is too slow to respond.
 If that happens, the DAG will look like this:
-
+```
     21/09/14 09:05:36 ERROR ActionDAGRun: Exec: TaskFailedException: Task download-departures failed. Root cause is 'WebserviceException: connect timed out': WebserviceException: connect timed out
     21/09/14 09:05:36 INFO ActionDAGRun$: Exec FAILED for .* runId=1 attemptId=1:
                                            ┌─────┐
@@ -258,7 +262,7 @@ If that happens, the DAG will look like this:
                                 ┌───────────────────────────┐
                                 │compute-distances CANCELLED│
                                 └───────────────────────────┘
-
+```
 As you can see, in this example, the action *download-departures* failed because of a timeout.
 Because SDL determined that both downloads are independent, it was able to complete *select-airport-cols* succesfully.
 

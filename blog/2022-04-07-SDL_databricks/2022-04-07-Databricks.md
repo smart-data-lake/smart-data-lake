@@ -86,7 +86,7 @@ Let's get started:
 	  }
 	  stg-ab {
 	    type = CsvFileDataObject
-	    schema = """id integer, name string, host_id integer, host_name string, neighbourhood_group string, neighbourhood string, latitude double, longitude double, room_type  string, price integer, minimum_nights integer, number_of_reviews integer, last_review timestamp, reviews_per_month double, calculated_host_listings_count integer,          availability_365 integer"""
+	    schema = """id integer, name string, host_id integer, host_name string, neighbourhood_group string, neighbourhood string, latitude double, longitude double, room_type  string, price integer, minimum_nights integer, number_of_reviews integer, last_review timestamp, reviews_per_month double, calculated_host_listings_count integer, availability_365 integer"""
 	    path = "file:///dbfs/data/~{id}"
 	  }
 	  int-ab {
@@ -152,11 +152,14 @@ Let's get started:
     ![table](table.png)
 
     :::info
+
     Note that our final table was defined as `DeltaLakeTableDataObject`.
 		With that, Smart Data Lake Builder automatically generates a Delta Lake Table in your Databricks workspace. 
+
+	:::
 
 
 ## Lessons Learned
 There are a few steps necessary, including building and uploading SDLB. 
 Further, we need to be careful with the used versions of the underlying libraries. 
-With these few steps we can reveal the power of SDLB and Databricks, creating a portable and reproducible pipeline into a Databricks Lakehouse.  
+With these few steps we can reveal the power of SDLB and Databricks, creating a portable and reproducible pipeline into a Databricks Lakehouse.

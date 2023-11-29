@@ -32,7 +32,7 @@ Create a directory called config in your current working directory and an empty 
 
 ## Define departures objects
 Add the following lines to your configuration file:
-
+```
     dataObjects {
       ext-departures {
         type = WebserviceFileDataObject
@@ -44,7 +44,7 @@ Add the following lines to your configuration file:
         path = "~{id}"
       }
     }
-
+```
 :::caution
 Note that the API Call **may freeze** as the timestamps provided under **begin=1696854853&end=1697027653** get older. When that's the case, simply replace them with more recent timestamps.
 You can go on https://www.epochconverter.com/ and set "end" to the current time in seconds and "begin" to the current time in seconds minus 2 days.
@@ -74,12 +74,13 @@ This data object acts as a target for our first action, so where and how to down
 We set type to JsonFileDataObject because we know from before that the webservice will return a json file.
 Path defines where the file will be stored. You could choose any name you want, but most of the time, the name of your DataObject is a good fit.
 Instead of writing *stg-departures* again,
-we used the placeholder *~{id}* which gets replaced by the DataObject-ID. Don't forget to surround that placeholder
+we used the placeholder *~\{id}* which gets replaced by the DataObject-ID. Don't forget to surround that placeholder
 with double quotes so that it is interpreted as a string.
 We defined a relative path - it is relative to the working directory SDL is started in. 
 The working directory has been set to the *data* directory in the Dockerfile by setting the JVM Property 
-
-    -Duser.dir=/mnt/data
+```
+-Duser.dir=/mnt/data
+```
 so that's why all your relative paths will start in the *data* directory.
 
 #### Naming Conventions
@@ -101,7 +102,7 @@ In our case, we simply copy data exactly as is from an external source. Hence, o
 
 ## Define download-ext-departures
 After the `dataObjects` section, add the following lines to your configuration file:
-
+```
     actions {
         download-departures {
           type = FileTransferAction
@@ -112,7 +113,7 @@ After the `dataObjects` section, add the following lines to your configuration f
           }
         }
     }
-
+```
 We added another section called actions, in which, you guessed it, all actions reside.
 We defined our action and called it *download-departures*.
 - The type *FileTransferAction* tells SDL that it should transfer a file from one place to another without any transformation.
