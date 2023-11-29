@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[4021],{4903:a=>{a.exports=JSON.parse('{"label":"housekeeping","permalink":"/blog/tags/housekeeping","allTagsPath":"/blog/tags","count":1,"unlisted":false}')}}]);
