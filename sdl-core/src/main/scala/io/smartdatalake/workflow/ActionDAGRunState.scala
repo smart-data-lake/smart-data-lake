@@ -151,6 +151,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     val attemptId = jValue \ "attemptId" match {
       case JInt(i) => i.toInt
     }
+    assert(formatVersion <= runStateFormatVersion, s"Cannot read state file with formatVersion=${formatVersion} newer than the version of this build (${runStateFormatVersion}). Check state file app=$appName runId=$runId attemptId=$attemptId and that your SDLB version is up-to-date!")
     val migrators = stateMigrators.dropWhile(m => m.versionFrom <= formatVersion)
     if (migrators.nonEmpty) {
       logger.info(s"Applying state migrators ${migrators.mkString(", ")} to state json for app=$appName runId=$runId attemptId=$attemptId")
