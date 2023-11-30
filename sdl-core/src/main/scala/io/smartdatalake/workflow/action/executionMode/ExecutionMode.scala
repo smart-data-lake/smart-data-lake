@@ -58,7 +58,7 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with ConfigHolder 
    */
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = Unit
   /**
-   * Called in init phase to apply execution mode. Result is stored and re-used in execution phase.
+   * Apply execution mode. Called in init and execution phase.
    */
   def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
                                    , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])
