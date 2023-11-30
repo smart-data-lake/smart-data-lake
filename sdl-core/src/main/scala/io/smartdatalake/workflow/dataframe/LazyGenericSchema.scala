@@ -53,4 +53,5 @@ case class LazyGenericSchema(schemaConfig: String) extends GenericSchema {
   override def toLowerCase: GenericSchema = schema.toLowerCase
   override def removeMetadata: GenericSchema = schema.removeMetadata
   override def subFeedType: universe.Type = schema.subFeedType
+  override def treeString(level: Int): String = schema.treeString(level)
 }

@@ -77,11 +77,16 @@ trait GenericDataFrame extends GenericTypedObject {
   private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
 
   /**
-   * Log message and DataFrame content
-   * @param msg Log message to add before DataFrame content
-   * @param loggerFunc Function used to log
+   * Get formatted sample data of DataFrame as String using show method.
+   * @param options options for show method, possible keys are dependent on the subFeedType.
    */
-  def log(msg: String, loggerFunc: String => Unit): Unit
+  def showString(options: Map[String,String] = Map()): String
+
+  /**
+   * Get a formatted execution plan of the DataFrame using explain method.
+   * @param options options for explain method, possible keys are dependent on the subFeedType.
+   */
+  def explainString(options: Map[String,String] = Map()): String
 
   /**
    * Create an Observation of metrics on this DataFrame.
@@ -251,6 +256,7 @@ trait GenericSchema extends GenericTypedObject {
   def columnExists(colName: String): Boolean = {
     GenericSchemaUtil.columnExists(this, colName)
   }
+  def treeString(level: Int): String
 }
 
 /**
