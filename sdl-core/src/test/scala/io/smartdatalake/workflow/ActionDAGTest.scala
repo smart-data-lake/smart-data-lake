@@ -1100,7 +1100,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r1 == Set((5,"waikiki beach")))
 
     // second dag run - no data to process in action a
-    // there should be no exception and action b should run with updated data of src2 and no data of tgt1, means the inner join results in 0 records written to tgt2
+    // there should be no exception and action b should run with updated data of src2 and all data of tgt1 (as skipped SubFeed is reset)
     val df3 = Seq(("doe","john","honolulu")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df3, Seq())
     dag.reset
@@ -1109,11 +1109,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.exec(contextExec)
 
     // check
-    assert(tgt2DO.getSparkDataFrame().isEmpty)
+    assert(tgt2DO.getSparkDataFrame().count == 1)
 
     // check metrics
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
-    assert(action2MainMetrics("records_written")==0 && action2MainMetrics("no_data")==true)
+    assert(action2MainMetrics("records_written")==1)
   }
 
   test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true and ProcessAll mode") {

@@ -20,7 +20,6 @@
 package com.snowflake.snowpark.custom
 
 import com.snowflake.snowpark.DataFrame
-import com.snowflake.snowpark.custom.SnowparkUtils.printSchemaString
 import com.snowflake.snowpark.types.{DataType, NumericType, StructType}
 
 object SnowparkUtils {
