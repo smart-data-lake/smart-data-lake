@@ -93,11 +93,12 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult)
   // not implemented in Snowpark
   override def uncache: GenericDataFrame = this
-  override def log(msg: String, loggerFunc: String => Unit): Unit = {
-    // for Snowpark we cannot print the DataFrame show output to a string. It is just printed to stdout after logging, which is not optimal as order in stdout is not guaranteed like that.
-    loggerFunc(msg)
-    inner.show()
+  override def showString(options: Map[String,String] = Map()): String = {
+    val showNumRows = options.get("showNumRows").map(_.toInt).getOrElse(10)
+    val showWidth = options.get("showWidth").map(_.toInt).getOrElse(200)
+    SnowparkUtils.showString(inner, showNumRows, showWidth)
   }
+  def explainString(options: Map[String,String] = Map()): String = SnowparkUtils.explainString(inner)
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     // Snowpark has no method to observe metrics. They need to be calculated.
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
@@ -153,6 +154,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
   override def makeNullable: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.makeNullable.inner)))
   override def toLowerCase: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.toLowerCase.inner)))
   override def removeMetadata: SnowparkSchema = this // metadata not existing in Snowpark
+  override def treeString(level: Int = Int.MaxValue): String = SnowparkUtils.schemaTreeString(inner, level)
 }
 
 case class SnowparkColumn(inner: Column) extends GenericColumn {
