@@ -1,6 +1,6 @@
 package io.smartdatalake.meta.configexporter
 
-import com.typesafe.config.{ConfigRenderOptions, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigRenderOptions, ConfigValueFactory}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -65,79 +65,88 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   }
 
   def exportConfigJson(exporterConfig: ConfigJsonExporterConfig): String = {
-    val defaultHadoopConf: Configuration = new Configuration()
+    implicit val defaultHadoopConf: Configuration = new Configuration()
     var sdlConfig = ConfigLoader.loadConfigFromFilesystem(exporterConfig.configPaths, defaultHadoopConf)
     // remove additional config paths introduced by system properties...
     val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
     sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config,key) => config.withoutPath(key))
     // enrich origin of first class config objects
-    val descriptionRegex = """([^\s,]*):\s*([0-9]+)(-[0-9]+)?""".r.unanchored
-    val configSectionsToEnrich =  Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
-    val configBasePaths = exporterConfig.configPaths.map(new Path(_)).map{
-        case p if p.getName.endsWith(".conf") => p.getParent.toString // if it is a file, take its parent folder as base path
-        case p => p.toString
-      }
-    if (exporterConfig.enrichOrigin) {
-      sdlConfig = configSectionsToEnrich.filter(sdlConfig.hasPath).foldLeft(sdlConfig) {
-        case (config, sectionKey) =>
-          config.getConfig(sectionKey).root.keySet().asScala.foldLeft(config) {
-            case (config, objectKey) =>
-              val objectConfig = config.getConfig(s"$sectionKey.$objectKey")
-              // parse origins description, as we can not access the detailed private properties
-              // note that currently endLineNumber is not filled by Hocon parser, even though it is foreseen in the code.
-              objectConfig.origin.description() match {
-                case descriptionRegex(path, lineNumber, endLineNumber) =>
-                  // relativize path
-                  val relativePath = configBasePaths.find(path.contains)
-                    .map(configPath => path.split(configPath).last.dropWhile("\\/".contains(_))).getOrElse(path)
-                  // add to config
-                  val origin = Seq(
-                    Some("path" -> relativePath),
-                    Some("lineNumber" -> lineNumber.toInt),
-                    Option(endLineNumber).map("endLineNumber" -> _.toInt)
-                  ).flatten.toMap
-                  config.withValue(s"$sectionKey.$objectKey._origin", ConfigValueFactory.fromMap(origin.asJava))
-              }
-          }
-      }
-    }
-    // enrich optional column description from description files.r
-    val columnDescriptionRegex = """\s*@column\s+["`']?([^\s"`']+)["`']?\s+(.*)""".r.anchored
-    exporterConfig.descriptionPath.foreach { path =>
-      val hadoopPath = new Path(path, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
-      implicit val filesystem: FileSystem = hadoopPath.getFileSystem(defaultHadoopConf)
-      logger.info(s"Searching DataObject description files in $hadoopPath")
-      RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory)
-        .filter(_.getPath.getName.endsWith(".md")).toSeq // only markdown files
-        .foreach { p =>
-          val dataObjectId = p.getPath.getName.split('.').head
-          val dataObjectPath = s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId"
-          if (sdlConfig.hasPath(dataObjectPath)) {
-            val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator.foldLeft((Seq[(String,String)](), false)) {
-                // if new column description tag, add new column description
-                case ((descriptions,_), columnDescriptionRegex(name, description)) =>
-                  (descriptions :+ (name, description.trim), true)
-                // if new header tag and column description open, close column description
-                case ((descriptions, true), line) if line.startsWith("#") =>
-                  (descriptions, false)
-                // if last column description open, add line to last column description text
-                case ((descriptions,true), line) =>
-                  val (lastName, lastDesc) = descriptions.last
-                  (descriptions.init :+ (lastName, (lastDesc + System.lineSeparator() + line.trim).trim), true)
-                // if last column description closed, ignore line
-                case ((descriptions,false), _) =>
-                  (descriptions, false)
-            }._1.filter(_._2.nonEmpty).toMap
-            if (descriptions.nonEmpty) {
-              logger.info(s"(${DataObjectId(dataObjectId)}) Merging ${descriptions.size} column descriptions")
-              sdlConfig = sdlConfig.withValue(s"$dataObjectPath._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
-            }
-          } else {
-            logger.error(s"(${DataObjectId(dataObjectId)}) Markdown file found, but DataObject does not exist in configuration")
-          }
-        }
-    }
+    if (exporterConfig.enrichOrigin) sdlConfig = enrichOrigin(exporterConfig.configPaths, sdlConfig)
+    // enrich optional column description from description files
+    exporterConfig.descriptionPath.foreach(path => sdlConfig = enrichColumnDescription(path, sdlConfig))
     // render config as json
     sdlConfig.root.render(ConfigRenderOptions.concise())
+  }
+
+  private def enrichOrigin(configPaths: Seq[String], config: Config): Config = {
+    val descriptionRegex = """([^\s,]*):\s*([0-9]+)(-[0-9]+)?""".r.unanchored
+    val configSectionsToEnrich = Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
+    val configBasePaths = configPaths.map(new Path(_)).map {
+      case p if p.getName.endsWith(".conf") => p.getParent.toString // if it is a file, take its parent folder as base path
+      case p => p.toString
+    }
+    configSectionsToEnrich.filter(config.hasPath).foldLeft(config) {
+      case (config, sectionKey) =>
+        config.getConfig(sectionKey).root.keySet().asScala.foldLeft(config) {
+          case (config, objectKey) =>
+            val objectConfig = config.getConfig(s"$sectionKey.$objectKey")
+            // parse origins description, as we can not access the detailed private properties
+            // note that currently endLineNumber is not filled by Hocon parser, even though it is foreseen in the code.
+            objectConfig.origin.description() match {
+              case descriptionRegex(path, lineNumber, endLineNumber) =>
+                // relativize path
+                val relativePath = configBasePaths.find(path.contains)
+                  .map(configPath => path.split(configPath).last.dropWhile("\\/".contains(_))).getOrElse(path)
+                // add to config
+                val origin = Seq(
+                  Some("path" -> relativePath),
+                  Some("lineNumber" -> lineNumber.toInt),
+                  Option(endLineNumber).map("endLineNumber" -> _.toInt)
+                ).flatten.toMap
+                config.withValue(s"$sectionKey.$objectKey._origin", ConfigValueFactory.fromMap(origin.asJava))
+            }
+        }
+    }
+  }
+
+  private def enrichColumnDescription(descriptionPath: String, config: Config)(implicit hadoopConf: Configuration): Config = {
+    val columnDescriptionRegex = """\s*@column\s+["`']?([^\s"`']+)["`']?\s+(.*)""".r.anchored
+    var enrichedConfig = config
+    val hadoopPath = new Path(descriptionPath, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
+    implicit val filesystem: FileSystem = hadoopPath.getFileSystem(hadoopConf)
+
+    logger.info(s"Searching DataObject description files in $hadoopPath")
+    RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory)
+      .filter(_.getPath.getName.endsWith(".md")).toSeq // only markdown files
+      .foreach { p =>
+        val dataObjectId = p.getPath.getName.split('.').head
+        val dataObjectPath = s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId"
+        if (enrichedConfig.hasPath(dataObjectPath)) {
+          val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator.foldLeft((Seq[(String, String)](), false)) {
+            // if new column description tag, add new column description
+            case ((descriptions, _), columnDescriptionRegex(name, description)) =>
+              (descriptions :+ (name, description.trim), true)
+            // if new header tag and column description open, close column description
+            case ((descriptions, true), line) if line.startsWith("#") =>
+              (descriptions, false)
+            // if last column description open, add line to last column description text
+            case ((descriptions, true), line) =>
+              val (lastName, lastDesc) = descriptions.last
+              (descriptions.init :+ (lastName, (lastDesc + System.lineSeparator() + line.trim).trim), true)
+            // if last column description closed, ignore line
+            case ((descriptions, false), _) =>
+              (descriptions, false)
+          }._1.filter(_._2.nonEmpty).toMap
+          if (descriptions.nonEmpty) {
+            logger.info(s"(${DataObjectId(dataObjectId)}) Merging ${descriptions.size} column descriptions")
+            enrichedConfig = enrichedConfig.withValue(s"$dataObjectPath._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
+          }
+        } else {
+          logger.error(s"(${DataObjectId(dataObjectId)}) Markdown file found, but DataObject does not exist in configuration")
+        }
+      }
+
+    // return
+    enrichedConfig
   }
 }
