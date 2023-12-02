@@ -1,11 +1,15 @@
 package io.smartdatalake.meta.configexporter
 
-import com.typesafe.config.{Config, ConfigRenderOptions, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue, ConfigValueFactory, ConfigValueType}
+import configs.ConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
+import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
+import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.DataFrameUtil
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
@@ -74,8 +78,52 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     if (exporterConfig.enrichOrigin) sdlConfig = enrichOrigin(exporterConfig.configPaths, sdlConfig)
     // enrich optional column description from description files
     exporterConfig.descriptionPath.foreach(path => sdlConfig = enrichColumnDescription(path, sdlConfig))
+    // enrich optional source documentation for custom classes from scaladoc
+    sdlConfig = enrichCustomClassScalaDoc(sdlConfig)
     // render config as json
     sdlConfig.root.render(ConfigRenderOptions.concise())
+  }
+
+  private def enrichCustomClassScalaDoc(config: Config): Config = {
+    def findClassConfigurationsHandleEntry(key: String, value: ConfigValue, path: Seq[String]): Seq[Seq[String]] = {
+      value.valueType match {
+        // recursion for objects and lists
+        case ConfigValueType.OBJECT =>
+          findClassConfigurationsInConfigObject(value.asInstanceOf[ConfigObject], path)
+        case ConfigValueType.LIST =>
+          val elements = value.asInstanceOf[ConfigList].asScala.zipWithIndex
+          elements.flatMap {
+            case (value, idx) => findClassConfigurationsHandleEntry(idx.toString, value, path :+ s"[$idx]")
+          }
+        // we are looking for className and type attributes
+        case ConfigValueType.STRING if Seq("className", "type").contains(DataFrameUtil.strToLowerCamelCase(key)) =>
+          // check if configuration value is full class name, e.g. it has at least three name parts
+          if (value.unwrapped.asInstanceOf[String].split('.').length > 2)
+            Seq(path) // found! return configuration path
+          else Seq()
+        // default -> nothing found
+        case _ => Seq()
+      }
+    }
+    def findClassConfigurationsInConfigObject(obj: ConfigObject, path: Seq[String]): Seq[Seq[String]] = {
+      obj.entrySet.asScala.toSeq.flatMap(e => findClassConfigurationsHandleEntry(e.getKey, e.getValue, path :+ e.getKey))
+    }
+    val classConfigurationPaths = findClassConfigurationsInConfigObject(config.root, Seq())
+    // enrich config with scala doc for config paths found
+    logger.info(s"Enriching source documentation for ${classConfigurationPaths.length} custom classes from scaladoc")
+    classConfigurationPaths.foldLeft(config) {
+      case (config, path) =>
+        val className = getConfigValue(config.root(), path).unwrapped().asInstanceOf[String]
+        try {
+          val scalaDoc = ScaladocUtil.getClassScalaDoc(className).map(ScaladocUtil.formatScaladocWithTags(_))
+          if (scalaDoc.isDefined) updateConfigValue(config.root(), path.init :+ "_sourceDoc", ConfigValueFactory.fromAnyRef(scalaDoc.get)).asInstanceOf[ConfigObject].toConfig
+          else config
+        } catch {
+          case e: Exception =>
+            logger.warn(s"${e.getClass.getSimpleName}: ${e.getMessage} for $className when enriching configuration path ${path.mkString(".")}")
+            config
+        }
+    }
   }
 
   private def enrichOrigin(configPaths: Seq[String], config: Config): Config = {
