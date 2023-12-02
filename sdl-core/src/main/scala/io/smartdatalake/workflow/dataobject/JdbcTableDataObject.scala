@@ -126,7 +126,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   // Define partition columns
   override val partitions: Seq[String] = if (Environment.caseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
 
-  // TODO: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
+  // Note: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
   // Using generic observations is forced therefore.
   override val forceGenericObservation = true
 

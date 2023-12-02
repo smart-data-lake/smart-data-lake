@@ -139,11 +139,11 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
     // first write
     DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", StringType))))), None, path)
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length==1)
-    Thread.sleep(1000)
+    Thread.sleep(1000) // timestamp in filename has seconds resolution, make sure we dont overwrite previous file.
     // second write -> no update
     DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", StringType))))), None, path)
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 1)
-    Thread.sleep(1000)
+    Thread.sleep(1000) // timestamp in filename has seconds resolution, make sure we dont overwrite previous file.
     // third write -> update
     DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", IntegerType))))), None, path)
     assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 2)
