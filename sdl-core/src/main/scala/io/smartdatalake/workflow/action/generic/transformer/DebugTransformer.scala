@@ -26,6 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import org.apache.commons.lang3.StringUtils
 import org.slf4j.event.Level
 
 /**
@@ -79,7 +80,7 @@ case class DebugTransformer(override val name: String = "debug", override val de
    */
   private def indent(s: String, n: Int) = {
     assert(n > 0)
-    val prefix = " ".repeat(n)
+    val prefix = StringUtils.repeat(' ', n)
     s.linesIterator.map(prefix + _).mkString(System.lineSeparator())
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = DebugTransformer
