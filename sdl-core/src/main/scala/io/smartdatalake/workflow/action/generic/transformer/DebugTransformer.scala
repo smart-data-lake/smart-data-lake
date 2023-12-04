@@ -21,16 +21,12 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.slf4j.event.Level
-
-import scala.reflect.runtime.universe.typeOf
-import scala.util.{Failure, Success, Try}
 
 /**
  * Log schema, sample data and plan of DataFrame to transform.
@@ -66,16 +62,25 @@ case class DebugTransformer(override val name: String = "debug", override val de
     }
     if (printSchema) {
       val level = printSchemaOptions.get("level").map(_.toInt).getOrElse(Int.MaxValue)
-      logEvent.log(getLogMsg("schema", df.schema.treeString(level).indent(2)))
+      logEvent.log(getLogMsg("schema", indent(df.schema.treeString(level),2)))
     }
     if (show) {
-      logEvent.log(getLogMsg("show", df.showString(showOptions).indent(2)))
+      logEvent.log(getLogMsg("show", indent(df.showString(showOptions),2)))
     }
     if (explain) {
-      logEvent.log(getLogMsg("explain", df.explainString(explainOptions).indent(2)))
+      logEvent.log(getLogMsg("explain", indent(df.explainString(explainOptions),2)))
     }
     // return
     df
+  }
+
+  /**
+   * This functionality is included in Java 17, e.g. string.indent(n). It's implemented here to be compatible with Java 8.
+   */
+  private def indent(s: String, n: Int) = {
+    assert(n > 0)
+    val prefix = " ".repeat(n)
+    s.linesIterator.map(prefix + _).mkString(System.lineSeparator())
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = DebugTransformer
 }
