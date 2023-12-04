@@ -118,7 +118,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       // prepare input SubFeed
       val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
       val isRecursive = recursiveInputs.exists(_.id == subFeed.dataObjectId)
-      preprocessInputSubFeedCustomized(subFeed, ignoreFilter, isRecursive)
+      // reset potentially skipped SubFeeds to deliver data as well.
+      val reactivatedSubFeed = subFeed.clearSkipped().asInstanceOf[S]
+      preprocessInputSubFeedCustomized(reactivatedSubFeed, ignoreFilter, isRecursive)
     }
     outputSubFeeds = outputSubFeeds.map(subFeed => addRunIdPartitionIfNeeded(outputMap(subFeed.dataObjectId), subFeed))
     (inputSubFeeds, outputSubFeeds)

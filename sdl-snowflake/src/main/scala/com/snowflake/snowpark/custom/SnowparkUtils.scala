@@ -19,8 +19,12 @@
 
 package com.snowflake.snowpark.custom
 
-import com.snowflake.snowpark.types.{DataType, NumericType}
+import com.snowflake.snowpark.DataFrame
+import com.snowflake.snowpark.types.{DataType, NumericType, StructType}
 
 object SnowparkUtils {
   def isNumeric(dataType: DataType) = dataType.isInstanceOf[NumericType]
+  def showString(df: DataFrame, numRows: Int = 10, width: Int = 200): String = df.showString(numRows, width)
+  def explainString(df: DataFrame): String = df.explainString
+  def schemaTreeString(schema: StructType, level: Int = Int.MaxValue): String = schema.treeString(level)
 }
