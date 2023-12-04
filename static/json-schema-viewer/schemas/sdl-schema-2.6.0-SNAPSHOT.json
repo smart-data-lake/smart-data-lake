@@ -4582,6 +4582,67 @@
         "additionalProperties" : false,
         "description" : "Apply validation rules to a DataFrame and collect potential violation error messages in a new column."
       },
+      "DebugTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "DebugTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "printSchema" : {
+            "type" : "boolean",
+            "description" : "true if the schema of the DataFrame should be logged. Default is true."
+          },
+          "printSchemaOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "SubType specific options to pass to the printSchema statement.\nFor Spark this is level=(int). Default is level=Int.MaxValue."
+          },
+          "show" : {
+            "type" : "boolean",
+            "description" : "true if data should be logged using show method. Default is false."
+          },
+          "showOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "SubType specific options to pass to the show statement.\nFor Spark this can be numRows=(int), truncate=(int) and vertical=(true/false). Default is numRows=10, truncate=20, vertical=false."
+          },
+          "explain" : {
+            "type" : "boolean",
+            "description" : "true if plan should be logged using explain method. Default is false."
+          },
+          "explainOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "SubType specific options to pass to explain statement.\nFor Spark this can be mode=(simple/extended/codegen/cost/formatted), see[[ExplainMode]] for details. Default is mode=simple.\nDefault is to use the default of the underlying SubFeed type, e.g. \\'simple\\' for Spark."
+          },
+          "logLevel" : {
+            "type" : "string",
+            "description" : "log level to use for logging. Possible values are \\'debug\\', \\'info\\', \\'warn\\', \\'error\\'. Default is \\'info\\'."
+          },
+          "titleMarker" : {
+            "type" : "string",
+            "description" : "a string to prefix before and after the DataFrame for finding the debug output easier. Default is \\'###\\'."
+          }
+        },
+        "title" : "DebugTransformer",
+        "required" : [ "type" ],
+        "additionalProperties" : false,
+        "description" : "Log schema, sample data and plan of DataFrame to transform.\nThis transformer can be used to log debug output between different transformers.\nIt\\'s not intended for production use."
+      },
       "DecryptColumnsTransformer" : {
         "type" : "object",
         "properties" : {
@@ -5478,6 +5539,66 @@
               "type" : "object",
               "properties" : {
                 "type" : {
+                  "const" : "DebugTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "printSchema" : {
+                  "type" : "boolean",
+                  "description" : "true if the schema of the DataFrame should be logged. Default is true."
+                },
+                "printSchemaOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "SubType specific options to pass to the printSchema statement.\nFor Spark this is level=(int). Default is level=Int.MaxValue."
+                },
+                "show" : {
+                  "type" : "boolean",
+                  "description" : "true if data should be logged using show method. Default is false."
+                },
+                "showOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "SubType specific options to pass to the show statement.\nFor Spark this can be numRows=(int), truncate=(int) and vertical=(true/false). Default is numRows=10, truncate=20, vertical=false."
+                },
+                "explain" : {
+                  "type" : "boolean",
+                  "description" : "true if plan should be logged using explain method. Default is false."
+                },
+                "explainOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "SubType specific options to pass to explain statement.\nFor Spark this can be mode=(simple/extended/codegen/cost/formatted), see[[ExplainMode]] for details. Default is mode=simple.\nDefault is to use the default of the underlying SubFeed type, e.g. \\'simple\\' for Spark."
+                },
+                "logLevel" : {
+                  "type" : "string",
+                  "description" : "log level to use for logging. Possible values are \\'debug\\', \\'info\\', \\'warn\\', \\'error\\'. Default is \\'info\\'."
+                },
+                "titleMarker" : {
+                  "type" : "string",
+                  "description" : "a string to prefix before and after the DataFrame for finding the debug output easier. Default is \\'###\\'."
+                }
+              },
+              "title" : "DebugTransformer",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Log schema, sample data and plan of DataFrame to transform.\nThis transformer can be used to log debug output between different transformers.\nIt\\'s not intended for production use."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
                   "const" : "DecryptColumnsTransformer"
                 },
                 "name" : {
@@ -5710,25 +5831,6 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "StandardizeSparkDatatypesTransformer"
-                },
-                "name" : {
-                  "type" : "string",
-                  "description" : "name of the transformer"
-                },
-                "description" : {
-                  "type" : "string",
-                  "description" : "Optional description of the transformer"
-                }
-              },
-              "title" : "StandardizeSparkDatatypesTransformer",
-              "required" : [ "type" ],
-              "additionalProperties" : false,
-              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
-            }, {
-              "type" : "object",
-              "properties" : {
-                "type" : {
                   "const" : "EncryptColumnsTransformer"
                 },
                 "name" : {
@@ -5764,7 +5866,7 @@
               "type" : "object",
               "properties" : {
                 "type" : {
-                  "const" : "SQLDfTransformer"
+                  "const" : "StandardizeSparkDatatypesTransformer"
                 },
                 "name" : {
                   "type" : "string",
@@ -5773,30 +5875,12 @@
                 "description" : {
                   "type" : "string",
                   "description" : "Optional description of the transformer"
-                },
-                "code" : {
-                  "type" : "string",
-                  "description" : "SQL code for transformation.\nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.\nExample:`select * from test where run = %{runId}`\nThe special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary view name.\nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
-                },
-                "options" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  },
-                  "description" : "Options to pass to the transformation"
-                },
-                "runtimeOptions" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  },
-                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
                 }
               },
-              "title" : "SQLDfTransformer",
-              "required" : [ "code", "type" ],
+              "title" : "StandardizeSparkDatatypesTransformer",
+              "required" : [ "type" ],
               "additionalProperties" : false,
-              "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix`_sdltemp`is added.\nIt is therefore recommended to use special token`%{inputViewName}`or`%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
+              "description" : "Standardize datatypes of a Spark-DataFrame.\nCurrent implementation converts all decimal datatypes to a corresponding integral or float datatype"
             }, {
               "type" : "object",
               "properties" : {
@@ -5834,6 +5918,43 @@
               "required" : [ "transformerClassName", "type" ],
               "additionalProperties" : false,
               "description" : "Configuration of a custom Spark-Dataset transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.\nThe Java/Scala class has to implement interface[[CustomDsTransformer]] ."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "SQLDfTransformer"
+                },
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the transformer"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "Optional description of the transformer"
+                },
+                "code" : {
+                  "type" : "string",
+                  "description" : "SQL code for transformation.\nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.\nExample:`select * from test where run = %{runId}`\nThe special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary view name.\nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "Options to pass to the transformation"
+                },
+                "runtimeOptions" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]] ."
+                }
+              },
+              "title" : "SQLDfTransformer",
+              "required" : [ "code", "type" ],
+              "additionalProperties" : false,
+              "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.\nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix`_sdltemp`is added.\nIt is therefore recommended to use special token`%{inputViewName}`or`%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
             }, {
               "type" : "object",
               "properties" : {
@@ -6092,11 +6213,11 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Names of SubFeeds the transformation should be applied to."
+            "description" : "Names of SubFeeds the transformation should be applied to. Default is an empty list,\nwhich will apply the transformation to all subfeeds."
           }
         },
         "title" : "DfTransformerWrapperDfsTransformer",
-        "required" : [ "type", "transformer", "subFeedsToApply" ],
+        "required" : [ "type", "transformer" ],
         "additionalProperties" : false,
         "description" : "A Transformer to use single DataFrame Transformers as multiple DataFrame Transformers.\nThis works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.\nAll other SubFeeds will be passed through without transformation."
       },
@@ -6433,6 +6554,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
               }, {
@@ -6898,6 +7021,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
@@ -7127,6 +7252,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
@@ -7272,6 +7399,12 @@
           },
           "wrappedAction" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/Action/CopyAction"
+            }, {
+              "$ref" : "#/definitions/Action/CustomDataFrameAction"
+            }, {
+              "$ref" : "#/definitions/Action/CustomFileAction"
+            }, {
               "$ref" : "#/definitions/Action/DeduplicateAction"
             }, {
               "$ref" : "#/definitions/Action/HistorizeAction"
