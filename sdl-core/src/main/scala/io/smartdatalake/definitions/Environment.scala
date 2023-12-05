@@ -421,7 +421,7 @@ object Environment {
         EnvironmentUtil.getSdlParameter("fileSystemFactory")
           .map(CustomCodeUtil.getClassInstanceByName[FileSystemFactory])
           .getOrElse{
-            if (UCFileSystemFactory.needUcFileSystem) new UCFileSystemFactory()
+            if (UCFileSystemFactory.isDatabricksEnv) new UCFileSystemFactory()
             else new DefaultFileSystemFactory()
           }
       )
