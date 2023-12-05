@@ -20,17 +20,23 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.ModulePlugin
+import io.smartdatalake.util.hdfs.UCFileSystemFactory
 
 class DeltaLakeModulePlugin extends ModulePlugin {
 
   /**
    * Additional spark properties to be added when creating SparkSession.
    */
-  override def additionalSparkProperties(): Map[String, String] = Map(
-    // DeltaLake Spark SQL extensions
-    "spark.sql.extensions" -> "io.delta.sql.DeltaSparkSessionExtension",
-    // Default catalog implementation supporting DeltaLake
-    "spark.sql.catalog.spark_catalog" -> "org.apache.spark.sql.delta.catalog.DeltaCatalog"
-  )
+  override def additionalSparkProperties(): Map[String, String] = {
+    // register DeltaLake extension and catalog if not on Databricks
+    if (!UCFileSystemFactory.isDatabricksEnv) {
+      Map(
+        // DeltaLake Spark SQL extensions
+        "spark.sql.extensions" -> "io.delta.sql.DeltaSparkSessionExtension",
+        // Default catalog implementation supporting DeltaLake
+        "spark.sql.catalog.spark_catalog" -> "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+      )
+    } else Map()
+  }
 
 }
