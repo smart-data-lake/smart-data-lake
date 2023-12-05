@@ -215,12 +215,12 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
    */
   def parse(input: String): Option[Row] = try {
     val parsedInternalRow = rawParser.parse(input)
-    if (missingFieldNames.nonEmpty && treatMissingColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow, new SparkException(s"Missing field(s) ${missingFieldNames.mkString(", ")} in header"))
-    if (superfluousFieldNames.nonEmpty && treatSuperfluousColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow, new SparkException(s"Superfluous field(s) ${superfluousFieldNames.mkString(", ")} in header") )
+    if (missingFieldNames.nonEmpty && treatMissingColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow.toArray, new SparkException(s"Missing field(s) ${missingFieldNames.mkString(", ")} in header"))
+    if (superfluousFieldNames.nonEmpty && treatSuperfluousColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow.toArray, new SparkException(s"Superfluous field(s) ${superfluousFieldNames.mkString(", ")} in header") )
     parsedInternalRow.map(row => createResultRow(Some(fnRowConverter(row)), None, None))
   } catch {
     case e: BadRecordException => parserOptions.parseMode match {
-      case PermissiveMode => Some(createResultRow(e.partialResult().map(fnRowConverter), Option(e.record()).map(_.toString), Option(e.cause).map(_.getMessage)))
+      case PermissiveMode => Some(createResultRow(e.partialResults().map(fnRowConverter).headOption, Option(e.record()).map(_.toString), Option(e.cause).map(_.getMessage)))
       case DropMalformedMode => None
       case FailFastMode => throw new SparkException(s"Malformed records are detected in record parsing, failing because of FailFastMode. inputRecord=${input.take(100)}", e)
     }
