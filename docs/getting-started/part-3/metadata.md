@@ -17,7 +17,7 @@ Descriptive metadata, in the context of SDLB, refers to additional configuration
 ## Metadata and Descriptions
 <!--There is also a metadata.name, where one can define a user friendly name for the configuration object. -->
 
-While metadata configuration attributes are optional, they can be very useful in many situations. `metadata.name` can define a user frinedly and name stringforward for the configuration object. 
+While metadata configuration attributes are optional, they can be very useful in many situations. `metadata.name` can define a user friendly and name stringforward for the configuration object. 
 
 In the realm of SDLB, metadata serves as a valuable space for documenting the usage of custom transformations, providing clarity on the intricacies of the data pipeline.
 For instance, metadata for action `join-departures-airports` can be:
