@@ -12,7 +12,7 @@ In this part, we are going to dive into the role of descriptive metadata in Smar
 
 ## About Metadata 
 <!--Should we also write about the markdown description files?-->
-Descriptive metadata, in the context of SDLB, refers to additional configuration attributes and markdown files that goes beyond the basic "id" of DataObjects and Actions. It is mainly about adding descriptions and tags to configuration object, and other attributes that help manage and explore data effectively. 
+Descriptive metadata, in the context of SDLB, refers to additional configuration attributes and markdown files that go beyond the basic "id" of DataObjects and Actions. It is mainly about adding descriptions and tags to configuration object, and other attributes that help manage and explore data effectively. 
 
 ## Metadata and Descriptions
 <!--There is also a metadata.name, where one can define a user friendly name for the configuration object. -->
