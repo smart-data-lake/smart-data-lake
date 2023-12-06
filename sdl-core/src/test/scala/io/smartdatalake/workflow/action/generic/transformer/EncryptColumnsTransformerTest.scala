@@ -44,11 +44,11 @@ class EncryptColumnsTransformerTest extends FunSuite {
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
-  test("test column encryption and decryption") {
+  def run_test(enc_type: String): Unit = {
     val sdlb = new DefaultSmartDataLakeBuilder()
 
     val config = ConfigFactory.parseString(
-      """
+      s"""
         |actions = {
         |   actenc = {
         |     type = CopyAction
@@ -61,6 +61,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
         |       key = "A%D*G-KaPdSgVkYp"
+        |       algorithm = ${enc_type}
         |     }]
         |   }
         |   actdec = {
@@ -74,6 +75,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
         |       key = "A%D*G-KaPdSgVkYp"
+        |       algorithm = ${enc_type}
         |     }]
         |   }
         |}
@@ -118,7 +120,13 @@ class EncryptColumnsTransformerTest extends FunSuite {
     val colName = dfEnc.columns
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
     val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect.toList
+    dfEnc.show(false)
     assert(testCol != Seq("Foo", "Space", "Space"))
+    if (enc_type === "GCM") {
+      assert(testCol(1) !== testCol(2), "2 encrypted items should not result in the same ciphertext with GCM")
+    } else if (enc_type === "ECB") {
+      assert(testCol(1) === testCol(2), "2 encrypted items should result in the same ciphertext with ECB")
+    }
 
     // check the decoded DataFrame
     val dec = instanceRegistry.get[ParquetFileDataObject]("dec")
@@ -128,4 +136,13 @@ class EncryptColumnsTransformerTest extends FunSuite {
     val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect.toList
     assert(testDecCol == Seq("Foo", "Space", "Space"))
   }
+
+  test("test column encryption and decryption") {
+    run_test("GCM")
+  }
+
+  test("test ECB column encryption and decryption") {
+    run_test("ECB")
+  }
+
 }
