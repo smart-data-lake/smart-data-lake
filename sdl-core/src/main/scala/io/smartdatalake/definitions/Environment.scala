@@ -21,7 +21,7 @@ package io.smartdatalake.definitions
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
-import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil, SmartDataLakeLogger}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
@@ -35,7 +35,7 @@ import java.net.URI
  * - by the global.environment configuration file section
  * - by a custom [[io.smartdatalake.app.SmartDataLakeBuilder]] implementation for your environment, which sets these variables directly.
  */
-object Environment {
+object Environment extends SmartDataLakeLogger {
 
   // this class loader needs to be overridden to find custom classes in some environments (e.g. Polynote)
   def classLoader(): ClassLoader = {
@@ -425,6 +425,7 @@ object Environment {
             else new DefaultFileSystemFactory()
           }
       )
+      logger.info(s"fileSystemFactory initialized with ${_fileSystemFactory.get.getClass.getName}")
     }
     _fileSystemFactory.get
   }

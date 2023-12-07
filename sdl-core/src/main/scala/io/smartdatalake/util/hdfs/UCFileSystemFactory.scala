@@ -91,6 +91,7 @@ private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeH
   isUnityCatalogEnabledMethod.setAccessible(true)
 
   def registerPathAccess(path: Path): Unit = {
+    logger.info(s"register path access for $path")
     registerPathAccessMethod.invoke(null, path, None) // invoking static method
   }
   private lazy val registerPathAccessMethod: Method = getMethod(credentialScopeHelperClass, "registerPathAccess", Seq(classOf[Path], classOf[Option[_]]))
