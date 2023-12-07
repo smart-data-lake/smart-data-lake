@@ -117,13 +117,11 @@
             <groupId>com.github.andyglow</groupId>
             <artifactId>scaladoc-ast_${scala.minor.version}</artifactId>
             <version>0.0.14</version>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.github.andyglow</groupId>
             <artifactId>scaladoc-parser_${scala.minor.version}</artifactId>
             <version>0.0.14</version>
-            <optional>true</optional>
         </dependency>
 
         <!-- TEST dependencies -->
