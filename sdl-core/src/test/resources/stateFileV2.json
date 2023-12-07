@@ -32,7 +32,11 @@
         "subFeed" : {
           "type" : "SparkSubFeed",
           "dataObjectId" : "test-out",
-          "partitionValues" : [ ],
+          "partitionValues" : [ {
+            "elements" : {
+              "test" : 1
+            }
+          } ],
           "isDAGStart" : false,
           "isSkipped" : false,
           "isDummy" : false

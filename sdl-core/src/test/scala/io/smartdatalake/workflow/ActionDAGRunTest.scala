@@ -49,7 +49,7 @@ class ActionDAGRunTest extends FunSuite {
       dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
     val appVersion = AppUtil.getManifestVersion
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
@@ -67,6 +67,10 @@ class ActionDAGRunTest extends FunSuite {
     val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
     val migratedState = ActionDAGRunState.fromJson(stateContent)
     assert(migratedState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion)
+    assert(migratedState.actionsState.head._2.inputIds.nonEmpty)
+    assert(migratedState.actionsState.head._2.outputIds.nonEmpty)
+    assert(migratedState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("test" -> 1))))
+    assert(migratedState.actionsState.head._2.results.head.getClass.getSimpleName == "SparkSubFeed")
   }
 
   test("append to state index file") {

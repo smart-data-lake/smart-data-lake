@@ -21,10 +21,12 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.app.{BuildVersionInfo, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.util.Json4sCompat
+import org.json4s.Extraction.decompose
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods
@@ -107,12 +109,16 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     {case s: String => RuntimeEventState.withName(s)},
     {case obj: RuntimeEventState => obj.toString}
   ))
+  private val partitionValuesSerializer = Json4sCompat.getCustomSerializer[PartitionValues](implicit formats => (
+    {case json: JObject => PartitionValues(json.values)},
+    {case obj: PartitionValues => JObject(obj.elements.map(e => JField(e._1, decompose(e._2))).toList)}
+  ))
 
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
-    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer
+    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer + partitionValuesSerializer
 
   // write state to Json
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
@@ -144,6 +150,9 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     }
     val appName = jValue \ "appConfig" \ "applicationName" match {
       case JString(s) => s
+      case _ => jValue \ "appConfig" \ "feedSel" match {
+        case JString(s) => s
+      }
     }
     val runId = jValue \ "runId" match {
       case JInt(i) => i.toInt
