@@ -24,7 +24,7 @@ import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
-import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -143,6 +143,12 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
   test("test ECB column encryption and decryption") {
     run_test("ECB")
+  }
+
+  test("test column encryption, unsupported algorithm") {
+    intercept[ConfigurationException]{
+      run_test("notSupported")
+    }
   }
 
 }
