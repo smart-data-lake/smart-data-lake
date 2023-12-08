@@ -17,7 +17,7 @@ Descriptive metadata, in the context of SDLB, refers to additional configuration
 ## Metadata and Descriptions
 <!--There is also a metadata.name, where one can define a user friendly name for the configuration object. -->
 
-While metadata configuration attributes are optional, they can be very useful in many situations. `metadata.name` can define a user friendly and name stringforward for the configuration object. 
+While metadata configuration attributes are optional, they can be very useful in many situations. `metadata.name` can define a user friendly and stringforward name for the configuration object. 
 
 In the realm of SDLB, metadata serves as a valuable space for documenting the usage of custom transformations, providing clarity on the intricacies of the data pipeline.
 For instance, metadata for action `join-departures-airports` can be:
@@ -58,28 +58,7 @@ For a deeper understanding of our visualization tool, please refer to this [blog
 :::
 
 ## Metadata and Feeds
-<!--On the other side i would reduce the section on feeds, and just refer to the getting started chapter https://smartdatalake.ch/docs/getting-started/part-1/select-columns/#more-on-feeds -->
-SDLB acknowledges the need to run specific parts of defined pipelines. This is achieved by associating actions with  [feeds](https://smartdatalake.ch/docs/getting-started/part-1/select-columns/#more-on-feeds), which act as markers for sub-pipelines within a greater pipeline. Feeds inserted into metadata allow the selective execution of actions during development, debugging, or various use cases.
-
-The following example has two feeds:
-
-![Feeds in SDLB](feeds_in_SDLB.png)
-
-
-Feeds are inserted into the metadata as follows:
-
-```
-actionName {
-  type = actionType
-  input = some-input-dataObject
-  output = some-output-dataObject
-  metadata {
-    feed = feedName
-  }
-}
-```
-
-Feeds in metadata are instrumental in selecting the right actions to run. During SDL execution, actions corresponding to certain feeds can be specified. Multiple actions can be associated with the same feed, allowing for more granular control over the execution of the data pipeline.
+[Feeds](https://smartdatalake.ch/docs/getting-started/part-1/select-columns/#more-on-feeds) in metadata are instrumental in selecting the right actions to run. During SDL execution, actions corresponding to certain feeds can be specified. Multiple actions can be associated with the same feed, allowing for more granular control over the execution of the data pipeline. And confiured feeds are displaed in UI as well.
 
 ## Try it out
 Now let us experiment with editing metadata for DataObjects and Actions from the [solution](../config-examples/application-part3-download-incremental-mode.conf) in the previous section. Customize metadata based on your understanding of different data, and modify feeds to run parts of the data pipeline selectively. The final configuration file could resemble [this](../config-examples/application-part3-with-metadata.conf).
