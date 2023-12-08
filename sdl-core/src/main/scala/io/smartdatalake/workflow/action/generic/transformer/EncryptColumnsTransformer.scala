@@ -140,9 +140,7 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
   override val cryptUDF: UserDefinedFunction = algorithm match {
     case "GCM" => udf(encryptGCM _)
     case "ECB" => udf(encryptECB _)
-    case _ => {assert(true, s"unsupported en/decryption algorithm ${algorithm}, using GCM")
-      udf(encryptGCM _)
-    }
+    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
   }
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
@@ -183,10 +181,7 @@ case class DecryptColumnsTransformer(override val name: String = "encryptColumns
   override val cryptUDF: UserDefinedFunction = algorithm match {
     case "GCM" => udf(decryptGCM _)
     case "ECB" => udf(decryptECB _)
-    case _ => {
-      assert(true, s"unsupported en/decryption algorithm ${algorithm}, using GCM")
-      udf(decryptGCM _)
-    }
+    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm: ${algorithm}")
   }
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
