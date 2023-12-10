@@ -36,7 +36,8 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.delta.DeltaLog
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -131,7 +132,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path $path. The table will use the existing path definition $hadoopPathHolder!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
@@ -452,8 +453,60 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     DeltaTable.forName(session, table.fullName).detail()
   }
 
-  override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      implicit val session = context.sparkSession
+      import session.implicits._
+      val dfHistory = DeltaTable.forName(session, table.fullName).history()
+        .select("timestamp", "userMetadata").as[(Long,String)]
+      val (_,lastCommitMsg) = dfHistory.head
+      val (oldestSnapshot,_) = dfHistory.head
+      val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, properties) = getDetails
+        .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head
+      val numRows = DeltaTable.forName(session, table.fullName).toDF.count // This is actionally calculated by Metadata only :-)
+      val deltaStats = Map(TableStatsType.CreatedAt.toString -> createdAt, TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.LastCommitMsg.toString -> lastCommitMsg, TableStatsType.NumDataFilesCurrent.toString -> numDataFilesCurrent, TableStatsType.SizeInBytesCurrent.toString -> sizeInBytesCurrent, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshot, TableStatsType.NumRows.toString -> numRows)
+      val columnStats = getColumnStats(update, Some(lastModifiedAt))
+      HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ deltaStats ++ getPartitionStats + (TableStatsType.Columns.toString -> columnStats)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map("info" -> e.getMessage)
+    }
+  }
 
+  override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
+    try {
+      val session = context.sparkSession
+      import session.implicits._
+      val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
+      val snapshot = deltaLog.unsafeVolatileSnapshot
+      val columns = snapshot.schema.fieldNames
+      def getAgg(col: String) = struct(
+        min($"stats.minValues"(col)).as("minValue"),
+        max($"stats.maxValues"(col)).as("maxValue"),
+        sum($"stats.nullCount"(col)).as("nullCount")
+      ).as(col)
+      val metricsRow = snapshot.allFiles
+        .select(from_json($"stats", snapshot.statsSchema).as("stats"))
+        .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg):_*).head
+      columns.map {
+        c =>
+          val struct = metricsRow.getStruct(metricsRow.fieldIndex(c))
+          c -> Map(
+            ColumnStatsType.NullCount.toString -> struct.getAs[Long]("nullCount"),
+            ColumnStatsType.Min.toString -> struct.getAs[Any]("minValue"),
+            ColumnStatsType.Max.toString -> struct.getAs[Any]("maxValue")
+          )
+      }.toMap
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map()
+    }
+
+  }
+
+  override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {

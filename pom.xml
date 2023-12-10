@@ -300,7 +300,7 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
-        <spark.version>3.4.1</spark.version>
+        <spark.version>3.4.2</spark.version>
         <spark-extensions.version>3.4.1</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.4</spark.minor.version> <!-- this is used in sdl-snowflake -->
 
@@ -324,7 +324,7 @@
         <hive.group>org.apache.hive</hive.group>
         <hive.classifier>core</hive.classifier>
         <!-- Version used in Maven Hive dependency -->
-        <hive.version>3.1.3</hive.version>
+        <hive.version>2.3.9</hive.version>
         <hive23.version>2.3.9</hive23.version>
         <!-- Version used for internal directory structure -->
         <hive.version.short>2.3</hive.version.short>
@@ -437,8 +437,8 @@
         <scopt.version>4.0.1</scopt.version>
         <databricks.spark-xml.version>0.14.0</databricks.spark-xml.version>
         <spark.excel.version>${spark.version331}_0.18.6-beta1</spark.excel.version>
-        <ucanaccess.version>5.0.1</ucanaccess.version>
-        <hsqldb.version>2.7.1</hsqldb.version>
+        <hsqldb.version>2.7.2</hsqldb.version>
+        <jackcess.version>4.0.5</jackcess.version>
         <!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
         <typesafe.config.version>1.4.1</typesafe.config.version>
         <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
@@ -446,10 +446,11 @@
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>2.12.0</snowflake-spark.version>
-        <snowflake-snowpark.version>1.8.0</snowflake-snowpark.version>
+        <snowflake-snowpark.version>1.9.0</snowflake-snowpark.version>
         <keycloak.version>22.0.1</keycloak.version>
         <delta.version>2.4.0</delta.version>
-        <iceberg.version>1.3.0</iceberg.version>
+        <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
+        <iceberg.version>1.3.1</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
@@ -758,8 +759,8 @@
                         <filereports>
                             ${project.artifactId}.txt
                         </filereports>
-                        <stdout>WT
-                        </stdout>  <!-- without color, show reminder of failed and canceled tests with short stack traces, see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
+                        <stdout>WFT
+                        </stdout>  <!-- without color, show full stack traces, show reminder of failed and canceled tests with short stack traces see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
                         <environmentVariables>
                             <SPARK_LOCAL_IP>127.0.0.1
                             </SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
@@ -1218,6 +1219,13 @@
                 <artifactId>netty-all</artifactId>
                 <version>${netty.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>${netty.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <!-- SPARK-38885: After Netty 4.1.76, add the following `Netty` dependencies explicitly
             to ensure `./dev/test-dependencies.sh` produce the same results on Linux and MacOS.
             -->
@@ -1589,6 +1597,20 @@
                     <exclusion>
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-log4j12</artifactId>
+                    </exclusion>
+                    <!-- exclusions according to https://github.com/apache/hadoop/blob/trunk/hadoop-client-modules/hadoop-client-api/pom.xml -->
+                    <exclusion>
+                        <groupId>javax.xml.bind</groupId>
+                        <artifactId>jaxb-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>xml-apis</groupId>
+                        <artifactId>xml-apis</artifactId>
+                    </exclusion>
+                    <!-- avoid duplicate -->
+                    <exclusion>
+                        <groupId>org.eclipse.jetty.websocket</groupId>
+                        <artifactId>websocket-client</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>
@@ -2824,6 +2846,21 @@
                 <artifactId>spark-core_${scala.minor.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
+                <exclusions>
+                    <!--
+                      Exclude hadoop-client-runtime from spark-core 3.4, as this is a shaded version with relocation.
+                      We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                      hadoop-client library is not shaded and included below.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -2870,7 +2907,21 @@
                     </exclusion>
                     <exclusion>
                         <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-slf4j-impl</artifactId>                    </exclusion>
+                        <artifactId>log4j-slf4j-impl</artifactId>
+                    </exclusion>
+                    <!--
+                      Exclude hadoop-client-runtime from spark-core 3.4, as this is a shaded version with relocation.
+                      We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                      hadoop-client library is not shaded and included below.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -2882,6 +2933,11 @@
                 <groupId>com.github.kxbmap</groupId>
                 <artifactId>configs_${scala.minor.version}</artifactId>
                 <version>${kxbmap.configs.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang.modules</groupId>
+                <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
+                <version>2.11.0</version>
             </dependency>
             <dependency>
                 <groupId>io.swagger</groupId>

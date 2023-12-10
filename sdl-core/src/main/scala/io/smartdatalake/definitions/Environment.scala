@@ -472,6 +472,21 @@ object Environment {
   }
   var _hadoopFileStateStoreIndexAppend: Option[Boolean] = None
 
+  /**
+   * Threshold for analyzing table columns.
+   * If table size is bigger than analyzeTableColumnMaxThresholdBytes, table columns are not analyzed.
+   */
+  def analyzeTableColumnMaxBytesThreshold: Int = {
+    if (_analyzeTableColumnMaxBytesThreshold.isEmpty) {
+      _analyzeTableColumnMaxBytesThreshold = Some(
+        EnvironmentUtil.getSdlParameter("analyzeTableColumnMaxBytesThreshold")
+          .map(_.toInt).getOrElse(1024*1024*1024) // 1G
+      )
+    }
+    _analyzeTableColumnMaxBytesThreshold.get
+  }
+  var _analyzeTableColumnMaxBytesThreshold: Option[Int] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

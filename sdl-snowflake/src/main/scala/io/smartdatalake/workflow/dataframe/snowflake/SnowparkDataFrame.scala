@@ -29,6 +29,8 @@ import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.json4s.JString
+import org.json4s.JsonAST.JValue
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -233,6 +235,7 @@ case class SnowparkField(inner: StructField) extends GenericField {
   override def name: String = inner.name
   override def dataType: SnowparkDataType = SnowparkDataType(inner.dataType)
   override def nullable: Boolean = inner.nullable
+  override def comment: Option[String] = None
   override def makeNullable: SnowparkField = SnowparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SnowparkField = SnowparkField(inner.copy(dataType = dataType.toLowerCase.inner, columnIdentifier = ColumnIdentifier(inner.name.toLowerCase)))
   override def removeMetadata: SnowparkField = this // metadata is not existing in Snowpark
@@ -253,6 +256,7 @@ case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
   override def makeNullable: SnowparkDataType = this
   override def toLowerCase: SnowparkDataType = this
   override def isSimpleType: Boolean = true
+  def toJson: JValue = JString(inner.typeName)
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)

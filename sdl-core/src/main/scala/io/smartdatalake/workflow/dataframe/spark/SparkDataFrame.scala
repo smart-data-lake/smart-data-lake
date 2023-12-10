@@ -30,6 +30,8 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.execution.ExplainMode
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
+import org.json4s.JString
+import org.json4s.JsonAST.JValue
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
@@ -243,6 +245,7 @@ case class SparkField(inner: StructField) extends GenericField {
   override def name: String = inner.name
   override def dataType: SparkDataType = SparkDataType(inner.dataType)
   override def nullable: Boolean = inner.nullable
+  override def comment: Option[String] = inner.getComment()
   override def makeNullable: SparkField = SparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SparkField = SparkField(inner.copy(dataType = dataType.toLowerCase.inner, name = inner.name.toLowerCase))
   override def removeMetadata: SparkField = SparkField(inner.copy(dataType = dataType.removeMetadata.inner, metadata = Metadata.empty))
@@ -266,6 +269,7 @@ case class SparkSimpleDataType(inner: DataType) extends SparkDataType {
   override def toLowerCase: SparkDataType = this
   override def removeMetadata: SparkDataType = this
   override def isSimpleType: Boolean = true
+  def toJson: JValue = JString(inner.typeName)
 }
 case class SparkStructDataType(override val inner: StructType) extends SparkDataType with GenericStructDataType {
   override def makeNullable: SparkDataType = SparkStructDataType(SparkSchema(inner).makeNullable.inner)

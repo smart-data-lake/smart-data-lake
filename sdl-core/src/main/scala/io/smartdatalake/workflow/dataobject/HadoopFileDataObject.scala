@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -320,5 +320,13 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   def extractPartitionValuesFromDirPath(dirPath: String)(implicit context: ActionPipelineContext): PartitionValues = {
     PartitionLayout.extractPartitionValues(partitionLayout().get, relativizePath(dirPath) + separator)
+  }
+
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ getPartitionStats
+    } catch {
+      case e:Exception => Map(TableStatsType.Info.toString -> e.getMessage)
+    }
   }
 }

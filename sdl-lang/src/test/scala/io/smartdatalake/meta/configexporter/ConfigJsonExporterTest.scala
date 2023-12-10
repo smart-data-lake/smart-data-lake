@@ -19,24 +19,33 @@
 
 package io.smartdatalake.meta.configexporter
 
+import org.json4s.StringInput
+import org.json4s.jackson.JsonMethods
 import org.scalatest.FunSuite
 
 import java.io.File
+import org.json4s.JsonDSL._
+import org.json4s._
 
 class ConfigJsonExporterTest extends FunSuite {
 
   test("export config") {
-    val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath))
+    val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter").getPath), descriptionPath = Some(getClass.getResource("/dagexporter/description").getPath))
     val actualOutput = ConfigJsonExporter.exportConfigJson(exporterConfig)
-    assert(actualOutput.contains("origin"))
-    assert(actualOutput.contains("dagexporter/dagexporterTest.conf"))
-    assert(actualOutput.contains("lineNumber"))
-    assert(actualOutput.contains("actionId1"))
+    val actualJsonOutput = JsonMethods.parse(StringInput(actualOutput))
+    assert((actualJsonOutput \ "actions").children.size === 8)
+    assert((actualJsonOutput \ "dataObjects").children.size === 14)
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(66))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))
+    assert((actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "b.[].b1").asInstanceOf[JString].s.linesIterator.toSeq === Seq("Beschreibung B1","2nd line B1 text"))
+    assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" === JString("Documentation for TestTransformer.\nThis should be exported by ConfigJsonExporter!"))
   }
 
   test("test main") {
     val fileName = "target/exportedConfig.json"
-    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getPath, "-f", fileName))
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-f", fileName))
     assert(new File(fileName).exists())
   }
 

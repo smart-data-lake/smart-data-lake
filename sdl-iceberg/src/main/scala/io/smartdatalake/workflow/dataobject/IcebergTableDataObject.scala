@@ -46,6 +46,7 @@ import org.apache.spark.sql.connector.catalog.{Identifier, SupportsNamespaces, T
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.time.Instant
 import scala.collection.JavaConverters._
 import scala.util.Try
 
@@ -139,7 +140,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path $path. The table will use the existing path definition $hadoopPathHolder!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
@@ -512,6 +513,48 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     getIcebergCatalog.dropTable(getTableIdentifier, true) // purge
     HdfsUtil.deletePath(hadoopPath, false)(filesystem)
+  }
+
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      val icebergTable = getIcebergTable
+      val branches = icebergTable.refs().asScala.filter(_._2.isBranch).keys.toSeq.mkString(",")
+      val oldestSnapshot = icebergTable.history().asScala.minBy(_.timestampMillis())
+      val snapshot = icebergTable.currentSnapshot()
+      val summary = snapshot.summary().asScala
+      val lastModifiedAt = snapshot.timestampMillis()
+      val oldestSnapshotTs = oldestSnapshot.timestampMillis()
+      val icebergStats = Map(TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.NumRows.toString -> summary("total-records").toLong, TableStatsType.NumDataFilesCurrent.toString -> summary("total-data-files").toInt, TableStatsType.Branches.toString -> branches, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshotTs)
+      val columnStats = getColumnStats(update, Some(lastModifiedAt))
+      HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ icebergStats ++ getPartitionStats + (TableStatsType.Columns.toString -> columnStats)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get table stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map(TableStatsType.Info.toString -> e.getMessage)
+    }
+  }
+
+  override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
+    try {
+      val session = context.sparkSession
+      import session.implicits._
+      val filesDf = context.sparkSession.table(s"${table.toString}.files")
+      val metricsRow = filesDf.select($"readable_metrics.*").head
+      val columns = metricsRow.schema.fieldNames
+      columns.map {
+        c =>
+          val struct = metricsRow.getStruct(metricsRow.fieldIndex(c))
+          c -> Map(
+            ColumnStatsType.NullCount.toString -> struct.getAs[Long]("null_value_count"),
+            ColumnStatsType.Min.toString -> struct.getAs[Any]("lower_bound"),
+            ColumnStatsType.Max.toString -> struct.getAs[Any]("upper_bound")
+          )
+      }.toMap
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map()
+    }
   }
 
   override def factory: FromConfigFactory[DataObject] = IcebergTableDataObject

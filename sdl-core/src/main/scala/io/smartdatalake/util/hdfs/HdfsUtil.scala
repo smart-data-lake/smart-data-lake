@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.hdfs
 
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, TableStatsType}
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
@@ -26,6 +26,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.io.IOException
 import java.net.URI
+import java.sql.Timestamp
+import java.time.Instant
 import scala.collection.AbstractIterator
 import scala.io.{Codec, Source}
 import scala.util.{Try, Using}
@@ -338,6 +340,15 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
     val file = new Path(path, filename)
     touchFile(file)
     filesystem.delete(file, true) // recursive=true
+  }
+
+  def getPathStats(path: Path)(implicit filesystem: FileSystem): Map[String,Any] = {
+    val summary = filesystem.getContentSummary(path)
+    val status = filesystem.getFileStatus(path)
+    val sizeInBytes = summary.getLength
+    val numFiles = summary.getFileCount
+    val lastModifiedAt = status.getModificationTime
+    Map(TableStatsType.SizeInBytes.toString -> sizeInBytes, TableStatsType.NumFiles.toString -> numFiles, TableStatsType.LastModifiedAt.toString -> lastModifiedAt)
   }
 
   /**

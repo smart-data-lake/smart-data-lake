@@ -81,17 +81,17 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) HiveUtil.removeTickTockFromLocation(new Path(HiveUtil.existingTableLocation(table)))
-        else HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
+        else getAbsolutePath
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
       if(thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
-        val definedPathNormalized = HiveUtil.normalizePath(path.get)
+        val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"Table ${table.fullName} exists already with different path $path. The table will be written with new path definition $hadoopPathHolder!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
@@ -104,6 +104,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       filesystemHolder = HdfsUtil.getHadoopFsFromSpark(hadoopPath)
     }
     filesystemHolder
+  }
+
+  private def getAbsolutePath(implicit context: ActionPipelineContext) = {
+    val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
+    HdfsUtil.makeAbsolutePath(prefixedPath)(HdfsUtil.getHadoopFsWithConf(prefixedPath)(context.serializableHadoopConf.conf)) // dont use "filesystem" to avoid loop
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
@@ -194,7 +199,8 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
-      HiveUtil.analyze(table, partitions, partitionValues)
+      val simpleColumns = SparkSchema(dfPrepared.schema).filter(_.dataType.isSimpleType).columns
+      HiveUtil.analyze(table, simpleColumns, partitions, partitionValues)
     }
 
     // return

@@ -82,6 +82,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
 
+  // Note: Spark snowflake data source does not execute Spark observations. This is the same for Spark jdbc data source, see also JdbcTableDataObject.
+  // Using generic observations is forced therefore.
+  override val forceGenericObservation = true
 
   // Get a Spark DataFrame with the table contents for Spark transformations
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {

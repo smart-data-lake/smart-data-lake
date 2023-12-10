@@ -75,4 +75,12 @@ private[smartdatalake] object ScaladocUtil {
       .flatMap(_.tree.children.collectFirst { case x: AssignOrNamedArg => x.rhs.toString })
     rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
   }
+
+  def getClassScalaDoc(className: String): Option[Scaladoc] = {
+    val cls = getClass.getClassLoader.loadClass(className)
+    val tpe = mirror.classSymbol(cls).toType
+    val annotations = tpe.typeSymbol.annotations
+    extractScalaDoc(annotations)
+  }
+  private lazy val mirror = scala.reflect.runtime.currentMirror
 }

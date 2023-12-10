@@ -80,7 +80,8 @@ object PartitionValues {
    */
   def getOrdering(partitions: Seq[String]): Ordering[PartitionValues] = new Ordering[PartitionValues] {
     def compare(pv1: PartitionValues, pv2: PartitionValues): Int = {
-      partitions.map{
+      val keys = pv1.keys.intersect(pv2.keys)
+      partitions.filter(keys.contains).map{
         p => (pv1(p), pv2(p)) match {
           case (v1: String, v2: String) => v1.compare(v2)
           case (v1: Byte, v2: Byte) => v1.compare(v2)
@@ -170,6 +171,14 @@ object PartitionValues {
   def sort(partitionCols: Seq[String], partitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
     val ordering = getOrdering(partitionCols)
     partitionValues.sorted(ordering)
+  }
+
+  def fromString(str: String): PartitionValues = {
+    val elements = str.split('/').map { e =>
+      val Array(k,v) = e.split('=')
+      (k,v)
+    }.toMap
+    PartitionValues(elements)
   }
 }
 

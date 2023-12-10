@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, Runtime
 import org.apache.spark.util.Json4sCompat
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization.{read, writePretty}
+import org.json4s.jackson.Serialization.{read, write, writePretty}
 import org.reflections.Reflections
 
 import java.time.{Duration, LocalDateTime}
@@ -89,13 +89,17 @@ private[smartdatalake] object ActionDAGRunState {
     {case json: JString => LocalDateTime.parse(json.s)},
     {case obj: LocalDateTime => JString(obj.toString)}
   ))
-  private val actionIdSerializer = Json4sCompat.getCustomKeySerializer[ActionId](formats => (
+  private val actionIdKeySerializer = Json4sCompat.getCustomKeySerializer[ActionId](formats => (
     {case s: String => ActionId(s)},
     {case obj: ActionId => obj.id}
   ))
-  private val dataObjectIdSerializer = Json4sCompat.getCustomKeySerializer[DataObjectId](formats => (
+  private val dataObjectIdKeySerializer = Json4sCompat.getCustomKeySerializer[DataObjectId](formats => (
     {case s: String => DataObjectId(s)},
     {case obj: DataObjectId => obj.id}
+  ))
+  private val dataObjectIdSerializer = Json4sCompat.getCustomSerializer[DataObjectId](formats => (
+    {case json: JString => DataObjectId(json.s)},
+    {case obj: DataObjectId => JString(obj.id)}
   ))
   private val runtimeEventStateKeySerializer = Json4sCompat.getCustomKeySerializer[RuntimeEventState](formats => (
     {case s: String => RuntimeEventState.withName(s)},
@@ -106,7 +110,7 @@ private[smartdatalake] object ActionDAGRunState {
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
-    actionIdSerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer
+    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer
 
   // write state to Json
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
@@ -114,7 +118,8 @@ private[smartdatalake] object ActionDAGRunState {
   }
 
   def toJson(entry: IndexEntry): String = {
-    writePretty(entry)
+    // index entry should be written compact in one line (not pretty)
+    write(entry)
   }
 
   // read state from json

@@ -22,12 +22,13 @@ import com.healthmarketscience.jackcess.DatabaseBuilder
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import java.io.File
@@ -35,9 +36,10 @@ import java.sql.Timestamp
 import scala.collection.JavaConverters._
 
 /**
- * [[DataObject]] of type JDBC / Access.
- * Provides access to a Access DB to an Action. The functionality is handled seperately from [[JdbcTableDataObject]]
- * to avoid problems with net.ucanaccess.jdbc.UcanaccessDriver
+ * [[DataObject]] of type Microsoft Access.
+ * Can read a table from a Microsoft Access DB.
+ * @param path: the path to the access database file
+ * @param table: the Access table to be read
  */
 case class AccessTableDataObject(override val id: DataObjectId,
                                  path: String,
@@ -50,24 +52,21 @@ case class AccessTableDataObject(override val id: DataObjectId,
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
     val session = context.sparkSession
 
-    // currently, only the schema is being inferred using [[net.ucanaccess.jdbc.UcanaccessDriver]]...
-    val tableSchema = session.read
-      .format("jdbc")
-      .options(Map(
-        "url" -> s"jdbc:ucanaccess://$path",
-        "driver" -> "net.ucanaccess.jdbc.UcanaccessDriver",
-        "dbtable" -> table.name))
-      .load()
-      .schema
-
-    // ...the data itself is being read using [[com.healthmarketscience.jackcess.DatabaseBuilder]]
-    // this shouldn't be necessary, but somehow Spark tries to read the header as a row as well when executing
-    // [[JdbcUtils.resultSetToSparkInternalRows]] with UcanaccessDriver
     val db = openDb(session)
-    val rows = db.getTable(table.name).iterator().asScala.toList.map(row => {
+    val accessTable = db.getTable(table.name)
+
+    // derive Spark Schema
+    val tableSchema = StructType(
+      accessTable.getColumns.asScala.map(
+        col => StructField(col.getName, getCatalystType(col.getSQLType, col.getPrecision, col.getScale))
+      )
+    )
+
+    // create DataFrame from rows
+    val rows = accessTable.iterator().asScala.toList.map(row => {
       val values = row.values().iterator().asScala.toSeq.map {
-        case v: java.util.Date => new Timestamp(v.getTime) // Date/Time are mapped to Date by the UcanaccessDriver
-        case v: java.lang.Float => v.toDouble // Floats are mapped to Doubles by the UcanaccessDriver
+        case v: java.util.Date => new Timestamp(v.getTime)
+        case v: java.time.LocalDateTime => Timestamp.valueOf(v)
         case default => default
       }
       Row.fromSeq(values)
@@ -89,18 +88,6 @@ case class AccessTableDataObject(override val id: DataObjectId,
     DatabaseBuilder.open(tempFile)
   }
 
-  // FIXME for dev purposes only, to visualize to current problem with the [[net.ucanaccess.jdbc.UcanaccessDriver]]
-  def getDataFrameByFramework(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
-    val df = context.sparkSession.read
-      .format("jdbc")
-      .options(Map("url" -> s"jdbc:ucanaccess://$path",
-        "driver" -> "net.ucanaccess.jdbc.UcanaccessDriver",
-        "dbtable" -> table.name))
-      .load()
-    validateSchemaMin(SparkSchema(df.schema), "read")
-    df
-  }
-
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     // if we can open the db, it is existing
     val db = openDb(context.sparkSession)
@@ -118,6 +105,53 @@ case class AccessTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError
+
+  /**
+   * Mapping from Java SQL Types to Spark Types
+   * Copied and adapted from Spark:JdbcUtils
+   */
+  def getCatalystType( sqlType: Int, precision: Int, scale: Int, signed: Boolean = true): DataType = {
+    sqlType match {
+      case java.sql.Types.BIGINT => if (signed) LongType else DecimalType(20, 0)
+      case java.sql.Types.BINARY => BinaryType
+      case java.sql.Types.BIT => BooleanType // @see JdbcDialect for quirks
+      case java.sql.Types.BLOB => BinaryType
+      case java.sql.Types.BOOLEAN => BooleanType
+      case java.sql.Types.CHAR => StringType
+      case java.sql.Types.CLOB => StringType
+      case java.sql.Types.DATALINK => null
+      case java.sql.Types.DATE => DateType
+      case java.sql.Types.DECIMAL if precision != 0 || scale != 0 => DecimalType(precision, scale)
+      case java.sql.Types.DECIMAL => DecimalType.SYSTEM_DEFAULT
+      case java.sql.Types.DISTINCT => null
+      case java.sql.Types.DOUBLE => DoubleType
+      case java.sql.Types.FLOAT => FloatType
+      case java.sql.Types.INTEGER => if (signed) IntegerType else LongType
+      case java.sql.Types.JAVA_OBJECT => null
+      case java.sql.Types.LONGNVARCHAR => StringType
+      case java.sql.Types.LONGVARBINARY => BinaryType
+      case java.sql.Types.LONGVARCHAR => StringType
+      case java.sql.Types.NCHAR => StringType
+      case java.sql.Types.NCLOB => StringType
+      case java.sql.Types.NULL => null
+      case java.sql.Types.NUMERIC if precision != 0 || scale != 0 => DecimalType(precision, scale)
+      case java.sql.Types.NUMERIC => DecimalType.SYSTEM_DEFAULT
+      case java.sql.Types.NVARCHAR => StringType
+      case java.sql.Types.OTHER => null
+      case java.sql.Types.REAL => DoubleType
+      case java.sql.Types.REF => StringType
+      case java.sql.Types.REF_CURSOR => null
+      case java.sql.Types.ROWID => StringType
+      case java.sql.Types.SMALLINT => IntegerType
+      case java.sql.Types.SQLXML => StringType
+      case java.sql.Types.STRUCT => StringType
+      case java.sql.Types.TIME => TimestampType
+      case java.sql.Types.TIMESTAMP => TimestampType
+      case java.sql.Types.TINYINT => IntegerType
+      case java.sql.Types.VARBINARY => BinaryType
+      case java.sql.Types.VARCHAR => StringType
+    }
+  }
 
   override def factory: FromConfigFactory[DataObject] = AccessTableDataObject
 }

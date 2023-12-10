@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, TableStatsType}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
@@ -124,5 +124,12 @@ trait CanHandlePartitions { this: DataObject =>
     val missingCols = if (Environment.caseSensitive) primaryKeyCols.diff(df.columns)
     else primaryKeyCols.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing primary key cols ${missingCols.mkString(", ")} on $role")
+  }
+
+  private[smartdatalake] def getPartitionStats(implicit context: ActionPipelineContext): Map[String,Any] = {
+    if (partitions.nonEmpty) {
+      val partitionValues = PartitionValues.sort(partitions, listPartitions)
+      Map(TableStatsType.NumPartitions.toString -> partitionValues.size, TableStatsType.MinPartition.toString -> partitionValues.head.toString, TableStatsType.MaxPartition.toString -> partitionValues.last.toString)
+    } else Map()
   }
 }

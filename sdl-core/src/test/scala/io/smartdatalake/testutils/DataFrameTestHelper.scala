@@ -270,4 +270,5 @@ object DataFrameTestHelper {
 
   case class TypedValue(value: Any, dataType: DataType)
 
+  case class ComplexTypeTest(a: String, b: Int)
 }
