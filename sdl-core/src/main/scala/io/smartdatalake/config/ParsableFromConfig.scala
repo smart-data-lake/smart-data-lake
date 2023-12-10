@@ -39,6 +39,6 @@ private[smartdatalake] trait ParsableFromConfig[+CO <: ParsableFromConfig[CO]] {
 }
 
 /**
- * A marker trait to exclude SdlConfigObject's from the schema export.
+ * A marker trait to exclude an SdlConfigObject from the schema export.
  */
 trait ExcludeFromSchemaExport

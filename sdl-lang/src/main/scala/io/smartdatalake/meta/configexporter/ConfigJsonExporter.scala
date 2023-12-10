@@ -40,7 +40,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     opt[String]('d', "descriptionPath")
       .optional()
       .action((value, c) => c.copy(descriptionPath = Some(value)))
-      .text("Path of description markdown files for parsing optional column columns from DataObject descriptions and exporting them for the visualizer.")
+      .text("Path to markdown files that contain column descriptions of DataObjects. If set, these descriptions are exported to the visualizer.")
     help("help").text("Display the help text.")
   }
 
