@@ -717,7 +717,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * Query partitions from catalog
    *
    * Note that for Hive Metastore (HMD) this might not be the best solution, as it depends on up-to-date partition metadata in HMS!
-   * We can do a directory listing for Hive tables. But for Delta Lake directory listing is not suitable, as there might be directories contain only outdated records.
+   * We can do a directory listing for Hive tables. But for Delta Lake directory listing is not suitable, as there might be directories which contain only outdated records.
    * In this case using the catalog is more efficient than quering them using a Spark DataFrame.
    *
    * @return
@@ -727,6 +727,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     metadata.map(p => PartitionValues(p.spec))
   }
 
+  /**
+   * Set table properties by execute and "alter table ... set tblproperties" statement.
+   * Existing properties values will be overwritten.
+   * If existing properties are not included in parameter 'properties', they will survive with their current value.
+   */
   def alterTableProperties(table: Table, properties: Map[String,Any])(implicit session: SparkSession): Unit = {
     execSqlStmt(s"ALTER TABLE ${table.fullName} SET TBLPROPERTIES(${properties.map{case(k,v) => s"$k = '$v'"}.mkString(",")})")
   }

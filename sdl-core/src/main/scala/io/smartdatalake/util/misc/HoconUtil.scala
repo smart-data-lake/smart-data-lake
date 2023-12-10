@@ -46,13 +46,12 @@ object HoconUtil {
       val configObj = config.asInstanceOf[ConfigObject]
       val nextPath = path.takeWhile(!isListIdx(_)).mkString(".")
       val restPath = path.dropWhile(!isListIdx(_))
-      val t = if (restPath.isEmpty) {
+      if (restPath.isEmpty) {
         configObj.toConfig.withValue(nextPath, newValue).root
       } else {
         val nextElement = configObj.toConfig.getValue(nextPath)
         configObj.toConfig.withValue(nextPath, updateConfigValue(nextElement, restPath, newValue)).root
       }
-      t
     }
   }
 

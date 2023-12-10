@@ -27,7 +27,7 @@ import scala.collection.immutable.Map
  * Documentation for TestTransformer.
  * This should be exported by ConfigJsonExporter!
  */
-class TestTransformer extends CustomGenericDfTransformer {
+class ScalaDocExportTestTransformer extends CustomGenericDfTransformer {
   override def transform(helper: DataFrameFunctions, options: Map[String, String], df: GenericDataFrame, dataObjectId: String): GenericDataFrame = {
     df
   }
