@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue
 import configs.ConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
@@ -161,7 +162,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     val columnDescriptionRegex = """\s*@column\s+["`']?([^\s"`']+)["`']?\s+(.*)""".r.anchored
     var enrichedConfig = config
     val hadoopPath = new Path(descriptionPath, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
-    implicit val filesystem: FileSystem = hadoopPath.getFileSystem(hadoopConf)
+    implicit val filesystem: FileSystem = Environment.fileSystemFactory.getFileSystem(hadoopPath, hadoopConf)
 
     logger.info(s"Searching DataObject description files in $hadoopPath")
     RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory)
