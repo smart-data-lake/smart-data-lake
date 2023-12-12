@@ -31,6 +31,7 @@ import org.apache.logging.log4j.spi.DefaultThreadContextMap
 import org.apache.logging.log4j.util.ReadOnlyStringMap
 import org.apache.logging.log4j.{Level, Marker, ThreadContext}
 import org.apache.spark.TaskContext
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.util
 import java.util.concurrent.TimeUnit
@@ -50,13 +51,15 @@ import scala.concurrent.duration.FiniteDuration
 class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend[LogEvent]], layout: JsonTemplateLayout, filter: Option[Filter] = None, maxDelayMillis: Option[Int] = None)
   extends AbstractAppender(name, filter.orNull, layout, /*ignoreExceptions*/ false, Array()) {
 
+  private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
+
   private var msgBuffer = collection.mutable.Buffer[LogEvent]()
 
   /**
    * Method to set backend later. This is useful if backend configuration is not available from the start, but logging should already collect events.
    */
   def updateBackend(backend: LogAnalyticsBackend[LogEvent]): Unit = {
-    assert(this.backend.isEmpty)
+    if (this.backend.nonEmpty) logger.warn("LogAnalyticsBackend was already initialized, it will be overwritten.")
     this.backend = Some(backend)
   }
 
