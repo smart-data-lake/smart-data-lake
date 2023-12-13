@@ -32,63 +32,83 @@ import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.spec.{GCMParameterSpec, SecretKeySpec}
 import javax.crypto.{Cipher, SecretKey}
-import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.functions.{col, lit, udf}
 
-trait EncryptDecrypt {
-  def keyAsBytes: Array[Byte]
+trait EncryptDecrypt extends Serializable {
+  protected def keyAsBytes: Array[Byte]
+  protected def encryptUDF: UserDefinedFunction
+  protected def decryptUDF: UserDefinedFunction
 
-  val cryptUDF: UserDefinedFunction = udf(encryptGCM _)
-  private val GCM_ALGORITHM_STRING: String = "AES/GCM/NoPadding"
-  private val ECB_ALGORITHM_STRING: String = "AES/ECB/PKCS5Padding"
-  private val IV_SIZE = 128
-  private val TAG_BIT_LENGTH = 128
-
-  private val secureRandom = new SecureRandom()
-
-
-  def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
+  def encrypt(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
     encryptColumns.foldLeft(df) {
-      case (dfTemp, colName) => dfTemp.withColumn(colName, cryptUDF(col(colName)))
+      case (dfTemp, colName) => dfTemp.withColumn(colName, encryptUDF(col(colName)))
     }
   }
 
-  private def generateAesKey(keyBytes: Array[Byte]): SecretKey = {
+  def decrypt(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
+    encryptColumns.foldLeft(df) {
+      case (dfTemp, colName) => dfTemp.withColumn(colName, decryptUDF(col(colName)))
+    }
+  }
+
+  def generateAesKey(keyBytes: Array[Byte]): SecretKey = {
     new SecretKeySpec(keyBytes, "AES")
   }
 
-  def encryptECB(message: String): String = {
-    val cipher: Cipher = Cipher.getInstance(ECB_ALGORITHM_STRING)
-    val secretKey = generateAesKey(keyAsBytes)
+}
+
+class EncryptDecryptECB(keyBytes: Array[Byte]) extends EncryptDecrypt {
+  override protected val keyAsBytes: Array[Byte] = keyBytes
+  private val ALGORITHM_STRING: String = "AES/ECB/PKCS5Padding"
+  override def encryptUDF: UserDefinedFunction = udf(encryptFunc _)
+  override def decryptUDF: UserDefinedFunction = udf(decryptFunc _)
+
+
+  private def encryptFunc(message: String): String = {
+    val cipher: Cipher = Cipher.getInstance(ALGORITHM_STRING)
+    val secretKey: SecretKey = generateAesKey(keyAsBytes)
     cipher.init(Cipher.ENCRYPT_MODE, secretKey)
     val data = cipher.doFinal(message.getBytes())
     Base64.getEncoder.encodeToString(data)
   }
 
-  def decryptECB(encryptedDataString: String): String = {
+  private def decryptFunc(encryptedDataString: String): String = {
     val data = Base64.getDecoder.decode(encryptedDataString)
-    val cipher: Cipher = Cipher.getInstance(ECB_ALGORITHM_STRING)
-    val secretKey = generateAesKey(keyAsBytes)
+    val cipher: Cipher = Cipher.getInstance(ALGORITHM_STRING)
+    val secretKey: SecretKey = generateAesKey(keyAsBytes)
     cipher.init(Cipher.DECRYPT_MODE, secretKey)
     val message = cipher.doFinal(data)
     new String(message)
   }
 
-  def encryptGCM(message: String): String = {
+}
+class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
+  override protected val keyAsBytes: Array[Byte] = keyBytes
+  override def encryptUDF: UserDefinedFunction = udf(encryptFunc _)
+  override def decryptUDF: UserDefinedFunction = udf(decryptFunc _)
+
+  private val ALGORITHM_STRING: String = "AES/GCM/NoPadding"
+  private val IV_SIZE = 128
+  private val TAG_BIT_LENGTH = 128
+
+  private val secureRandom = new SecureRandom()
+
+  def encryptFunc(message: String): String = {
     val aesKey: SecretKey = generateAesKey(keyAsBytes)
     val gcmParameterSpec = generateGcmParameterSpec()
 
-    val cipher = Cipher.getInstance(GCM_ALGORITHM_STRING)
+    val cipher = Cipher.getInstance(ALGORITHM_STRING)
     cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
 
     val encryptedMessage = cipher.doFinal(message.getBytes)
     encodeData(gcmParameterSpec, encryptedMessage)
   }
 
-  def decryptGCM(encryptedDataString: String): String = {
+  def decryptFunc(encryptedDataString: String): String = {
     val aesKey: SecretKey = generateAesKey(keyAsBytes)
     val (gcmParameterSpec, encryptedMessage) = decodeData(encryptedDataString)
 
-    val cipher = Cipher.getInstance(GCM_ALGORITHM_STRING)
+    val cipher = Cipher.getInstance(ALGORITHM_STRING)
     cipher.init(Cipher.DECRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
 
     val message = cipher.doFinal(encryptedMessage)
@@ -132,19 +152,18 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
                                      private val key: Option[StringOrSecret],
                                      algorithm: String = "GCM"
                                     )
-  extends SparkDfTransformer with EncryptDecrypt {
+  extends SparkDfTransformer {
   private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
+  private val keyBytes: Array[Byte] = cur_key.resolve().getBytes
 
-  override def keyAsBytes: Array[Byte] = cur_key.resolve().getBytes
-
-  override val cryptUDF: UserDefinedFunction = algorithm match {
-    case "GCM" => udf(encryptGCM _)
-    case "ECB" => udf(encryptECB _)
+  val crypt: EncryptDecrypt = algorithm match {
+    case "GCM" => new EncryptDecryptGCM(keyBytes)
+    case "ECB" => new EncryptDecryptECB(keyBytes)
     case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
   }
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    process(df, encryptColumns)
+    crypt.encrypt(df, encryptColumns)
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
@@ -173,19 +192,18 @@ case class DecryptColumnsTransformer(override val name: String = "encryptColumns
                                      private val key: Option[StringOrSecret],
                                      algorithm: String = "AES/GCM/NoPadding"
                                     )
-  extends SparkDfTransformer with EncryptDecrypt {
+  extends SparkDfTransformer {
   private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
+  private val keyBytes: Array[Byte] = cur_key.resolve().getBytes
 
-  override def keyAsBytes: Array[Byte] = cur_key.resolve().getBytes
-
-  override val cryptUDF: UserDefinedFunction = algorithm match {
-    case "GCM" => udf(decryptGCM _)
-    case "ECB" => udf(decryptECB _)
-    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm: ${algorithm}")
+  val crypt: EncryptDecrypt = algorithm match {
+    case "GCM" => new EncryptDecryptGCM(keyBytes)
+    case "ECB" => new EncryptDecryptECB(keyBytes)
+    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
   }
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    process(df, decryptColumns)
+    crypt.decrypt(df, decryptColumns)
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = DecryptColumnsTransformer
