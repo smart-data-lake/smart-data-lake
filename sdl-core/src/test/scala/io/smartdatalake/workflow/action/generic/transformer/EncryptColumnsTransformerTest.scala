@@ -121,6 +121,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
     val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect.toList
     dfEnc.show(false)
+    print("### encrypted dataFrame")
     assert(testCol != Seq("Foo", "Space", "Space"))
     if (enc_type === "GCM") {
       assert(testCol(1) !== testCol(2), "2 encrypted items should not result in the same ciphertext with GCM")
@@ -131,6 +132,9 @@ class EncryptColumnsTransformerTest extends FunSuite {
     // check the decoded DataFrame
     val dec = instanceRegistry.get[ParquetFileDataObject]("dec")
     val dfDec = dec.getSparkDataFrame()
+    dfDec.show(false)
+    print("### decrypted dataFrame")
+
     val colDecName = dfDec.columns
     assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
     val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect.toList
