@@ -23,6 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB, EncryptDecryptGCM}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.workflow.ActionPipelineContext

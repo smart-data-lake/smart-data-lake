@@ -156,6 +156,6 @@ class EncryptColumnsTransformerTest extends FunSuite {
   }
 
   test("test column encryption and decryption with Class Name") {
-    run_test("io.smartdatalake.workflow.action.generic.transformer.EncryptDecryptECB")
+    run_test("io.smartdatalake.util.crypt.EncryptDecryptECB")
   }
 }
