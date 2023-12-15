@@ -18,10 +18,9 @@
  */
 
 package io.smartdatalake.workflow.action.generic.transformer
-
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
@@ -29,19 +28,19 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.DataFrame
 
 /**
- * Encryption of specified columns using AES/GCM algorithm.
+ * Decryption of specified columns using AES/GCM algorithm.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
- * @param encryptColumns List of columns [columnA, columnB] to be encrypted
+ * @param decryptColumns List of columns [columnA, columnB] to be encrypted
  * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
  *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
  * @param algorithm      Specify: "GCM" (AES/GCM/NoPadding), "ECB" (AES/ECB/PKCS5Padding),
  *                       alternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM
  */
-case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
+case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
-                                     encryptColumns: Seq[String],
+                                     decryptColumns: Seq[String],
                                      @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
                                      private val key: Option[StringOrSecret],
                                      algorithm: String = "GCM"
@@ -59,20 +58,19 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
 
   private def loadEncryptDecryptClass(classname: String): EncryptDecrypt = {
     val clazz = Environment.classLoader.loadClass(classname)
-    assert(clazz.getConstructors.exists(con => con.getParameterTypes.toSeq == Seq(classOf[Array[Byte]])),
-      s"Class $classname needs to have a constructor with 1 parameter of type 'Array[Byte]'!")
+    assert(clazz.getConstructors.exists(con => con.getParameterTypes.toSeq == Seq(classOf[Array[Byte]])), s"Class $classname needs to have a constructor with 1 parameter of type 'Array[Byte]'!")
     clazz.getConstructor(classOf[Array[Byte]]).newInstance(keyBytes).asInstanceOf[EncryptDecrypt]
   }
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    crypt.encrypt(df, encryptColumns)
+    crypt.decrypt(df, decryptColumns)
   }
 
-  override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = DecryptColumnsTransformer
 }
 
-object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): EncryptColumnsTransformer = {
-    extract[EncryptColumnsTransformer](config)
+object DecryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DecryptColumnsTransformer = {
+    extract[DecryptColumnsTransformer](config)
   }
 }
