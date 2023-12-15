@@ -36,8 +36,14 @@ import org.apache.spark.sql.functions.{col, lit, udf}
 
 trait EncryptDecrypt extends Serializable {
   protected def keyAsBytes: Array[Byte]
-  protected def encryptUDF: UserDefinedFunction
-  protected def decryptUDF: UserDefinedFunction
+
+  protected def encryptUDF: UserDefinedFunction = udf(encryptFunc _)
+
+  protected def decryptUDF: UserDefinedFunction = udf(decryptFunc _)
+
+  protected def encryptFunc(message: String): String
+
+  protected def decryptFunc(encryptedDataString: String): String
 
   def encrypt(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
     encryptColumns.foldLeft(df) {
@@ -60,11 +66,8 @@ trait EncryptDecrypt extends Serializable {
 class EncryptDecryptECB(keyBytes: Array[Byte]) extends EncryptDecrypt {
   override protected val keyAsBytes: Array[Byte] = keyBytes
   private val ALGORITHM_STRING: String = "AES/ECB/PKCS5Padding"
-  override def encryptUDF: UserDefinedFunction = udf(encryptFunc _)
-  override def decryptUDF: UserDefinedFunction = udf(decryptFunc _)
 
-
-  private def encryptFunc(message: String): String = {
+  override protected def encryptFunc(message: String): String = {
     val cipher: Cipher = Cipher.getInstance(ALGORITHM_STRING)
     val secretKey: SecretKey = generateAesKey(keyAsBytes)
     cipher.init(Cipher.ENCRYPT_MODE, secretKey)
@@ -72,7 +75,7 @@ class EncryptDecryptECB(keyBytes: Array[Byte]) extends EncryptDecrypt {
     Base64.getEncoder.encodeToString(data)
   }
 
-  private def decryptFunc(encryptedDataString: String): String = {
+  override protected def decryptFunc(encryptedDataString: String): String = {
     val data = Base64.getDecoder.decode(encryptedDataString)
     val cipher: Cipher = Cipher.getInstance(ALGORITHM_STRING)
     val secretKey: SecretKey = generateAesKey(keyAsBytes)
@@ -82,10 +85,9 @@ class EncryptDecryptECB(keyBytes: Array[Byte]) extends EncryptDecrypt {
   }
 
 }
+
 class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
   override protected val keyAsBytes: Array[Byte] = keyBytes
-  override def encryptUDF: UserDefinedFunction = udf(encryptFunc _)
-  override def decryptUDF: UserDefinedFunction = udf(decryptFunc _)
 
   private val ALGORITHM_STRING: String = "AES/GCM/NoPadding"
   private val IV_SIZE = 128
@@ -93,7 +95,7 @@ class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
 
   private val secureRandom = new SecureRandom()
 
-  def encryptFunc(message: String): String = {
+  override protected def encryptFunc(message: String): String = {
     val aesKey: SecretKey = generateAesKey(keyAsBytes)
     val gcmParameterSpec = generateGcmParameterSpec()
 
@@ -104,7 +106,7 @@ class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
     encodeData(gcmParameterSpec, encryptedMessage)
   }
 
-  def decryptFunc(encryptedDataString: String): String = {
+  override protected def decryptFunc(encryptedDataString: String): String = {
     val aesKey: SecretKey = generateAesKey(keyAsBytes)
     val (gcmParameterSpec, encryptedMessage) = decodeData(encryptedDataString)
 
