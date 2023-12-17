@@ -38,6 +38,7 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.reflect.runtime.universe.{ClassSymbol, Type, TypeRef, typeOf}
+import scala.collection.compat._
 
 /**
  * Create Json schema elements from generic type definitions.
@@ -122,13 +123,14 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       }
     }
 
-    def fromCaseClass(cls: ClassSymbol): JsonObjectDef = {
+    def fromCaseClass(cls: ClassSymbol, isDeprecated: Option[Boolean] = None): JsonObjectDef = {
       convertedCaseClasses.getOrElseUpdate(cls, {
         logger.debug(s"Converting case class ${cls.fullName}")
         val typeDef = GenericTypeUtil.typeDefForClass(cls.toType)
         // this might result in stack overflow because ProxyAction includes an Action again.
         // It is solved by using lazy property processing, see type LazyListMapWrapper of JsonSchemaObj.properties.
-        fromGenericTypeDef(typeDef)
+        val jsonObjDef = fromGenericTypeDef(typeDef)
+        jsonObjDef.copy(deprecated = Seq(jsonObjDef.deprecated,isDeprecated).flatten.maxOption)
       })
     }
     private val convertedCaseClasses: mutable.Map[ClassSymbol, JsonObjectDef] = mutable.Map()
@@ -157,7 +159,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           else refDefs.head
         }
         case t if registry.typeExists(t) => registry.getJsonRefDef(t, isDeprecated)
-        case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass)
+        case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass, isDeprecated)
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
           val baseCls = getClass.getClassLoader.loadClass(t.typeSymbol.fullName)
           val subTypeClssSym = reflections.getSubTypesOf(baseCls).asScala
