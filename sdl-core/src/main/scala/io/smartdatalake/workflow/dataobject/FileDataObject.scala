@@ -27,6 +27,11 @@ private[smartdatalake] trait FileDataObject extends DataObject with CanHandlePar
   /**
    * The root path of the files that are handled by this DataObject.
    * For most DataObjects this can be a directory or a specific file.
+   *
+   * If it doesn't contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not
+   * defined or doesn't define scheme and authority, default schema and authority is applied.
+   *
+   * Optionally defined partitions are appended with hadoop standard partition layout to this path.
    */
   protected def path: String
 

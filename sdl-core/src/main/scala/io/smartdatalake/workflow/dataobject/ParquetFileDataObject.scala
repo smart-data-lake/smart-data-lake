@@ -43,31 +43,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
 
- * @param id unique name of this data object
- * @param path Hadoop directory where this data object reads/writes it's files.
- *             If it doesn't contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not
- *             defined or doesn't define scheme and authority, default schema and authority is applied.
- *             Optionally defined partitions are appended with hadoop standard partition layout to this path.
- *             Only files ending with *.parquet* are considered as data for this DataObject.
- * @param partitions partition columns for this data object
  * @param parquetOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                       [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional schema for the spark data frame to be validated on read and write. Note: Existing Parquet files
- *               contain a source schema. Therefore, this schema is ignored when reading from existing Parquet files.
- *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
- *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
- *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
- * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
- * @param acl override connections permissions for files created with this connection
- * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HadoopFileConnection]]
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
- * @param metadata Metadata describing this data object.
  */
 case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val path: String,

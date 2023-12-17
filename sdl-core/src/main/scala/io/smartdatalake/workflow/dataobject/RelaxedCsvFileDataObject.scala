@@ -46,22 +46,12 @@ import scala.reflect.runtime.universe.typeOf
  * If mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.
  * RelaxCsvFileDataObject also supports getting an error msg by adding "<options.columnNameOfCorruptRecord>_msg" as field to the schema.
  *
- * @param schema The data object schema.
- *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
- *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
- *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType Specifies the string format used for writing date typed data.
  * @param treatMissingColumnsAsCorrupt If set to true records from files with missing columns in its header are treated as corrupt (default=false).
  *                                   Corrupt records are handled according to options.mode (default=permissive).
  * @param treatSuperfluousColumnsAsCorrupt If set to true records from files with superfluous columns in its header are treated as corrupt (default=false).
  *                                   Corrupt records are handled according to options.mode (default=permissive).
- * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
  **/
 case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val path: String,
