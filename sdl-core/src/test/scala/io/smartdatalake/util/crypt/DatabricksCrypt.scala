@@ -39,8 +39,8 @@ class DatabricksCrypt extends FunSuite {
     session.sql("SELECT * FROM testTable").show()
 
     // where does that needs to be defined?
-    val encDec = new EncDecECB()
-    val bla = session.udf.register("encrypt_udf", encDec.encrypt _)
+    val encDec = new EncryptColumn()
+    val bla = session.udf.register("encrypt_udf", encDec.evaluate _)
 
     // once the above is registered, the user can use the UDF e.g. in PowerBI as
     val key = "A%D*G-KaPdSgVkYp"
