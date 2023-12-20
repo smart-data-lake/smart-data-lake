@@ -34,6 +34,7 @@ import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql
 
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -44,7 +45,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
-  def run_test(enc_type: String): Unit = {
+  def run_test(enc_type: String): sql.DataFrame = {
     val sdlb = new DefaultSmartDataLakeBuilder()
 
     val config = ConfigFactory.parseString(
@@ -139,6 +140,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
     val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect.toList
     assert(testDecCol == Seq("Foo", "Space", "Space"))
+    dfEnc
   }
 
   test("test column encryption and decryption") {
@@ -146,7 +148,8 @@ class EncryptColumnsTransformerTest extends FunSuite {
   }
 
   test("test ECB column encryption and decryption") {
-    run_test("ECB")
+    val df = run_test("ECB")
+    assert(df.select("c2").take(2)(1).getAs[String]("c2") === "0RK5Cr5ax1OXlBO7Q+BHxA==")
   }
 
   test("test column encryption, unsupported algorithm") {
@@ -156,6 +159,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
   }
 
   test("test column encryption and decryption with Class Name") {
-    run_test("io.smartdatalake.util.crypt.EncryptDecryptECB")
+    val df = run_test("io.smartdatalake.util.crypt.EncryptDecryptECB")
+    assert(df.select("c2").take(2)(1).getAs[String]("c2") === "0RK5Cr5ax1OXlBO7Q+BHxA==")
   }
 }
