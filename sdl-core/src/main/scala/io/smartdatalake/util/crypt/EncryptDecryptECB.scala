@@ -39,12 +39,12 @@ class EncryptDecryptECB(keyBytes: Array[Byte]) extends EncryptDecrypt {
     cipher
   }
 
-  override protected def encryptFunc(message: String): String = {
+  override def encrypt(message: String): String = {
     val data = cipherEncrypt.doFinal(message.getBytes())
     Base64.getEncoder.encodeToString(data)
   }
 
-  override protected def decryptFunc(encryptedDataString: String): String = {
+  override def decrypt(encryptedDataString: String): String = {
     val data = Base64.getDecoder.decode(encryptedDataString)
     val message = cipherDecrypt.doFinal(data)
     new String(message)

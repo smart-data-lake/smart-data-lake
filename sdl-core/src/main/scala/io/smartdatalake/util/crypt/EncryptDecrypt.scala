@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.crypt
 
+import io.smartdatalake.definitions.Environment
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, udf}
@@ -29,21 +30,21 @@ import javax.crypto.spec.SecretKeySpec
 trait EncryptDecrypt extends Serializable {
   protected def keyAsBytes: Array[Byte]
 
-  protected def encryptUDF: UserDefinedFunction = udf(encryptFunc _)
+  protected def encryptUDF: UserDefinedFunction = udf(encrypt _)
 
-  protected def decryptUDF: UserDefinedFunction = udf(decryptFunc _)
+  protected def decryptUDF: UserDefinedFunction = udf(decrypt _)
 
-  protected def encryptFunc(message: String): String
+  def encrypt(message: String): String
 
-  protected def decryptFunc(encryptedDataString: String): String
+  def decrypt(encryptedDataString: String): String
 
-  def encrypt(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
+  def encryptColumns(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
     encryptColumns.foldLeft(df) {
       case (dfTemp, colName) => dfTemp.withColumn(colName, encryptUDF(col(colName)))
     }
   }
 
-  def decrypt(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
+  def decryptColumns(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
     encryptColumns.foldLeft(df) {
       case (dfTemp, colName) => dfTemp.withColumn(colName, decryptUDF(col(colName)))
     }
@@ -52,5 +53,13 @@ trait EncryptDecrypt extends Serializable {
   def generateAesKey(keyBytes: Array[Byte]): SecretKey = {
     new SecretKeySpec(keyBytes, "AES")
   }
+}
 
+trait EncryptDecryptSupport {
+  def loadEncryptDecryptClass(classname: String, keyAsBytes: Array[Byte]): EncryptDecrypt = {
+    val clazz = Environment.classLoader.loadClass(classname)
+    assert(clazz.getConstructors.exists(con => con.getParameterTypes.toSeq == Seq(classOf[Array[Byte]])),
+      s"Class $classname needs to have a constructor with 1 parameter of type 'Array[Byte]'!")
+    clazz.getConstructor(classOf[Array[Byte]]).newInstance(keyAsBytes).asInstanceOf[EncryptDecrypt]
+  }
 }

@@ -469,6 +469,22 @@
                             </excludes>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>crypt-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>crypt</classifier>
+                            <includes>
+                                <include>**/crypt/**</include>
+                            </includes>
+                            <excludes>
+                                <exclude>dummy-entry</exclude> <!-- override excludes inherited from parent plugin management with dummy entry -->
+                            </excludes>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
 
