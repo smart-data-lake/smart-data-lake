@@ -27,7 +27,7 @@ import org.scalatest.FunSuite
  * Unit tests for historization
  *
  */
-class DatabricksCrypt extends FunSuite {
+class DatabricksCryptTest extends FunSuite {
   implicit lazy val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -44,6 +44,26 @@ class DatabricksCrypt extends FunSuite {
 
     // once the above is registered, the user can use the UDF e.g. in PowerBI as
     val key = "A%D*G-KaPdSgVkYp"
-    session.sql(s"SELECT *, encrypt_udf(c2, '${key}', 'ECB') FROM testTable").show(false)
+    val df = session.sql(s"SELECT *, encrypt_udf(c2, '${key}', 'ECB') as enc_c2 FROM testTable")
+    df.show(false)
+    assert(df.select("enc_c2").take(2)(1).getAs[String]("enc_c2") === "0RK5Cr5ax1OXlBO7Q+BHxA==")
+  }
+
+  test("decrypting UDF") {
+    val dfSrc = Seq(("testData", "FOT23KPxnymcuU9hzoeYPg==", "ice"), ("bar", "0RK5Cr5ax1OXlBO7Q+BHxA==", "water"),
+      ("gogo", "0RK5Cr5ax1OXlBO7Q+BHxA==", "water")).toDF("c1", "c2", "c3")
+    dfSrc.show(false)
+    dfSrc.createOrReplaceTempView("testTable")
+    session.sql("SELECT * FROM testTable").show()
+
+    // where does that needs to be defined?
+    val encDec = new DecryptColumn()
+    val bla = session.udf.register("decrypt_udf", encDec.evaluate _)
+
+    // once the above is registered, the user can use the UDF e.g. in PowerBI as
+    val key = "A%D*G-KaPdSgVkYp"
+    val df = session.sql(s"SELECT *, decrypt_udf(c2, '${key}', 'ECB') as dec_c2 FROM testTable")
+    df.show(false)
+    assert(df.select("dec_c2").take(2)(1).getAs[String]("dec_c2") === "Space")
   }
 }
