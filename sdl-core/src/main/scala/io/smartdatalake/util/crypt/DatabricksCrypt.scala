@@ -2,8 +2,8 @@ package io.smartdatalake.util.crypt
 
 import org.apache.hadoop.hive.ql.exec.UDF
 
-class EncDecECB extends EncryptDecryptSupport {
-  def encrypt(message: String, key: String, algorithm: String): String = {
+class EncryptColumn extends UDF with EncryptDecryptSupport {
+  def evaluate(message: String, key: String, algorithm: String): String = {
     val keyBytes: Array[Byte] = key.getBytes
     val crypt: EncryptDecrypt = algorithm match {
       case "GCM" => new EncryptDecryptGCM(keyBytes)
@@ -14,7 +14,10 @@ class EncDecECB extends EncryptDecryptSupport {
     crypt.encrypt(message)
   }
 
-  def decrypt(message: String, key: String, algorithm: String): String = {
+}
+
+class DecryptColumn extends UDF with EncryptDecryptSupport {
+  def evaluate(message: String, key: String, algorithm: String): String = {
     val keyBytes: Array[Byte] = key.getBytes
     val crypt: EncryptDecrypt = algorithm match {
       case "GCM" => new EncryptDecryptGCM(keyBytes)
