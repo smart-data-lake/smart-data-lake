@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB, EncryptDecryptGCM}
+import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB, EncryptDecryptGCM, EncryptDecryptSupport}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -47,26 +47,19 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
                                      private val key: Option[StringOrSecret],
                                      algorithm: String = "GCM"
                                     )
-  extends SparkDfTransformer {
+  extends SparkDfTransformer with EncryptDecryptSupport {
   private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
   private val keyBytes: Array[Byte] = cur_key.resolve().getBytes
 
   val crypt: EncryptDecrypt = algorithm match {
     case "GCM" => new EncryptDecryptGCM(keyBytes)
     case "ECB" => new EncryptDecryptECB(keyBytes)
-    case classname if classname.contains(".") => loadEncryptDecryptClass(classname)
+    case classname if classname.contains(".") => loadEncryptDecryptClass(classname, keyBytes)
     case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
   }
 
-  private def loadEncryptDecryptClass(classname: String): EncryptDecrypt = {
-    val clazz = Environment.classLoader.loadClass(classname)
-    assert(clazz.getConstructors.exists(con => con.getParameterTypes.toSeq == Seq(classOf[Array[Byte]])),
-      s"Class $classname needs to have a constructor with 1 parameter of type 'Array[Byte]'!")
-    clazz.getConstructor(classOf[Array[Byte]]).newInstance(keyBytes).asInstanceOf[EncryptDecrypt]
-  }
-
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    crypt.encrypt(df, encryptColumns)
+    crypt.encryptColumns(df, encryptColumns)
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
