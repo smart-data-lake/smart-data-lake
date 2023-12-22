@@ -469,6 +469,19 @@
                             </excludes>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>crypt-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>crypt</classifier>
+                            <includes>
+                                <include>**/crypt/**</include>
+                            </includes>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
 
