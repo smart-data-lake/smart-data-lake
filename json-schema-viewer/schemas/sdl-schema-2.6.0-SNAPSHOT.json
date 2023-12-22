@@ -4675,7 +4675,8 @@
             "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
           },
           "algorithm" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "Specify: \\\"GCM\\\" (AES/GCM/NoPadding), \\\"ECB\\\" (AES/ECB/PKCS5Padding),\nalternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM"
           }
         },
         "title" : "DecryptColumnsTransformer",
@@ -4712,6 +4713,10 @@
           "key" : {
             "type" : "string",
             "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\nto get a secret from an environment variable."
+          },
+          "algorithm" : {
+            "type" : "string",
+            "description" : "Specify: \\\"GCM\\\" (AES/GCM/NoPadding), \\\"ECB\\\" (AES/ECB/PKCS5Padding),\nalternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM"
           }
         },
         "title" : "EncryptColumnsTransformer",
