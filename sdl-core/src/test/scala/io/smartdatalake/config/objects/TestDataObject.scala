@@ -61,7 +61,7 @@ case class TestDataObject( id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
 
-  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   override def factory: FromConfigFactory[DataObject] = TestDataObject
 

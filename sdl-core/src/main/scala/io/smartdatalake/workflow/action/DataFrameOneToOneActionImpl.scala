@@ -83,7 +83,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    * Executes operations needed after executing an action for the SubFeed.
    * Can be implemented by sub classes.
    */
-  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = Unit
+  def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * apply transformer to SubFeed

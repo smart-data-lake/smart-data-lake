@@ -42,7 +42,6 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
-
  * @param id unique name of this data object
  * @param path Hadoop directory where this data object reads/writes it's files.
  *             If it doesn't contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not

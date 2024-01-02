@@ -93,7 +93,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
       , ("preRead", "smith", "feedTest", 3), ("preWrite", "emma", "feedTest", 3)
       , ("postRead", "smith", "feedTest", 3), ("postWrite", "emma", "feedTest", 3)
     ).toDF("type", "lastname", "firstname", "rating")
-    srcDO.getSparkDataFrame().symmetricDifference(dfSrcExpected).show
+    srcDO.getSparkDataFrame().symmetricDifference(dfSrcExpected).show()
     assert(srcDO.getSparkDataFrame().symmetricDifference(dfSrcExpected).isEmpty)
   }
 
@@ -160,7 +160,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     dataObject.prepare
-    dataObject.getSparkDataFrame(Seq()).show
+    dataObject.getSparkDataFrame(Seq()).show()
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
     assert(partitionValues.size == 2)
@@ -176,12 +176,12 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.prepare
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
-    dataObject.getSparkDataFrame(Seq()).show
+    dataObject.getSparkDataFrame(Seq()).show()
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
     assert(partitionValues.size == 2)
     assert(partitionValues.map(_.elements("abc")).toSet == Set("ext","int"))
-    dataObject.getSparkDataFrame().select($"abc").show
+    dataObject.getSparkDataFrame().select($"abc").show()
   }
 
   test("SaveMode merge") {
@@ -261,7 +261,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
     // test 1
     targetDO.setState(None) // initialize incremental output with empty state
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
     val newState1 = targetDO.getState
 
     // append test data 2
@@ -271,11 +271,11 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     // test 2
     targetDO.setState(newState1)
     val df2result = targetDO.getSparkDataFrame()(contextExec)
-    df2result.count shouldEqual 1
+    df2result.count() shouldEqual 1
     val newState2 = targetDO.getState
     assert(newState1.get < newState2.get)
 
-    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 5
   }
 
   test("write to jdbc table with different order of columns") {

@@ -32,7 +32,7 @@ import org.scalatest.FunSuite
 import java.nio.file.Files
 import java.time.{Duration, LocalDateTime}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class ActionDAGRunTest extends FunSuite {
 
@@ -57,7 +57,7 @@ class ActionDAGRunTest extends FunSuite {
         .copy(results = actionState.results.map {
           case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
           case subFeed => subFeed
-        })))
+        })).toMap)
     // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)

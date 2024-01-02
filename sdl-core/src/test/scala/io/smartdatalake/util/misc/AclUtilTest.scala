@@ -99,7 +99,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
     assert(rootParentPath.isEmpty)
   }
 
-  def noOpAclSetter(p:Path): Unit = Unit
+  def noOpAclSetter(p:Path): Unit = ()
 
   test("Traverse directoryUp some existing directory (user home)") {
     val path = new Path("/user/app_dir/integration/someapp")

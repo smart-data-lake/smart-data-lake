@@ -129,7 +129,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedType].getActualTypeArguments.head.getTypeName
     val columsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
-    val resAsDF = res.asInstanceOf[Dataset[_]].toDF
+    val resAsDF = res.asInstanceOf[Dataset[_]].toDF()
     val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
 
     if (addPartitionValuesToOutput) {

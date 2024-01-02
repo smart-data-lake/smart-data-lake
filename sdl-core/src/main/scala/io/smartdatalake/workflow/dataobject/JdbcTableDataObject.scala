@@ -186,7 +186,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
       val newDataType = resolvedExpr.dataType
       if (context.isExecPhase) {
-        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head.get(0))
+        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head().get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
         logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
@@ -395,7 +395,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         .options(options)
         .options(connection.getAuthModeSparkOptions)
         .option("dbtable", tableName)
-        .save
+        .save()
     )
   }
 
@@ -477,7 +477,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      PartitionValues.fromDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct)
+      PartitionValues.fromDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct())
     } else Seq()
   }
 

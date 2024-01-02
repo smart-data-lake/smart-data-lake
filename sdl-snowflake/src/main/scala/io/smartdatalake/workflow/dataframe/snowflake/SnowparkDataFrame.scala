@@ -76,7 +76,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
-  override def collect: Seq[GenericRow] = inner.collect.map(SnowparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
     SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
   }
@@ -92,7 +92,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.count() == 0
   override def count: Long = inner.count()
-  override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult)
+  override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult())
   // not implemented in Snowpark
   override def uncache: GenericDataFrame = this
   override def showString(options: Map[String,String] = Map()): String = {

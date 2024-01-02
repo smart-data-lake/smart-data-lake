@@ -56,7 +56,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
     assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
     val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) {
       // infer partition values
-      df.select(partitions.map(col):_*).collect.map(row => PartitionValues(partitions.map(p => (p,row.getAs[Any](p))).toMap)).toSeq
+      df.select(partitions.map(col):_*).collect().map(row => PartitionValues(partitions.map(p => (p,row.getAs[Any](p))).toMap)).toSeq
     } else partitionValues
 
     if (partitions.nonEmpty && dataFrameMock.isDefined) {
@@ -72,7 +72,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
       dataFrameMock = Some(df)
       partitionValuesMock = inferredPartitionValues
     }
-    Map("records_written" -> df.count)
+    Map("records_written" -> df.count())
   }
 
   def register(implicit instanceRegistry: InstanceRegistry): MockDataObject = {

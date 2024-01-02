@@ -84,7 +84,7 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
   }
 
   private def closeConnection(connection: HybridConnectionChannel): Unit = {
-    logger.info(this + ": received EndConnection request, closing connection")
+    logger.info(this.toString + ": received EndConnection request, closing connection")
     connection.close()
   }
 }

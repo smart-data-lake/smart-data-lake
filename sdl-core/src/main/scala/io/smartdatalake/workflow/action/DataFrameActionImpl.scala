@@ -168,7 +168,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             // validate partition values existing for input
             input match {
               case partitionedInput: DataObject with CanHandlePartitions => validatePartitionValuesExisting(partitionedInput, subFeed)
-              case _ => Unit
+              case _ => ()
             }
             // check if data is existing, otherwise create empty dataframe for recursive input
             val isDataExisting = input match {
@@ -329,7 +329,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         // start streaming query - use Trigger.Once for synchronous one-time execution
         val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once(), m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
         // wait for termination
-        streamingQuery.awaitTermination
+        streamingQuery.awaitTermination()
         val queryProgress = streamingQuery.lastProgress
         val streamingMetrics = SparkStreamingMetrics(queryProgress)
         if (streamingMetrics.noData) logger.info(s"($id) no data to process for ${output.id} in first micro-batch streaming mode")

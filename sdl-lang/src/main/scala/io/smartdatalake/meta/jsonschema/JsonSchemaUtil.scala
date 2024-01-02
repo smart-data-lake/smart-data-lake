@@ -34,7 +34,7 @@ import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.reflect.runtime.universe.{ClassSymbol, Type, TypeRef, typeOf}

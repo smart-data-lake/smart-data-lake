@@ -45,7 +45,7 @@ trait PartitionValueTransformer {
 
   private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct, executionModeResultOptions) // note that stream is lazy -> distinct is only calculated if transformPartitionValues creates a mapping.
-    thisPartitionValuesMap.map(newMapping => partitionValuesMap.mapValues(newMapping))
+    thisPartitionValuesMap.map(newMapping => partitionValuesMap.mapValues(newMapping).toMap)
       .getOrElse(partitionValuesMap)
   }
 }
@@ -61,7 +61,7 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
   /**
    * Optional function to implement validations in prepare phase.
    */
-  def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = Unit
+  def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = ()
   /**
    * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
    */
@@ -139,7 +139,7 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
     runtimeOptions.mapValues {
       expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get)
+    }.filter(_._2.isDefined).mapValues(_.get).toMap
   }
 }
 object OptionsGenericDfTransformer {

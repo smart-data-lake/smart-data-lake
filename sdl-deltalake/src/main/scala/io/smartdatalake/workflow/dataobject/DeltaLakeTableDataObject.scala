@@ -121,7 +121,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
-        if (thisIsTableExisting) new Path(getDetails.head.getAs[String]("location"))
+        if (thisIsTableExisting) new Path(getDetails.head().getAs[String]("location"))
         else getAbsolutePath
       }
 
@@ -290,9 +290,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     // get delta table operational metrics
     val dfHistory = DeltaTable.forName(session, table.fullName).history(1)
     if (logger.isDebugEnabled) dfHistory.show(false)
-    val latestHistoryEntry = dfHistory.select("operationMetrics", "userMetadata").head
+    val latestHistoryEntry = dfHistory.select("operationMetrics", "userMetadata").head()
     assert(latestHistoryEntry.getString(1) == userMetadata, s"($id) current delta lake history entry is not written by this spark application (userMetadata should be $userMetadata). Is there someone else writing to this table?!")
-    val deltaMetrics = dfHistory.select("operationMetrics").head.getMap[String,String](0)
+    val deltaMetrics = dfHistory.select("operationMetrics").head().getMap[String,String](0)
       // normalize names lowercase with underscore
       .map{case (k,v) => (DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
       // standardize naming
@@ -418,7 +418,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val (pvs,d) = PerformanceUtils.measureDuration(
-      if(isTableExisting) PartitionValues.fromDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct)
+      if(isTableExisting) PartitionValues.fromDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct())
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
@@ -439,7 +439,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
     partitionValues.foreach {
       case (pvExisting, pvNew) =>
-        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit))
+        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit).toMap)
         logger.info(s"($id) Partition $pvExisting moved to $pvNew")
     }
   }
@@ -459,11 +459,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       import session.implicits._
       val dfHistory = DeltaTable.forName(session, table.fullName).history()
         .select("timestamp", "userMetadata").as[(Long,String)]
-      val (_,lastCommitMsg) = dfHistory.head
-      val (oldestSnapshot,_) = dfHistory.head
+      val (_,lastCommitMsg) = dfHistory.head()
+      val (oldestSnapshot,_) = dfHistory.head()
       val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, properties) = getDetails
-        .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head
-      val numRows = DeltaTable.forName(session, table.fullName).toDF.count // This is actionally calculated by Metadata only :-)
+        .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head()
+      val numRows = DeltaTable.forName(session, table.fullName).toDF.count() // This is actionally calculated by Metadata only :-)
       val deltaStats = Map(TableStatsType.CreatedAt.toString -> createdAt, TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.LastCommitMsg.toString -> lastCommitMsg, TableStatsType.NumDataFilesCurrent.toString -> numDataFilesCurrent, TableStatsType.SizeInBytesCurrent.toString -> sizeInBytesCurrent, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshot, TableStatsType.NumRows.toString -> numRows)
       val columnStats = getColumnStats(update, Some(lastModifiedAt))
       HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ deltaStats ++ getPartitionStats + (TableStatsType.Columns.toString -> columnStats)
@@ -488,7 +488,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       ).as(col)
       val metricsRow = snapshot.allFiles
         .select(from_json($"stats", snapshot.statsSchema).as("stats"))
-        .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg):_*).head
+        .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg):_*).head()
       columns.map {
         c =>
           val struct = metricsRow.getStruct(metricsRow.fieldIndex(c))

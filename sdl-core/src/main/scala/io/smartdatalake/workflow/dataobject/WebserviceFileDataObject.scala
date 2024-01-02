@@ -141,7 +141,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     new ByteArrayInputStream(getResponse(Some(query)))
   }
 
-  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * @param path      is ignored for webservices
@@ -155,13 +155,13 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
         val bytes = this.toByteArray
         postResponse(bytes, None)
       } match {
-        case Success(_) => Unit
+        case Success(_) => ()
         case Failure(e) => throw new RuntimeException(s"($id) Could not post to webservice: ${e.getMessage}", e)
       }
     }
   }
 
-  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)

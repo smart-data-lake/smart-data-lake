@@ -111,7 +111,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // check state: two actions succeeded
     val latestState = stateStore.getLatestStateId().get
     val previousRunState = stateStore.recoverRunState(latestState)
-    val previousActionState = previousRunState.actionsState.mapValues(_.state)
+    val previousActionState = previousRunState.actionsState.mapValues(_.state).toMap
     val resultActionState = actions.map( a => (a.id, RuntimeEventState.SUCCEEDED)).toMap
     assert(previousActionState == resultActionState)
   }
@@ -267,17 +267,17 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val r1 = tgtBDO.getSparkDataFrame()
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r1.toSet == Set(6))
 
     val r2 = tgtCDO.getSparkDataFrame()
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r2.toSet == Set(3))
 
     val r3 = tgtDDO.getSparkDataFrame()
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r3.toSet == Set(3,5))
   }
 
@@ -321,7 +321,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // as filters are ignored, we expect both records from src3, but only one record from src2
     val r1 = tgtDO.getSparkDataFrame(Seq())
       .select($"lastname", $"firstname", $"origin")
-      .as[(String,String,Int)].collect.toSet
+      .as[(String,String,Int)].collect().toSet
     assert(r1 == Set(("doe","john",1),("doe","john",2),("doe","john",3),("xyz","john",3)))
   }
 
@@ -379,19 +379,19 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val r1 = session.table(s"${tgtBTable.fullName}")
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 5)
 
     val r2 = session.table(s"${tgtCTable.fullName}")
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r2.size == 1)
     assert(r2.head == 5)
 
     val r3 = session.table(s"${tgtDTable.fullName}")
       .select($"rating".cast("int"))
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     r3.foreach(println)
     assert(r3.size == 1)
     assert(r3.head == 10)
@@ -435,7 +435,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     {
       val r = tgtCDO.getSparkDataFrame()
         .select($"rating")
-        .as[Int].collect.toSeq
+        .as[Int].collect().toSeq
       assert(r == Seq(5, 3))
     }
 
@@ -451,7 +451,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     {
       val r = tgtCDO.getSparkDataFrame()
         .select($"rating")
-        .as[Int].collect.toSeq
+        .as[Int].collect().toSeq
       assert(r == Seq(5, 4)) // doe is not updated...
     }
   }
@@ -547,10 +547,10 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // read src/tgt and count
     val dfSrc = srcDO.getSparkDataFrame()
-    val srcCount = dfSrc.count
+    val srcCount = dfSrc.count()
     val dfTgt1 = tgt1DO.getSparkDataFrame()
     val dfTgt2 = tgt2DO.getSparkDataFrame()
-    val tgtCount = dfTgt2.count
+    val tgtCount = dfTgt2.count()
     assert(srcCount == tgtCount)
   }
 
@@ -595,9 +595,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // read src/tgt and count
     val dfSrc = srcDO.getSparkDataFrame()
-    val srcCount = dfSrc.count
+    val srcCount = dfSrc.count()
     val dfTgt3 = tgt3DO.getSparkDataFrame()
-    val tgtCount = dfTgt3.count
+    val tgtCount = dfTgt3.count()
     assert(srcCount == tgtCount)
 
     // check metrics for CsvFileDataObject
@@ -738,7 +738,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.exec(contextExec)
 
     // check
-    assert(tgt1DO.getSparkDataFrame().count == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
+    assert(tgt1DO.getSparkDataFrame().count() == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
     assert(tgt1DO.listPartitions.isEmpty)
     val r2 = tgt2DO.getSparkDataFrame()
       .select($"rating")
@@ -1109,7 +1109,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.exec(contextExec)
 
     // check
-    assert(tgt2DO.getSparkDataFrame().count == 1)
+    assert(tgt2DO.getSparkDataFrame().count() == 1)
 
     // check metrics
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
@@ -1341,7 +1341,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     dag.init(contextInit)
     dag.exec(contextExec)
 
-    assert(recDO.getSparkDataFrame().count > 0)
+    assert(recDO.getSparkDataFrame().count() > 0)
 
     // and cleanup special config again
     Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())

@@ -128,7 +128,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
         if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw SparkJobNotEndedException(s"SparkStageMetricsListener didn't get onJobEnd notification for jobIds=${runningJobs.keys.mkString(",")} within timeout of $timeoutSec seconds.")
       }
     }
-    metrics
+    metrics.toSeq
   } finally {
     context.sparkSession.sparkContext.removeSparkListener(this)
   }

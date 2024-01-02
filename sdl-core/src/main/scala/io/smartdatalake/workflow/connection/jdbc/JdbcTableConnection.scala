@@ -143,7 +143,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
   }
 
   def test(): Unit = {
-    execWithJdbcConnection{ _ => Unit }
+    execWithJdbcConnection{ _ => () }
   }
 
   private def getConnection: SqlConnection = {

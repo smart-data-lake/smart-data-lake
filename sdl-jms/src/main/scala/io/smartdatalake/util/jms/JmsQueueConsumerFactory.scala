@@ -24,7 +24,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import javax.jms._
 import javax.naming.{Context, InitialContext}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * JMS Queue Consumer Factory

@@ -115,7 +115,7 @@ object SparkRepartitionDef extends SmartDataLakeLogger {
     // to distribute records across tasks within partitions, we need calculate a task number from keyCols
     val repartitionCols = if (numberOfTasksPerPartition == 1) partitions.map(col)
     else if (keyCols.nonEmpty) partitions.map(col) :+ pmod(hash(keyCols.map(col): _*), lit(numberOfTasksPerPartition))
-    else partitions.map(col) :+ floor(rand * numberOfTasksPerPartition).cast(IntegerType)
+    else partitions.map(col) :+ floor(rand() * numberOfTasksPerPartition).cast(IntegerType)
     if (nbOfPartitionValues.isDefined) {
       df.repartition(numberOfTasksPerPartition * nbOfPartitionValues.get, repartitionCols: _*)
     } else {

@@ -21,7 +21,7 @@ package io.smartdatalake.util.misc
 
 import org.reflections.Reflections
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
 

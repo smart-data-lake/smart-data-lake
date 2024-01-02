@@ -56,7 +56,7 @@ private[smartdatalake] object CustomCodeUtil {
   }
 
   def getClassInstanceByName[T](classname:String): T = {
-    val clazz = Environment.classLoader.loadClass(classname)
+    val clazz = Environment.classLoader().loadClass(classname)
     assert(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
     clazz.getConstructor().newInstance().asInstanceOf[T]
   }
@@ -65,7 +65,7 @@ private[smartdatalake] object CustomCodeUtil {
     val stream : InputStream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
       .getOrElse(throw new FileNotFoundException(filename))
     val source = scala.io.Source.fromInputStream(stream)
-    val content = source.getLines.mkString(sys.props("line.separator"))
+    val content = source.getLines().mkString(sys.props("line.separator"))
     source.close
     // return value
     content

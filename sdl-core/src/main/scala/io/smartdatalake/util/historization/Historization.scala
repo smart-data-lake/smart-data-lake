@@ -129,15 +129,15 @@ object Historization extends SmartDataLakeLogger {
       .union(SchemaEvolution.sortColumns(restHist, dfHistory.columns))
 
     if (logger.isDebugEnabled) {
-      logger.debug(s"Count previous history: ${dfHistory.count}")
-      logger.debug(s"Count current load of feed: ${dfNew.count}")
-      logger.debug(s"Count rows not in current feed anymore: ${notInFeedAnymore.count}")
-      logger.debug(s"Count new rows: ${newRows.count}")
-      logger.debug(s"Count updated rows new: ${updatedNew.count}")
-      logger.debug(s"Count updated rows old: ${updatedOld.count}")
-      logger.debug(s"Count no updates old: ${noUpdates.count}")
-      logger.debug(s"Count rows from remaining history: ${restHist.count}")
-      logger.debug(s"Summary count rows new history: ${dfNewHist.count}")
+      logger.debug(s"Count previous history: ${dfHistory.count()}")
+      logger.debug(s"Count current load of feed: ${dfNew.count()}")
+      logger.debug(s"Count rows not in current feed anymore: ${notInFeedAnymore.count()}")
+      logger.debug(s"Count new rows: ${newRows.count()}")
+      logger.debug(s"Count updated rows new: ${updatedNew.count()}")
+      logger.debug(s"Count updated rows old: ${updatedOld.count()}")
+      logger.debug(s"Count no updates old: ${noUpdates.count()}")
+      logger.debug(s"Count rows from remaining history: ${restHist.count()}")
+      logger.debug(s"Summary count rows new history: ${dfNewHist.count()}")
     }
 
     dfNewHist

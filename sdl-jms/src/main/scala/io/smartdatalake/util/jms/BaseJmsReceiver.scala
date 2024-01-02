@@ -56,7 +56,7 @@ private[smartdatalake] abstract class BaseJmsReceiver[T](val consumerFactory: Me
    */
   def store(dataBuffer : scala.collection.mutable.ArrayBuffer[T]) : DataFrame = {
     val msgStrings: RDD[TextMessageString] = session.sparkContext.parallelize(dataBuffer.map(x =>
-      TextMessageString(x.asInstanceOf[String])))
+      TextMessageString(x.asInstanceOf[String])).toSeq)
     session.createDataFrame(msgStrings)
   }
 }

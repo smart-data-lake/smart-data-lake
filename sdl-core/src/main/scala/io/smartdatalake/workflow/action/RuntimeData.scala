@@ -46,7 +46,7 @@ private[smartdatalake] trait RuntimeData {
   def lastExecutionId: Option[ExecutionId] = lastExecution.map(_.id)
   def getLatestEventState: Option[RuntimeEventState] = lastExecution.flatMap(_.getLatestEvent.map(_.state))
   def clear(): Unit = {
-    executions.clear
+    executions.clear()
     currentExecution = None
     lastExecution = None
   }
@@ -130,7 +130,7 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
         currentExecution.get.addEvent(event)
         // add unassigned synchronous metrics
         unassignedMetrics.foreach { case (d, m) => currentExecution.get.addMetrics(d, m) }
-        unassignedMetrics.clear
+        unassignedMetrics.clear()
         // remove current execution on final state. This is needed for handling unassigned Metrics.
         if (RuntimeEventState.isFinal(event.state)) currentExecution = None
         doHousekeeping()
@@ -172,7 +172,7 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     val dataObjectMetrics = metricsMap.getOrElseUpdate(dataObjectId, mutable.Buffer[ActionMetrics]())
     dataObjectMetrics.append(metrics)
   }
-  def getEvents: Seq[RuntimeEvent] = events
+  def getEvents: Seq[RuntimeEvent] = events.toSeq
   def getLatestEvent: Option[RuntimeEvent] = {
     events.lastOption
   }

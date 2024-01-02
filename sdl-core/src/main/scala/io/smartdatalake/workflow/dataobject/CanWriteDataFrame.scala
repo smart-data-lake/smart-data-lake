@@ -38,7 +38,7 @@ trait CanWriteDataFrame {
    * Called during init phase for checks and initialization.
    * If possible dont change the system until execution phase.
    */
-  def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
+  def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Write a DataFrame to the DataObject

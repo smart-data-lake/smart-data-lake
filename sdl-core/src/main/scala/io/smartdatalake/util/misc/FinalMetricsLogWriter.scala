@@ -95,11 +95,11 @@ class FinalMetricsLogWriter(options: Map[String, StringOrSecret]) extends StateL
 
   private def createActionDf(actionLog: Seq[ActionLog])(implicit spark: SparkSession) = {
     import spark.implicits._
-    actionLog.toDF.drop($"data_object_metrics")
+    actionLog.toDF().drop($"data_object_metrics")
   }
   private def createMetricsDf(actionLog: Seq[ActionLog])(implicit spark: SparkSession) = {
     import spark.implicits._
-    actionLog.toDF
+    actionLog.toDF()
       .withColumn("data_object_metrics", explode($"data_object_metrics"))
       .select($"run_id", $"run_start_tstmp", $"action_id", $"attempt_id", $"data_object_metrics.*")
   }
@@ -136,11 +136,11 @@ object LogExtractor extends SmartDataLakeLogger {
       val filesWritten = metrics.get ("files_written").map (castToLong)
       val recordsWritten = metrics.get ("records_written").map (castToLong)
       val filteredMetrics = metrics.filterKeys (! Set ("num_tasks", "files_written", "records_written").contains (_) )
-      MetricsLog (result.dataObjectId.id, Timestamp.valueOf (info.startTstmp.get), numTasks, filesWritten, recordsWritten, filteredMetrics.mapValues (_.toString), result.partitionValues.map (_.getMapString) )
+      MetricsLog (result.dataObjectId.id, Timestamp.valueOf (info.startTstmp.get), numTasks, filesWritten, recordsWritten, filteredMetrics.mapValues (_.toString).toMap, result.partitionValues.map (_.getMapString) )
     }
     ActionLog(executionId.runId, Timestamp.valueOf(context.runStartTime), actionId.id
       , executionId.attemptId, Timestamp.valueOf(context.attemptStartTime), finalState
-      , Timestamp.valueOf(info.startTstmp.get), duration.get
+      , Timestamp.valueOf(info.startTstmp.get), duration.get.toFloat
       , info.state, info.dataObjectsState.map(_.toStringTuple).toMap, dataObjectLogs
     )
   }

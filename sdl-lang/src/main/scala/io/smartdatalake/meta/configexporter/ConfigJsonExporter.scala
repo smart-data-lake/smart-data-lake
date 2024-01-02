@@ -16,7 +16,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, filename: String = "exportedConfig.json", enrichOrigin: Boolean = true, descriptionPath: Option[String] = None)
 
@@ -95,7 +95,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
           val elements = value.asInstanceOf[ConfigList].asScala.zipWithIndex
           elements.flatMap {
             case (value, idx) => findClassConfigurationsHandleEntry(idx.toString, value, path :+ s"[$idx]")
-          }
+          }.toSeq
         // we are looking for className and type attributes
         case ConfigValueType.STRING if Seq("className", "type").contains(DataFrameUtil.strToLowerCamelCase(key)) =>
           // check if configuration value is full class name, e.g. it has at least three name parts

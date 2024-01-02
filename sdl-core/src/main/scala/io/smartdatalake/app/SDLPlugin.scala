@@ -34,16 +34,16 @@ trait SDLPlugin {
    * Startup is called from SDL as early as possible (before config reading).
    * Use cases are dynamic log configuration or setup of credentials
    */
-  def startup(): Unit = Unit
+  def startup(): Unit = ()
 
   /**
    * Configure is called from SDL when GlobalConfig is parsed passing GlobalConfig.pluginOptions as parameter.
    */
-  def configure(options: Map[String,StringOrSecret]): Unit = Unit
+  def configure(options: Map[String,StringOrSecret]): Unit = ()
 
   /**
    * Shutdown is called from SDL as late as possible on ordinary exit of an SDL run.
    */
-  def shutdown(): Unit = Unit
+  def shutdown(): Unit = ()
 
 }

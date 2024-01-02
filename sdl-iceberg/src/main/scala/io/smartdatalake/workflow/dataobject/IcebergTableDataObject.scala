@@ -47,7 +47,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.time.Instant
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 /**
@@ -498,7 +498,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val partitionsDf = context.sparkSession.sql(s"select partition.* from ${table.toString}.partitions")
-    val partitions = partitionsDf.collect.toSeq.map(r => r.getValuesMap[Any](partitionsDf.columns).mapValues(_.toString))
+    val partitions = partitionsDf.collect().toSeq.map(r => r.getValuesMap[Any](partitionsDf.columns).mapValues(_.toString).toMap)
     partitions.map(PartitionValues(_))
   }
 
@@ -539,7 +539,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       val session = context.sparkSession
       import session.implicits._
       val filesDf = context.sparkSession.table(s"${table.toString}.files")
-      val metricsRow = filesDf.select($"readable_metrics.*").head
+      val metricsRow = filesDf.select($"readable_metrics.*").head()
       val columns = metricsRow.schema.fieldNames
       columns.map {
         c =>

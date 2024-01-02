@@ -37,7 +37,7 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
@@ -80,7 +80,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
     // wait for result
     val result = Await.result(futureResult, Duration.Inf)
-    scheduler.shutdown
+    scheduler.shutdown()
 
     // collect all root exceptions
     val dagExceptions = result.filter(_.isFailure).map(_.failed.get).flatMap {
@@ -263,7 +263,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
     override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
       // only first line of message included as logical plan of AnalysisException might have several 100 lines...
-      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next).getOrElse("null")}"
+      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next()).getOrElse("null")}"
       node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg))
       logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
       saveState(phase, Some(node.id))
@@ -284,7 +284,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    * Get Action count per RuntimeEventState
    */
   def getStatistics: Map[RuntimeEventState, Int] = {
-    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size)
+    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size).toMap
   }
 
   /**

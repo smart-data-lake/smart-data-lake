@@ -63,7 +63,7 @@ class JettyAgentServerSocket(config: LocalJettyAgentSmartDataLakeBuilderConfig, 
   }
 
   def closeConnection(): Unit = {
-    logger.info(this + ": received EndConnection request, closing connection")
+    logger.info(this.toString + ": received EndConnection request, closing connection")
     getSession.close(StatusCode.NORMAL, "Connection closed by " + this)
   }
 

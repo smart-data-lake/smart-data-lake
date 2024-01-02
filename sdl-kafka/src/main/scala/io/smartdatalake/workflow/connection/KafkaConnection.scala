@@ -29,7 +29,7 @@ import org.apache.kafka.common.config.SslConfigs
 import org.apache.spark.sql.confluent.ConfluentClient
 
 import java.util.Properties
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Connection information for kafka
@@ -83,7 +83,7 @@ case class KafkaConnection(override val id: ConnectionId,
         props.setProperty(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
       }
       case Some(m) => throw ConfigurationException(s"${m.getClass.getSimpleName} is not supported for ${getClass.getSimpleName}")
-      case None => Unit
+      case None => ()
     }
     props
   }
@@ -98,7 +98,7 @@ case class KafkaConnection(override val id: ConnectionId,
 
   def testSchemaRegistry(): Unit = {
     try {
-      schemaRegistry.foreach(new ConfluentClient(_).test)
+      schemaRegistry.foreach(new ConfluentClient(_).test())
     } catch {
       case e:Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
     }

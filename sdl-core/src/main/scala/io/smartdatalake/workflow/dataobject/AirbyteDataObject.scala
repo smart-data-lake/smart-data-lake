@@ -42,7 +42,7 @@ import org.json4s.jackson.JsonMethods.compact
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.reflect.{ClassTag, classTag}
 
 /**

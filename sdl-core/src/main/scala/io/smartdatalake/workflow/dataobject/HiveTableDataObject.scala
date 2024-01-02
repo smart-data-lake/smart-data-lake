@@ -37,7 +37,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
 import java.sql.Timestamp
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * [[DataObject]] of type Hive.
@@ -204,7 +204,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
         } else {
           throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
         }
-      case _ => Unit
+      case _ => ()
     }
 
     // write table and collect Spark metrics

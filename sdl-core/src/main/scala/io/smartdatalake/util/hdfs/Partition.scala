@@ -52,9 +52,9 @@ case class PartitionValues(elements: Map[String, Any]) {
   def nonEmpty: Boolean = elements.nonEmpty
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
-  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
+  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains).toMap)
   def addKey(key: String, value: Any): PartitionValues = if(!elements.contains(key)) this.copy(elements = elements + (key -> value)) else this
-  def getMapString: Map[String,String] = elements.mapValues(_.toString)
+  def getMapString: Map[String,String] = elements.mapValues(_.toString).toMap
 
   /**
    * Returns true if all given partitions are defined in this partition values instance
@@ -153,7 +153,7 @@ object PartitionValues {
    */
   def fromDataFrame(df: DataFrame): Seq[PartitionValues] = {
     val cols = df.columns
-    df.distinct.collect.map {
+    df.distinct().collect().map {
       row => PartitionValues(cols.map(c => (c,row.getAs[Any](c).toString)).toMap)
     }
   }

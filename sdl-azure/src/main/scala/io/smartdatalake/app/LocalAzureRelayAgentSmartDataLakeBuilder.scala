@@ -87,7 +87,7 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     OParser.sequence(
       parserGeneric(feedSelRequired = false),
       opt[String]('u', "url")
-        .required
+        .required()
         .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
         .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to"),
     )

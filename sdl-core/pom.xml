@@ -45,8 +45,14 @@
     <dependencies>
         <dependency>
             <groupId>com.databricks</groupId>
-            <artifactId>dbutils-api_${scala.minor.version}</artifactId>
-            <version>0.0.6</version>
+            <artifactId>databricks-dbutils-scala_${scala.minor.version}</artifactId>
+            <version>0.1.4</version>
+        </dependency>
+        <!-- this is a transitive dependency of databricks-dbutils-scala, but as this pom is defect in Scala 2.13, it must be added manually -->
+        <dependency>
+            <groupId>com.databricks</groupId>
+            <artifactId>databricks-sdk-java</artifactId>
+            <version>0.7.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -199,7 +205,7 @@
         <dependency>
             <groupId>org.scalaj</groupId>
             <artifactId>scalaj-http_${scala.minor.version}</artifactId>
-            <version>2.3.0</version>
+            <version>2.4.2</version>
         </dependency>
 
         <dependency>
@@ -255,9 +261,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.mutcianm</groupId>
+            <groupId>org.scalameta</groupId>
             <artifactId>ascii-graphs_${scala.minor.version}</artifactId>
-            <version>0.0.6</version>
+            <version>0.1.2</version>
         </dependency>
 
         <dependency>
@@ -343,13 +349,13 @@
         <dependency>
             <groupId>io.circe</groupId>
             <artifactId>circe-yaml_${scala.minor.version}</artifactId>
-            <version>0.10.1</version>
+            <version>0.15.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.circe</groupId>
             <artifactId>circe-generic_${scala.minor.version}</artifactId>
-            <version>0.12.0-M3</version>
+            <version>0.14.6</version>
             <scope>test</scope>
         </dependency>
 

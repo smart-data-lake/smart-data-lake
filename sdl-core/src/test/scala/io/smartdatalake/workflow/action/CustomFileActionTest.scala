@@ -87,12 +87,12 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     // read src with util and count
     val dfSrc = srcDO.getSparkDataFrame()
     assert(dfSrc.columns.length > 2)
-    val srcCount = dfSrc.count
+    val srcCount = dfSrc.count()
 
     // read tgt with util and count
     val dfTgt = tgtDO.getSparkDataFrame()
     assert(dfTgt.columns.length == 2)
-    val tgtCount = dfTgt.count
+    val tgtCount = dfTgt.count()
     assert(srcCount == tgtCount)
   }
 
@@ -130,7 +130,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     // check counts
     val dfSrc = srcDO.getSparkDataFrame()
     val dfTgt = tgtDO.getSparkDataFrame()
-    assert(dfSrc.count == dfTgt.count)
+    assert(dfSrc.count() == dfTgt.count())
   }
 
 }

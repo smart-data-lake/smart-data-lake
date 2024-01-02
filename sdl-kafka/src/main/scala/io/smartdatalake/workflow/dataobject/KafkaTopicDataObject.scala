@@ -49,7 +49,7 @@ import java.time._
 import java.time.format.DateTimeFormatter
 import java.time.temporal.{ChronoUnit, TemporalAccessor, TemporalQuery}
 import java.util.Properties
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Definition of date partition column to extract formatted time into column.
@@ -238,8 +238,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // get DataFrame from topic
     val dfRaw = if (_kafkaStateIncrementalModeEnabled && context.isExecPhase) {
       val partitions = consumer.partitionsFor(topicName)
-      val topicPartitions = partitions.asScala.map(p => new TopicPartition(topicName, p.partition))
-      val committedOffsets = getCommittedOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)))
+      val topicPartitions = partitions.asScala.map(p => new TopicPartition(topicName, p.partition)).toSeq
+      val committedOffsets = getCommittedOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)).toSeq)
       val currentOffsets = getCurrentOffsets(topicPartitions)
       val currentOffsetsLkp = getCurrentOffsets(topicPartitions).toMap
       val endingOffsets = if (_delayedMaxTimestamp.isDefined) {
@@ -253,7 +253,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       val lastOffsets = incrementalOutputState.get
       val partitions = consumer.partitionsFor(topicName)
       assert(lastOffsets.map(_._1).sorted == partitions.asScala.map(_.partition).sorted, s"($id) last incremental state kafka partitions are different from current kafak topics partitions: ${lastOffsets.map(_._1).sorted.mkString(",")} != ${partitions.asScala.map(_.partition).sorted.mkString(",")}")
-      val currentOffsets = getCurrentOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)))
+      val currentOffsets = getCurrentOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)).toSeq)
       incrementalOutputState = Some(currentOffsets)
       logger.debug(s"($id) incremental state current offsets are: ${currentOffsets.mkString(",")}")
       createDataFrameForTopicPartitionOffsets(TopicPartitionOffsets.fromOffsets(topicName, lastOffsets, currentOffsets), s"increment")
@@ -314,7 +314,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   private def getPartitionOffsetsForTimePeriod(startTimeIncl: LocalDateTime, endTimeExcl: LocalDateTime)(implicit context: ActionPipelineContext): Seq[TopicPartitionOffsets] = {
     val partitions = consumer.partitionsFor(topicName)
     require(partitions!=null, s"($id) topic $topicName doesn't exist")
-    val topicPartitions = partitions.asScala.map(p => new TopicPartition(topicName, p.partition))
+    val topicPartitions = partitions.asScala.map(p => new TopicPartition(topicName, p.partition)).toSeq
     val topicPartitionsStart = getTopicPartitionsAtTstmp(topicPartitions, startTimeIncl).toMap
     val topicPartitionsEnd = getTopicPartitionsAtTstmp(topicPartitions, endTimeExcl).toMap
     topicPartitions.map( tp => TopicPartitionOffsets( tp, Option(topicPartitionsStart(tp)).map(_.offset), Option(topicPartitionsEnd(tp)).map(_.offset)))
@@ -366,7 +366,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         .format("kafka")
         .options(instanceOptions)
         .option("topic", topicName)
-        .save
+        .save()
     )
   }
 
@@ -455,7 +455,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     val partitions = consumer.partitionsFor(topicName)
     require(partitions!=null, s"($id) topic $topicName doesn't exist")
     logger.debug(s"($id) got kafka partitions ${partitions.asScala.map(_.partition)} for topic $topicName")
-    val topicPartitions = partitions.asScala.map( p => new TopicPartition(topicName, p.partition))
+    val topicPartitions = partitions.asScala.map( p => new TopicPartition(topicName, p.partition)).toSeq
     // determine last completed partition - we need to wait some time after considering a partition to be complete because of late data
     val currentPartitionStartTime = datePartitionCol.get.current
     val minDurationWaitToComplete = Duration.ofMillis((datePartitionCol.get.chronoUnit.getDuration.toMillis * pctChronoUnitWaitToComplete).toLong)
@@ -516,7 +516,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       // parse offsets from String
       .map(s => s.split(',').map(TopicPartitionOffsets.parseOffsetForSpark).toSeq)
       // else prepare for first increment
-      .orElse(Some(consumer.partitionsFor(topicName).asScala.map(p => (p.partition, None))))
+      .orElse(Some(consumer.partitionsFor(topicName).asScala.map(p => (p.partition, None)).toSeq))
   }
 
   override def getState: Option[String] = {

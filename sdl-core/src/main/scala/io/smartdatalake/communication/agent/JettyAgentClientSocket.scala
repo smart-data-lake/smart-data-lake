@@ -47,7 +47,7 @@ class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger
 
   override def onWebSocketClose(statusCode: Int, reason: String): Unit = {
     super.onWebSocketClose(statusCode, reason)
-    logger.info(this + ": Socket Closed: [" + statusCode + "] " + reason)
+    logger.info(this.toString + ": Socket Closed: [" + statusCode + "] " + reason)
 
   }
 

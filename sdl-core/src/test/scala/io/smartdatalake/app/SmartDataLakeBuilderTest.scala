@@ -122,7 +122,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
     }
@@ -153,7 +153,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId)).toMap
       val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == selectedPartitions)
@@ -215,7 +215,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
     }
@@ -242,7 +242,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId)).toMap
       val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED,SDLExecutionId(1,1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1,2)))
       assert(resultActionsState == expectedActionsState)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -303,7 +303,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map(
         (action1.id, RuntimeEventState.SKIPPED),
         (action2fail.id, RuntimeEventState.FAILED),
@@ -340,7 +340,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId)).toMap
       val expectedActionsState = Map(
         action1.id -> (RuntimeEventState.SKIPPED,SDLExecutionId(1,1)),
         action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1,2)),
@@ -394,7 +394,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId))
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId)).toMap
       val expectedActionsState = Map(
         action1.id -> (RuntimeEventState.SKIPPED,SDLExecutionId(1,1)),
         action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,1))
@@ -458,7 +458,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt4DO.getSparkDataFrame(Seq()).count == 2)
+    assert(tgt4DO.getSparkDataFrame(Seq()).count() == 2)
   }
 
   test("sdlb run with executionMode=PartitionDiffMode, increase runId on second run, state listener") {
@@ -471,7 +471,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear
+    instanceRegistry.clear()
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -509,7 +509,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20180101"))))
@@ -521,7 +521,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     srcDO.writeSparkDataFrame(dfSrc2, Seq())
 
     // reset Actions / DataObjects
-    instanceRegistry.clear
+    instanceRegistry.clear()
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgt1DO)
     instanceRegistry.register(action1.copy())
@@ -539,7 +539,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
@@ -566,7 +566,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear
+    instanceRegistry.clear()
 
     // setup DataObjects
     val srcDO1 = TestIncrementalDataObject("src1")
@@ -592,7 +592,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check results
     val dfResult1 = tgt1DO.getSparkDataFrame(Seq())
-    assert(dfResult1.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (10,10))
+    assert(dfResult1.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head() == (10,10))
 
     // start second dag run
     action1.reset
@@ -601,7 +601,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check results
     val dfResult2 = tgt1DO.getSparkDataFrame(Seq())
-    assert(dfResult2.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
+    assert(dfResult2.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head() == (20,20))
 
     // start 3rd dag run -> no data
     action1.reset
@@ -610,7 +610,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check results
     val dfResult3 = tgt1DO.getSparkDataFrame(Seq())
-    assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (20,20))
+    assert(dfResult3.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head() == (20,20))
 
     // start 4th dag run
     action1.reset
@@ -619,7 +619,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // check results
     val dfResult4 = tgt1DO.getSparkDataFrame(Seq())
-    assert(dfResult4.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head == (30,30))
+    assert(dfResult4.select(functions.max($"nb".cast("int")), functions.count("*")).as[(Int,Long)].head() == (30,30))
   }
 
   test("sdlb simulation run") {
@@ -632,7 +632,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear
+    instanceRegistry.clear()
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
@@ -809,7 +809,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val writer = new FinalStateUploader(Map(
       "uploadUrl" -> "https://localhost/good/post/no_auth",
       "uploadStagePath" -> uploadStagePath
-    ).mapValues(StringOrSecret))
+    ).mapValues(StringOrSecret).toMap)
     writer.init(actionPipelineContext)
     writer.stageStateStore.get.getFiles().isEmpty
 

@@ -303,7 +303,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
 
   def readHadoopFile(file: Path)(implicit filesystem: FileSystem): String = {
     Using.resource(filesystem.open(file)) { is =>
-      Source.fromInputStream(is)(Codec.UTF8).getLines.mkString(sys.props("line.separator"))
+      Source.fromInputStream(is)(Codec.UTF8).getLines().mkString(sys.props("line.separator"))
     }
   }
 
@@ -330,7 +330,7 @@ private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
   }
 
   def touchFile(path: Path)(implicit filesystem: FileSystem): Unit = {
-    Using.resource(filesystem.create(path, /*overwrite*/ true))(_ => Unit)
+    Using.resource(filesystem.create(path, /*overwrite*/ true))(_ => ())
   }
 
   /**

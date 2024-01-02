@@ -56,7 +56,7 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with ConfigHolder 
   /**
    * Called in init phase before initialization. Can be used to initialize dataObjectsState, e.g. for DataObjectStateIncrementalMode
    */
-  def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = Unit
+  def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = ()
   /**
    * Apply execution mode. Called in init and execution phase.
    */
@@ -66,7 +66,7 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with ConfigHolder 
   /**
    * Called in execution phase after writing subfeed. Can be used to implement incremental processing , e.g. deleteDataAfterRead.
    */
-  def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = Unit
+  def postExec(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, mainInputSubFeed: SubFeed, mainOutputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = ()
   def mainInputOutputNeeded: Boolean = false
   val applyConditionsDef: Seq[Condition] = Seq()
   val failConditionsDef: Seq[Condition] = Seq()

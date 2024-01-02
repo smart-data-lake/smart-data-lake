@@ -44,7 +44,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     assert(srcDO.getStats().get(TableStatsType.NumRows.toString).contains(3))
     assert(srcDO.getColumnStats().apply("type").get(ColumnStatsType.DistinctCount.toString).contains(2))
     // check table contents
-    assert(srcDO.getSparkDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count()==3)
   }
 
   test("write and analyze table with partitions and partition values") {
@@ -58,7 +58,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     assert(srcDO.getColumnStats().apply("type").get(ColumnStatsType.DistinctCount.toString).contains(2))
     assert(srcDO.getColumnStats().apply("rating").get(ColumnStatsType.Max.toString).contains("7"))
     // check table contents
-    assert(srcDO.getSparkDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count()==3)
   }
 
   test("write and analyze table with partitions without partition values") {
@@ -73,7 +73,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     assert(HiveUtil.getCatalogPartitionStats(srcTable, PartitionValues(Map("type" -> "ext"))).get(TableStatsType.NumRows.toString).contains(2))
     assert(HiveUtil.getCatalogPartitionStats(srcTable, PartitionValues(Map("type" -> "int"))).get(TableStatsType.NumRows.toString).contains(1))
     // check table contents
-    assert(srcDO.getSparkDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count()==3)
   }
 
   test("write and analyze table with multi partition layout and partial partition values") {
@@ -90,7 +90,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // check no partition statistics for type=int,lastname=emma
     assert(!HiveUtil.getCatalogPartitionStats(srcTable, PartitionValues(Map("type" -> "int", "lastname" -> "emma"))).contains(TableStatsType.NumRows.toString))
     // check table contents
-    assert(srcDO.getSparkDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count()==3)
   }
 
   test("write and analyze table with multi partition layout and full partition values") {
@@ -107,7 +107,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     // check no partition statistics for type=int,lastname=emma
     assert(!HiveUtil.getCatalogPartitionStats(srcTable, PartitionValues(Map("type" -> "int", "lastname" -> "emma"))).contains(TableStatsType.NumRows.toString))
     // check table contents
-    assert(srcDO.getSparkDataFrame().count==3)
+    assert(srcDO.getSparkDataFrame().count()==3)
   }
 
   test("overwrite only one partition") {
@@ -123,7 +123,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    srcDO.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    srcDO.getSparkDataFrame().count() shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
@@ -132,7 +132,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    srcDO.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    srcDO.getSparkDataFrame().count() shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
   }
 
@@ -149,7 +149,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    srcDO.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    srcDO.getSparkDataFrame().count() shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
@@ -158,7 +158,7 @@ class HiveTableDataObjectTest extends DataObjectTestSuite {
     srcDO.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    srcDO.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    srcDO.getSparkDataFrame().count() shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual srcDO.listPartitions.toSet
   }
 

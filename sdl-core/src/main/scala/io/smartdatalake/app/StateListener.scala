@@ -35,7 +35,7 @@ import io.smartdatalake.util.secrets.StringOrSecret
 case class StateListenerConfig(className: String, options: Option[Map[String,StringOrSecret]] = None) {
   // instantiate listener
   private[smartdatalake] val listener: StateListener = try {
-    val clazz = Environment.classLoader.loadClass(className)
+    val clazz = Environment.classLoader().loadClass(className)
     val constructor = clazz.getConstructor(classOf[Map[String,String]])
     constructor.newInstance(options.getOrElse(Map())).asInstanceOf[StateListener]
   } catch {
@@ -52,7 +52,7 @@ trait StateListener {
   /**
    * Called on initialization to check environment
    */
-  def init(context: ActionPipelineContext): Unit = Unit
+  def init(context: ActionPipelineContext): Unit = ()
 
   /**
    * notifyState is called whenever an action is finished (succeeded or failed) and at the end of the DAG execution (success or failure).

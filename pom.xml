@@ -172,15 +172,22 @@
                 </plugins>
             </build>
         </profile>
-        <!-- only scala 2.12 supported in spark 3.0 -->
         <profile>
             <id>scala-2.12</id>
             <activation>
+                <!-- scala 2.12 is default in spark 3.3/3.4 -->
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
                 <scala.minor.version>2.12</scala.minor.version>
                 <scala.version>${scala.minor.version}.15</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+            </properties>
+        </profile>
+        <profile>
+            <id>scala-2.13</id>
+            <properties>
+                <scala.minor.version>2.13</scala.minor.version>
+                <scala.version>${scala.minor.version}.12</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
             </properties>
         </profile>
         <profile>
@@ -554,12 +561,12 @@
                         <checkMultipleScalaVersions>true</checkMultipleScalaVersions>
                         <failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
                         <recompileMode>incremental</recompileMode>
+                        <target>jvm-1.${maven.compiler.release}</target>
                         <args>
                             <arg>-unchecked</arg>
                             <arg>-deprecation</arg>
                             <arg>-feature</arg>
                             <arg>-explaintypes</arg>
-                            <arg>-target:jvm-1.8</arg>
                         </args>
                         <jvmArgs>
                             <jvmArg>-Xms64m</jvmArg>

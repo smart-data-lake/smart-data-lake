@@ -82,7 +82,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
         val tmp = msgBuffer
         msgBuffer = collection.mutable.Buffer[LogEvent]()
         tmp
-      }
+      }.toSeq
       // don't include sending in synchronized block as it might take a longer time (or even hang...)
       backend.get.send(msgBufferToSend)
     }
@@ -91,7 +91,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
   override def start(): Unit = {
     super.start()
     import monix.execution.Scheduler.{global => scheduler}
-    val duration = FiniteDuration(maxDelayMillis.getOrElse(1000), TimeUnit.MILLISECONDS)
+    val duration = FiniteDuration(maxDelayMillis.getOrElse(1000).toLong, TimeUnit.MILLISECONDS)
     scheduler.scheduleAtFixedRate(duration, duration)(flush())
     sys.addShutdownHook(flush())
     println("LogAnalyticsAppender started")
@@ -106,7 +106,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
   private def enrichSparkLocalProperties(event: LogEvent) = {
     // If we are on an executor, we have a TaskContext
     // On executors we need to enrich LogEvent with SDLB information from spark local properties
-    if (TaskContext.get != null) new LogEventWithSparkLocalProperties(event)
+    if (TaskContext.get() != null) new LogEventWithSparkLocalProperties(event)
     else event
   }
 }
@@ -174,7 +174,7 @@ object LogEventWithSparkLocalProperties {
   def getContextData: ReadOnlyStringMap = {
     val tc = TaskContext.get()
     if (tc != null) {
-      cachedContextData.getOrElseUpdate(tc.stageId, {
+      cachedContextData.getOrElseUpdate(tc.stageId(), {
         val data = new DefaultThreadContextMap()
         AppUtil.MDC_SDLB_PROPERTIES
           .flatMap(k => Option((k, tc.getLocalProperty(k))))

@@ -183,7 +183,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // check first load
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getSparkDataFrame().count == 1)
+    assert(tgtDO.getSparkDataFrame().count() == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
@@ -191,14 +191,14 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getSparkDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
     assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
-    assert(tgtDO.getSparkDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count() == 2)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
@@ -234,11 +234,11 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // check load
     assert(tgtSubFeed1.dataObjectId == tgtDO1.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO1.getSparkDataFrame().count == 1) // partition type=A is missing
+    assert(tgtDO1.getSparkDataFrame().count() == 1) // partition type=A is missing
     assert(tgtDO1.listPartitions.toSet == l1PartitionValues.toSet)
-    assert(tgtDO2.getSparkDataFrame().count == 1) // only partitions according to srcDO1 read
+    assert(tgtDO2.getSparkDataFrame().count() == 1) // only partitions according to srcDO1 read
     assert(tgtDO2.listPartitions.toSet == l1PartitionValues.toSet)
-    assert(tgtDO3.getSparkDataFrame().count == 2) // all records read because not partitioned
+    assert(tgtDO3.getSparkDataFrame().count() == 2) // all records read because not partitioned
   }
 
   test("copy load with multiple transformations and multiple outputs from sql code") {
@@ -341,7 +341,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     action1.exec(Seq(srcSubFeed1, srcSubFeed2))(contextExec)
 
     // check record from l1 and l2 is present (union all in SQL transformer)
-    assert(tgtDO1.getSparkDataFrame().count == 2)
+    assert(tgtDO1.getSparkDataFrame().count() == 2)
   }
 
   test("date to month aggregation with partition value transformation") {

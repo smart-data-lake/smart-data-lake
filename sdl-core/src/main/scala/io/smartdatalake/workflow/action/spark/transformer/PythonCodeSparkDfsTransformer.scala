@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransform
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m) as Python/PySpark code.

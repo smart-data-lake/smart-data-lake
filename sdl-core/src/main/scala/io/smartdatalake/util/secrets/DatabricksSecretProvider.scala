@@ -19,7 +19,7 @@
 
 package io.smartdatalake.util.secrets
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+import com.databricks.sdk.scala.dbutils.DBUtils
 import io.smartdatalake.config.ConfigurationException
 
 /**
@@ -27,11 +27,12 @@ import io.smartdatalake.config.ConfigurationException
  * @param scope scope to read secrets from databricks
  */
 class DatabricksSecretProvider(scope: String) extends SecretProvider {
-  def this(options: Map[String, String]) {
+  def this(options: Map[String, String]) = {
     this(
       options.getOrElse("scope", throw new ConfigurationException(s"Cannot create DatabricksSecretProvider, option 'scope' missing."))
     )
   }
+  private val dbutils = DBUtils.getDBUtils()
   override def getSecret(name: String): String =
     try {
       val secret = dbutils.secrets.get(scope = scope, key = name)

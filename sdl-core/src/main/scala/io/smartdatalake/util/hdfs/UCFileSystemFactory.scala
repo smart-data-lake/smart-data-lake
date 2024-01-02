@@ -73,7 +73,7 @@ object UCFileSystemFactory {
 private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeHelperClass: Class[_]) extends SmartDataLakeLogger {
 
   def checkPermissionAccess[X](pathAndActions: Seq[_], withUnityCatalog: java.lang.Boolean, code : => X): X = {
-    checkPermissionMethod.invoke(fsUtilsInst, pathAndActions, withUnityCatalog, code _).asInstanceOf[X]
+    checkPermissionMethod.invoke(fsUtilsInst, pathAndActions, withUnityCatalog, () => code).asInstanceOf[X]
   }
   private lazy val checkPermissionMethod = getMethod(fsUtilsInst.getClass, "checkPermission", Seq(classOf[Seq[_]], classOf[Boolean], classOf[Function0[_]]))
   checkPermissionMethod.setAccessible(true)

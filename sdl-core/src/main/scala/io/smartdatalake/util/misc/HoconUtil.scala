@@ -21,7 +21,7 @@ package io.smartdatalake.util.misc
 
 import com.typesafe.config.{ConfigList, ConfigObject, ConfigValue, ConfigValueFactory, ConfigValueType}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object HoconUtil {
 
