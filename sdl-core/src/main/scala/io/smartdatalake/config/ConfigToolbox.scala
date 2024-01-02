@@ -25,6 +25,7 @@ import io.smartdatalake.util.misc.SerializableHadoopConfiguration
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
+import org.apache.spark.sql.SparkSession
 
 import java.time.LocalDateTime
 
@@ -40,12 +41,11 @@ object ConfigToolbox {
    * @param userClassLoader when working in notebooks and loading dependencies through the notebook metadata configuration, it might be needed to pass the ClassLoader of the notebook, otherwise this function might not be able to load classes referenced in the configuration.
    * @return instanceRegistry with parsed config objects and parsed global config
    */
-  def loadAndParseConfig(locations: Seq[String], userClassLoader: Option[ClassLoader] = None): (InstanceRegistry, GlobalConfig) = {
+  def loadAndParseConfig(locations: Seq[String], userClassLoader: Option[ClassLoader] = None, hadoopConf: Configuration = new Configuration()): (InstanceRegistry, GlobalConfig) = {
     // override classloader if given
     userClassLoader.foreach(classLoader => Environment._classLoader = Some(classLoader))
     // load config
-    val defaultHadoopConf: Configuration = new Configuration()
-    val config = ConfigLoader.loadConfigFromFilesystem(locations, defaultHadoopConf)
+    val config = ConfigLoader.loadConfigFromFilesystem(locations, hadoopConf)
     val globalConfig = GlobalConfig.from(config)
     Environment._globalConfig = globalConfig
     val registry = ConfigParser.parse(config)
@@ -56,11 +56,11 @@ object ConfigToolbox {
   /**
    * Create an action pipeline context used by many DataObject and Action methods.
    */
-  def getDefaultActionPipelineContext(implicit sparkSession : org.apache.spark.sql.SparkSession, instanceRegistry : io.smartdatalake.config.InstanceRegistry) : ActionPipelineContext = {
-    val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
+  def getDefaultActionPipelineContext(implicit sparkSession : SparkSession, instanceRegistry : InstanceRegistry) : ActionPipelineContext = {
+    val hadoopConf = new SerializableHadoopConfiguration(sparkSession.sparkContext.hadoopConfiguration)
     val name = "interactive"
     val globalConfig = GlobalConfig()
-    val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(name, Some(name)), phase = ExecutionPhase.Exec, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
+    val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(name, Some(name)), phase = ExecutionPhase.Exec, serializableHadoopConf = hadoopConf, globalConfig = globalConfig)
     globalConfig._sparkSession = Option(sparkSession)
     context
   }
