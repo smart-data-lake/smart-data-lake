@@ -19,10 +19,10 @@
 
 package io.smartdatalake.meta
 
-import scaladoc.{Markup, Scaladoc, Tag}
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
+import scaladoc.Markup.{CodeBlock, Document, Heading, Paragraph, Span}
+import scaladoc.{Markup, Scaladoc, Tag}
 
-import scala.reflect.internal.AnnotationInfos
 import scala.reflect.runtime.universe.Annotation
 
 private[smartdatalake] object ScaladocUtil {
@@ -66,9 +66,17 @@ private[smartdatalake] object ScaladocUtil {
   }
 
   def formatScaladocMarkup(markup: Markup): String = {
-    formatScaladocString(markup.trimmed.plainString)
-      .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
-      .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
+    markup match {
+      case x: Heading => s"\n\n${x.trimmed.plainString}\n\n"
+      case x: Paragraph => s"\n\n${x.trimmed.plainString}"
+      case x: CodeBlock => s"\n${x.trimmed.plainString}\n"
+      case x: Span => s" ${x.trimmed.plainString}"
+      case x: Document =>
+        val contentStr = x.elements.map(formatScaladocMarkup).mkString("")
+        formatScaladocString(contentStr)
+          .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
+          .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
+    }
   }
 
   def extractScalaDoc(annotations: Seq[Annotation]): Option[Scaladoc] = {
