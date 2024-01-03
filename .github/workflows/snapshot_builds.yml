@@ -53,12 +53,11 @@ jobs:
       # to avoid running tests twice, phase 'compile' instead of 'test' is used, as tests are also executed by scoverage:report
       run: mvn -P scala-2.12,test-sonar -B clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
-    - name: Build with Maven for Scala 2.11, only if on develop-spark2* branch
+    - name: Build with Maven for Scala 2.13
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2') }}
-      run: mvn -P scala-2.11 -B clean test -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
+      run: mvn -P scala-2.13 -B clean test -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
 
   deploy:
