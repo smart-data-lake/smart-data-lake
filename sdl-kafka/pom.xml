@@ -279,13 +279,17 @@
 		</testResources>
 
 		<plugins>
+
+			<!-- add scala sources, if we have also java sources using sourceDirectory / testSourceDirectory tag -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+			</plugin>
+
 			<!-- Compiles Scala sources. -->
 			<plugin>
 				<groupId>net.alchim31.maven</groupId>
 				<artifactId>scala-maven-plugin</artifactId>
-				<configuration>
-					<testSourceDir>src/test/scala</testSourceDir>
-				</configuration>
 			</plugin>
 
 			<!-- rewrite pom for compiling with different scala version profiles -->
