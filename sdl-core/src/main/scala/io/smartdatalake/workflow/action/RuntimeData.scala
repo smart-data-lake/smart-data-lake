@@ -170,7 +170,9 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
   def addEvent(event: RuntimeEvent): Unit = events.append(event)
   def addMetrics(dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = {
     val dataObjectMetrics = metricsMap.getOrElseUpdate(dataObjectId, mutable.Buffer[ActionMetrics]())
-    dataObjectMetrics.append(metrics)
+    dataObjectMetrics.synchronized {
+      dataObjectMetrics.append(metrics)
+    }
   }
   def getEvents: Seq[RuntimeEvent] = events.toSeq
   def getLatestEvent: Option[RuntimeEvent] = {
@@ -187,7 +189,10 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
    */
   private[action] def getLatestMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
     // combine latest metric for all types
-    val metrics = metricsMap.get(dataObjectId).map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
+    val dataObjectMetrics = metricsMap.get(dataObjectId)
+    val metrics = dataObjectMetrics.synchronized { // avoid potential ConcurrentModificationException
+      dataObjectMetrics.map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
+    }
     metrics.map(GenericMetrics("latest", 1, _))
   }
   def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState]): Option[RuntimeInfo] = {
