@@ -29,8 +29,19 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.json4s.jackson.{JsonMethods, prettyJson}
 import scopt.OptionParser
 
+/**
+ * Configuration for migrating old SDLB state versions to current state.
+ * @param statePath path to search for SDLB state files to migrate.
+ *                  Note that the path will be searched recursively for .json state files.
+ */
 case class StateMigratorConfig(statePath: Option[String] = None)
 
+/**
+ * Command line tool to migrate old SDLB state versions to current state.
+ * The given state path will be searched recursively for .json state files.
+ * Each state file is treated individually to apply all state migrations needed to migrate from its version to the current version.
+ * The state file is then overwritten with its migrated version.
+ */
 object StateMigrator extends SmartDataLakeLogger {
 
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
@@ -40,7 +51,7 @@ object StateMigrator extends SmartDataLakeLogger {
     opt[String]('s', "state-path")
       .required()
       .action((value, c) => c.copy(statePath = Some(value)))
-      .text("Path with run state files to migrate.")
+      .text("Path to search for SDLB state files to migrate.")
     help("help").text("Display the help text.")
   }
 
