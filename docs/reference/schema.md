@@ -5,7 +5,7 @@ title: Schema
 
 Smart Data Lake Builder relies on DataFrame schema to verify proper transitions from one DataObject to another. 
 
-Depending on the DataObject the schema is provided directly with the data source. Alternative, the schema can be specified in the configuration or inferred from the data.
+Depending on the DataObject the schema is provided directly with the data source. Alternatively, the schema can be specified in the configuration or inferred from the data.
 For productive workloads it is not recommended to use schema inference, but the schema of DataObjects that are at the start of a data pipeline should be specified for performance and stability reasons.
 
 Furthermore, depending on the DataObject type, schema evolution is supported, see below.
