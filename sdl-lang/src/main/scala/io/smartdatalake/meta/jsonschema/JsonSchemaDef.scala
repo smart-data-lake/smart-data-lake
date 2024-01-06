@@ -58,7 +58,8 @@ private[smartdatalake] case class JsonObjectDef(
                           title: String,
                           required: Seq[String] = Seq(),
                           additionalProperties: Boolean = false,
-                          description: Option[String] = None
+                          description: Option[String] = None,
+                          deprecated: Option[Boolean] = None
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Object)
 }

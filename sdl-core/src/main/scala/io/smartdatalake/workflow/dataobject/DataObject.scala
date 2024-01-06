@@ -47,6 +47,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
 
   /**
    * Configure a housekeeping mode to e.g cleanup, archive and compact partitions.
+   *
    * Default is None.
    */
   def housekeepingMode: Option[HousekeepingMode] = None

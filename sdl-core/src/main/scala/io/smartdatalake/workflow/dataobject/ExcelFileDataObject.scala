@@ -52,17 +52,6 @@ import org.apache.spark.sql.DataFrame
  * When no schema is provided and `inferSchema` is disabled, all columns are assumed to be of string type.
  *
  * @param excelOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
- *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define the schema by using one of the schema providers DDL, DDLFile, jsonSchemaFile, xsdFile, caseClass, avroSchemaFile, javaBean.
- *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
- *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop. Default is numberOfTasksPerPartition = 1.
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
  */
 case class ExcelFileDataObject(override val id: DataObjectId,
                                override val path: String,
@@ -88,16 +77,10 @@ case class ExcelFileDataObject(override val id: DataObjectId,
   // spark excel data source doesnt support reading all files in a directory. Each file must be read one by one.
   override val handleFilesOneByOne: Boolean = true
 
-  /**
-   * @inheritdoc
-   */
   override val options: Map[String, String] = excelOptions.toMap(schema).filter {
       case (_, v) => v.isDefined
   }.mapValues(_.get.toString).toMap.map(identity) // make serializable
 
-  /**
-   * @inheritdoc
-   */
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.afterRead(df)
 

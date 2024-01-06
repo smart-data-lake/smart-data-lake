@@ -337,7 +337,8 @@ object SchemaProviderType extends Enumeration {
   val JavaBean: SchemaProviderType.Value = Value("javabean")
 
   /**
-   * Get schema from an XSD file (XML schema definition), using spark-xml's XSD support: [[https://github.com/databricks/spark-xml#xsd-support]]
+   * Get schema from an XSD file (XML schema definition).
+   * This is using a customized version of spark-xml's XSD support: [[https://github.com/databricks/spark-xml#xsd-support]]
    * Parameters (semicolon separated):
    * - the hadoop path of the XSD file.
    * - row tag to extract a subpart from the schema, see also XML source rowTag option. Put an emtpy string to use root tag.
