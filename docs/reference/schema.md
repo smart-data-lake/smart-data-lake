@@ -53,7 +53,7 @@ Customize `jsonSchemaFile` provider behaviour: `jsonSchemaFile#<path-to-json-fil
   additional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).
   Default is strictTyping=false.
 - `<additionalPropertiesDefault>`: Set to true or false. This is used as default value for 'additionalProperties'-field if it is missing in a schema with type='object'.
-  Default value is additionalPropertiesDefault=true, as this is conform with the specification.
+  Default value is additionalPropertiesDefault=true, as this conforms with the specification.
 
 Customize `avroSchemaFile` provider behaviour: `avroSchemaFile#<path-to-avsc-file>;<row-tag>`
 - `<row-tag>`: configure the path of the element to extract from the avro schema. Leave empty to extract the root.
