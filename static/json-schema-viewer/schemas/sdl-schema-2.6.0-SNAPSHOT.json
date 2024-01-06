@@ -909,14 +909,14 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "avroOptions" : {
             "type" : "object",
@@ -927,7 +927,7 @@
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional schema for the spark data frame to be validated on read and write. Note: Existing Avro files\ncontain a source schema. Therefore, this schema is ignored when reading from existing Avro files.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -1017,7 +1017,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -1025,7 +1025,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1044,7 +1044,7 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "csvOptions" : {
             "type" : "object",
@@ -1058,11 +1058,11 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional data object schema. If defined, any automatic schema inference is avoided.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -1157,7 +1157,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -1165,7 +1165,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1346,67 +1346,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "ExpectationDefaultImpl"
                   }
                 },
@@ -1496,6 +1435,39 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -1529,6 +1501,34 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -1617,7 +1617,7 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "excelOptions" : {
             "type" : "object",
@@ -1680,11 +1680,11 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional data object schema. If defined, any automatic schema inference is avoided.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, DDLFile, jsonSchemaFile, xsdFile, caseClass, avroSchemaFile, javaBean.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -1774,7 +1774,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -1782,7 +1782,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -1862,67 +1862,6 @@
             "type" : "array",
             "items" : {
               "oneOf" : [ {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
@@ -2015,6 +1954,39 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -2048,6 +2020,34 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2196,67 +2196,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "ExpectationDefaultImpl"
                   }
                 },
@@ -2346,6 +2285,39 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -2379,6 +2351,34 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2507,7 +2507,7 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "jsonOptions" : {
             "type" : "object",
@@ -2521,11 +2521,11 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional data object schema. If defined, any automatic schema inference is avoided.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -2569,7 +2569,8 @@
           },
           "stringify" : {
             "type" : "boolean",
-            "description" : "Set the data type for all values to string."
+            "description" : "Set the data type for all values to string. Use action/transformers instead.",
+            "deprecated" : true
           },
           "acl" : {
             "type" : "object",
@@ -2619,7 +2620,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -2627,7 +2628,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -2764,14 +2765,14 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "Hadoop directory where this data object reads/writes it\\'s files.\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\nOptionally defined partitions are appended with hadoop standard partition layout to this path.\nOnly files ending with *.parquet* are considered as data for this DataObject."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "partition columns for this data object"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "parquetOptions" : {
             "type" : "object",
@@ -2782,7 +2783,7 @@
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional schema for the spark data frame to be validated on read and write. Note: Existing Parquet files\ncontain a source schema. Therefore, this schema is ignored when reading from existing Parquet files.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -2790,150 +2791,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "spark[[SaveMode]] to use when writing files, default is \\\"overwrite\\\"",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
-          },
-          "sparkRepartition" : {
-            "type" : "object",
-            "properties" : {
-              "numberOfTasksPerPartition" : {
-                "type" : "integer",
-                "description" : "Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame.\nThis controls how many files are created in each Hadoop partition."
-              },
-              "keyCols" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "string"
-                },
-                "description" : "Optional key columns to distribute records over Spark tasks inside a Hadoop partition.\nIf DataObject has Hadoop partitions defined, keyCols must be defined."
-              },
-              "sortCols" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "string"
-                },
-                "description" : "Optional columns to sort records inside files created."
-              },
-              "filename" : {
-                "type" : "string",
-                "description" : "Option filename to rename target file(s). If numberOfTasksPerPartition is greater than 1,\nmultiple files can exist in a directory and a number is inserted into the filename after the first \\'.\\'.\nExample: filename=data.csv -> files created are data.1.csv, data.2.csv, ..."
-              }
-            },
-            "title" : "SparkRepartitionDef",
-            "required" : [ "numberOfTasksPerPartition" ],
-            "additionalProperties" : false,
-            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file."
-          },
-          "acl" : {
-            "type" : "object",
-            "properties" : {
-              "permission" : {
-                "type" : "string",
-                "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
-              },
-              "acls" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "object",
-                  "properties" : {
-                    "aclType" : {
-                      "type" : "string",
-                      "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
-                    },
-                    "name" : {
-                      "type" : "string",
-                      "description" : ": the name of the user/group for which an ACL definition is being added"
-                    },
-                    "permission" : {
-                      "type" : "string",
-                      "description" : ": the permission (rwx syntax) to be granted"
-                    }
-                  },
-                  "title" : "AclElement",
-                  "required" : [ "aclType", "name", "permission" ],
-                  "additionalProperties" : false,
-                  "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
-                },
-                "description" : ": a sequence of[[AclElement]] s"
-              }
-            },
-            "title" : "AclDef",
-            "required" : [ "permission", "acls" ],
-            "additionalProperties" : false,
-            "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
-          },
-          "connectionId" : {
-            "type" : "string",
-            "description" : "optional id of[[io.smartdatalake.workflow.connection.HadoopFileConnection]]"
-          },
-          "filenameColumn" : {
-            "type" : "string",
-            "description" : "The name of the (optional) additional column containing the source filename"
-          },
-          "expectedPartitionsCondition" : {
-            "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
-          },
-          "housekeepingMode" : {
-            "oneOf" : [ {
-              "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
-            }, {
-              "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
-            } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
-          },
-          "metadata" : {
-            "$ref" : "#/definitions/Others/DataObjectMetadata"
-          }
-        },
-        "title" : "ParquetFileDataObject",
-        "required" : [ "type", "path" ],
-        "additionalProperties" : false,
-        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Apache Hive data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Parquet formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
-      },
-      "RawFileDataObject" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "RawFileDataObject"
-          },
-          "path" : {
-            "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
-          },
-          "customFormat" : {
-            "type" : "string",
-            "description" : "Custom Spark data source format, e.g. binaryFile or text. Only needed if you want to read/write this DataObject with Spark."
-          },
-          "options" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "description" : "Options for custom Spark data source format. Only of use if you want to read/write this DataObject with Spark."
-          },
-          "fileName" : {
-            "type" : "string",
-            "description" : "Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything."
-          },
-          "partitions" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            },
-            "description" : "Definition of partition columns"
-          },
-          "schema" : {
-            "type" : "string",
-            "description" : "An optional[[DataObject]]user-defined schema definition.\n\nSome[[DataObject]]s support optional schema inference.\nSpecifying this attribute disables automatic schema inference. When the wrapped data source contains a source\nschema, this`schema`attribute is ignored.\n\nNote: This is only used by the functionality defined in[[CanCreateDataFrame]], that is,\nwhen reading Spark data frames from the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that bypass Spark data frames ignore the`schema` attribute\nif it is defined."
-          },
-          "schemaMin" : {
-            "type" : "string",
-            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
-          },
-          "saveMode" : {
-            "type" : "string",
-            "description" : "Overwrite or Append new data.",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
             "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
@@ -3015,7 +2873,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -3023,7 +2881,150 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/DataObjectMetadata"
+          }
+        },
+        "title" : "ParquetFileDataObject",
+        "required" : [ "type", "path" ],
+        "additionalProperties" : false,
+        "description" : "A[[io.smartdatalake.workflow.dataobject.DataObject]]backed by an Apache Hive data source.\n\nIt manages read and write access and configurations required for[[io.smartdatalake.workflow.action.Action]]s to\nwork on Parquet formatted files.\n\nReading and writing details are delegated to Apache Spark[[org.apache.spark.sql.DataFrameReader]]\nand[[org.apache.spark.sql.DataFrameWriter]] respectively.\n\nSEE: [[org.apache.spark.sql.DataFrameReader]]\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
+      },
+      "RawFileDataObject" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "RawFileDataObject"
+          },
+          "path" : {
+            "type" : "string",
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
+          },
+          "customFormat" : {
+            "type" : "string",
+            "description" : "Custom Spark data source format, e.g. binaryFile or text.\nOnly needed if you want to read/write this DataObject with Spark."
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options for custom Spark data source format.\nOnly of use if you want to read/write this DataObject with Spark."
+          },
+          "fileName" : {
+            "type" : "string",
+            "description" : "Definition of fileName. Default is an asterix to match everything.\nThis is concatenated with the partition layout to search for files."
+          },
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
+          },
+          "schema" : {
+            "type" : "string",
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
+          },
+          "schemaMin" : {
+            "type" : "string",
+            "description" : "An optional, minimal schema that a[[DataObject]]schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in[[CanCreateDataFrame]]and[[CanWriteDataFrame]], that is,\nwhen reading or writing Spark data frames from/to the underlying data container.\n[[io.smartdatalake.workflow.action.Action]]s that work with files ignore the`schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn\\'t yet exist."
+          },
+          "saveMode" : {
+            "type" : "string",
+            "description" : "Overwrite or Append new data.\nWhen writing partitioned data, this applies only to partitions concerned.",
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+          },
+          "sparkRepartition" : {
+            "type" : "object",
+            "properties" : {
+              "numberOfTasksPerPartition" : {
+                "type" : "integer",
+                "description" : "Number of Spark tasks to create per partition before writing to DataObject by repartitioning the DataFrame.\nThis controls how many files are created in each Hadoop partition."
+              },
+              "keyCols" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                },
+                "description" : "Optional key columns to distribute records over Spark tasks inside a Hadoop partition.\nIf DataObject has Hadoop partitions defined, keyCols must be defined."
+              },
+              "sortCols" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                },
+                "description" : "Optional columns to sort records inside files created."
+              },
+              "filename" : {
+                "type" : "string",
+                "description" : "Option filename to rename target file(s). If numberOfTasksPerPartition is greater than 1,\nmultiple files can exist in a directory and a number is inserted into the filename after the first \\'.\\'.\nExample: filename=data.csv -> files created are data.1.csv, data.2.csv, ..."
+              }
+            },
+            "title" : "SparkRepartitionDef",
+            "required" : [ "numberOfTasksPerPartition" ],
+            "additionalProperties" : false,
+            "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file."
+          },
+          "acl" : {
+            "type" : "object",
+            "properties" : {
+              "permission" : {
+                "type" : "string",
+                "description" : ": File system permission string in symbolic notation form (e.g. rwxr-xr-x)"
+              },
+              "acls" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "object",
+                  "properties" : {
+                    "aclType" : {
+                      "type" : "string",
+                      "description" : ": type of ACL to be added \\\"group\\\", \\\"user\\\""
+                    },
+                    "name" : {
+                      "type" : "string",
+                      "description" : ": the name of the user/group for which an ACL definition is being added"
+                    },
+                    "permission" : {
+                      "type" : "string",
+                      "description" : ": the permission (rwx syntax) to be granted"
+                    }
+                  },
+                  "title" : "AclElement",
+                  "required" : [ "aclType", "name", "permission" ],
+                  "additionalProperties" : false,
+                  "description" : "Describes a single extended ACL to be applied to a Data Object\nin addition to the basic file system permissions"
+                },
+                "description" : ": a sequence of[[AclElement]] s"
+              }
+            },
+            "title" : "AclDef",
+            "required" : [ "permission", "acls" ],
+            "additionalProperties" : false,
+            "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
+          },
+          "connectionId" : {
+            "type" : "string",
+            "description" : "Return the connection id.\n\nConnection defines path prefix (scheme, authority, base path) and ACL\\'s in central location."
+          },
+          "filenameColumn" : {
+            "type" : "string",
+            "description" : "The name of the (optional) additional column containing the source filename"
+          },
+          "expectedPartitionsCondition" : {
+            "type" : "string",
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
+          },
+          "housekeepingMode" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveCompactionMode"
+            }, {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
+            } ],
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3032,7 +3033,7 @@
         "title" : "RawFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "DataObject of type raw for files with unknown content.\nProvides details to an Action to access raw files.\nBy specifying format you can custom Spark data formats"
+        "description" : "DataObject of type raw for files with unknown content.\nProvides details to an Action to access raw files.\n\nBy specifying customFormat, binary or text files can read with Spark."
       },
       "RelaxedCsvFileDataObject" : {
         "type" : "object",
@@ -3042,7 +3043,7 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "csvOptions" : {
             "type" : "object",
@@ -3056,11 +3057,11 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "schema" : {
             "type" : "string",
-            "description" : "The data object schema.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -3163,7 +3164,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -3171,7 +3172,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3190,7 +3191,7 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "connectionId" : {
             "type" : "string"
@@ -3200,7 +3201,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "partitionLayout" : {
             "type" : "string",
@@ -3273,67 +3274,6 @@
             "type" : "array",
             "items" : {
               "oneOf" : [ {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
@@ -3426,6 +3366,39 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -3459,6 +3432,34 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -3549,7 +3550,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "analyzeTableAfterWrite" : {
             "type" : "boolean"
@@ -3601,67 +3602,6 @@
             "type" : "array",
             "items" : {
               "oneOf" : [ {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "AvgCountPerPartitionExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "AvgCountPerPartitionExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
@@ -3754,6 +3694,39 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
+                    "const" : "CountExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is \\'Job\\', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are \\'All\\' and \\'JobPartitions\\', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the number of records."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
                     "const" : "SQLQueryExpectation"
                   },
                   "name" : {
@@ -3787,6 +3760,34 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AvgCountPerPartitionExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. \\'> 100000\\\".\nIf no expectation is defined, the result value is just recorded in metrics."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "AvgCountPerPartitionExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of an expectation based on the average number of records per partitions.\n\nNote that the scope for evaluating this expectation is fixed to Job."
               } ]
             },
             "description" : "Map of expectation name and definition to evaluate on write, see[[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
@@ -3841,7 +3842,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nexample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nOTHERTAG: true if partition is expected to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -3849,7 +3850,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\nDefault is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -3976,10 +3977,12 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file."
+            "description" : "The root path of the files that are handled by this DataObject.\nFor most DataObjects this can be a directory or a specific file.\n\nIf it doesn\\'t contain scheme and authority, the connections pathPrefix is applied. If pathPrefix is not\ndefined or doesn\\'t define scheme and authority, default schema and authority is applied.\n\nOptionally defined partitions are appended with hadoop standard partition layout to this path."
           },
           "rowTag" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "Define rowTag in xmlOptions instead",
+            "deprecated" : true
           },
           "xmlOptions" : {
             "type" : "object",
@@ -3993,11 +3996,11 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "Definition of partition columns"
+            "description" : "Definition of partition columns\n\nExample:`[dt]`"
           },
           "schema" : {
             "type" : "string",
-            "description" : "An optional data object schema. If defined, any automatic schema inference is avoided.\nAs this corresponds to the schema on write, it must not include the optional filenameColumn on read.\nDefine the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\nA DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional user-defined schema definition for this DataObject.\nIf defined, any automatic schema inference is avoided.\n\nThe schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.\n\nDefine the schema by using one of the schema providers below, default is DDL.\nThe schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.\n\nSchema Providers available are (see also[[io.smartdatalake.util.misc.SchemaProviderType]]):\n- ddl: create the schema from a Spark ddl string, e.g.`ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`\n- ddlFile: read a Spark ddl definition from a file and create a schema, e.g.`ddlFile#abc/xyz.ddl`\n- caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g.`caseClass#com.sample.XyzClass`\n- javaBean: convert a Java Bean to a schema using Spark encoders, e.g.`javaBean#com.sample.XyzClass`\n- xsdFile: read an Xml Schema Definition file and create a schema, e.g.`xsdFile#abc/xyz.xsd`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`\n<row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.\n<maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.\nDefault is 10 levels.\n<jsonCompatibility>: In XML array elements are modeled with their own tag named with singular name.\nIn JSON an array attribute has unnamed array entries, but the array attribute has a plural name.\nIf true, the singular name of the array element in the XSD is converted to a plural name by adding an \\'s\\'\nin order to read corresponding json files.\nDefault is false.\n- jsonSchemaFile: read a Json Schema file and create a schema, e.g.`xsdFile#abc/xyz.json`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`\n<row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.\n<strictTyping>: if true\nunion types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;\nadditional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String).\nDefault is strictTyping=false.\n<additionalPropertiesDefault>: Set to true or false.\nThis is used as default value for \\'additionalProperties\\'-field if it is missing in a schema with type=\\'object\\'.\nDefault value is additionalPropertiesDefault=true, as this is conform with the specification.\n- avroSchemaFile: read an Avro Schema file and create a schema, e.g.`xsdFile#abc/xyz.avsc`\nThe following parameters allow to customize the behavior:`xsdFile#<path-to-avsc-file>;<row-tag>`\n<row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.\n\nNote that all schema files are configured as Hadoop path. The custom prefix \\'cp\\' can be used to read schema files\nfrom the classpath, e.g.`xsdFile#cp:/xyz.xsd` ."
           },
           "schemaMin" : {
             "type" : "string",
@@ -4040,7 +4043,9 @@
             "description" : "This controls repartitioning of the DataFrame before writing with Spark to Hadoop.\n\nWhen writing multiple partitions of a partitioned DataObject, the number of spark tasks created is equal to numberOfTasksPerPartition\nmultiplied with the number of partitions to write. To spread the records of a partition only over numberOfTasksPerPartition spark tasks,\nkeyCols must be given which are used to derive a task number inside the partition (hashvalue(keyCols) modulo numberOfTasksPerPartition).\n\nWhen writing to an unpartitioned DataObject or only one partition of a partitioned DataObject, the number of spark tasks created is equal\nto numberOfTasksPerPartition. Optional keyCols can be used to keep corresponding records together in the same task/file."
           },
           "flatten" : {
-            "type" : "boolean"
+            "type" : "boolean",
+            "description" : "Use action/transformers instead",
+            "deprecated" : true
           },
           "acl" : {
             "type" : "object",
@@ -4090,7 +4095,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don\\'t return no data.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\n\nExample: \\\"elements[\\'yourColName\\'] > 2017\\\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -4098,7 +4103,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -6003,7 +6008,8 @@
             },
             "title" : "CustomDfsTransformerConfig",
             "additionalProperties" : false,
-            "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m).\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has\nto return a map of output DataObjectIds with DataFrames, see also trait[[CustomDfsTransformer]] ."
+            "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m).\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has\nto return a map of output DataObjectIds with DataFrames, see also trait[[CustomDfsTransformer]] .",
+            "deprecated" : true
           },
           "transformers" : {
             "type" : "array",
