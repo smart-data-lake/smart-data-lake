@@ -39,7 +39,7 @@ Install VC++ Redistributable Package from Microsoft:
 http://www.microsoft.com/en-us/download/details.aspx?id=5555 (x86)  
 http://www.microsoft.com/en-us/download/details.aspx?id=14632 (x64)
 
-## Java IllegalAccessError /InaccessibleObjectException (Java 17)
+## Java IllegalAccessError / InaccessibleObjectException (Java 17)
 Symptom:
 Starting an SDLB pipeline fails with the following exception:
 ```
