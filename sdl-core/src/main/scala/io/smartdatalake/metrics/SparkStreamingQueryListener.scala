@@ -74,7 +74,7 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
   }
   private def releaseFirstProgressWaitLock(): Unit = {
     if (isFirstProgress) {
-      logger.info("releaseFirstProgressWaitLock")
+      logger.debug("releaseFirstProgressWaitLock")
       synchronized {
         Thread.`yield`() // give main streaming query thread the chance to finalize progress as well
         notifyAll()
@@ -85,12 +85,12 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
 
   def waitForFirstProgress(): Unit = {
     while(isFirstProgress) {
-      logger.info("waitForFirstProgress")
+      logger.debug("waitForFirstProgress")
       synchronized {
         if (isFirstProgress) wait()
       }
     }
-    logger.info("waitForFirstProgress passed")
+    logger.debug("waitForFirstProgress passed")
   }
 }
 
