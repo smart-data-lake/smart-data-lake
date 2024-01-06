@@ -49,7 +49,7 @@ java.lang.IllegalAccessError: class org.apache.spark.storage.StorageUtils$ (in u
 ```
 
 Solution:
-Java 17 is more restrictive regarding usage of module exports. Unfortunately Spark uses classes from unexported packages. Packages can be exported manually. To fix above exception add `--add-exports java.base/sun.nio.ch=ALL-UNNAMED` to the java command line / IntelliJ VM Options, see also [Stackoverflow](https://stackoverflow.com/questions/72230174/java-17-solution-for-spark-java-lang-noclassdeffounderror-could-not-initializ).
+Java 17 is more restrictive regarding usage of module exports. Unfortunately Spark uses classes from unexported packages. Packages can be exported manually. To fix the above exception add `--add-exports java.base/sun.nio.ch=ALL-UNNAMED` to the java command line / IntelliJ VM Options, see also [Stackoverflow](https://stackoverflow.com/questions/72230174/java-17-solution-for-spark-java-lang-noclassdeffounderror-could-not-initializ).
 
 There might be additional InaccessibleObjectException erros depending on the function of Spark used:
 ```
