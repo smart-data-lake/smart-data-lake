@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
  * DataObject of type raw for files with unknown content.
  * Provides details to an Action to access raw files.
  *
- * By specifying format binary or text files can used with Spark.
+ * By specifying customFormat, binary or text files can read with Spark.
  *
  * @param customFormat Custom Spark data source format, e.g. binaryFile or text.
  *                     Only needed if you want to read/write this DataObject with Spark.
