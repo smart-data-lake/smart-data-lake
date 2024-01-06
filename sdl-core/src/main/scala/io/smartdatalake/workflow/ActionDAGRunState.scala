@@ -172,7 +172,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
   private val stateMigrators: Seq[StateMigratorDef] = Seq(
     new StateMigratorDef3To4()
   ).sortBy(_.versionFrom) // force ordering
-  assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unigue
+  assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unique
   assert(stateMigrators.forall(m => m.versionFrom + 1 == m.versionTo)) // check that a state migrator always converts to the next version, without skipping a version.
 }
 

@@ -39,7 +39,7 @@ private[smartdatalake] trait StateMigratorDef {
  * Migrate state from format version 3 to 4:
  * - the structure of `actionState.results` was cleaned up.
  *   instead of having `results.subFeed`, the attributes of `subFeed` have been moved directly into `result`.
- * - Additionally `actionState.inputIds[].id` was cleaned up as `inputIds[]`, and the the same applies for `actionState.outputIds`.
+ * - Additionally `actionState.inputIds[].id` was cleaned up as `inputIds[]`, and the same applies for `actionState.outputIds`.
  */
 class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
   override val versionFrom = 3
