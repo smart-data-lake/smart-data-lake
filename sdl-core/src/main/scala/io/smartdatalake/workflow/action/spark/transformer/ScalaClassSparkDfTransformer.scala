@@ -35,6 +35,9 @@ import org.apache.spark.sql.DataFrame
  * Define a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a
  * DataFrame. The Java/Scala class has to implement interface [[CustomDfTransformer]].
  *
+ * Note that the following options are passed by default to the transformation:
+ * - isExec: defined as `context.isExecPhase`
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomDfTransformer]]

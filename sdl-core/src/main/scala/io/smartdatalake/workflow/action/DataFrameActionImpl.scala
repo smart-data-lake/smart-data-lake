@@ -366,7 +366,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
       case ((inputDfsMap, inputPartitionValues), transformer) =>
-        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions)
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions, outputs.map(_.id))
         (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     // create output subfeeds from transformed dataframes

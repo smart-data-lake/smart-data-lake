@@ -78,5 +78,32 @@ object HoconUtil {
     }
   }
 
+  private def findInConfigEntry(key: String, value: ConfigValue, conditionFn: (String,ConfigValue) => Boolean, path: Seq[String]): Seq[Seq[String]] = {
+    value.valueType match {
+      // recursion for objects and lists
+      case ConfigValueType.OBJECT =>
+        findInConfigObject(value.asInstanceOf[ConfigObject], conditionFn, path)
+      case ConfigValueType.LIST =>
+        val elements = value.asInstanceOf[ConfigList].asScala.zipWithIndex
+        elements.flatMap {
+          case (value, idx) => findInConfigEntry(idx.toString, value, conditionFn, path :+ s"[$idx]")
+        }
+      // we are looking for className and type attributes
+      case _ =>
+        if (conditionFn(key,value)) Seq(path) // found! return configuration path
+        else Seq() // default -> nothing found
+    }
+  }
+
+  /**
+   * Finds all paths in a Hocon configuration matching a given condition.
+   * @param obj the config object to search
+   * @param conditionFn search condition defined on key and value of a config entry.
+   * @return list of paths matching condition
+   */
+  def findInConfigObject(obj: ConfigObject, conditionFn: (String,ConfigValue) => Boolean, path: Seq[String] = Seq()): Seq[Seq[String]] = {
+    obj.entrySet.asScala.toSeq.flatMap(e => findInConfigEntry(e.getKey, e.getValue, conditionFn, path :+ e.getKey))
+  }
+
   private def isListIdx(pathElement: String) = pathElement.startsWith("[")
 }

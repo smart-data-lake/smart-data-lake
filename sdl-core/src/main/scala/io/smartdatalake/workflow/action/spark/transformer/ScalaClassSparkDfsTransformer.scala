@@ -32,8 +32,22 @@ import org.apache.spark.sql.DataFrame
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)
- * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
- * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomDfsTransformer]].
+ *
+ * To define the transformation a class implementing the trait [[CustomDfsTransformer]] has to be created.
+ * There are two methods to define of defining transformation:
+ *
+ * 1) Overwrite the generic transform function of CustomDfsTransformer: Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has
+ * to return a map of output DataObjectIds with DataFrames. The exact signature is `transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]`.
+ *
+ * 2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
+ * Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
+ * The transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.
+ * Using this method you can avoid writing code to prepre DataFrames and Options from the corresponding Map parameters.
+ * It also allows the UI to display input parameter details of your transformation.
+ *
+ * Note that the following options are passed by default to the transformation:
+ * - isExec: defined as `context.isExecPhase`
+ * - outputDataObjectId: defined as outputDataObject.id if transformation has only one output DataObject configured.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
