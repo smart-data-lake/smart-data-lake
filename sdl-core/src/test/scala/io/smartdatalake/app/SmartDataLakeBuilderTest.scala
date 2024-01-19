@@ -683,6 +683,10 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
         |     outputId = tgt
         |     transformers = [{
         |       type = StandardizeColNamesTransformer
+        |        camelCaseToLower = true
+        |        normalizeToAscii = true
+        |        removeNonStandardSQLNameChars = false
+        |        replaceNonStandardSQLNameCharsWithUnderscores = true
         |     }]
         |   }
         |}
@@ -704,7 +708,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
+    val dfSrc = Seq(("testData", "Foo", "bar","multi", "hi")).toDF("testColumn", "c?olumnN[ä]me", "col-\nname", "mul#@!ti", "hyphen-Case")
 
     // Run SDLB
     val (outputSubFeeds, _) = sdlb.startSimulation(sdlConfig, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc)), srcDO.id, Seq())))
@@ -712,7 +716,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // check result
     val dfTgt = outputSubFeeds.head.dataFrame.get
     val colName = dfTgt.schema.columns
-    assert(colName == Seq("test_column", "column_naeme"))
+    println("std col names: "+colName.mkString(" | "))
+    assert(colName == Seq("test_column", "c_olumn_n_ae_me", "col_name", "mul_ti", "hyphen_case"))
   }
 
 
