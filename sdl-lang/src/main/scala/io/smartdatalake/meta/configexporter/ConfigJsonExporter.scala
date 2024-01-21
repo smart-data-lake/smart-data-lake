@@ -3,14 +3,17 @@ package io.smartdatalake.meta.configexporter
 import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue, ConfigValueFactory, ConfigValueType}
 import configs.ConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
+import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomTransformMethodDef}
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
@@ -81,35 +84,22 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     exporterConfig.descriptionPath.foreach(path => sdlConfig = enrichColumnDescription(path, sdlConfig))
     // enrich optional source documentation for custom classes from scaladoc
     sdlConfig = enrichCustomClassScalaDoc(sdlConfig)
+    // enrich optional custom transformer parameter info
+    sdlConfig = enrichCustomTransformerParameters(sdlConfig)
     // render config as json
     sdlConfig.root.render(ConfigRenderOptions.concise())
   }
 
   private def enrichCustomClassScalaDoc(config: Config): Config = {
-    def findClassConfigurationsHandleEntry(key: String, value: ConfigValue, path: Seq[String]): Seq[Seq[String]] = {
-      value.valueType match {
-        // recursion for objects and lists
-        case ConfigValueType.OBJECT =>
-          findClassConfigurationsInConfigObject(value.asInstanceOf[ConfigObject], path)
-        case ConfigValueType.LIST =>
-          val elements = value.asInstanceOf[ConfigList].asScala.zipWithIndex
-          elements.flatMap {
-            case (value, idx) => findClassConfigurationsHandleEntry(idx.toString, value, path :+ s"[$idx]")
-          }.toSeq
-        // we are looking for className and type attributes
-        case ConfigValueType.STRING if Seq("className", "type").contains(DataFrameUtil.strToLowerCamelCase(key)) =>
-          // check if configuration value is full class name, e.g. it has at least three name parts
-          if (value.unwrapped.asInstanceOf[String].split('.').length > 2)
-            Seq(path) // found! return configuration path
-          else Seq()
-        // default -> nothing found
-        case _ => Seq()
-      }
+    // we are looking for className and type attributes
+    def searchCondition(key: String, value: ConfigValue) = {
+      val lccKey = DataFrameUtil.strToLowerCamelCase(key)
+      // condition
+      value.valueType == ConfigValueType.STRING &&
+      (lccKey == "className" || lccKey == "type") &&
+      value.unwrapped.asInstanceOf[String].split('.').length > 2 // check if configuration value is full class name, e.g. it has at least three name parts
     }
-    def findClassConfigurationsInConfigObject(obj: ConfigObject, path: Seq[String]): Seq[Seq[String]] = {
-      obj.entrySet.asScala.toSeq.flatMap(e => findClassConfigurationsHandleEntry(e.getKey, e.getValue, path :+ e.getKey))
-    }
-    val classConfigurationPaths = findClassConfigurationsInConfigObject(config.root, Seq())
+    val classConfigurationPaths = HoconUtil.findInConfigObject(config.root, searchCondition)
     // enrich config with scala doc for config paths found
     logger.info(s"Enriching source documentation for ${classConfigurationPaths.length} custom classes from scaladoc")
     classConfigurationPaths.foldLeft(config) {
@@ -198,4 +188,29 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     // return
     enrichedConfig
   }
+
+  private def enrichCustomTransformerParameters(config: Config)(implicit hadoopConf: Configuration): Config = {
+    // we are looking for type = ScalaClassSparkDfsTransformer (for now)
+    def searchCondition(key: String, value: ConfigValue) = {
+      // condition
+      value.valueType == ConfigValueType.STRING &&
+        key == "type" &&
+        value.unwrapped.asInstanceOf[String] == classOf[ScalaClassSparkDfsTransformer].getSimpleName
+    }
+    val customTransformerConfigurationPaths = HoconUtil.findInConfigObject(config.root, searchCondition)
+    // enrich config with ScalaClassSparkDfsTransformer parameters if available
+    logger.info(s"Enriching custom transformer parameter information for ${customTransformerConfigurationPaths.length} transformers")
+    customTransformerConfigurationPaths.foldLeft(config) {
+      case (config, path) =>
+        val className = getConfigValue(config.root(), path.init :+ "className").unwrapped().asInstanceOf[String]
+        val classInstance = CustomCodeUtil.getClassInstanceByName[CustomTransformMethodDef](className)
+        val parameters = classInstance.getCustomTransformMethodParameterInfo
+        if (parameters.isDefined) {
+          val parametersValue = ConfigValueFactory.fromIterable(parameters.get.map(p => ConfigValueFactory.fromMap(p.toMap.asJava)).asJava)
+          updateConfigValue(config.root(), path.init :+ "_parameters", parametersValue).asInstanceOf[ConfigObject].toConfig
+        }
+        else config
+    }
+  }
+
 }

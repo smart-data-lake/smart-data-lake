@@ -37,7 +37,7 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 case class DfTransformerWrapperDfsTransformer(transformer: GenericDfTransformer, subFeedsToApply: Seq[String] = Seq()) extends GenericDfsTransformer {
   override def name: String = transformer.name
   override def description: Option[String] = transformer.description
-  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val missingSubFeeds = subFeedsToApply.toSet.diff(dfs.keySet)
     assert(missingSubFeeds.isEmpty, s"($actionId) [transformation.$name] subFeedsToApply ${missingSubFeeds.mkString(", ")} not found in input dfs. Available subFeeds are ${dfs.keys.mkString(", ")}.")
     dfs.map {

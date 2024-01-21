@@ -19,10 +19,11 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -54,7 +55,7 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
    * @param executionModeResultOptions options set by the actions execution mode
    * @return Map of transformed (dataObjectId, DataFrame) tuples
    */
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame]
+  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame]
 
   /**
    * Declare supported Language for transformation.
@@ -62,8 +63,8 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
    */
   private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): (Map[String,GenericDataFrame], Seq[PartitionValues]) = {
-    val transformedDfs = transform(actionId, partitionValues, dfs, executionModeResultOptions)
+  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[DataObjectId])(implicit context: ActionPipelineContext): (Map[String,GenericDataFrame], Seq[PartitionValues]) = {
+    val transformedDfs = transform(actionId, partitionValues, dfs, executionModeResultOptions, outputDataObjectIds.map(_.id))
     val transformedPartitionValues = transformPartitionValues(actionId, partitionValues, executionModeResultOptions).map(_.values.toSeq.distinct)
       .getOrElse(partitionValues)
     (transformedDfs,transformedPartitionValues)
@@ -78,7 +79,7 @@ trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromCo
 trait SparkDfsTransformer extends GenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.
   def transformSpark(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame]
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
     val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
     transformSpark(actionId, partitionValues, sparkDfs)
@@ -120,11 +121,16 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
     // transform
     transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
+    // prepare default options
+    val defaultOptions = Seq(
+      Some(IS_EXEC -> context.isExecPhase.toString),
+      if (outputDataObjectIds.size == 1) Some(OptionsGenericDfsTransformer.OUTPUT_DATAOBJECT_ID -> outputDataObjectIds.head) else None
+    ).flatten.toMap
     // transform
-    transformWithOptions(actionId, partitionValues, dfs, options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
+    transformWithOptions(actionId, partitionValues, dfs, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
@@ -132,6 +138,10 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
       expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get).toMap
   }
+}
+object OptionsGenericDfsTransformer {
+  final val IS_EXEC = "isExec"
+  final val OUTPUT_DATAOBJECT_ID = "outputDataObjectId"
 }
 
 /**
