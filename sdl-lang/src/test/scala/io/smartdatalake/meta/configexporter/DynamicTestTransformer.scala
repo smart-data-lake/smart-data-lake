@@ -23,6 +23,10 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.Test
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
+/**
+ * Custom Transformer to check export parameter documentation with ConfigJsonExorter.
+ * It is used in ConfigJsonExporterTest.
+ */
 class DynamicTestTransformer extends CustomDfsTransformer {
   def transform(session: SparkSession, dfDataObjectParquet9: DataFrame, isExec: Boolean, optionalBoolean: Option[Boolean], defaultBoolean: Boolean = true, long: Long) = {
     Map("dataObjectCsv5" -> dfDataObjectParquet9)

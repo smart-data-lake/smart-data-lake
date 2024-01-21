@@ -187,6 +187,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   override final def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = try {
+    require(context.isExecPhase, throw new IllegalStateException(s"context.phase=${context.phase} but should be Exec for executing action!"))
     validateInputSubFeeds(subFeeds)
     if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
     // prepare

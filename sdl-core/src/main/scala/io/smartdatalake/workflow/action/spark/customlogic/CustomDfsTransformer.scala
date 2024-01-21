@@ -53,7 +53,9 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
    */
   def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] = {
     val transformMethod = customTransformMethod.get
-    assert(transformMethod.returnType =:= typeOf[Map[String, DataFrame]], s"The return type of the transform method should be Map[String,DataFrame], but is ${transformMethod.returnType}")
+    val rt = transformMethod.returnType
+    require(rt =:= typeOf[DataFrame] || rt <:< typeOf[Dataset[_]] || rt =:= typeOf[Map[String, DataFrame]] || rt <:< typeOf[Map[String, Dataset[_]]]
+      , s"The return type of the transform method is ${transformMethod.returnType} but should be one of DataFrame Dataset[_], Map[String,DataFrame] or Map[String,Dataset[_]]")
 
     // prepare parameters
     val transformParameters = getCustomTransformMethodParameterInfo.get
@@ -111,11 +113,11 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
       transformResult.asInstanceOf[Map[String, DataFrame]]
     } else if (transformMethod.returnType <:< typeOf[Map[String, Dataset[_]]]) {
       transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF)
-    } else if (transformMethod.returnType <:< typeOf[DataFrame]) {
-      assert(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
+    } else if (transformMethod.returnType =:= typeOf[DataFrame]) {
+      require(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
       Map(options(OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
     } else if (transformMethod.returnType <:< typeOf[Dataset[_]]) {
-      assert(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
+      require(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
       Map(options(OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[Dataset[_]].toDF)
     } else {
       throw new IllegalStateException(s"Custom transform function has unsupported return type ${transformMethod.returnType}")
@@ -140,8 +142,8 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
     val transformMethods = CustomCodeUtil.getClassMethodsByName(getClass, "transform")
     val (defaultTransformMethods,subClassTransformMethods) = transformMethods
       .partition(_.owner == typeOf[CustomDfsTransformer].typeSymbol)
-    assert(defaultTransformMethods.size == 1) // this is the default implementation of CustomDfsTransformer
-    assert(subClassTransformMethods.size == 1, """
+    require(defaultTransformMethods.size == 1) // this is the default implementation of CustomDfsTransformer
+    require(subClassTransformMethods.size == 1, """
                                                    | CustomDfsTransformer implementations need to implement exactly one method with name 'transform'.
                                                    | Traditionally the signature of the transform method is 'transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]',
                                                    | but since SDLB 2.6 you can also implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).

@@ -64,7 +64,7 @@ private[smartdatalake] object CustomCodeUtil {
 
   def getClassInstanceByName[T](classname:String): T = {
     val clazz = Environment.classLoader.loadClass(classname)
-    assert(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
+    require(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
     clazz.getConstructor().newInstance().asInstanceOf[T]
   }
 
@@ -84,7 +84,6 @@ private[smartdatalake] object CustomCodeUtil {
   def getClassMethodsByName(cls: Class[_], methodName: String): scala.Seq[universe.MethodSymbol] = {
     val mirror = scala.reflect.runtime.currentMirror
     val classType = mirror.classSymbol(cls).toType
-    val t = classType.members.filter(_.isMethod).filter(_.name.toString == methodName)
     classType.members.filter(_.isMethod).filter(_.name.toString == methodName).map(_.asMethod).toSeq
   }
 

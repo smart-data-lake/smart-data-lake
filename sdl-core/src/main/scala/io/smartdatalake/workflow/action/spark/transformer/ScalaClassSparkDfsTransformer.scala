@@ -42,7 +42,7 @@ import org.apache.spark.sql.DataFrame
  * 2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
  * Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
  * The transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.
- * Using this method you can avoid writing code to prepre DataFrames and Options from the corresponding Map parameters.
+ * Using this method you can avoid writing code to prepare DataFrames and Options from the corresponding Map parameters.
  * It also allows the UI to display input parameter details of your transformation.
  *
  * Note that the following options are passed by default to the transformation:
@@ -58,12 +58,15 @@ import org.apache.spark.sql.DataFrame
  */
 case class ScalaClassSparkDfsTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](className)
-  override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
+
+  override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     customTransformer.transform(context.sparkSession, options, dfs)
   }
-  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
-   customTransformer.transformPartitionValues(options, partitionValues)
+
+  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
+    customTransformer.transformPartitionValues(options, partitionValues)
   }
+
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDfsTransformer
 }
 
