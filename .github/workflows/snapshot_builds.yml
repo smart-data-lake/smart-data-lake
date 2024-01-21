@@ -56,8 +56,8 @@ jobs:
     - name: Build with Maven for Scala 2.13
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: mvn -P scala-2.13 -B clean test -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
+      # scoverage and sonar are only run for scala-2.12 and not for scala-2.13.
+      run: mvn -P scala-2.13 -B clean test -f pom.xml
 
 
   deploy:
