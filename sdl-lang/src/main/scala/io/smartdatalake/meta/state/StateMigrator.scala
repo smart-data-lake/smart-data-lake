@@ -26,6 +26,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionDAGRunState.checkStateFormatVersionAndMigrate
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.json4s.JsonAST.JObject
 import org.json4s.jackson.{JsonMethods, prettyJson}
 import scopt.OptionParser
 
@@ -88,10 +89,10 @@ object StateMigrator extends SmartDataLakeLogger {
 
   def migrateStateFile(file: Path)(implicit filesystem: FileSystem): Unit = {
     val jsonStr = HdfsUtil.readHadoopFile(file)
-    val jValue = JsonMethods.parse(jsonStr)
-    val migratedJValue = checkStateFormatVersionAndMigrate(jValue)
-    if (migratedJValue.nonEmpty) {
-      HdfsUtil.writeHadoopFile(file, prettyJson(migratedJValue.get))
+    val jObj = JsonMethods.parse(jsonStr).asInstanceOf[JObject]
+    val migratedJObj = checkStateFormatVersionAndMigrate(jObj)
+    if (migratedJObj.nonEmpty) {
+      HdfsUtil.writeHadoopFile(file, prettyJson(migratedJObj.get))
     }
   }
 }
