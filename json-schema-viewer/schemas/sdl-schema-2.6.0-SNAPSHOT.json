@@ -4949,7 +4949,7 @@
         "title" : "ScalaClassSparkDfTransformer",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomDfTransformer]] ."
+        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.\nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface[[CustomDfTransformer]].\n\nNote that the following options are passed by default to the transformation:\n- isExec: defined as`context.isExecPhase`"
       },
       "ScalaClassSparkDsTransformer" : {
         "type" : "object",
@@ -5702,7 +5702,7 @@
         "title" : "ScalaClassSparkDfsTransformer",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)\nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as\nto return a map of output DataObjectIds with DataFrames, see also trait[[CustomDfsTransformer]] ."
+        "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)\n\nTo define the transformation a class implementing the trait[[CustomDfsTransformer]]has to be created.\nThere are two methods to define of defining transformation:\n\n1) Overwrite the generic transform function of CustomDfsTransformer: Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has\nto return a map of output DataObjectIds with DataFrames. The exact signature is`transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]`.\n\n2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).\nPrimitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.\nThe transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.\nUsing this method you can avoid writing code to prepare DataFrames and Options from the corresponding Map parameters.\nIt also allows the UI to display input parameter details of your transformation.\n\nNote that the following options are passed by default to the transformation:\n- isExec: defined as`context.isExecPhase` \n- outputDataObjectId: defined as outputDataObject.id if transformation has only one output DataObject configured."
       },
       "ScalaClassSparkDsNTo1Transformer" : {
         "type" : "object",
