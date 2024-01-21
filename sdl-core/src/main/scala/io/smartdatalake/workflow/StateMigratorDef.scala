@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.json4s.JsonAST.JInt
+import org.json4s.JsonAST.{JInt, JNothing, JObject}
 import org.json4s.{JArray, JValue}
 
 /**
@@ -31,7 +31,25 @@ import org.json4s.{JArray, JValue}
 private[smartdatalake] trait StateMigratorDef {
   def versionFrom: Int
   def versionTo: Int
-  def migrate(json: JValue): JValue
+  def migrate(json: JObject): JObject
+
+  /**
+   * Updates runStateFormatVersion to the given version number.
+   * First state files did not have a version field.
+   */
+  protected def updateVersion(json: JObject, version: Int): JObject = {
+    import org.json4s.JsonDSL._
+    val jVersion = JInt(version)
+    if ((json \ "runStateFormatVersion").values == None) {
+      json ~ ("runStateFormatVersion" -> jVersion)
+    } else {
+      json.transformField {
+        case (name, _) if name == "runStateFormatVersion" =>
+          (name, jVersion)
+      }.asInstanceOf[JObject]
+    }
+  }
+
   override def toString: String = s"$versionFrom -> $versionTo"
 }
 
@@ -44,9 +62,14 @@ private[smartdatalake] trait StateMigratorDef {
 class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
   override val versionFrom = 3
   override val versionTo = 4
-  override def migrate(json: JValue): JValue = {
-    assert(json \ "runStateFormatVersion" match { case JInt(version) => version <= versionFrom}, s"Version should be equals or less than $versionFrom")
-    json.transformField {
+  override def migrate(json: JObject): JObject = {
+    assert(json \ "runStateFormatVersion" match {
+      case JInt(version) => version <= versionFrom
+      case JNothing => true // first state files did not have an attribute runStateFormatVersion
+    }, s"Version should be equals or less than $versionFrom")
+
+    // migrate json
+    val migratedJson = json.transformField {
       case (name, actionsState) if name == "actionsState" =>
         (name, actionsState.transformField {
           case (name, results) if name == "results" =>
@@ -74,8 +97,9 @@ class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
               id => id \ "id"
             }))
         })
-      case (name, runStateFormatVersion) if name == "runStateFormatVersion" =>
-        (name, JInt(versionTo))
-    }
+    }.asInstanceOf[JObject]
+
+    // update version and return
+    updateVersion(migratedJson, versionTo)
   }
 }

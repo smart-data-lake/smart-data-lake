@@ -133,38 +133,38 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
   // read state from json
   def fromJson(stateJson: String): ActionDAGRunState = {
     try{
-      val jValue = JsonMethods.parse(stateJson)
-      val migratedJValue = checkStateFormatVersionAndMigrate(jValue).getOrElse(jValue)
+      val jObj = JsonMethods.parse(stateJson).asInstanceOf[JObject]
+      val migratedJObj = checkStateFormatVersionAndMigrate(jObj).getOrElse(jObj)
       // extract into class structures
-      migratedJValue.extract[ActionDAGRunState]
+      migratedJObj.extract[ActionDAGRunState]
     } catch {
       case ex: Exception => throw new IllegalStateException(s"Unable to parse state from json: ${ex.getMessage}", ex)
     }
   }
 
-  def checkStateFormatVersionAndMigrate(jValue: JValue): Option[JValue] = {
+  def checkStateFormatVersionAndMigrate(json: JObject): Option[JObject] = {
     // convert old format versions
-    val formatVersion = jValue \ "runStateFormatVersion" match {
+    val formatVersion = json \ "runStateFormatVersion" match {
       case JInt(i) => i.toInt
       case _ => 0 // runStateFormatVersion was missing in first format version
     }
-    val appName = jValue \ "appConfig" \ "applicationName" match {
+    val appName = json \ "appConfig" \ "applicationName" match {
       case JString(s) => s
-      case _ => jValue \ "appConfig" \ "feedSel" match {
+      case _ => json \ "appConfig" \ "feedSel" match {
         case JString(s) => s
       }
     }
-    val runId = jValue \ "runId" match {
+    val runId = json \ "runId" match {
       case JInt(i) => i.toInt
     }
-    val attemptId = jValue \ "attemptId" match {
+    val attemptId = json \ "attemptId" match {
       case JInt(i) => i.toInt
     }
     assert(formatVersion <= runStateFormatVersion, s"Cannot read state file with formatVersion=${formatVersion} newer than the version of this build (${runStateFormatVersion}). Check state file app=$appName runId=$runId attemptId=$attemptId and that your SDLB version is up-to-date!")
     val migrators = stateMigrators.dropWhile(m => m.versionFrom <= formatVersion)
     if (migrators.nonEmpty) {
       logger.info(s"Applying state migrators ${migrators.mkString(", ")} to state json for app=$appName runId=$runId attemptId=$attemptId")
-      Some(migrators.foldLeft(jValue)((v, m) => m.migrate(v)))
+      Some(migrators.foldLeft(json)((v, m) => m.migrate(v)))
     } else None
   }
 
