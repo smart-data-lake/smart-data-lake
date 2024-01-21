@@ -20,8 +20,13 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.workflow.action.spark.customlogic.NotFoundError
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.tolerantGet
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.functions.col
 
 import java.io.{FileNotFoundException, InputStream}
+import scala.reflect.runtime.universe
 import scala.tools.reflect.ToolBox
 import scala.util.{Failure, Success, Try}
 
@@ -31,8 +36,10 @@ import scala.util.{Failure, Success, Try}
   */
 private[smartdatalake] object CustomCodeUtil {
 
+  private val runtimeMirror = scala.reflect.runtime.currentMirror
+
   // get Scala Toolbox to compile code at runtime
-  private lazy val tb = scala.reflect.runtime.currentMirror.mkToolBox()
+  private lazy val tb = runtimeMirror.mkToolBox()
 
   /**
    * Compiling Scala Source Code into Object of Type T
@@ -57,7 +64,7 @@ private[smartdatalake] object CustomCodeUtil {
 
   def getClassInstanceByName[T](classname:String): T = {
     val clazz = Environment.classLoader.loadClass(classname)
-    assert(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
+    require(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
     clazz.getConstructor().newInstance().asInstanceOf[T]
   }
 
@@ -70,4 +77,60 @@ private[smartdatalake] object CustomCodeUtil {
     // return value
     content
   }
+
+  /**
+   * Get method symbol with given name from class definition
+   */
+  def getClassMethodsByName(cls: Class[_], methodName: String): scala.Seq[universe.MethodSymbol] = {
+    val mirror = scala.reflect.runtime.currentMirror
+    val classType = mirror.classSymbol(cls).toType
+    classType.members.filter(_.isMethod).filter(_.name.toString == methodName).map(_.asMethod).toSeq
+  }
+
+  /**
+   * Extract default values for parameters of a method signature.
+   * @param instance class instance of object the method belongs to
+   * @param method method symbol to read signature from
+   * @return a Map with parameter names and their default values.
+   */
+  def getMethodParameterDefaultValues(instance: Any, method: universe.MethodSymbol): Map[String, Any] = {
+    val instanceMirror = runtimeMirror.reflect(instance)
+    val classType = instanceMirror.symbol.toType
+    method.paramLists.head.zipWithIndex.flatMap {
+      case (p,i) =>
+        val parameterName = p.name.toString
+        // There is a special method for getting the default value for a given parameter.
+        // The method name for default values is by convention, see also https://stackoverflow.com/questions/13812172/how-can-i-create-an-instance-of-a-case-class-with-constructor-arguments-with-no
+        val defaultMethod = classType.member(universe.TermName(s"${method.name.toString}$$default$$${i+1}"))
+        if (defaultMethod != universe.NoSymbol) {
+          val defaultMethodMirror = instanceMirror.reflectMethod(defaultMethod.asMethod)
+          Some((parameterName, defaultMethodMirror.apply()))
+        } else None
+    }.toMap
+  }
+
+  /**
+   * Dynamically call method on class instance.
+   */
+  def callMethod[R](instance: Any, methodSymbol: universe.MethodSymbol, args: Seq[Any]): R = {
+    val instanceMirror = runtimeMirror.reflect(instance)
+    instanceMirror.reflectMethod(methodSymbol).apply(args:_*).asInstanceOf[R]
+  }
+
+  /**
+   * Extract method parameters with default values through reflection.
+   * @param instance: class instance for method to inspect
+   * @param method: method symbol to inspect
+   */
+  def analyzeMethodParameters(instance: Any, method: universe.MethodSymbol): Seq[MethodParameterInfo] = {
+    val parameters = method.paramLists.head
+    val defaultValues = getMethodParameterDefaultValues(instance, method)
+    parameters.map { p =>
+      MethodParameterInfo(p.name.toString, p.typeSignature, defaultValues.get(p.name.toString))
+    }
+  }
+}
+
+case class MethodParameterInfo(name: String, tpe: universe.Type, defaultValue: Option[Any]) {
+  def toMap: Map[String, Any] = Seq(Some("name" -> name), Some("type" -> tpe.toString), defaultValue.map("default" -> _)).flatten.toMap
 }
