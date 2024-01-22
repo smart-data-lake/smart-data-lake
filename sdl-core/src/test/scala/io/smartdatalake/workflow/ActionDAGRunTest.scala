@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -31,7 +32,6 @@ import org.scalatest.FunSuite
 
 import java.nio.file.Files
 import java.time.{Duration, LocalDateTime}
-
 import scala.collection.JavaConverters._
 
 class ActionDAGRunTest extends FunSuite {
@@ -49,7 +49,7 @@ class ActionDAGRunTest extends FunSuite {
       dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
     val appVersion = AppUtil.getManifestVersion
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
@@ -61,6 +61,16 @@ class ActionDAGRunTest extends FunSuite {
     // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)
+  }
+
+  test("read old state version") {
+    val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
+    val migratedState = ActionDAGRunState.fromJson(stateContent)
+    assert(migratedState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion)
+    assert(migratedState.actionsState.head._2.inputIds.nonEmpty)
+    assert(migratedState.actionsState.head._2.outputIds.nonEmpty)
+    assert(migratedState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("test" -> 1))))
+    assert(migratedState.actionsState.head._2.results.head.getClass.getSimpleName == "SparkSubFeed")
   }
 
   test("append to state index file") {

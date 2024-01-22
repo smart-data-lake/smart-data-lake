@@ -1,0 +1,70 @@
+{
+  "appConfig" : {
+    "feedSel" : "test",
+    "applicationName" : "test",
+    "configuration" : [ "/mnt/config" ],
+    "master" : "local[*]",
+    "deployMode" : "client",
+    "parallelism" : 1,
+    "statePath" : "data",
+    "streaming" : false
+  },
+  "runId" : 1,
+  "attemptId" : 1,
+  "runStartTime" : "2023-11-22T15:37:00.595894",
+  "attemptStartTime" : "2023-11-22T15:37:00.595936",
+  "actionsState" : {
+    "load-test" : {
+      "executionId" : {
+        "type" : "SDLExecutionId",
+        "runId" : 1,
+        "attemptId" : 1
+      },
+      "state" : "SUCCEEDED",
+      "startTstmpPrepare" : "2023-11-22T15:37:03.869082",
+      "endTstmpPrepare" : "2023-11-22T15:37:06.723945",
+      "startTstmpInit" : "2023-11-22T15:37:06.779401",
+      "endTstmpInit" : "2023-11-22T15:37:09.115512",
+      "startTstmp" : "2023-11-22T15:37:09.124818",
+      "endTstmp" : "2023-11-22T15:37:19.820717",
+      "duration" : "PT10.695899S",
+      "results" : [ {
+        "subFeed" : {
+          "type" : "SparkSubFeed",
+          "dataObjectId" : "test-out",
+          "partitionValues" : [ {
+            "elements" : {
+              "test" : 1
+            }
+          } ],
+          "isDAGStart" : false,
+          "isSkipped" : false,
+          "isDummy" : false
+        },
+        "mainMetrics" : {
+          "stage" : "save",
+          "count" : 6622,
+          "num_tasks" : 1,
+          "records_written" : 6622,
+          "stage_duration" : "PT1.037S",
+          "bytes_written" : 0
+        }
+      } ],
+      "dataObjectsState" : [ {
+        "dataObjectId" : "test-in",
+        "state" : "\"0\":5"
+      } ],
+      "inputIds" : [ {
+        "id" : "test-in"
+      } ],
+      "outputIds" : [ {
+        "id" : "test-out"
+      } ]
+    }
+  },
+  "isFinal" : true,
+  "runStateFormatVersion" : 2,
+  "buildVersionInfo" : {
+    "version" : "2.5.2"
+  }
+}

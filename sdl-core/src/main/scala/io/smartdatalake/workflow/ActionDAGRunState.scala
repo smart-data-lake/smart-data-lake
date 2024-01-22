@@ -21,13 +21,16 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.app.{BuildVersionInfo, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.util.Json4sCompat
+import org.json4s.Extraction.decompose
 import org.json4s._
 import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization.{read, write, writePretty}
+import org.json4s.jackson.JsonMethods
+import org.json4s.jackson.Serialization.{write, writePretty}
 import org.reflections.Reflections
 
 import java.time.{Duration, LocalDateTime}
@@ -74,8 +77,9 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
   def toStringTuple: (String,String) = (dataObjectId.id, state)
 }
 
-private[smartdatalake] object ActionDAGRunState {
+private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
+  // Note: if increasing this version, please check if a StateMigrator is needed to read files of older versions. See also stateMigrators below.
   val runStateFormatVersion: Int = 4
 
   private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
@@ -105,12 +109,16 @@ private[smartdatalake] object ActionDAGRunState {
     {case s: String => RuntimeEventState.withName(s)},
     {case obj: RuntimeEventState => obj.toString}
   ))
+  private val partitionValuesSerializer = Json4sCompat.getCustomSerializer[PartitionValues](implicit formats => (
+    {case json: JObject => PartitionValues(json.values)},
+    {case obj: PartitionValues => JObject(obj.elements.map(e => JField(e._1, decompose(e._2))).toList)}
+  ))
 
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
-    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer
+    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer + partitionValuesSerializer
 
   // write state to Json
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
@@ -125,11 +133,47 @@ private[smartdatalake] object ActionDAGRunState {
   // read state from json
   def fromJson(stateJson: String): ActionDAGRunState = {
     try{
-      read[ActionDAGRunState](stateJson)
+      val jObj = JsonMethods.parse(stateJson).asInstanceOf[JObject]
+      val migratedJObj = checkStateFormatVersionAndMigrate(jObj).getOrElse(jObj)
+      // extract into class structures
+      migratedJObj.extract[ActionDAGRunState]
     } catch {
       case ex: Exception => throw new IllegalStateException(s"Unable to parse state from json: ${ex.getMessage}", ex)
     }
   }
+
+  def checkStateFormatVersionAndMigrate(json: JObject): Option[JObject] = {
+    // convert old format versions
+    val formatVersion = json \ "runStateFormatVersion" match {
+      case JInt(i) => i.toInt
+      case _ => 0 // runStateFormatVersion was missing in first format version
+    }
+    val appName = json \ "appConfig" \ "applicationName" match {
+      case JString(s) => s
+      case _ => json \ "appConfig" \ "feedSel" match {
+        case JString(s) => s
+      }
+    }
+    val runId = json \ "runId" match {
+      case JInt(i) => i.toInt
+    }
+    val attemptId = json \ "attemptId" match {
+      case JInt(i) => i.toInt
+    }
+    assert(formatVersion <= runStateFormatVersion, s"Cannot read state file with formatVersion=${formatVersion} newer than the version of this build (${runStateFormatVersion}). Check state file app=$appName runId=$runId attemptId=$attemptId and that your SDLB version is up-to-date!")
+    val migrators = stateMigrators.dropWhile(m => m.versionFrom <= formatVersion)
+    if (migrators.nonEmpty) {
+      logger.info(s"Applying state migrators ${migrators.mkString(", ")} to state json for app=$appName runId=$runId attemptId=$attemptId")
+      Some(migrators.foldLeft(json)((v, m) => m.migrate(v)))
+    } else None
+  }
+
+  // list of state migrators, sorted in ascending order
+  private val stateMigrators: Seq[StateMigratorDef] = Seq(
+    new StateMigratorDef3To4()
+  ).sortBy(_.versionFrom) // force ordering
+  assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unique
+  assert(stateMigrators.forall(m => m.versionFrom + 1 == m.versionTo)) // check that a state migrator always converts to the next version, without skipping a version.
 }
 
 private[smartdatalake] trait ActionDAGRunStateStore[A <: StateId] extends SmartDataLakeLogger {
