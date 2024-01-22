@@ -3,6 +3,7 @@ package io.smartdatalake.meta.configexporter
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
+import io.smartdatalake.util.misc.FileUtil.readFile
 import io.smartdatalake.util.misc.{ProductUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -181,11 +182,5 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     val filename = s"${dataObjectId.id}.$tpe.${System.currentTimeMillis() / 1000}.json"
     val file = path.resolve(filename)
     (filename, file)
-  }
-
-  private def readFile(file: File): String = {
-    Using(Source.fromFile(file)) {
-      _.getLines().mkString(System.lineSeparator)
-    }.get
   }
 }
