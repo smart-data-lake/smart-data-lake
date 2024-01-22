@@ -19,7 +19,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, filename: String = "exportedConfig.json", enrichOrigin: Boolean = true, descriptionPath: Option[String] = None)
 

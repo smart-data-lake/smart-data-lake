@@ -168,7 +168,7 @@ private object IndexEntry {
   def from(state: ActionDAGRunState, relativePath: String) = {
     implicit val localDateTimeOrdering: Ordering[LocalDateTime] = _ compareTo _
     val runEndTime = state.actionsState.values.flatMap(_.endTstmp).toSeq.sorted.lastOption
-    val actionsState = state.actionsState.mapValues(a => IndexActionEntry(a.state, a.dataObjectsState.map(_.dataObjectId)))
+    val actionsState = state.actionsState.mapValues(a => IndexActionEntry(a.state, a.dataObjectsState.map(_.dataObjectId))).toMap
     IndexEntry(
       state.appConfig.appName, state.runId, state.attemptId, state.appConfig.feedSel,
       state.runStartTime, state.attemptStartTime, runEndTime,

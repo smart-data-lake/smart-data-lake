@@ -304,7 +304,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.schema.columns.last == "type", "partition columns must be moved last already in init phase")
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getSparkDataFrame().count == 1)
+    assert(tgtDO.getSparkDataFrame().count() == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
@@ -312,14 +312,14 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getSparkDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
     assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
-    assert(tgtDO.getSparkDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count() == 2)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
@@ -354,7 +354,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     assert(initOutputSubFeeds.head.asInstanceOf[SparkSubFeed].dataFrame.get.schema.columns.last == "type", "partition columns must be moved last already in init phase")
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
     assert(tgtSubFeed1.partitionValues.toSet == l1PartitionValues.toSet)
-    assert(tgtDO.getSparkDataFrame().count == 1)
+    assert(tgtDO.getSparkDataFrame().count() == 1)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet)
 
     // prepare & start 2nd load
@@ -362,14 +362,14 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
     srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getSparkDataFrame().count == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
     // check 2nd load
     assert(tgtSubFeed2.dataObjectId == tgtDO.id)
     assert(tgtSubFeed2.partitionValues.toSet == l2PartitionValues.toSet)
-    assert(tgtDO.getSparkDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count() == 2)
     assert(tgtDO.listPartitions.toSet == l1PartitionValues.toSet ++ l2PartitionValues.toSet)
   }
 
@@ -439,7 +439,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     // run
     action1.preExec(Seq(srcSubFeed))(contextExec)
     val resultSubFeeds = action1.exec(Seq(srcSubFeed))(contextExec)
-    assert(tgtDO.getSparkDataFrame().count == 2)
+    assert(tgtDO.getSparkDataFrame().count() == 2)
     action1.postExec(Seq(srcSubFeed),resultSubFeeds)(contextExec)
 
     // next run with no data

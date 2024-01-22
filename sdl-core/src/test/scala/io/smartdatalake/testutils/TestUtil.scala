@@ -50,7 +50,7 @@ import java.math.BigDecimal
 import java.nio.file.Files
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDateTime}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Utility methods for testing.
@@ -76,7 +76,7 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   // create SparkSession if needed
-  lazy val session : SparkSession = sparkSessionBuilder().getOrCreate
+  lazy val session : SparkSession = sparkSessionBuilder().getOrCreate()
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     getDefaultActionPipelineContext(session) // initialize with Spark session incl. Hive support
@@ -376,7 +376,7 @@ object TestUtil extends SmartDataLakeLogger {
 
   def arbitraryDataFrame(schema: StructType, nbRecords: Int = 100)(implicit session: SparkSession): DataFrame = {
     val nbOfArrayRecords = 3
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     def arbitraryValue(dataType: DataType): Any = {
       dataType match {
         case IntegerType => Arbitrary.arbInt.arbitrary.sample.get

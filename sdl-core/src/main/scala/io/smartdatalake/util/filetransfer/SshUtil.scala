@@ -29,7 +29,7 @@ import java.io.{InputStream, OutputStream}
 import java.net.{InetAddress, Proxy, Socket}
 import java.util
 import javax.net.SocketFactory
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.Try
 
@@ -96,11 +96,11 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
       }
       if (newglobPathElementsTodo.isEmpty) {
         fileAttrs.filter(!_.isDirectory)
-          .map( a => (globPathElementsResolved :+ a.getName).mkString("/"))
+          .map( a => (globPathElementsResolved :+ a.getName).mkString("/")).toSeq
       }
       else {
         fileAttrs.filter(_.isDirectory)
-          .flatMap( f => lsGlobElement( basePath, globPathElementsResolved :+ f.getName, newglobPathElementsTodo ))
+          .flatMap( f => lsGlobElement( basePath, globPathElementsResolved :+ f.getName, newglobPathElementsTodo )).toSeq
       }
     }
     val (basePath, childPathElements) = splitPathElements(path)
@@ -121,7 +121,7 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     if (deleteSource) sftp.rm(srcPath)
 
     // return
-    copiedFiles
+    copiedFiles.toSeq
   }
 
   def getInputStream(path: String, onCloseFunc: () => Unit)(implicit sftp: SFTPClient): InputStream = {

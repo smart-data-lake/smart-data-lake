@@ -85,7 +85,7 @@ object ActionHelper extends SmartDataLakeLogger {
 
     logger.info("starting checkDataFrameNotNewerThan")
     session.sparkContext.setJobDescription("checkDataFrameNotNewerThan")
-    val existingLatestCaptured = df.agg(max(col(tstmpColName))).as[Timestamp].collect.find(_ != null)
+    val existingLatestCaptured = df.agg(max(col(tstmpColName))).as[Timestamp].collect().find(_ != null)
     if (existingLatestCaptured.isDefined) {
       if (timestamp.compareTo(existingLatestCaptured.get.toLocalDateTime) < 0) {
         throw new TimeOrderLogicException(

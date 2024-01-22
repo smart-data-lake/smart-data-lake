@@ -241,7 +241,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Executes operations needed to cleanup after executing an action failed.
    */
-  def postExecFailed(implicit context: ActionPipelineContext): Unit = Unit
+  def postExecFailed(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.

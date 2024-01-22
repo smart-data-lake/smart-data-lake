@@ -66,7 +66,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schema'", "schema", e)
       }
-      case _ => Unit
+      case _ => ()
     }
     // check lazy parsed schemaMin (note that it can match schema and schemaMin, and we therefore need two match statements)
     this match {
@@ -75,25 +75,25 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schemaMin'", "schemaMin", e)
       }
-      case _ => Unit
+      case _ => ()
     }
   }
 
   /**
    * Runs operations before reading from [[DataObject]]
    */
-  private[smartdatalake] def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations after reading from [[DataObject]]
    */
-  private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations before writing to [[DataObject]]
    * Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
    */
-  private[smartdatalake] def preWrite(implicit context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def preWrite(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations after writing to [[DataObject]]

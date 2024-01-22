@@ -23,7 +23,9 @@ import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutp
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 
 import java.io.{InputStream, OutputStream}
+import java.util.concurrent.ForkJoinPool
 import scala.annotation.tailrec
+import scala.collection.parallel.ForkJoinTaskSupport
 import scala.util.{Failure, Success, Try, Using}
 
 /**
@@ -51,9 +53,10 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
   }
 
   private def parallelize(fileRefPairs: Seq[FileRefMapping]) = {
+    import io.smartdatalake.util.misc.CompatParColls.Converters._
     if (parallelism>1) {
       val parFileList = fileRefPairs.par
-      parFileList.tasksupport = new scala.collection.parallel.ForkJoinTaskSupport(new scala.concurrent.forkjoin.ForkJoinPool(parallelism))
+      parFileList.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(parallelism))
       parFileList
     } else fileRefPairs
   }

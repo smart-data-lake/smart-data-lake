@@ -145,7 +145,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       .format(readFormat)
       .options(options)
       .load(path)
-      .withOptionalColumn(filenameColumn, input_file_name)
+      .withOptionalColumn(filenameColumn, input_file_name())
     val dfWithPartitions = partitions.foldLeft(df) {
       case (df, p) => df.withColumn(p, functions.lit("dummyString"))
     }
@@ -217,7 +217,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
 
     // add filename column
-    df = df.withOptionalColumn(filenameColumn, input_file_name)
+    df = df.withOptionalColumn(filenameColumn, input_file_name())
 
     // configure observer to get files processed for incremental execution mode
     if (filesObservers.nonEmpty && context.isExecPhase) {
@@ -381,12 +381,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
     if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
     // force creating filenameColumn, and drop the it later again
     val forcedFilenameColumn = "__filename"
-    if (filenameColumn.isEmpty) df = df.withColumn(forcedFilenameColumn, input_file_name)
+    if (filenameColumn.isEmpty) df = df.withColumn(forcedFilenameColumn, input_file_name())
     // initialize observers
     df = filesObservers.foldLeft(df) {
       case (df, (actionId, observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
     }
-    filesObservers.clear
+    filesObservers.clear()
     // drop forced filenameColumn
     if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
     // return
@@ -521,7 +521,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
         } else {
           throw new ProcessingLogicException(s"($id) OverwritePreserveDirectories without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
         }
-      case _ => Unit
+      case _ => ()
     }
 
     // write

@@ -43,7 +43,7 @@ class DataValidationTransformerTest extends FunSuite {
     ))
     val dfValidated = validator.transform("testAction", Seq(), SparkDataFrame(df), "testDO", None, Map()).asInstanceOf[SparkDataFrame]
     import SparkSubFeed._
-    assert(dfValidated.filter(col("firstname") === lit("bob")).select(explode(col("errors"))).asInstanceOf[SparkDataFrame].inner.as[String].collect.toSet == Set("rating should not be empty", "first should not be 'bob'"))
+    assert(dfValidated.filter(col("firstname") === lit("bob")).select(explode(col("errors"))).asInstanceOf[SparkDataFrame].inner.as[String].collect().toSet == Set("rating should not be empty", "first should not be 'bob'"))
   }
 
 }

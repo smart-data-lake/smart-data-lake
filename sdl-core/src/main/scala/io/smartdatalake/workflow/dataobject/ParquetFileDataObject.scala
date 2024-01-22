@@ -42,7 +42,6 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
-
  * @param parquetOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                       [[org.apache.spark.sql.DataFrameWriter]].
  */

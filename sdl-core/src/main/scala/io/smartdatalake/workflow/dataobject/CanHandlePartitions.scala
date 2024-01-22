@@ -95,7 +95,7 @@ trait CanHandlePartitions { this: DataObject =>
     val session = context.sparkSession
     expectedPartitionsCondition.map{ condition =>
       // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
-      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString), pv.hashCode))
+      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString).toMap, pv.hashCode))
       val expectedHashCodes = partitionsValuesStringWithHashCode
         .map{ case (elements, hashCode) => PartitionValueFilterExpressionData(elements, hashCode)}
         .filter(p => SparkExpressionUtil.evaluateBoolean(id, None, condition, p))

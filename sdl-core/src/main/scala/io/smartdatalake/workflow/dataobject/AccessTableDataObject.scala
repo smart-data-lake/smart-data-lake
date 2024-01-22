@@ -33,7 +33,7 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import java.io.File
 import java.sql.Timestamp
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * [[DataObject]] of type Microsoft Access.
@@ -59,7 +59,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
     val tableSchema = StructType(
       accessTable.getColumns.asScala.map(
         col => StructField(col.getName, getCatalystType(col.getSQLType, col.getPrecision, col.getScale))
-      )
+      ).toList
     )
 
     // create DataFrame from rows

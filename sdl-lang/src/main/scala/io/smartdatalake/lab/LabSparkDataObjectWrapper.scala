@@ -84,7 +84,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => Seq()
   }
   def partitions: Seq[Map[String,String]] = dataObject match {
-    case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString))
+    case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString).toMap)
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
   def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head))

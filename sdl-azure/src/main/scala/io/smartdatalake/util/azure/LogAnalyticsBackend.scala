@@ -28,7 +28,7 @@ import io.smartdatalake.util.azure.client.loganalytics.LogAnalyticsClient
 import reactor.core.publisher.Mono
 
 import java.io.{InputStream, OutputStream}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.reflect.{ClassTag, classTag}
 
 trait LogAnalyticsBackend[A] {

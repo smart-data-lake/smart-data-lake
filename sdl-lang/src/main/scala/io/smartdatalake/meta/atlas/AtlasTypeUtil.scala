@@ -48,7 +48,7 @@ case class AtlasTypeUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogger {
    *
    * @return atlas response.
    */
-  def export(implicit instanceRegistry: InstanceRegistry): Unit = {
+  def `export`(implicit instanceRegistry: InstanceRegistry): Unit = {
 
     val atlasDefinedTypes = atlasDefinedTypeNames
 

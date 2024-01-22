@@ -14,7 +14,7 @@ import org.reflections.Reflections
 import scaladoc.Tag
 import scala.reflect.internal.Symbols
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
 
 
@@ -133,7 +133,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     val name = tpe.typeSymbol.name.toString
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
     val description = scaladoc.map(formatScaladocWithTags(_, !_.isInstanceOf[Tag.Param]))
-    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
     GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
   }
 

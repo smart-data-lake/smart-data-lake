@@ -57,7 +57,7 @@ trait EncryptDecrypt extends Serializable {
 
 trait EncryptDecryptSupport {
   def loadEncryptDecryptClass(classname: String, keyAsBytes: Array[Byte]): EncryptDecrypt = {
-    val clazz = Environment.classLoader.loadClass(classname)
+    val clazz = Environment.classLoader().loadClass(classname)
     assert(clazz.getConstructors.exists(con => con.getParameterTypes.toSeq == Seq(classOf[Array[Byte]])),
       s"Class $classname needs to have a constructor with 1 parameter of type 'Array[Byte]'!")
     clazz.getConstructor(classOf[Array[Byte]]).newInstance(keyAsBytes).asInstanceOf[EncryptDecrypt]

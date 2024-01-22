@@ -95,7 +95,7 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
     val results = runtimeInfo.results.map {
       result =>
         val metadata = instanceRegistry.get[DataObject](result.dataObjectId).metadata
-        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").mapValues(_.toString)
+        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").mapValues(_.toString).toMap
         else Map()
         val dataObjectsState = runtimeInfo.dataObjectsState.find(_.dataObjectId == result.dataObjectId).map(_.state)
         StateLogEvent(logContext, actionId.id, runtimeInfo.state.toString, runtimeInfo.msg,

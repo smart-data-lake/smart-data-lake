@@ -151,7 +151,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         throw ex
     }
 
-    session.sql(s"show partitions ${table.fullName}").as[String].collect.map( parseHDFSPartitionString).toSeq
+    session.sql(s"show partitions ${table.fullName}").as[String].collect().map( parseHDFSPartitionString).toSeq
   }
 
   // get partition columns for specified table from DDL
@@ -159,7 +159,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     import session.implicits._
 
     // get ddl and concat into one string without newlines
-    val tableDDL = session.sql(s"show create table ${table.fullName}").as[String].collect.mkString(" ").replace("\n"," ")
+    val tableDDL = session.sql(s"show create table ${table.fullName}").as[String].collect().mkString(" ").replace("\n"," ")
 
     // extract partition by declaration
     val regexPartitionBy = raw"PARTITIONED BY\s+\(([^\)]+)\)".r.unanchored
@@ -359,8 +359,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
       // if schema evolution with partitioning, make sure old partitions data is included within new dataframe
       if (withSchemaEvolution && partitions.nonEmpty) {
-        val existingPartitions = df_existing.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
-        val newPartitions = df_new.select(array(partitions.map(col): _*)).distinct.collect.map( _.getSeq[String](0))
+        val existingPartitions = df_existing.select(array(partitions.map(col): _*)).distinct().collect().map( _.getSeq[String](0))
+        val newPartitions = df_new.select(array(partitions.map(col): _*)).distinct().collect().map( _.getSeq[String](0))
         assert(existingPartitions.diff(newPartitions).nonEmpty, s"(${table.fullName}) writeDfToHive: schema evolution with partitions needs all existing data in new dataframe, but partition data of existing dataframe is missing in new data frame!")
       }
 
@@ -531,7 +531,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   def hiveTableLocation(table: Table)(implicit session: SparkSession): String = {
     val extendedDescribe = session.sql(s"describe extended ${table.fullName}")
-      .cache
+      .cache()
 
     // Spark 2.2, 2.3: Location is found as row with col_name == "Location",
     // Some tables can have a real column "Location", so the data_type column is also verified for a path with "/"
@@ -549,7 +549,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     //+----------------------------+-----------------------------+-------+
     //
     val location22 = Try(extendedDescribe.where(col("col_name") === "Location" && col("data_type")
-      .contains(Path.SEPARATOR_CHAR)).select("data_type").first.getString(0)).toOption
+      .contains(Path.SEPARATOR_CHAR)).select("data_type").first().getString(0)).toOption
 
     // Spark 2.1: Location must be parsed from row with col_name == "Detailed Table Information"
     val tableDetails = extendedDescribe.where("col_name like '%Detailed Table Information%'").select("*").first()
@@ -625,7 +625,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     if (partitions.nonEmpty) {
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions)
       // list directories and extract partition values
-      session.sql(s"show partitions ${table.fullName}").as[String].collect.toSeq
+      session.sql(s"show partitions ${table.fullName}").as[String].collect().toSeq
         .map( path => PartitionLayout.extractPartitionValues(partitionLayout, path + Path.SEPARATOR))
     } else Seq()
   }
@@ -693,7 +693,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
           stats.min.map(ColumnStatsType.Min.toString -> _),
           stats.max.map(ColumnStatsType.Max.toString -> _)
         ).flatten.toMap
-      )
+      ).toMap
   }
 
   /**
@@ -710,7 +710,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
           stats.min.map(ColumnStatsType.Min.toString -> _),
           stats.max.map(ColumnStatsType.Max.toString -> _)
         ).flatten.toMap
-      )
+      ).toMap
   }
 
   /**

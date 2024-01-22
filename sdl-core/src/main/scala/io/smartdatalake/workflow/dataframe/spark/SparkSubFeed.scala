@@ -115,11 +115,11 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     } else this.copy(filter = None, observation = None)
   }
   override def persist: SparkSubFeed = {
-    this.dataFrame.foreach(_.inner.persist) // Spark's persist & cache can be called without referencing the resulting DataFrame
+    this.dataFrame.foreach(_.inner.persist()) // Spark's persist & cache can be called without referencing the resulting DataFrame
     this
   }
   override def unpersist: SparkSubFeed = {
-    this.dataFrame.foreach(_.inner.unpersist) // Spark's unpersist can be called without referencing the resulting DataFrame
+    this.dataFrame.foreach(_.inner.unpersist()) // Spark's unpersist can be called without referencing the resulting DataFrame
     this
   }
   override def isStreaming: Option[Boolean] = dataFrame.map(_.inner.isStreaming)

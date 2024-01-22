@@ -19,10 +19,11 @@
 
 package io.smartdatalake.meta
 
-import scaladoc.{Markup, Scaladoc, Tag}
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
+import scaladoc.Markup.{CodeBlock, Document, Heading, Paragraph, Span}
+import scaladoc.{Markup, Scaladoc, Tag}
 
-import scala.reflect.runtime.universe.{Annotation, AssignOrNamedArg, typeOf}
+import scala.reflect.runtime.universe.Annotation
 
 private[smartdatalake] object ScaladocUtil {
 
@@ -65,15 +66,27 @@ private[smartdatalake] object ScaladocUtil {
   }
 
   def formatScaladocMarkup(markup: Markup): String = {
-    formatScaladocString(markup.trimmed.plainString)
-      .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
-      .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
+    markup match {
+      case x: Heading => s"\n\n${x.trimmed.plainString}\n\n"
+      case x: Paragraph => s"\n\n${x.trimmed.plainString}"
+      case x: CodeBlock => s"\n${x.trimmed.plainString}\n"
+      case x: Span => s" ${x.trimmed.plainString}"
+      case x: Document =>
+        val contentStr = x.elements.map(formatScaladocMarkup).mkString("")
+        formatScaladocString(contentStr)
+          .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
+          .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
+    }
   }
 
   def extractScalaDoc(annotations: Seq[Annotation]): Option[Scaladoc] = {
-    val rawScaladoc = annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
-      .flatMap(_.tree.children.collectFirst { case x: AssignOrNamedArg => x.rhs.toString })
-    rawScaladoc.map(d => scaladoc.Scaladoc.fromString(d).right.get)
+    import scala.reflect.runtime.universe._
+    val annotation = annotations.find(_.tree.tpe =:= typeOf[ScaladocAnnotation])
+    val rawScalaDoc = annotation.flatMap(_.tree.children.last.children.collectFirst{case Literal(Constant(name: String)) => name}) // In scala 2.12 this is an AssignOrNamedArg, in Scala 2.13 a NamedArg... we need to be dynamic...
+    rawScalaDoc.map { d =>
+      val s = scaladoc.Scaladoc.fromString(d)
+      s.right.getOrElse(throw new IllegalStateException(s"Could not extract Scaladoc from '$d': ${s.left.e}"))
+    }
   }
 
   def getClassScalaDoc(className: String): Option[Scaladoc] = {

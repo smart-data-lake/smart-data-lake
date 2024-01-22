@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,26 +17,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.app
-
-import org.reflections.Reflections
-import scala.jdk.CollectionConverters._
+package io.smartdatalake.util.misc
 
 /**
- * Hooks for modules to interact with sdl-core
+ * Workaround to use scala.collection.parallel.CollectionConverters in Scala 2.12 and Scala 2.13,
+ * see also https://github.com/scala/scala-parallel-collections/issues/22
  */
-trait ModulePlugin {
-
-  /**
-   * Additional spark properties to be added when creating SparkSession.
-   */
-  def additionalSparkProperties(): Map[String,String] = Map()
-}
-
-object ModulePlugin {
-  lazy val modules: Seq[ModulePlugin] = {
-    new Reflections("io.smartdatalake")
-      .getSubTypesOf(classOf[ModulePlugin]).asScala.toSeq
-      .map(_.getDeclaredConstructor().newInstance())
+object CompatParColls {
+  val Converters = {
+    import Compat._
+    {
+      import scala.collection.parallel._
+      CollectionConverters
+    }
+  }
+  object Compat {
+    object CollectionConverters
   }
 }

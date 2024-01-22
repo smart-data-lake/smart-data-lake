@@ -45,7 +45,7 @@ import io.smartdatalake.util.secrets.SecretProvider
  */
 class AzureKeyVaultSecretProvider(keyVaultName: String, azureCredentialBuilderClass: Option[String] = None) extends SecretProvider {
   // alternative constructor
-  def this(options: Map[String, String]) {
+  def this(options: Map[String, String]) = {
     this(
       options.getOrElse("keyVaultName", throw new ConfigurationException(s"Cannot create AzureKeyVaultSecretProvider, option 'keyVaultName' missing.")),
       options.get("azureCredentialBuilderClass")

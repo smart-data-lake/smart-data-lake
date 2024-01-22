@@ -83,7 +83,7 @@ private[smartdatalake] object ProductUtil {
    * Case classes and Maps are formatted as key=value list.
    */
   private[smartdatalake] def formatObj(obj: Any, truncateListLimit: Int = 10): String = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     // recursive function to add an object to the message
     def addObjToBuilder(msg: StringBuilder, inputObj: Any, spacing: Boolean = true): Unit = {

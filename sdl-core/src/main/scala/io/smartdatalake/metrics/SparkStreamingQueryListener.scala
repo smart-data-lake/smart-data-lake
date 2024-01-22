@@ -35,11 +35,13 @@ import scala.collection.mutable
 /**
  * Collect metrics for Spark streaming queries
  * This listener registers and unregisters itself in the spark session.
+ * Method waitForFirstProgress can be used to wait until streaming query made first progress
  */
-class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: DataObjectId, queryName: String, firstProgressWaitLock: Option[Semaphore] = None)(implicit context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
+class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: DataObjectId, queryName: String)(implicit context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
   private var id: UUID = _
   private var isFirstProgress = true
   context.sparkSession.streams.addListener(this) // self-register
+
   override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = {
     if (queryName == event.name) {
       logger.info(s"(${event.name}) streaming query started")
@@ -72,9 +74,23 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
   }
   private def releaseFirstProgressWaitLock(): Unit = {
     if (isFirstProgress) {
-      firstProgressWaitLock.foreach(_.release())
-      isFirstProgress = false
+      logger.debug("releaseFirstProgressWaitLock")
+      synchronized {
+        Thread.`yield`() // give main streaming query thread the chance to finalize progress as well
+        notifyAll()
+        isFirstProgress = false
+      }
     }
+  }
+
+  def waitForFirstProgress(): Unit = {
+    while(isFirstProgress) {
+      logger.debug("waitForFirstProgress")
+      synchronized {
+        if (isFirstProgress) wait()
+      }
+    }
+    logger.debug("waitForFirstProgress passed")
   }
 }
 

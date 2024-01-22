@@ -112,5 +112,5 @@ private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
     // add options as headers
     additionalHeaders = options
   }
-  override private[smartdatalake] def getHeaders = additionalHeaders.mapValues(_.resolve())
+  override private[smartdatalake] def getHeaders = additionalHeaders.mapValues(_.resolve()).toMap
 }

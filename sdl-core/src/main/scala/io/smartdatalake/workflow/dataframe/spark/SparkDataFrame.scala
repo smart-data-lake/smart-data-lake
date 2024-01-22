@@ -77,7 +77,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
-  override def collect: Seq[GenericRow] = inner.collect.map(SparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): SparkSubFeed = {
     SparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
   }
@@ -93,8 +93,8 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.isEmpty
   override def count: Long = inner.count()
-  override def cache: GenericDataFrame = SparkDataFrame(inner.cache)
-  override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist)
+  override def cache: GenericDataFrame = SparkDataFrame(inner.cache())
+  override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist())
   override def showString(options: Map[String,String] = Map()): String = {
     val numRows = options.get("numRows").map(_.toInt).getOrElse(10)
     val truncate = options.get("truncate").map(_.toInt).getOrElse(20)

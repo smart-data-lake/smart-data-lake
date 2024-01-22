@@ -33,7 +33,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 case class SparkUDFCreatorConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate SparkUDFCreator
   private[smartdatalake] val creator: SparkUDFCreator = try {
-    val clazz = Environment.classLoader.loadClass(className)
+    val clazz = Environment.classLoader().loadClass(className)
     val constructor = clazz.getConstructor()
     constructor.newInstance().asInstanceOf[SparkUDFCreator]
   } catch {

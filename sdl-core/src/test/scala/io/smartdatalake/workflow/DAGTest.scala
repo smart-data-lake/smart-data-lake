@@ -62,7 +62,7 @@ class TestEventListener extends DAGEventListener[TestNode] with SmartDataLakeLog
 class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   before {
-    execCntPerNode.clear
+    execCntPerNode.clear()
   }
 
   test("create and run dag: linear unordered") {

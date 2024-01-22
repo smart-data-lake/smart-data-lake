@@ -108,7 +108,7 @@ extends SmartDataLakeLogger {
    * This is using potential hadoop properties defined in sparkOptions.
    */
   def getHadoopConfiguration: Configuration = {
-    PrivateAccessor.getHadoopConfiguration(sparkOptions.map(_.mapValues(_.resolve())).getOrElse(Map()))
+    PrivateAccessor.getHadoopConfiguration(sparkOptions.map(_.mapValues(_.resolve()).toMap).getOrElse(Map()))
   }
 
   /**
@@ -142,7 +142,7 @@ extends SmartDataLakeLogger {
     val moduleOptions = ModulePlugin.modules.map(_.additionalSparkProperties()).reduceOption(mergeSparkOptions).getOrElse(Map())
     // if SDL is case sensitive then Spark should be as well
     val caseSensitivityOptions = Map(SQLConf.CASE_SENSITIVE.key -> Environment.caseSensitive.toString)
-    Seq(moduleOptions, memoryLogOptions, executorPluginOptions, caseSensitivityOptions).reduceOption(mergeSparkOptions).map(_.mapValues(StringOrSecret)).getOrElse(Map())
+    Seq(moduleOptions, memoryLogOptions, executorPluginOptions, caseSensitivityOptions).reduceOption(mergeSparkOptions).map(_.mapValues(StringOrSecret).toMap).getOrElse(Map())
   }
 
   private def checkCaseSensitivityIsConsistent(options: Map[String, StringOrSecret]): Unit = {

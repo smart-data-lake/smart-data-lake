@@ -325,7 +325,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
     val (subFeeds, _): (Seq[SubFeed], Map[RuntimeEventState, Int]) = sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1, srcDO2))(session)
 
     val tgt1DO: SparkSubFeed = subFeeds.head.asInstanceOf[SparkSubFeed]
-    val actual = tgt1DO.dataFrame.get.inner.as[AnotherOutputDataSetPartitioned].collect.head
+    val actual = tgt1DO.dataFrame.get.inner.as[AnotherOutputDataSetPartitioned].collect().head
     assert(actual.added_rating == 15)
     assert(actual.concatenated_name == "johndoe")
     assert(actual.year == "1992")

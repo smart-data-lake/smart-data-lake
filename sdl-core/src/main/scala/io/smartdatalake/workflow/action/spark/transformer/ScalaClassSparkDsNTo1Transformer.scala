@@ -125,7 +125,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     val outputClassType = transformMethod.returnType.typeArgs.head
     val columnsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
-    val resAsDF = resDs.toDF
+    val resAsDF = resDs.toDF()
     val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columnsFromCaseClass.map(col): _*) else resAsDF
 
     if (addPartitionValuesToOutput) {

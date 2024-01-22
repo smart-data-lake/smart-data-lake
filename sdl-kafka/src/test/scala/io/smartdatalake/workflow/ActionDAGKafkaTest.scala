@@ -201,7 +201,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     }
 
     // check there is no data because of delay not yet over.
-    assert(tgt1DO.getSparkDataFrame().count == 0)
+    assert(tgt1DO.getSparkDataFrame().count() == 0)
 
     // second dag run
     {
@@ -216,7 +216,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     }
 
     // check data now written to tgt1
-    assert(tgt1DO.getSparkDataFrame().count == 1)
+    assert(tgt1DO.getSparkDataFrame().count() == 1)
   }
 
 }

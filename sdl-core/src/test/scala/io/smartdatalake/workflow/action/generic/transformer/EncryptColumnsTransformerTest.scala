@@ -120,7 +120,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     val dfEnc = enc.getSparkDataFrame()
     val colName = dfEnc.columns
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
-    val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect.toList
+    val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect().toList
     dfEnc.show(false)
     print(s"### ${enc_type} encrypted dataFrame")
     assert(testCol != Seq("Foo", "Space", "Space"))
@@ -138,7 +138,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
     val colDecName = dfDec.columns
     assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
-    val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect.toList
+    val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect().toList
     assert(testDecCol == Seq("Foo", "Space", "Space"))
     dfEnc
   }

@@ -32,7 +32,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.util
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Dummy spark streaming source
@@ -44,8 +44,8 @@ private[smartdatalake] class DummyStream(schema: StructType) extends MicroBatchS
 
   override def deserializeOffset(json: String): Offset = LongOffset(json.toLong)
   override def planInputPartitions(start: Offset, end: Offset): Array[InputPartition] = throw new NotImplementedError("DummyStream cannot deliver data")
-  override def commit(end: Offset): Unit = Unit
-  override def stop(): Unit = Unit
+  override def commit(end: Offset): Unit = ()
+  override def stop(): Unit = ()
   override def toString: String = s"DummyStream"
   override def initialOffset(): Offset = LongOffset(0)
   override def latestOffset(): Offset = LongOffset(0)
@@ -56,7 +56,7 @@ private[smartdatalake] class DummyStream(schema: StructType) extends MicroBatchS
       new PartitionReader[InternalRow] {
         override def next(): Boolean = false
         override def get(): UnsafeRow = throw new NotImplementedError("DummyStream cannot deliver data")
-        override def close(): Unit = Unit
+        override def close(): Unit = ()
       }
     }
   }
@@ -91,6 +91,6 @@ class DummyStreamProvider extends TableProvider {
 object DummyStreamProvider extends SmartDataLakeLogger {
   def getDummyDf(schema: StructType)(implicit session: SparkSession): DataFrame = {
     logger.debug("creating dummy streaming df")
-    session.readStream.schema(schema).format(classOf[DummyStreamProvider].getName).load
+    session.readStream.schema(schema).format(classOf[DummyStreamProvider].getName).load()
   }
 }

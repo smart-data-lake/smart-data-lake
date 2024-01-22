@@ -33,7 +33,7 @@ import net.schmizz.sshj.sftp.{SFTPClient, SFTPException}
 import java.io.{InputStream, OutputStream}
 import java.nio.file.FileAlreadyExistsException
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 /**

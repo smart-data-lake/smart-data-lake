@@ -76,7 +76,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   }
 
   def test(): Unit = {
-    WithResourcePool.exec(pool){ sftp => Unit } // no operation
+    WithResourcePool.exec(pool){ sftp => () } // no operation
   }
 
   // setup connection pool

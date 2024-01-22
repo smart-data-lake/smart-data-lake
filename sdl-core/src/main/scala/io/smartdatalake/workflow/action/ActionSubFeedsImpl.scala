@@ -111,7 +111,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
             updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result)), Some(transformPartitionValues))
           )
           executionModeResultOptions = result.options
-        case _ => Unit
+        case _ => ()
       }
     }
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
@@ -346,6 +346,6 @@ case class SubFeedExpressionData(partitionValues: Seq[Map[String,String]], isDAG
 case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData])
 object SubFeedsExpressionData {
   def fromSubFeeds(subFeeds: Seq[SubFeed]): SubFeedsExpressionData = {
-    SubFeedsExpressionData(subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).mapValues(_.toString)))).toMap)
+    SubFeedsExpressionData(subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).mapValues(_.toString).toMap))).toMap)
   }
 }

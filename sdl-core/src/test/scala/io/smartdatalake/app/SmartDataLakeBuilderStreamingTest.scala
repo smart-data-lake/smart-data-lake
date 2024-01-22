@@ -141,7 +141,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       val runState = stateStore.recoverRunState(stateId)
       assert(runState.runId >= 3)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id , RuntimeEventState.SKIPPED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues.isEmpty)
@@ -185,7 +185,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -201,12 +201,12 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
               case 2 =>
                 // stop streaming query
                 logger.info("stopping streaming query")
-                session.streams.active.find(_.name == event.progress.name).get.stop
-              case _ => Unit
+                session.streams.active.find(_.name == event.progress.name).get.stop()
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -241,7 +241,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       // only one SDL run executed (streaming action is asynchronous)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId,s.state))
+      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId,s.state)).toMap
       val expectedActionsState = Map((action1.id, (SDLExecutionId(1), RuntimeEventState.SUCCEEDED))) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
       assert(resultActionsState == expectedActionsState)
       assert(getFirstMetrics(runState.actionsState(action1.id))("records_written") == 1)
@@ -292,7 +292,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -309,11 +309,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
-              case _ => Unit
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -374,7 +374,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -391,11 +391,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
-              case _ => Unit
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -465,7 +465,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -481,7 +481,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -625,7 +625,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener: StreamingQueryListener = new StreamingQueryListener {
       var dfSrc2Written = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -642,11 +642,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
-              case _ => Unit
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 

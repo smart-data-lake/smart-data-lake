@@ -170,7 +170,7 @@ class DataFrameUtilTest extends org.scalatest.FunSuite with Matchers with SmartD
   }
 
   test("isSchemaEqual_complex_different_order") {
-    assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplex.select(dfComplex.columns.reverseMap(col):_*)))
+    assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplex.select(dfComplex.columns.reverseIterator.map(col).toSeq:_*)))
   }
 
   // other tests

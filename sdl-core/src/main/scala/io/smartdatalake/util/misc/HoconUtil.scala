@@ -21,7 +21,7 @@ package io.smartdatalake.util.misc
 
 import com.typesafe.config.{ConfigList, ConfigObject, ConfigValue, ConfigValueFactory, ConfigValueType}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object HoconUtil {
 
@@ -87,7 +87,7 @@ object HoconUtil {
         val elements = value.asInstanceOf[ConfigList].asScala.zipWithIndex
         elements.flatMap {
           case (value, idx) => findInConfigEntry(idx.toString, value, conditionFn, path :+ s"[$idx]")
-        }
+        }.toSeq
       // we are looking for className and type attributes
       case _ =>
         if (conditionFn(key,value)) Seq(path) // found! return configuration path

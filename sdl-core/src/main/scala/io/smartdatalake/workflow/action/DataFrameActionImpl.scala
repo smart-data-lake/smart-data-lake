@@ -168,7 +168,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             // validate partition values existing for input
             input match {
               case partitionedInput: DataObject with CanHandlePartitions => validatePartitionValuesExisting(partitionedInput, subFeed)
-              case _ => Unit
+              case _ => ()
             }
             // check if data is existing, otherwise create empty dataframe for recursive input
             val isDataExisting = input match {
@@ -297,17 +297,13 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         assert(subFeed.isStreaming.getOrElse(false), s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
         // check if streaming query already started. This is needed if dag is restarted for pseudo-streaming.
         if (sparkStreamingQuery.isEmpty) {
-          // initialize listener to release lock after first progress
-          // semaphore with size=1 used as Lock.
-          val firstProgressWaitLock = new Semaphore(1)
           // add metrics listener for this action if not yet done
           val queryName = getStreamingQueryName(output.id)
-          new SparkStreamingQueryListener(this, output.id, queryName, Some(firstProgressWaitLock)) // self-registering, listener will release firstProgressWaitLock after first progress event.
+          val queryListener = new SparkStreamingQueryListener(this, output.id, queryName) // self-registering, listener will release firstProgressWaitLock after first progress event.
           // start streaming query
           val streamingQueryLocalVal = output.writeStreamingDataFrame(subFeed.dataFrame.get, m.trigger, m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
           // wait for first progress
-          firstProgressWaitLock.acquire() // empty semaphore
-          firstProgressWaitLock.acquire() // wait for SparkStreamingQueryListener releasing a semaphore permit
+          queryListener.waitForFirstProgress()
           streamingQueryLocalVal.exception.foreach(throw _) // throw exception if failed
           val queryProgress = streamingQueryLocalVal.lastProgress
           val streamingMetrics = SparkStreamingMetrics(queryProgress)
@@ -325,11 +321,13 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         assert(subFeed.isStreaming.getOrElse(false), s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")
         // add metrics listener for this action if not yet done
         val queryName = getStreamingQueryName(output.id)
-        new SparkStreamingQueryListener(this, output.id, queryName)
+        val queryListener = new SparkStreamingQueryListener(this, output.id, queryName)
         // start streaming query - use Trigger.Once for synchronous one-time execution
         val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once(), m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
         // wait for termination
-        streamingQuery.awaitTermination
+        streamingQuery.awaitTermination()
+        // wait for first progress (otherwise metrics might not yet be ready)
+        queryListener.waitForFirstProgress()
         val queryProgress = streamingQuery.lastProgress
         val streamingMetrics = SparkStreamingMetrics(queryProgress)
         if (streamingMetrics.noData) logger.info(s"($id) no data to process for ${output.id} in first micro-batch streaming mode")

@@ -137,7 +137,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     df match {
       // TODO: initSparkDataFrame has empty implementation
       case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
-      case sparkDf: SnowparkDataFrame => Unit
+      case sparkDf: SnowparkDataFrame => ()
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
     }
   }
@@ -205,7 +205,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
     // retrieve metrics from result scan
     val dfResultScan = snowparkSession.sql(s"SELECT * FROM TABLE(RESULT_SCAN(${asyncWriter.getQueryId()}))")
-    dfResultScan.first.map(row => dfResultScan.schema.names.map(_.toLowerCase.replace(" ","_")).zip(row.toSeq).toMap).getOrElse(Map())
+    dfResultScan.first().map(row => dfResultScan.schema.names.map(_.toLowerCase.replace(" ","_")).zip(row.toSeq).toMap).getOrElse(Map())
       // standardize naming
       .map {
         case ("number_of_rows_inserted", v) => "rows_inserted" -> v
