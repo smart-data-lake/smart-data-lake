@@ -87,7 +87,7 @@ object HoconUtil {
         val elements = value.asInstanceOf[ConfigList].asScala.zipWithIndex
         elements.flatMap {
           case (value, idx) => findInConfigEntry(idx.toString, value, conditionFn, path :+ s"[$idx]")
-        }
+        }.toSeq
       // we are looking for className and type attributes
       case _ =>
         if (conditionFn(key,value)) Seq(path) // found! return configuration path

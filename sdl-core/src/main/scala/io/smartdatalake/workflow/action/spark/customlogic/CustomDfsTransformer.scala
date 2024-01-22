@@ -112,7 +112,7 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
     if (transformMethod.returnType =:= typeOf[Map[String, DataFrame]]) {
       transformResult.asInstanceOf[Map[String, DataFrame]]
     } else if (transformMethod.returnType <:< typeOf[Map[String, Dataset[_]]]) {
-      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF)
+      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF).toMap
     } else if (transformMethod.returnType =:= typeOf[DataFrame]) {
       require(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
       Map(options(OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
