@@ -166,6 +166,18 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
             .map(mirror.classSymbol)
           logger.debug(s"ParsableFromConfig ${baseCls.getSimpleName} has sub types ${subTypeClssSym.map(_.name.toString)}")
           JsonOneOfDef(subTypeClssSym.map(c => addTypeProperty(fromCaseClass(c), c.fullName)).toSeq, description, deprecated = isDeprecated)
+        case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
+          val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
+          assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
+          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString.trim).toSeq), deprecated = isDeprecated)
+        case t if t.typeSymbol.asClass.isJavaEnum =>
+          // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
+          val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
+          val firstClassNamePart = classNamePartsIterator.takeWhile(_.head.isLower)
+          val javaEnumClassName = (firstClassNamePart :+ classNamePartsIterator.drop(firstClassNamePart.length).mkString("$")).mkString(".")
+          val enumValues = getClass.getClassLoader.loadClass(javaEnumClassName).getEnumConstants.map(_.toString)
+          assert(enumValues.nonEmpty, s"Java enum values for ${t.typeSymbol.fullName}/$javaEnumClassName not found")
+          JsonStringDef(description, enum = Some(enumValues.toSeq), deprecated = isDeprecated)
         case t if t.typeSymbol.asClass.isSealed =>
           val subTypeClss = t.typeSymbol.asClass.knownDirectSubclasses
           logger.debug(s"Sealed trait ${t.typeSymbol.fullName} has sub types ${subTypeClss.map(_.name.toString)}")
@@ -186,18 +198,6 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
             case 2 => throw new IllegalStateException(s"Key type for Map must be String, but is ${t.typeArgs.head.typeSymbol.fullName}")
             case _ => throw new IllegalStateException(s"Can not handle List with elements of type ${t.typeArgs.map(_.typeSymbol.fullName).mkString(",")}")
           }
-        case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
-          val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
-          assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
-          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString.trim).toSeq), deprecated = isDeprecated)
-        case t if t.typeSymbol.asClass.isJavaEnum =>
-          // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
-          val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
-          val firstClassNamePart = classNamePartsIterator.takeWhile(_.head.isLower)
-          val javaEnumClassName = (firstClassNamePart :+ classNamePartsIterator.drop(firstClassNamePart.length).mkString("$")).mkString(".")
-          val enumValues = getClass.getClassLoader.loadClass(javaEnumClassName).getEnumConstants.map(_.toString)
-          assert(enumValues.nonEmpty, s"Java enum values for ${t.typeSymbol.fullName}/$javaEnumClassName not found")
-          JsonStringDef(description, enum = Some(enumValues.toSeq), deprecated = isDeprecated)
         case t =>
           logger.warn(s"Json schema creator for ${t.typeSymbol.fullName} missing. Creating type as existingJavaType.")
           JsonStringDef(description, existingJavaType = Some(t.typeSymbol.fullName), deprecated = isDeprecated)
