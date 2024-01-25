@@ -26,7 +26,7 @@ dataObjects {
   testDataObject {
     ...
     constraints = [{
-      name = A shold be smaller than B
+      name = A should be smaller than B
       description = "If A is bigger than B we have a problem because of ..."
       expression = "a < b"
       errorMsgCols = [id, a, b]
