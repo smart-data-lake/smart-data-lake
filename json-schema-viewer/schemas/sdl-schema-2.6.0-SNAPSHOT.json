@@ -643,7 +643,9 @@
                 "description" : "proxy port"
               },
               "proxyType" : {
-                "description" : "Type of proxy: HTTP or SOCKS. Default is HTTP."
+                "type" : "string",
+                "description" : "Type of proxy: HTTP or SOCKS. Default is HTTP.",
+                "enum" : [ "DIRECT", "HTTP", "SOCKS" ]
               }
             },
             "title" : "JavaNetProxyConfig",
