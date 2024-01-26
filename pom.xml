@@ -180,7 +180,7 @@
             </activation>
             <properties>
                 <scala.minor.version>2.12</scala.minor.version>
-                <scala.version>${scala.minor.version}.15</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+                <scala.version>${scala.minor.version}.18</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
             </properties>
         </profile>
         <profile>
