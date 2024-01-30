@@ -456,7 +456,7 @@
         <snowflake-spark.version>2.15.0</snowflake-spark.version>
         <snowflake-snowpark.version>1.11.0</snowflake-snowpark.version>
         <keycloak.version>22.0.1</keycloak.version>
-        <delta.version>2.4.0</delta.version>
+        <delta.version>3.0.0</delta.version>
         <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
         <iceberg.version>1.3.1</iceberg.version>
 
@@ -2974,7 +2974,7 @@
             </dependency>
             <dependency>
                 <groupId>io.delta</groupId>
-                <artifactId>delta-core_${scala.minor.version}</artifactId>
+                <artifactId>delta-spark_${scala.minor.version}</artifactId>
                 <version>${delta.version}</version>
             </dependency>
 
