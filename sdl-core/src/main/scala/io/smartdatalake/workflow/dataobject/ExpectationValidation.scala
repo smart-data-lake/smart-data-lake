@@ -24,6 +24,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
+import io.smartdatalake.workflow.dataobject.ExpectationValidation.defaultExpectations
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 
 import java.util.UUID
@@ -69,8 +70,6 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     if (expectations.exists(_.scope != ExpectationScope.Job)) (dfJobExpectations.cache, observation)
     else (dfJobExpectations, observation)
   }
-
-  private val defaultExpectations = Seq(SQLExpectation(name = "count", aggExpression = "count(*)" ))
 
   /**
    * Collect metrics for expectations with scope = JobPartition
@@ -179,11 +178,12 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
 
   protected def forceGenericObservation = false
   private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, DataFrameObservation) = {
-    val (dfObserved, observation) = df.setupObservation(this.id + "-" + UUID.randomUUID(), expectationColumns, isExecPhase, forceGenericObservation)
+    val (dfObserved, observation) = df.setupObservation(this.id + "#" + UUID.randomUUID(), expectationColumns, isExecPhase, forceGenericObservation)
     (dfObserved, observation)
   }
 }
 
 object ExpectationValidation {
   private[smartdatalake] final val partitionDelimiter = "#"
+  private[smartdatalake] val defaultExpectations = Seq(SQLExpectation(name = "count", aggExpression = "count(*)" ))
 }

@@ -23,6 +23,7 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOp
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
+import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
@@ -216,7 +217,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics
     val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "countAll" -> 1, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None))
+    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 1, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None))
 
     // add another record & process
     val l2 = Seq(("dau", "peter", 5)).toDF("lastname", "firstname", "rating")
@@ -226,7 +227,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics - countAll should be 2 now, but count should stay 1
     val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#dau" -> 1, "countAll" -> 2, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None))
+    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0, "countPerPartition#dau" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 2, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None))
 
     // fail constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
@@ -235,7 +236,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDOConstraintFail)
     val actionConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
     val ex1 = intercept[TaskFailedException](actionConstraintFail.exec(Seq(srcSubFeed))(contextExec))
-    assert(ex1.cause.isInstanceOf[RuntimeException])
+    assert(getRootCause(ex1).isInstanceOf[RuntimeException])
      
     // fail expectation evaluation
     val tgtDOExpectationFail = HiveTableDataObject( "tgt1expectationFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
@@ -244,7 +245,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDOExpectationFail)
     val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)
     val ex2 = intercept[TaskFailedException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
-    assert(ex2.cause.isInstanceOf[ExpectationValidationException])
+    assert(getRootCause(ex2).isInstanceOf[ExpectationValidationException])
   }
 
 

@@ -30,10 +30,11 @@ trait DataFrameObservation {
    *
    * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
    *                   timeoutSec can be ignored if the Observation implementation is calculating results.
+   * @param otherMetricsPrefix metric name prefix of others metrics to extract if possible. This is used to extract spark observations setup independently, using ActionId as prefix.
    * @return the observed metrics as a `Map[String, Any]`
    */
   @throws[InterruptedException]
-  def waitFor(timeoutSec: Int = 10): Map[String, _]
+  def waitFor(timeoutSec: Int = 10, otherMetricsPrefix: Option[String] = None): Map[String, _]
 
 }
 
@@ -43,7 +44,7 @@ trait DataFrameObservation {
  * For Snowpark this is the only method to observe metrics.
  */
 private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFrame, aggregateColumns: GenericColumn*) extends DataFrameObservation {
-  override def waitFor(timeoutSec: Int): Map[String, _] = {
+  override def waitFor(timeoutSec: Int, otherMetricsPrefix: Option[String] = None): Map[String, _] = {
     // calculate aggregate expressions on DataFrame
     val dfObservations = df.agg(aggregateColumns)
     val metricsRow = dfObservations.collect.headOption

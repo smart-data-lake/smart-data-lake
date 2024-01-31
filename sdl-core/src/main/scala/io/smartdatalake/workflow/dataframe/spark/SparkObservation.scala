@@ -29,10 +29,10 @@ import java.util.UUID
 
 
 /**
- * This code is inspired from Spark 3.3.0 when it was not yet released (and simplified).
- * See https://github.com/apache/spark/blob/v3.3.0-rc1/sql/core/src/main/scala/org/apache/spark/sql/Observation.scala
+ * This code is inspired from org.apache.spark.sql.Observation.
  *
- * Note: the name is used to make metrics unique across parallel queries in the same Spark session
+ * Note 1: Observations are not supported streaming Datasets
+ * Note 2: the name is used to make metrics unique across parallel queries in the same Spark session
  */
 private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends DataFrameObservation with SmartDataLakeLogger {
 
@@ -40,24 +40,25 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
 
   @volatile private var sparkSession: Option[SparkSession] = None
 
-  @volatile private var metrics: Option[Map[String, Any]] = None
+  @volatile private var metrics: Option[Map[String, Row]] = None
 
   def on[T](ds: Dataset[T], registerListener: Boolean, exprs: Column*): Dataset[T] = {
-    if (ds.isStreaming) throw new IllegalArgumentException("SparkObservation does not support streaming Datasets")
+    // check this is no streaming Dataset. It would need registering a StreamingQueryListener instead of a QueryExecutionListener.
+    if (ds.isStreaming) throw new IllegalArgumentException("SparkObservation does not yet support streaming Datasets")
     sparkSession = Some(ds.sparkSession)
     if (registerListener) ds.sparkSession.listenerManager.register(listener)
     ds.observe(name, exprs.head, exprs.tail: _*)
   }
 
   /**
-   * Get the observed metrics. This waits for the observed dataset to finish its first action.
-   * Only the result of the first action is available. Subsequent actions do not modify the result.
+   * Get the observed metrics. This waits for the observed dataset to finish and deliver metrics with the name of this SparkObservation.
    *
    * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
+   * @param otherMetricsPrefix metric name prefix of others metrics to extract if possible. This is used to extract spark observations setup independently, using ActionId as prefix.
    * @return the observed metrics as a `Map[String, Any]`
    */
   @throws[InterruptedException]
-  def waitFor(timeoutSec: Int = 10): Map[String, _] = {
+  def waitFor(timeoutSec: Int = 10, otherMetricsPrefix: Option[String] = None): Map[String, _] = {
     synchronized {
       // we need to loop as wait might return without us calling notify
       // https://en.wikipedia.org/w/index.php?title=Spurious_wakeup&oldid=992601610
@@ -68,23 +69,32 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
         if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"SparkObservation $name did not receive metrics within timeout of $timeoutSec seconds.")
       }
     }
-    metrics.get.mapValues(Option(_).getOrElse(Option.empty[Any])).toMap // if null convert to None
+    extractMetrics(otherMetricsPrefix)
+  }
+
+  def extractMetrics(otherMetricsPrefix: Option[String] = None): Map[String, _] = {
+    // if metric with observation name found, also get other metrics whose name starts with otherMetricsPrefix, e.g. observations for input records count, or custom observations in user Spark code.
+    metrics.getOrElse(Map())
+      .filterKeys(k => k == name || otherMetricsPrefix.exists(k.startsWith)).toMap
+      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherMetricsPrefix.map(name.stripPrefix).getOrElse(name), e))}
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {
     synchronized {
-      //TODO: streaming: reset metrics for each microbatch
-      if (metrics.isEmpty) {
-        val row = qe.observedMetrics.get(name)
-        metrics = row.map(r => r.getValuesMap[Any](r.schema.fieldNames))
-        if (metrics.isDefined) {
-          notifyAll()
-          sparkSession.foreach(_.listenerManager.unregister(listener))
-        } else {
-          if (logger.isDebugEnabled && qe.observedMetrics.nonEmpty) logger.debug(s"($name) received unexpected metric "+qe.observedMetrics)
-        }
+      val observedMetrics = qe.observedMetrics
+      if (metrics.isEmpty && observedMetrics.isDefinedAt(name)) {
+        logger.debug(s"got observations: ${observedMetrics.keys.mkString(", ")}")
+        metrics = Some(qe.observedMetrics)
+        notifyAll()
+        sparkSession.foreach(_.listenerManager.unregister(listener))
       }
     }
+  }
+
+  private def createMetric(observationName: String, observation: (String,Any)) = {
+    val (k,v) = observation
+    val metricName = if (observationName==name) k else s"$k#${observationName.stripSuffix("!tolerant")}"
+    (metricName, Option(v).getOrElse(None)) // if value is null convert to None
   }
 }
 

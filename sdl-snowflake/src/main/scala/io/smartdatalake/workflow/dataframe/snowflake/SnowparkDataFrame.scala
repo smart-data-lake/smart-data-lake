@@ -25,7 +25,7 @@ import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Ro
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -35,7 +35,7 @@ import org.json4s.JsonAST.JValue
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
+case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with SmartDataLakeLogger {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def schema: SnowparkSchema = SnowparkSchema(inner.schema)
   override def join(other: GenericDataFrame, joinCols: Seq[String]): SnowparkDataFrame = {
@@ -107,6 +107,10 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this.cache, observation)
+  }
+  override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
+    logger.warn("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")
+    this
   }
   override def apply(columnName: String): GenericColumn = SnowparkColumn(inner.apply(columnName))
 }

@@ -23,7 +23,7 @@ import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.HadoopFileConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
 
@@ -94,6 +94,29 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
 
     val result = doSrc1.getSparkDataFrame()
     assert(result.count() == 3)
+  }
+
+
+  test("read parquet file check push-down filter with input count observation") {
+
+    val config = ConfigFactory.parseString(s"""
+                                              | id = src1
+                                              | path = "${escapedFilePath(tempPath)}"
+                                              | filenameColumn = _filename
+         """.stripMargin)
+
+    val doSrc1 = ParquetFileDataObject.fromConfig(config)
+    doSrc1.writeSparkDataFrame(testDf, Seq())
+    val (df, observation) = doSrc1.getDataFrame(Seq(), SparkSubFeed.subFeedType)(contextExec)
+      .observe("test#input!tolerant", Seq(SparkSubFeed.count(SparkSubFeed.lit("*")).as("count")), isExecPhase = true)
+      .where(SparkSubFeed.col("str")===SparkSubFeed.lit("test"))
+      .setupObservation("final", Seq(SparkSubFeed.count(SparkSubFeed.lit("*")).as("count")), isExecPhase = true)
+
+    assert(df.count == 0) // no results expected
+
+    val metrics = observation.waitFor(otherMetricsPrefix = Some("test#"))
+    assert(metrics("count") == 0) // this is the final count
+    assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)
   }
 
   testsFor(readNonExistingSources(createDataObject, fileExtension = ".parquet"))

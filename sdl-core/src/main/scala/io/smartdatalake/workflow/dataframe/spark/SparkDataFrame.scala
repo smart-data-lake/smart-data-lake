@@ -122,6 +122,14 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       (SparkDataFrame(dfObserved), observation)
     }
   }
+
+  def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
+    val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
+    val dfObserved = inner.observe(name, sparkAggregatedColumns.head, sparkAggregatedColumns.tail: _*)
+    SparkDataFrame(dfObserved)
+  }
+
   override def apply(columnName: String): GenericColumn = SparkColumn(inner.apply(columnName))
 }
 

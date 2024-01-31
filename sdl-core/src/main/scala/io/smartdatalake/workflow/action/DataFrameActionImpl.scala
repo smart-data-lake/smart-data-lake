@@ -249,6 +249,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // enrich with fresh DataFrame if needed
     preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive)
+    // add count observation. Observation name must include action id because DataFrames might be passed on from previous actions and might read the same DataObject.
+    if (Environment.enableInputDataObjectCount) {
+      val aggExpressions = ExpectationValidation.defaultExpectations.flatMap(_.getAggExpressionColumns(subFeed.dataObjectId))
+      preparedSubFeed = preparedSubFeed.withDataFrame(preparedSubFeed.dataFrame.map(_.observe(s"${id.id}#${subFeed.dataObjectId.id}!tolerant", aggExpressions, context.isExecPhase))) // "!tolerant" suffix marks the observation to allow filter push down over CollectMetrics operation, see also SDLSparkExtension.
+    }
     // return
     preparedSubFeed
   }
@@ -281,7 +286,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // get expectations metrics and check violations
     outputSubFeed = output match {
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
-        val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
+        var scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor(otherMetricsPrefix = Some(id.id+"#"))).getOrElse(Map())
+        scopeJobExpectationMetrics = enrichJobExpectationMetrics(scopeJobExpectationMetrics, output.id)
         val (metrics,exceptions) = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
         outputSubFeed = outputSubFeed.appendMetrics(metrics).asInstanceOf[DataFrameSubFeed]
         // throw first validation exceptions if any, enriched with metrics...
@@ -298,6 +304,21 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     if (count.contains(0) || (count.isEmpty && recordsWritten.contains(0))) outputSubFeed = outputSubFeed.appendMetrics(Map[String,Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
     // return
     outputSubFeed
+  }
+
+  def enrichJobExpectationMetrics(metrics: Map[String, _], outputId: DataObjectId): Map[String, _] = {
+    val mainInputCountKey = s"count#${prioritizedMainInputCandidates.head.id.id}"
+    var enrichedMetrics = metrics
+    // copy count#mainInput metric on mainOutput from corresponding input metric
+    if (outputId == mainOutput.id && metrics.isDefinedAt(mainInputCountKey)) {
+      enrichedMetrics = enrichedMetrics + ("count#mainInput" -> metrics(mainInputCountKey))
+    }
+    // calculate pctTransfer on mainOutput, if count on output and mainInput is available.
+    if (outputId == mainOutput.id && metrics.isDefinedAt("count") && metrics.isDefinedAt(mainInputCountKey)) {
+      // transferPct is rounded off to 4 digits to show better if something is missing.
+      enrichedMetrics = enrichedMetrics + ("pctTransfer" -> Math.floor(metrics("count").asInstanceOf[Long].toDouble / metrics(mainInputCountKey).asInstanceOf[Long] * 10000) / 10000)
+    }
+    enrichedMetrics
   }
 
   /**

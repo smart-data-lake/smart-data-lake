@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.col
+import scala.jdk.CollectionConverters._
 
 /**
  * Partitioned transactional mock data object.
@@ -68,11 +69,14 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
     assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
     assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
 
+    // recreate DataFrame to truncate logical plan to avoid side-effects in tests
+    val newDf = context.sparkSession.createDataFrame(df.collect.toSeq.asJava, df.schema)
+
     if (partitions.nonEmpty) {
       // mimick partition overwrite
       val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) PartitionValues.fromDataFrame(SparkDataFrame(df.select(partitions.map(col):_*)))
       else partitionValues
-      val newDataFrames = inferredPartitionValues.map(pv => (pv, df.where(getPartitionValueFilter(pv)))).toMap
+      val newDataFrames = inferredPartitionValues.map(pv => (pv, newDf.where(getPartitionValueFilter(pv)))).toMap
       partitionedDataFrameMock = Some(
         partitionedDataFrameMock.getOrElse(Map()) ++ newDataFrames
       )
@@ -80,11 +84,11 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
       dataFrameMock = None
     } else {
       // overwrite all
-      dataFrameMock = Some(df)
+      dataFrameMock = Some(newDf)
       partitionValuesMock = Set()
       partitionedDataFrameMock = None
     }
-    Map("records_written" -> df.collect().length) // enforce evaluate all columns by '.collect', so that constraints or RuntimeFailTransformer work as expected
+    Map("records_written" -> newDf.collect().length) // enforce evaluate all columns by '.collect', so that constraints or RuntimeFailTransformer work as expected
   }
 
   def register(implicit instanceRegistry: InstanceRegistry): MockDataObject = {
