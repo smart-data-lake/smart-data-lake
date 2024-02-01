@@ -269,6 +269,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt is not properly supported.
   // We test for failure to be notified once it is working...
+  // Once this works again, also enable 3rd load in IcebergHistorizeWithMergeActionTest and IcebergDeduplicateWithMergeActionTest test cases again
   test("SaveMode merge with schema evolution - fails in deltalake 1.x") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("tpe","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
@@ -301,6 +302,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
   // We test for failure to be notified once it is working...
+  // Once this works again, also enable 3rd load in IcebergHistorizeWithMergeActionTest and IcebergDeduplicateWithMergeActionTest test cases again
   test("SaveMode merge with updateCols and schema evolution - fails in deltalake 1.x") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("tpe","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
