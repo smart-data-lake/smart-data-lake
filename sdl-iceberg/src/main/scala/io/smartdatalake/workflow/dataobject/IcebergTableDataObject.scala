@@ -438,7 +438,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Iceberg as a write option 'mergeSchema' (see also SparkWriteOptions.MERGE_SCHEMA),
+   * Iceberg has a write option 'mergeSchema' (see also SparkWriteOptions.MERGE_SCHEMA),
    * but it doesnt work as there is another validation before that checks the schema (e.g. QueryCompilationErrors$.cannotWriteTooManyColumnsToTableError in the stack trace)
    * This code is therefore copied from SparkWriteBuilder.validateOrMergeWriteSchema:246ff
    */

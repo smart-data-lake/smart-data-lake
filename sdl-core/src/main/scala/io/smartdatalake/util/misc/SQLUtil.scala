@@ -51,8 +51,7 @@ object SQLUtil {
     val joinConditionStr = targetTable.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
     val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
     val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
-    val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(columns.diff(targetTable.primaryKey.get)).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
-
+    val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(columns).diff(targetTable.primaryKey.get).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
     val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
     val insertCols = columns.diff(saveModeOptions.insertColumnsToIgnore)
     val insertSpecStr = insertCols.map(quoteCaseSensitiveColumn).reduce(_+", "+_)
