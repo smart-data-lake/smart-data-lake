@@ -471,7 +471,7 @@
         <sonar.organization>smart-data-lake</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <scoverage.plugin.version>2.0.2</scoverage.plugin.version>
-        <scoverage.scalacPluginVersion>2.0.2</scoverage.scalacPluginVersion>
+        <scoverage.scalacPluginVersion>2.0.11</scoverage.scalacPluginVersion>
 
     </properties>
 
