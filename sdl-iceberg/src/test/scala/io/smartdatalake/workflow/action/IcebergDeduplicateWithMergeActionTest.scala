@@ -52,7 +52,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
     val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname","firstname")))
-    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
+    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -94,12 +94,18 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     }
 
     // prepare & start 3rd load with schema evolution
+    // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
+    // See also last two tests in IcebergTableDataObjectTest.
+    /*
     val refTimestamp3 = LocalDateTime.now()
     val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+    val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
+    instanceRegistry.register(tgtDOwithSchemaEvolution)
+    val action3 = action1.copy(outputId = tgtDOwithSchemaEvolution.id)
     val l3 = Seq(("doe", "john", 11)).toDF("lastname", "firstname", "rating2")
     srcDO.writeSparkDataFrame(l3, Seq())(context3)
-    action1.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context3)
+    action3.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
+    action3.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context3)
 
     {
       val expected = Seq(("doe", "john", 10, Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", 5, None, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, None, Timestamp.valueOf(refTimestamp1)))
@@ -109,6 +115,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
+    */
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
@@ -117,7 +124,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     val srcDO = MockDataObject("src1").register
     instanceRegistry.register(srcDO)
     val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname","firstname")))
-    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
+    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -160,12 +167,18 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     }
 
     // prepare & start 3rd load with schema evolution
+    // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
+    // See also last two tests in IcebergTableDataObjectTest.
+    /*
     val refTimestamp3 = LocalDateTime.now()
     val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+    val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true)
+    instanceRegistry.register(tgtDOwithSchemaEvolution)
+    val action3 = action1.copy(outputId = tgtDOwithSchemaEvolution.id)
     val l3 = Seq(("doe", "john", 11)).toDF("lastname", "firstname", "rating2")
     srcDO.writeSparkDataFrame(l3, Seq())(context3)
-    action1.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context3)
+    action3.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
+    action3.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context3)
 
     {
       val expected = Seq(("doe", "john", Some(10), Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", Some(5), None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), None, Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), None, Timestamp.valueOf(refTimestamp1)))
@@ -175,5 +188,6 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
+    */
   }
 }
