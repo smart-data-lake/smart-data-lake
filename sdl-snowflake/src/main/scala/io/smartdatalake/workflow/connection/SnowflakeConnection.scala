@@ -39,6 +39,7 @@ import java.sql.ResultSet
  * @param database  Snowflake database
  * @param role      Snowflake role
  * @param authMode  optional authentication information: for now BasicAuthMode is supported.
+ * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
  * @param metadata  Connection metadata
  */
 case class SnowflakeConnection(override val id: ConnectionId,
@@ -47,6 +48,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                database: String,
                                role: String,
                                authMode: AuthMode,
+                               sparkOptions: Map[String, String] = Map(),
                                override val metadata: Option[ConnectionMetadata] = None
                               ) extends Connection with SmartDataLakeLogger {
 
@@ -56,10 +58,10 @@ case class SnowflakeConnection(override val id: ConnectionId,
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
-    Utils.runQuery(getSnowflakeOptions(""), sql)
+    Utils.runQuery(getSnowflakeAuthOptions(""), sql)
   }
 
-  def getSnowflakeOptions(schema: String): Map[String, String] = {
+  def getSnowflakeAuthOptions(schema: String): Map[String, String] = {
     authMode match {
       case m: BasicAuthMode =>
         Map(
