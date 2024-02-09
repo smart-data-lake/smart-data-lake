@@ -39,7 +39,7 @@ import org.apache.spark.sql.functions.col
  * PartitionValues are inferred if parameter of writeSparkDataFrame is empty.
  * writeSparkDataFrame mimicks overwrite mode, also for partitions.
  */
-case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(), override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None) extends DataObject with CanHandlePartitions with TransactionalTableDataObject {
+case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(), override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None, tableName: String = "mock") extends DataObject with CanHandlePartitions with TransactionalTableDataObject {
 
   // variables to store mock values. They are filled using writeSparkDataFrame
   private var dataFrameMock: Option[DataFrame] = None
@@ -84,7 +84,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
   override val metadata: Option[DataObjectMetadata] = None
   override val options: Map[String,String] = Map()
 
-  override var table: Table = Table(Some("mock"), id.id, primaryKey = primaryKey)
+  override var table: Table = Table(Some("mock"), tableName, primaryKey = primaryKey)
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = true
 
