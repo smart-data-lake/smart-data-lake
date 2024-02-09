@@ -53,6 +53,8 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param comment      An optional comment to add to the table after writing a DataFrame to it
+ * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
+ *                     These options override connection.options.
  * @param metadata     meta data
  */
 // TODO: we should add virtual partitions as for JdbcTableDataObject and KafkaDataObject, so that PartitionDiffMode can be used...
@@ -63,6 +65,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val expectations: Seq[Expectation] = Seq(),
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
+                                    sparkOptions: Map[String, String] = Map(),
                                     comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -86,13 +89,16 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   // Using generic observations is forced therefore.
   override val forceGenericObservation = true
 
+  private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
+
   // Get a Spark DataFrame with the table contents for Spark transformations
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> fullyQualifiedTableName))
     val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getSnowflakeOptions(table.db.get))
+      .options(connection.getSnowflakeAuthOptions(table.db.get))
+      .options(instanceSparkOptions)
       .options(queryOrTable)
       .load()
     df
@@ -118,7 +124,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
       df.write
         .format(SNOWFLAKE_SOURCE_NAME)
-        .options(connection.getSnowflakeOptions(table.db.get))
+        .options(connection.getSnowflakeAuthOptions(table.db.get))
+        .options(instanceSparkOptions)
         .options(Map("dbtable" -> fullyQualifiedTableName))
         .mode(SparkSaveMode.from(finalSaveMode))
         .save()
@@ -199,7 +206,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     // TODO: merge mode not yet implemented
     assert(saveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
 
-    // use asynchronous writier to get query id
+    // use asynchronous writer to get query id
     val asyncWriter = df.write.mode(SnowparkSaveMode.from(saveMode)).async.saveAsTable(table.fullName)
     asyncWriter.getResult()
 
