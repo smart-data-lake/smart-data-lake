@@ -316,13 +316,15 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
       case SDLSaveMode.Append =>
         // write target table with SaveMode.Append
-        val metrics = writeDataFrameInternalWithAppend(df, table.fullName)
+        val metrics = writeDataFrameInternal(df, table.fullName, SaveMode.Append)
         metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
     }
   }
 
   private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): MetricsMap = {
-    try {
+    if (connection.directTableOverwrite) {
+      writeDataFrameInternal(df, table.fullName, SaveMode.Overwrite)
+    } else try {
       // create & write to temp-table
       val tableSchema = getExistingSchema.get
       val metrics = writeToTempTable(df, tableSchema)
@@ -360,7 +362,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
     // create & write to temp-table
     connection.createTableFromSchema(tmpTable.fullName, tempTableSchema, options)
-    writeDataFrameInternalWithAppend(df, tmpTable.fullName)
+    writeDataFrameInternal(df, tmpTable.fullName, SaveMode.Append)
   }
 
   /**
@@ -388,10 +390,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  private def writeDataFrameInternalWithAppend(df: DataFrame, tableName: String)(implicit context: ActionPipelineContext): MetricsMap = {
+  private def writeDataFrameInternal(df: DataFrame, tableName: String, saveMode: SaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     // No need to define any partitions as parallelization will be defined according to the data frame's partitions
     SparkStageMetricsListener.execWithMetrics(this.id,
-      df.write.mode(SaveMode.Append).format("jdbc")
+      df.write.mode(saveMode).format("jdbc")
         .options(options)
         .options(connection.getAuthModeSparkOptions)
         .option("dbtable", tableName)

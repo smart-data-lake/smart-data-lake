@@ -290,4 +290,17 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val dfRead = dataObject.getSparkDataFrame(Seq())
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
+
+  // see logs to manually assure that no temp table is created and the configuration is correct.
+  test("write to jdbc table with directTableOverwrite=true") {
+    instanceRegistry.register(jdbcConnection.copy(directTableOverwrite = true))
+    val table = Table(Some("public"), "table1")
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", saveMode = SDLSaveMode.Overwrite)
+    dataObject.dropTable
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    dataObject.initSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df, Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())
+    assert(dfRead.symmetricDifference(df).isEmpty)
+  }
 }
