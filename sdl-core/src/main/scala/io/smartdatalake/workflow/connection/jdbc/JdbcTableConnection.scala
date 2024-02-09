@@ -55,6 +55,12 @@ import java.time.Duration
  * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
  *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
+ * @param directTableOverwrite flag to enable overwriting target tables directly without creating temporary table.
+ *                         Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
+ *                         For SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
+ *                         Default is directTableWrite=false, this will write data first into a temporary table, and then use
+ *                         an "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
+ *                         Also note that SDLSaveMode.Merge always creates a temporary table.
  */
 case class JdbcTableConnection(override val id: ConnectionId,
                                url: String,
@@ -64,9 +70,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                maxParallelConnections: Int = 3,
                                connectionPoolMaxIdleTimeSec: Int = 3,
                                connectionPoolMaxWaitTimeSec: Int = 600,
-                               override val metadata: Option[ConnectionMetadata] = None,
                                @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") autoCommit: Boolean = false,
-                               connectionInitSql: Option[String] = None
+                               connectionInitSql: Option[String] = None,
+                               directTableOverwrite: Boolean = false,
+                               override val metadata: Option[ConnectionMetadata] = None,
                                ) extends Connection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
