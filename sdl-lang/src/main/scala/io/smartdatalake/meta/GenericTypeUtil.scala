@@ -2,7 +2,7 @@ package io.smartdatalake.meta
 
 import io.smartdatalake.definitions.{AuthMode, SaveModeOptions}
 import io.smartdatalake.meta.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
@@ -12,8 +12,8 @@ import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
 import org.reflections.Reflections
 import scaladoc.Tag
-import scala.reflect.internal.Symbols
 
+import scala.reflect.internal.Symbols
 import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
 
@@ -46,7 +46,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[CustomDfTransformerConfig]
   )
 
-  def getReflections = new Reflections("io.smartdatalake")
+  def getReflections = ReflectionUtil.getReflections("io.smartdatalake")
 
   /**
    * Finds all relevant types according to the config and generates GenericTypeDefs for them.
