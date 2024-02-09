@@ -50,5 +50,10 @@ class ConfigJsonExporterTest extends FunSuite {
     assert(new File(fileName).exists())
   }
 
+  test("test main with default filename") {
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile))
+    assert(new File("exportedConfig.json").exists())
+  }
+
 
 }
