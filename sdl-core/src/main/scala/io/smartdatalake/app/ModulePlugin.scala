@@ -19,7 +19,9 @@
 
 package io.smartdatalake.app
 
+import io.smartdatalake.util.misc.ReflectionUtil
 import org.reflections.Reflections
+
 import scala.jdk.CollectionConverters._
 
 /**
@@ -35,7 +37,7 @@ trait ModulePlugin {
 
 object ModulePlugin {
   lazy val modules: Seq[ModulePlugin] = {
-    new Reflections("io.smartdatalake")
+    ReflectionUtil.getReflections("io.smartdatalake")
       .getSubTypesOf(classOf[ModulePlugin]).asScala.toSeq
       .map(_.getDeclaredConstructor().newInstance())
   }

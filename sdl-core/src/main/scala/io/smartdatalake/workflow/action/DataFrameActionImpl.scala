@@ -90,18 +90,22 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   // This has to be done at runtime as it depends on the types of input & output DataObjects.
   // It is a "lazy val" so it is executed after inputs & outputs are defined by subclass initialization.
   private[smartdatalake] lazy val subFeedType: Type = {
-    val commonInputTypes = inputs.map(_.getSubFeedSupportedTypes).toSet.reduce(_ intersect _)
-    val commonOutputTypes = outputs.map(_.writeSubFeedSupportedTypes).toSet.reduce(_ intersect _)
+    def explodeGenericType(subFeedTypes: Seq[Type]): Seq[Type] = {
+      subFeedTypes.flatMap(tpe => if (tpe =:= typeOf[DataFrameSubFeed]) DataFrameSubFeed.getKnownSubFeedTypes else Seq(tpe))
+    }
+    val allInputTypes = inputs.map(_.getSubFeedSupportedTypes).map(explodeGenericType)
+    val commonInputTypes = allInputTypes.toSet.reduce(_ intersect _)
+    val commonOutputTypes = outputs.map(_.writeSubFeedSupportedTypes).map(explodeGenericType).toSet.reduce(_ intersect _)
     // search common types in input & output
     val commonTypes = commonInputTypes.intersect(commonOutputTypes)
     if (commonTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs & outputs")
     val commonType = if (transformerSubFeedType.isDefined && !(transformerSubFeedType.get =:= typeOf[DataFrameSubFeed])) {
       // if transformerSubFeedType is defined and not generic, we have to take that one and assert it is in common types list
-      assert(transformerSubFeedType.get =:= typeOf[DataFrameSubFeed] || commonTypes.contains(transformerSubFeedType.get), s"($id) subfeed type of transformers (${transformerSubFeedType.get}) doesnt exist in common subfeed types of inputs & outputs (${commonTypes.mkString(", ")})")
+      assert(commonTypes.contains(transformerSubFeedType.get), s"($id) subfeed type of transformers (${transformerSubFeedType.get}) doesnt exist in common subfeed types of inputs & outputs (${commonTypes.mkString(", ")})")
       transformerSubFeedType.get
     } else {
-      // if transformerSubFeedType is None or generic, take the one that occurs first in the inputs list
-      commonTypes.map(t => (t, inputs.map(_.getSubFeedSupportedTypes.indexOf(t)).max)).minBy(_._2)._1
+      // if transformerSubFeedType is None or generic, take the first matching entry from the inputs list
+      allInputTypes.flatten.find(commonTypes.contains).get
     }
     logger.info(s"($id) selected subFeedType ${commonType.typeSymbol.name}")
     commonType

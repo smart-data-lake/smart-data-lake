@@ -20,13 +20,14 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeGenericOptions}
+import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
@@ -523,6 +524,29 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeedNoInit = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("firstname" -> "bob"))))
     action1.exec(Seq(srcSubFeedNoInit))(contextExec)
 
+  }
+
+  test("copy load with generic DataFrameSubFeed as input") {
+
+    // setup DataObjects
+    // PKViolatorsDataObject has getSubFeedSupportedTypes=Seq(DataFrameSubFeed)
+    // The Action should choose an appropriate SubFeedType for init/exec based on the output DataObject.
+
+    val pkDO = MockDataObject("pkTest", primaryKey = Some(Seq("id"))).register
+    pkDO.writeSparkDataFrame(dfNonUniqueWithNull)
+
+    val srcDO = PKViolatorsDataObject("src1")
+    instanceRegistry.register(srcDO)
+    val tgtDO = MockDataObject("tgt1").register
+
+    // prepare & start load with positive constraint and expectation evaluation
+    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = "select * from %{inputViewName}")
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig1))
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    action1.init(Seq(srcSubFeed))(contextInit).head
+    val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
+
+    tgtDO.getSparkDataFrame().show
   }
 }
 
