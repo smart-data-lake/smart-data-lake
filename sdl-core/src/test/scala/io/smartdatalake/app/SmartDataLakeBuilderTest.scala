@@ -130,11 +130,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // now fill tgt1 with both partitions
     tgt1DO.writeSparkDataFrame(dfSrc, Seq())
 
-    // reset DataObjects
-    instanceRegistry.clear()
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(tgt1DO)
-    instanceRegistry.register(tgt2DO)
+    // reset actions in registry
     instanceRegistry.register(action1.copy())
 
     // start recovery dag run
@@ -223,11 +219,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // now fill tgt1 with both partitions
     tgt1DO.writeSparkDataFrame(dfSrc, Seq())
 
-    // reset DataObjects
-    instanceRegistry.clear()
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(tgt1DO)
-    instanceRegistry.register(tgt2DO)
+    // reset actions in registry
     instanceRegistry.register(action1.copy())
 
     // start recovery dag run
@@ -314,18 +306,10 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(resultActionsState == expectedActionsState)
     }
 
-    // reset registry
-    instanceRegistry.clear()
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(tgt1DO)
-    instanceRegistry.register(tgt2DO)
-    instanceRegistry.register(tgt3DO)
-    instanceRegistry.register(tgt4DO)
-    instanceRegistry.register(tgt5DO)
-
+    // reset actions in registry
     instanceRegistry.register(action1.copy())
     val action2success = CopyAction("b", srcDO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
-    instanceRegistry.register(action2success.copy())
+    instanceRegistry.register(action2success)
     instanceRegistry.register(action3.copy())
     instanceRegistry.register(action4.copy())
     instanceRegistry.register(action5.copy())
@@ -520,10 +504,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc2, Seq())
 
-    // reset Actions / DataObjects
-    instanceRegistry.clear()
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(tgt1DO)
+    // reset actions in registry
     instanceRegistry.register(action1.copy())
 
     // start second run
