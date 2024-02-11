@@ -62,9 +62,14 @@ case class PartitionValues(elements: Map[String, Any]) {
   def isComplete(partitions: Seq[String]) = this.keys == partitions.toSet
 
   /**
-   * Returns true if partition values defined by this instance are a valid "init" of given partitions
+   * Returns true if partition defined by this instance are a valid "init" of given partitions
    */
-  def isInitOf(partitions: Seq[String]) = partitions.inits.map(_.toSet).contains(this.keys)
+  def isInitOf(partitions: Seq[String]): Boolean = partitions.inits.map(_.toSet).contains(this.keys)
+
+  /**
+   * Returns true if partition values defined by this instance are included in given partition values.
+   */
+  def isIncludedIn(pv: PartitionValues): Boolean = filterKeys(pv.keys.toSeq) == pv
 }
 
 object PartitionValues {

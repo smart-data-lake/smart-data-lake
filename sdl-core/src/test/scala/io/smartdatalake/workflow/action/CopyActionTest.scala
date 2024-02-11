@@ -22,12 +22,13 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
@@ -233,15 +234,17 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     )
     instanceRegistry.register(tgtDOConstraintFail)
     val actionConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
-    intercept[RuntimeException](actionConstraintFail.exec(Seq(srcSubFeed))(contextExec))
-
+    val ex1 = intercept[TaskFailedException](actionConstraintFail.exec(Seq(srcSubFeed))(contextExec))
+    assert(ex1.cause.isInstanceOf[RuntimeException])
+     
     // fail expectation evaluation
     val tgtDOExpectationFail = HiveTableDataObject( "tgt1expectationFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
       expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
     )
     instanceRegistry.register(tgtDOExpectationFail)
     val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)
-    intercept[ExpectationValidationException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
+    val ex2 = intercept[TaskFailedException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
+    assert(ex2.cause.isInstanceOf[ExpectationValidationException])
   }
 
 
@@ -545,8 +548,6 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextInit).head
     val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
-
-    tgtDO.getSparkDataFrame().show
   }
 }
 

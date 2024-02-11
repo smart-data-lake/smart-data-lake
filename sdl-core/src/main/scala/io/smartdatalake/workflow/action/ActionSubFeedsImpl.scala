@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
@@ -143,16 +144,30 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
-    outputs.map { output =>
-      val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
-      logWritingStarted(subFeed)
-      val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
-      val (outputSubFeed, d) = PerformanceUtils.measureDuration {
-        writeSubFeed(subFeed, isRecursiveInput)
-      }
-      logWritingFinished(outputSubFeed, d)
-      outputSubFeed
+    // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
+    // Like this metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
+    val (outputSubFeeds,taskFailedException) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException])) {
+      case ((outputSubFeeds, taskFailedException), output) =>
+        // find SubFeed for output and write it
+        val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
+        if (taskFailedException.isEmpty) {
+          logWritingStarted(subFeed)
+          val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
+          try {
+            val (outputSubFeed, d) = PerformanceUtils.measureDuration {
+              writeSubFeed(subFeed, isRecursiveInput)
+            }
+            logWritingFinished(outputSubFeed, d)
+            (outputSubFeeds :+ outputSubFeed, None)
+          } catch {
+            case ex: TaskFailedException => (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex))
+          }
+        } else (outputSubFeeds :+ subFeed, taskFailedException)
     }
+    // if there is a TaskFailedException, enrich it will all results and throw it.
+    taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
+    // return processed SubFeeds
+    outputSubFeeds
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
@@ -192,14 +207,20 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
     // prepare
     var (inputSubFeeds, outputSubFeeds) = prepareInputSubFeeds(subFeeds)
-    // transform
-    outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
-    // check and adapt output SubFeeds
-    outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
-    // write output
-    outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
-    // return
-    outputSubFeeds
+    try {
+      // transform
+      outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
+      // check and adapt output SubFeeds
+      outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
+      // write output
+      outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
+      // return
+      outputSubFeeds
+    } catch {
+      case ex: NoDataToProcessWarning => throw ex // pass on to outer exception handler
+      case ex: TaskFailedException => throw ex // pass on to outer exception handler
+      case ex: Exception => throw TaskFailedException(id.id, ex, Some(outputSubFeeds.collect{case x: SubFeed => x}))
+    }
   } catch {
     // throw exception with skipped output subfeeds if "no data"
     case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))

@@ -22,7 +22,7 @@ package io.smartdatalake.util.dag
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.LogUtil
-import io.smartdatalake.workflow.SimplifiedAnalysisException
+import io.smartdatalake.workflow.{SimplifiedAnalysisException, SubFeed}
 import org.apache.spark.sql.AnalysisException
 
 private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
@@ -30,11 +30,11 @@ private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable
   def getDAGRootExceptions: Seq[DAGException]
 }
 
-private[smartdatalake] case class TaskFailedException(id: NodeId, msg: String, cause: Throwable, override val severity: ExceptionSeverity.ExceptionSeverity) extends DAGException(msg, cause) {
+private[smartdatalake] case class TaskFailedException(id: NodeId, msg: String, cause: Throwable, override val severity: ExceptionSeverity.ExceptionSeverity, results: Option[Seq[SubFeed]] = None) extends DAGException(msg, cause) {
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 private[smartdatalake] object TaskFailedException {
-  def apply(id: NodeId, cause: Throwable): TaskFailedException = {
+  def apply(id: NodeId, cause: Throwable, results: Option[Seq[SubFeed]]): TaskFailedException = {
     // get root cause to show create message of this exception
     val rootCause = getRootCause(cause)
     // create message including first line of cause message
@@ -42,11 +42,11 @@ private[smartdatalake] object TaskFailedException {
     val msg = s"Task $id failed. Root cause is '${rootCause.getClass.getSimpleName}${rootCauseFirstLine.map(": "+_).getOrElse("")}'"
     // create exception
     val ex = cause match {
-      case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity)
+      case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity, results)
       case ex: AnalysisException if Environment.simplifyFinalExceptionLog =>
         // reduce logical plan output to 5 lines
-        TaskFailedException(id, msg, new SimplifiedAnalysisException(ex), ExceptionSeverity.FAILED)
-      case _ => TaskFailedException(id, msg, cause, ExceptionSeverity.FAILED)
+        TaskFailedException(id, msg, new SimplifiedAnalysisException(ex), ExceptionSeverity.FAILED, results)
+      case _ => TaskFailedException(id, msg, cause, ExceptionSeverity.FAILED, results)
     }
     // remove stacktrace: avoid many lines of DAG, Monix and Java stacktrace and show directly the real exception that made the task fail
     ex.setStackTrace(Array())

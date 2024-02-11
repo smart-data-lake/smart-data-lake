@@ -110,14 +110,12 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     srcDO1.writeSparkDataFrame(l1, Seq())
 
     val tgtSubFeedsNonRecursive = action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(contextExec)
-    assert(tgtSubFeedsNonRecursive.size == 1)
     assert(tgtSubFeedsNonRecursive.map(_.dataObjectId) == Seq(tgtDO1.id))
 
     val r1 = tgtDO1.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
+    assert(r1 == Seq(6)) // should be increased by 1 through TestDfTransformer
 
     // second action to test recursive inputs
     val action2 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), recursiveInputIds = List(tgtDO1.id))
@@ -128,8 +126,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val r2 = tgtDO1.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r2.size == 1)
-    assert(r2.head == 11) // Record should be updated a second time with data from tgt1
+    assert(r2 == Seq(11)) // Record should be updated a second time with data from tgt1
 
   }
 
@@ -210,7 +207,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcDO3 = MockDataObject("src3").register
     val tgtDO1 = MockDataObject("tgt1", partitions = Seq("type")).register
     val tgtDO2 = MockDataObject("tgt2", partitions = Seq("type")).register
-    val tgtDO3 = MockDataObject("tgt3", partitions = Seq("type")).register
+    val tgtDO3 = MockDataObject("tgt3").register
 
     // prepare action
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
