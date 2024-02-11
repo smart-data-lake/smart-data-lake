@@ -49,7 +49,7 @@ private[smartdatalake] trait DAGResult {
 private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
   def onNodeStart(node: T): Unit
   def onNodeSuccess(results: Seq[DAGResult])(node: T): Unit
-  def onNodeFailure(exception: Throwable)(node: T): Unit
+  def onNodeFailure(exception: Throwable, partialResults: Seq[DAGResult] = Seq())(node: T): Unit
   def onNodeSkipped(exception: Throwable)(node: T): Unit
 }
 
@@ -163,10 +163,14 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
         // if severity is low, notify that task is skipped
         notify(node, eventListener.onNodeSkipped(ex))
         resultRaw
+      case Failure(ex: TaskFailedException) =>
+        // if severity is low, notify that task is skipped
+        notify(node, eventListener.onNodeFailure(ex, ex.results.getOrElse(Seq())))
+        resultRaw
       case Failure(ex) =>
         // pass Failure for all other exceptions
         notify(node, eventListener.onNodeFailure(ex))
-        Failure(TaskFailedException(node.nodeId, ex))
+        Failure(TaskFailedException(node.nodeId, ex, None))
     }
     // return
     result

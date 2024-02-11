@@ -22,15 +22,14 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.dag.TaskFailedException
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsNto1Transformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -202,7 +201,9 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
     instanceRegistry.register(testAction)
     val srcSubFeed1 = SparkSubFeed(None, "src1Ds", partitionValues = Seq())
     val srcSubFeed2 = SparkSubFeed(None, "src2Ds", partitionValues = Seq())
-    a[java.lang.IllegalStateException] shouldBe thrownBy(testAction.exec(Seq(srcSubFeed1, srcSubFeed2)))
+
+    val ex = intercept[TaskFailedException](testAction.exec(Seq(srcSubFeed1, srcSubFeed2)))
+    assert(ex.cause.isInstanceOf[IllegalStateException])
 
   }
 

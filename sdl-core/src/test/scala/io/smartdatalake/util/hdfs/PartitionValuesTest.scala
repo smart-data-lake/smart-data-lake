@@ -84,4 +84,26 @@ class PartitionValuesTest extends FunSuite {
     assert(PartitionValues.checkExpectedPartitionValues(partitionValues3 ++ partitionValues3a, partitionValues3).isEmpty)
     assert(PartitionValues.checkExpectedPartitionValues(partitionValues3, partitionValues3 ++ partitionValues3a).nonEmpty)
   }
+
+  test("check isComplete") {
+    assert(PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isComplete(Seq("town","date")))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isComplete(Seq("town","abc")))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isComplete(Seq("town")))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isComplete(Seq("abc")))
+  }
+
+  test("check isInitOf") {
+    assert(PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isInitOf(Seq("town","date")))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isInitOf(Seq("town","abc")))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isInitOf(Seq("town")))
+    assert(PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isInitOf(Seq("town","date","abc")))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isInitOf(Seq("abc")))
+  }
+
+  test("check isIncludedIn") {
+    assert(PartitionValues(Map("town" -> "NYC", "date" -> "20190101")).isIncludedIn(PartitionValues(Map("date" -> "20190101"))))
+    assert(!PartitionValues(Map("town" -> "NYC", "date" -> "20180101")).isIncludedIn(PartitionValues(Map("date" -> "20190101"))))
+    assert(!PartitionValues(Map("town" -> "NYC", "abc" -> "a")).isIncludedIn(PartitionValues(Map("date" -> "20190101"))))
+    assert(!PartitionValues(Map("town" -> "NYC", "abc" -> "20190101")).isIncludedIn(PartitionValues(Map("date" -> "20190101"))))
+  }
 }

@@ -261,10 +261,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       saveState(phase, Some(node.id))
     }
 
-    override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
+    override def onNodeFailure(exception: Throwable, partialResults: Seq[DAGResult])(node: Action): Unit = {
       // only first line of message included as logical plan of AnalysisException might have several 100 lines...
       val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next()).getOrElse("null")}"
-      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg))
+      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg), results = partialResults.collect { case x: SubFeed => x })
       logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
       saveState(phase, Some(node.id))
     }

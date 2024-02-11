@@ -23,6 +23,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.{SparkStreamingMetrics, SparkStreamingQueryListener}
+import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
 import io.smartdatalake.util.spark.DummyStreamProvider
@@ -282,8 +283,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     output match {
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
-        val metrics = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
-        outputSubFeed.appendMetrics(metrics).asInstanceOf[DataFrameSubFeed]
+        val (metrics,exceptions) = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
+        outputSubFeed = outputSubFeed.appendMetrics(metrics).asInstanceOf[DataFrameSubFeed]
+        // throw first validation exceptions if any, enriched with metrics...
+        exceptions.foreach(ex => throw TaskFailedException(id.id, ex, Some(Seq(outputSubFeed))))
+        outputSubFeed
       case _ =>
         outputSubFeed
     }
