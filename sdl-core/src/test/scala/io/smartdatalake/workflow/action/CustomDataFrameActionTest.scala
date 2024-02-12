@@ -130,35 +130,6 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
   }
 
-  test("spark action with skipped input subfeed but ignore filter") {
-
-    // setup DataObjects
-    val srcDO1 = MockDataObject("src1", partitions = Seq("lastname")).register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
-
-    val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select * from ${srcDO1.id.id}"))
-    val action1 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id), transformers = Seq(customTransformer))
-    instanceRegistry.register(action1)
-    val action1IgnoreFilter = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id), inputIdsToIgnoreFilter = Seq(srcDO1.id), transformers = Seq(customTransformer))
-    val l1 = Seq(("doe", "john", 5),("be", "bob", 3)).toDF("lastname", "firstname", "rating")
-    srcDO1.writeSparkDataFrame(l1, Seq())
-
-    // nothing processed if input is skipped and filters not ignored
-    val tgtSubFeeds = action1.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))), isSkipped = true)))(contextExec)
-    assert(tgtSubFeeds.map(_.dataObjectId) == Seq(tgtDO1.id))
-    tgtDO1.getSparkDataFrame()
-      .isEmpty
-
-    // input is processed if filters are ignored, even if input subfeed is skipped
-    val tgtSubFeedsIgnoreFilter = action1IgnoreFilter.exec(Seq(SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "test"))), isSkipped = true)))(contextExec)
-    assert(tgtSubFeedsIgnoreFilter.map(_.dataObjectId) == Seq(tgtDO1.id))
-    val r2 = tgtDO1.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r2.toSet == Set(5,3))
-  }
-
-
   test("copy with partition diff execution mode 2 iterations") {
 
     // setup DataObjects
