@@ -40,7 +40,7 @@ class SparkFlattenDFTransformerTest extends FunSuite {
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  test("Nested DataFrame returns an flat Dataframe") {
+  test("Nested DataFrame returns a flat Dataframe") {
     val flattenDfTransformer = SparkFlattenDfTransformer()
     val nestedSchema: StructType = new StructType()
       .add("name", StringType, true)
