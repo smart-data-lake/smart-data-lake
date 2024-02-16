@@ -26,8 +26,9 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, SparkDfTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{col, explode_outer}
+import org.apache.spark.sql.functions.{col, explode_outer, get}
 import org.apache.spark.sql.types.{ArrayType, DataType, StructType}
+
 import scala.annotation.tailrec
 
 /**
@@ -47,14 +48,27 @@ import scala.annotation.tailrec
  * |---parent_child2
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
+ * @param enableExplode Enables exploding Arrays in the Dataframe, therefore potentially increasing the number of rows. Default is set to "true"
  */
-case class SparkFlattenDfTransformer(override val name: String = "standardizeSparkDatatypes", override val description: Option[String] = None) extends SparkDfTransformer {
+case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDataFrame",
+                                     override val description: Option[String] = None,
+                                     enableExplode: Boolean = true) extends SparkDfTransformer {
 
   private def getComplexFields(df: DataFrame): List[(String, DataType)] = {
-    (for (field <- df.schema.fields
-          if (field.dataType.isInstanceOf[StructType] || field.dataType.isInstanceOf[ArrayType]))
-    yield (field.name, field.dataType)).toList
+    enableExplode match {
+      case true => {
+        (for (field <- df.schema.fields
+              if (field.dataType.isInstanceOf[StructType] || field.dataType.isInstanceOf[ArrayType]))
+        yield (field.name, field.dataType)).toList
+      }
+      case false => {
+        (for (field <- df.schema.fields
+              if (field.dataType.isInstanceOf[StructType]))
+        yield (field.name, field.dataType)).toList
+      }
+    }
   }
+
   @tailrec
   private def flattenDf(df: DataFrame): DataFrame = {
     val complex_fields = getComplexFields(df)
