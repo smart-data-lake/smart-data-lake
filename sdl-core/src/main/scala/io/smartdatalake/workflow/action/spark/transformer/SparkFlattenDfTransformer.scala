@@ -48,11 +48,11 @@ import scala.annotation.tailrec
  * |---parent_child2
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param enableExplode Enables exploding Arrays in the Dataframe, therefore potentially increasing the number of rows. Default is set to "true"
+ * @param enableExplode Enables exploding Arrays in the Dataframe, therefore potentially increasing the number of rows. Default is set to "false"
  */
 case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDataFrame",
                                      override val description: Option[String] = None,
-                                     enableExplode: Boolean = true) extends SparkDfTransformer {
+                                     enableExplode: Boolean = false) extends SparkDfTransformer {
 
   private def getComplexFields(df: DataFrame): List[(String, DataType)] = {
     enableExplode match {
@@ -71,18 +71,18 @@ case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDa
 
   @tailrec
   private def flattenDf(df: DataFrame): DataFrame = {
-    val complex_fields = getComplexFields(df)
-    if (complex_fields.isEmpty) return df;
-    val (col_name, col_type) = complex_fields.head
-    val new_df = col_type match {
+    val complexFields = getComplexFields(df)
+    if (complexFields.isEmpty) return df;
+    val (colName, colType) = complexFields.head
+    val newDf = colType match {
       case StructType(fields) => {
         val inner = for (n <- fields) yield n.name
-        val expanded = for (k <- inner) yield col(col_name + '.' + k).alias(col_name + '_' + k)
-        df.select(col("*") +: expanded: _*).drop(col_name)
+        val expanded = for (k <- inner) yield col(colName + '.' + k).alias(colName + '_' + k)
+        df.select(col("*") +: expanded: _*).drop(colName)
       }
-      case a: ArrayType => df.withColumn(col_name, explode_outer(col(col_name)))
+      case a: ArrayType => df.withColumn(colName, explode_outer(col(colName)))
     }
-    flattenDf(new_df)
+    flattenDf(newDf)
   }
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame =
     flattenDf(df)
