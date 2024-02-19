@@ -23,7 +23,6 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import org.apache.spark.sql.{SparkSession, Row}
 import org.scalatest.FunSuite
@@ -79,9 +78,8 @@ class SparkFlattenDFTransformerTest extends FunSuite {
   }
 
 
-  test("Array explode works") {
-    val flattenDfTransformer = SparkFlattenDfTransformer()
-    val flattenDfTransformerNoExplode = SparkFlattenDfTransformer(enableExplode = false)
+  test("Array explode works when enabled") {
+    val flattenDfTransformer = SparkFlattenDfTransformer(enableExplode = true)
 
     val arraySchema: StructType = new StructType()
       .add("name", StringType, true)
@@ -93,8 +91,23 @@ class SparkFlattenDFTransformerTest extends FunSuite {
 
     val array_df = session.createDataFrame(arrayData, arraySchema)
     val exploded_df = flattenDfTransformer.transform(ActionId("ActionId"), Seq(), array_df, DataObjectId("dataObjectId"))
+    assert(exploded_df.count() == 4)
+  }
+
+  test("Array explode disabled by default") {
+    val flattenDfTransformerNoExplode = SparkFlattenDfTransformer()
+
+    val arraySchema: StructType = new StructType()
+      .add("name", StringType, true)
+      .add("hobbies", ArrayType(StringType), true)
+
+    val arrayData = new ArrayList[Row]()
+    arrayData.add(Row("Michael", Seq("football", "programming")))
+    arrayData.add(Row("Bob", Seq("playing piano", "reading")))
+
+    val array_df = session.createDataFrame(arrayData, arraySchema)
     val non_exploded_df = flattenDfTransformerNoExplode.transform(ActionId("ActionId2"), Seq(), array_df, DataObjectId("dataObjectId2"))
-    assert(exploded_df.count() == 4 && non_exploded_df.count() == 2)
+    assert(non_exploded_df.count() == 2)
   }
 
 
