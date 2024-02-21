@@ -187,11 +187,11 @@ or define any transform method that suits you best (starting from SDLB version 2
 
 If you choose to implement any transform method, this method is called dynamically by looking for the parameter values in the input DataFrames and Options.
 The limitation is that the parameter types must be chosen from the following list:
-- SparkSession
-- Map[String,String]
-- DataFrame
-- Dataset[<Product>]
-- any primitive data type (String, Boolean, Int, ...)
+- `SparkSession`
+- `Map[String,String]`
+- `DataFrame`
+- `Dataset[<Product>]`
+- any primitive data type (`String`, `Boolean`, `Int`, ...)
 
 Primitive value parameters are assigned looking up the parameter name in the Map of Options and converted to the target data type.
 Data types for primitive values might also use default values or be enclosed in an Option[...] to mark it as non required.
