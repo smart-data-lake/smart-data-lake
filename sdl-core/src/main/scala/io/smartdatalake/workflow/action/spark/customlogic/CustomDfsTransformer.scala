@@ -140,10 +140,8 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
   // lookup custom transform method
   override private[smartdatalake] lazy val customTransformMethod = {
     val transformMethods = CustomCodeUtil.getClassMethodsByName(getClass, "transform")
-    val (defaultTransformMethods,subClassTransformMethods) = transformMethods
-      .partition(_.owner == typeOf[CustomDfsTransformer].typeSymbol)
-    require(defaultTransformMethods.size == 1) // this is the default implementation of CustomDfsTransformer
-    require(subClassTransformMethods.size == 1, """
+      .filter(_.owner != typeOf[CustomDfsTransformer].typeSymbol) // remove default transform-method implementation of CustomDfsTransformer
+    require(transformMethods.size == 1, """
                                                    | CustomDfsTransformer implementations need to implement exactly one method with name 'transform'.
                                                    | Traditionally the signature of the transform method is 'transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]',
                                                    | but since SDLB 2.6 you can also implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
@@ -151,7 +149,9 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
                                                    | The transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.
       """)
     // if type signature is different from default method, this transformer has a custom transform method, otherwise return None.
-    subClassTransformMethods.find(_.typeSignature != defaultTransformMethods.head.typeSignature)
+    import scala.reflect.runtime.universe._
+    val defaultTransformMethod = typeOf[CustomDfsTransformer].member(TermName("transform"))
+    transformMethods.find(_.typeSignature != defaultTransformMethod.typeSignature)
   }
 }
 
