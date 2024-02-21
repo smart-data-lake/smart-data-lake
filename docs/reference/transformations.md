@@ -135,7 +135,7 @@ In custom Scala code, the whole Spark Dataset API is available.
 It's of course also possible to include additional libraries for your code, 
 so anything you can do in Spark Scala, you can do with SDLB. 
 
-##### As Scala class
+##### As Scala class 1-to-1
 If you have a Java/Scala project, it usually makes sense to create separate classes for your custom Scala code.
 Any classes in your classpath are picked up and can be referenced. 
 
@@ -168,12 +168,13 @@ In the end, you simply need to return a DataFrame back to SDLB.
 
 Because a CopyAction is 1-to-1 only, the transformer also needs to extend the 1-to-1 `CustomDfTransformer`.
 
+##### As Scala class many-to-many
 If you have a many-to-many action and want to write a custom Scala transformer, you need to switch to a `CustomDataFrameAction`. 
 ```
 my_many_to_many_action {
   type = CustomDataFrameAction
-  inputIds = [df1,df2]
-  outputIds = [dfOut]
+  inputIds = [obj1,obj2]
+  outputIds = [out]
   transformers = [{
     type = ScalaClassSparkDfsTransformer
     class-name = io.package.MySecondTransformer
@@ -181,20 +182,50 @@ my_many_to_many_action {
 }
 ```
 
-In this case, your Scala class also needs to extend the many-to-many `CustomDfsTransformer` and overwrite the respective transform method:
+In this case, your Scala class also needs to extend the many-to-many `CustomDfsTransformer`. You can either overwrite the respective transform method as shown later, 
+or define any transform method that suits you best (starting from SDLB version 2.6.x).
+
+If you choose to implement any transform method, this method is called dynamically by looking for the parameter values in the input DataFrames and Options.
+The limitation is that the parameter types must be chosen from the following list:
+- SparkSession
+- Map[String,String]
+- DataFrame
+- Dataset[<Product>]
+- any primitive data type (String, Boolean, Int, ...)
+
+Primitive value parameters are assigned looking up the parameter name in the Map of Options and converted to the target data type.
+Data types for primitive values might also use default values or be enclosed in an Option[...] to mark it as non required.
+
+DataFrame parameters are assigned looking up the parameter name in the Map of DataFrames. A potential `df` prefix is removed from the parameter name before the lookup.
+
+All lookups of parameters are down case insensitive, also dash and underscores are removed.
+
+If the Action has only one output DataObject, the return type can also be defined as a simple DataFrame instead of a `Map[String,DataFrame]`.
+
 ```
 class MySecondTransformer extends CustomDfsTransformer {
-    def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] {
+    def transform(session: SparkSession, dfObj1: DataFrame, dfObj2: DataFrame, parameter123: Boolean = true) : DataFrame {
         // now you have multiple input DataFrames and can potentially return multiple DataFrames
-        val df1 = dfs("df1")
-        val df2 = dfs("df2")
-        val combined = df1.join(df2, $"df1.id"==$"df2.fk", "left")
-        Map("dfOut"->combined)
+        val dfCombined = dfObj1.join(dfObj2, $"dfObj1.id"==$"dfObj2.fk", "left")
+        dfCombined // use a Map[String,DataFrame] to return multiple DataFrames.
+    }
+}
+```
+
+Overwriting the standard transform (traditional way) is done as follows:
+```
+class MySecondTransformer extends CustomDfsTransformer {
+    override def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] {
+        // now you have multiple input DataFrames and can potentially return multiple DataFrames
+        val dfObj1 = dfs("obj1")
+        val dfObj2 = dfs("obj2")
+        val dfCombined = dfObj1.join(dfObj2, $"dfObj1.id"==$"dfObj2.fk", "left")
+        Map("out"->dfCombined)
     }
 }
 ```
 The _transform_ method now gets a map with all your input DataFrames called _dfs_. 
-The key in _dfs_ contains the dataObjectId, in this example we have two inputs called _df1_ and _df2_, 
+The key in _dfs_ contains the dataObjectId, in this example we have two inputs called _obj1_ and _obj2_, 
 we use it to extract the two DataFrames.
 Again, you can manipulate all DataFrames as needed and this time, return a map with all output Data Objects.
 As noted, it's best practice to only return one Data Object (many-to-one action) as in our example.
@@ -208,7 +239,7 @@ Take a look at the  [Configuration Schema Viewer](../../json-schema-viewer):
 You will see CustomDataFrameAction as a direct action type, similar to CopyAction or HistorizeAction.
 
 ScalaClassSparkDfsTransformer is the type of your **transformer**. 
-It needs to correspond to the action type. A 1-to-1 action, expects a 1-to-1 transformer.
+It needs to correspond to the action type. A 1-to-1 action, expects a 1-to-1 transformer, a many-to-many action expects a many-to-many transformer.
 :::
 
 ##### In Configuration
