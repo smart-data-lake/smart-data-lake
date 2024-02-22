@@ -45,19 +45,23 @@ class SparkFlattenDFTransformerTest extends FunSuite {
       .add("name", StringType, true)
       .add("info", new StructType()
         .add("age", IntegerType, true)
-        .add("address", StringType, true), true)
+        .add("address", new StructType()
+          .add("street", StringType)
+          .add("number", StringType)
+        ))
 
     //createDataFrame requires Java Lists
     val nestedData = new ArrayList[Row]()
-    nestedData.add(Row("Michael", Row(30, "123 Main St")))
-    nestedData.add(Row("Bob", Row(25, "456 Elm St")))
+    nestedData.add(Row("Michael", Row(30, Row("Main St","123"))))
+    nestedData.add(Row("Bob", Row(25, Row("Elm St","456"))))
 
     val nested_df = session.createDataFrame(nestedData, nestedSchema)
     val new_df = flattenDfTransformer.transform(ActionId("ActionId"), Seq(), nested_df, DataObjectId("dataObjectId"))
     val expectedSchema = new StructType()
       .add("name", StringType, true)
       .add("info_age", IntegerType, true)
-      .add("info_address", StringType, true)
+      .add("info_address_street", StringType)
+      .add("info_address_number", StringType)
     assert(new_df.schema.equals(expectedSchema))
   }
 
