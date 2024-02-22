@@ -54,19 +54,11 @@ case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDa
                                      override val description: Option[String] = None,
                                      enableExplode: Boolean = false) extends SparkDfTransformer {
 
-  private def getComplexFields(df: DataFrame): List[(String, DataType)] = {
-    enableExplode match {
-      case true => {
-        (for (field <- df.schema.fields
-              if (field.dataType.isInstanceOf[StructType] || field.dataType.isInstanceOf[ArrayType]))
-        yield (field.name, field.dataType)).toList
-      }
-      case false => {
-        (for (field <- df.schema.fields
-              if (field.dataType.isInstanceOf[StructType]))
-        yield (field.name, field.dataType)).toList
-      }
-    }
+  private def getComplexFields(df: DataFrame): Seq[(String, DataType)] = {
+    df.schema.fields.map(f => (f.name, f.dataType)).collect {
+      case (name, dataType: StructType) => (name,dataType)
+      case (name, dataType: ArrayType) if enableExplode => (name,dataType)
+    }.toSeq
   }
 
   @tailrec
