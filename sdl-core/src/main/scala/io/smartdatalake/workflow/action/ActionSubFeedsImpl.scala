@@ -145,7 +145,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
-    // Like this metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
+    // This way metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
     val (outputSubFeeds,taskFailedException) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException])) {
       case ((outputSubFeeds, taskFailedException), output) =>
         // find SubFeed for output and write it

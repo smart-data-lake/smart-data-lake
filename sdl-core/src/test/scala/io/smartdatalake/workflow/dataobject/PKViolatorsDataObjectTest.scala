@@ -41,7 +41,7 @@ class PKViolatorsDataObjectTest extends FunSuite with BeforeAndAfter with SmartD
 
   before { instanceRegistry.clear() }
 
-  test("PKviolatorDO_PKid") {
+  test("normal pk violations") {
     val src = MockDataObject("source_tableDO", tableName = "source_table", primaryKey = Some(Seq("id"))).register
     src.writeSparkDataFrame(dfNonUniqueWithNull)
 
@@ -65,11 +65,11 @@ class PKViolatorsDataObjectTest extends FunSuite with BeforeAndAfter with SmartD
 
     // Comparing actual with expected
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("PKviolatorDO_PKid",Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
+    if (!resultat) printFailedTestResult("normal pk violations",Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }
 
-  test("PKviolators_noDataColumns") {
+  test("pk violations with null values") {
     // creating and registering data object //
     val src = MockDataObject("hive_table_pk_id_ValueDO", tableName = "hive_table_pk_id_Value", primaryKey = Some(Seq("id","value"))).register
     src.writeSparkDataFrame(dfNonUniqueWithNull)
@@ -93,12 +93,12 @@ class PKViolatorsDataObjectTest extends FunSuite with BeforeAndAfter with SmartD
     val expected = SparkDataFrame(rows_expected.toDF)
 
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("PKviolators_noDataColumns",
+    if (!resultat) printFailedTestResult("pk violations with null values",
       Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }
 
-  test("PKviolators_multipleDOs") {
+  test("pk violations for multiple sources") {
 
     // creating and registering data objects //
 
@@ -152,7 +152,7 @@ class PKViolatorsDataObjectTest extends FunSuite with BeforeAndAfter with SmartD
     )
 
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("PKviolators_multipleDOs",
+    if (!resultat) printFailedTestResult("pk violations for multiple sources",
       Seq(customDO.getSparkDataFrame(),hiveTablePKidDO.getSparkDataFrame(),hiveTableNoPKDO.getSparkDataFrame(),hiveTablePKidValueDO.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }

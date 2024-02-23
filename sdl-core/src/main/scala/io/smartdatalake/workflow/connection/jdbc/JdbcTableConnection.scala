@@ -59,7 +59,7 @@ import java.time.Duration
  *                         Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
  *                         For SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
  *                         Default is directTableWrite=false, this will write data first into a temporary table, and then use
- *                         an "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
+ *                         a "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
  *                         Also note that SDLSaveMode.Merge always creates a temporary table.
  */
 case class JdbcTableConnection(override val id: ConnectionId,
