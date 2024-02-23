@@ -198,7 +198,7 @@ Data types for primitive values might also use default values or be enclosed in 
 
 DataFrame parameters are assigned looking up the parameter name in the Map of DataFrames. A potential `df` prefix is removed from the parameter name before the lookup.
 
-All lookups of parameters are down case insensitive, also dash and underscores are removed.
+All lookups of parameters are done case-insensitive, also dash and underscores are removed.
 
 If the Action has only one output DataObject, the return type can also be defined as a simple DataFrame instead of a `Map[String,DataFrame]`.
 
@@ -239,7 +239,7 @@ Take a look at the  [Configuration Schema Viewer](../../json-schema-viewer):
 You will see CustomDataFrameAction as a direct action type, similar to CopyAction or HistorizeAction.
 
 ScalaClassSparkDfsTransformer is the type of your **transformer**. 
-It needs to correspond to the action type. A 1-to-1 action, expects a 1-to-1 transformer, a many-to-many action expects a many-to-many transformer.
+It needs to correspond to the action type. A 1-to-1 action expects a 1-to-1 transformer, a many-to-many action expects a many-to-many transformer.
 :::
 
 ##### In Configuration
