@@ -312,6 +312,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
       case SDLSaveMode.Merge =>
         // write to tmp-table and merge by primary key
+        if (connection.directTableOverwrite) logger.warn(s"($id) directTableOverwrite=true can not be applied with SaveMode=Merge")
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
 
       case SDLSaveMode.Append =>
