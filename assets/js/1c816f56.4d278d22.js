@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[9255],{9630:a=>{a.exports=JSON.parse('{"label":"Databricks","permalink":"/blog/tags/databricks","allTagsPath":"/blog/tags","count":1,"unlisted":false}')}}]);

@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[5638],{7665:a=>{a.exports=JSON.parse('{"label":"CDC","permalink":"/blog/tags/cdc","allTagsPath":"/blog/tags","count":1,"unlisted":false}')}}]);

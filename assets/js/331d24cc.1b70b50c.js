@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[9314],{7625:a=>{a.exports=JSON.parse('{"label":"partitioning","permalink":"/blog/tags/partitioning","allTagsPath":"/blog/tags","count":1,"unlisted":false}')}}]);
