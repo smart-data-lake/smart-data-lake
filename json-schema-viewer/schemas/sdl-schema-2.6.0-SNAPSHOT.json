@@ -598,9 +598,6 @@
             "type" : "integer",
             "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
           },
-          "metadata" : {
-            "$ref" : "#/definitions/Others/ConnectionMetadata"
-          },
           "autoCommit" : {
             "type" : "boolean",
             "description" : "flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.\nDefault is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.",
@@ -609,6 +606,13 @@
           "connectionInitSql" : {
             "type" : "string",
             "description" : "SQL statement to be executed every time a new connection is created, for example to set session parameters"
+          },
+          "directTableOverwrite" : {
+            "type" : "boolean",
+            "description" : "flag to enable overwriting target tables directly without creating temporary table.\nBackground: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.\nFor SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.\nDefault is directTableWrite=false, this will write data first into a temporary table, and then use\na \"DELETE\" + \"INSERT INTO SELECT\" statement to overwrite data in the target table within one transaction.\nAlso note that SDLSaveMode.Merge always creates a temporary table."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/ConnectionMetadata"
           }
         },
         "title" : "JdbcTableConnection",
@@ -783,6 +787,13 @@
               "$ref" : "#/definitions/AuthMode/TokenAuthMode"
             } ],
             "description" : "optional authentication information: for now BasicAuthMode is supported."
+          },
+          "sparkOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
@@ -3870,6 +3881,13 @@
           "connectionId" : {
             "type" : "string",
             "description" : "The SnowflakeTableConnection to use for the table"
+          },
+          "sparkOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.\nThese options override connection.options."
           },
           "comment" : {
             "type" : "string",
