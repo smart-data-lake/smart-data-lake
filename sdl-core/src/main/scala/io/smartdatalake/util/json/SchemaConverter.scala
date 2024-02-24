@@ -36,6 +36,8 @@ import scala.annotation.tailrec
  *                              - additional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String)
  * @param additionalPropertiesDefault This is the default value for 'additionalProperties'-field if it is missing in a schema with type='object'.
  *                                    Default value is additionalPropertiesDefault=true, as this is conform with the specification.
+ *
+ * TODO: consolidate with JsonToSparkSchemaConverter of spark-extensions...
  */
 class SchemaConverter(inputSchema: JObject,
                       isStrictTypingEnabled: Boolean = true,
@@ -187,7 +189,8 @@ class SchemaConverter(inputSchema: JObject,
       throw new IllegalStateException(s"type is empty in schema at $name")
     case jsonObj: JObject =>
       val resolvedJsonObj = resolveRefs(jsonObj)
-      val jsonType = (resolvedJsonObj \ SchemaFieldType).toOption
+      val jsonType = (resolvedJsonObj \ SchemaFieldFormat).toOption
+        .orElse((resolvedJsonObj \ SchemaFieldType).toOption)
         .orElse((resolvedJsonObj \ SchemaFieldOneOf).toOption)
       assert(jsonType.isDefined, throw new IllegalArgumentException(s"No 'type'-field in schema at <$name>"))
       extractType(jsonType.get, name)
@@ -254,6 +257,7 @@ object SchemaConverter {
 
   private val SchemaFieldName = "name"
   private val SchemaFieldType = "type"
+  private val SchemaFieldFormat = "format"
   private val SchemaFieldOneOf = "oneOf"
   private val SchemaFieldId = "id"
   private val SchemaFieldProperties = "properties"
