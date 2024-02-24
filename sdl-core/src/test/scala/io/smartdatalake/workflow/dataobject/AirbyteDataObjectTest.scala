@@ -26,9 +26,10 @@ import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.script.CmdScript
 import org.apache.spark.sql.types.DataType
-import org.json4s.{Formats, JObject, JString}
+import org.json4s.{Formats, JBool, JDecimal, JObject, JString}
 
 import java.nio.file.Files
+import java.sql.Timestamp
 import scala.collection.mutable
 
 class AirbyteDataObjectTest extends DataObjectTestSuite {
@@ -57,7 +58,8 @@ class AirbyteDataObjectTest extends DataObjectTestSuite {
     )
     dataObject.prepare
     val actual = dataObject.getSparkDataFrame()(contextExec)
-    val expected = Seq(("TEST", "A", "2345.67", "Test Auto")).toDF("produkttyp", "flag", "artikelID", "artikelbezeichnung")
+    val expected = Seq(("TEST", true, "123", 2345.67, "Test Auto", Timestamp.valueOf("2022-11-22 01:23:45")))
+      .toDF("produkttyp", "flag", "artikelID", "price", "artikelbezeichnung", "updated")
     val resultat = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("wsl cmd test", Seq())(actual)(expected)
     assert(resultat)
@@ -86,9 +88,9 @@ class AirbyteDataObjectTest extends DataObjectTestSuite {
   }
 
   test("parse record") {
-    val msg = parseMessage("""{"type": "RECORD", "record": {"stream": "mystream", "data": {"produkttyp": "TEST", "flag": "A", "artikelID": "2345.67", "artikelbezeichnung": "Test Auto"}, "emitted_at": 1640029476000}}""")
+    val msg = parseMessage("""{"type": "RECORD", "record": {"stream": "mystream", "data": {"produkttyp": "TEST", "flag": true, "artikelID": "123", "artikelbezeichnung": "Test Auto"}, "emitted_at": 1640029476000}}""")
     println(msg)
-    val record =  AirbyteRecordMessage("mystream", JObject(List(("produkttyp",JString("TEST")), ("flag",JString("A")), ("artikelID",JString("2345.67")), ("artikelbezeichnung",JString("Test Auto")))), 1640029476000L, None)
+    val record =  AirbyteRecordMessage("mystream", JObject(List(("produkttyp",JString("TEST")), ("flag",JBool(true)), ("artikelID",JDecimal(123)), ("artikelbezeichnung",JString("Test Auto")))), 1640029476000L, None)
     assert(msg.toString == record.toString) // interestingly the objects are not equal, but the string representation is!
   }
 

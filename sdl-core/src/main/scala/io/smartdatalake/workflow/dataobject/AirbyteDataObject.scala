@@ -28,22 +28,32 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.json.JsonUtils._
 import io.smartdatalake.util.json.SchemaConverter
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
+import org.apache.spark.sql.custom.SQLUtils
 import org.apache.spark.sql.functions.from_json
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.Formats
+import org.json4s.JsonAST._
 import org.json4s.jackson.JsonMethods.compact
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.sql.Timestamp
+import java.time.{Instant, LocalDateTime, OffsetDateTime, ZonedDateTime}
+import java.time.format.DateTimeFormatter
 import scala.jdk.CollectionConverters._
+import scala.math
 import scala.reflect.{ClassTag, classTag}
+import scala.util.Try
 
 /**
  *
@@ -121,9 +131,9 @@ case class AirbyteDataObject(override val id: DataObjectId,
               None
             case _ => None
           }
-        val dfRaw = data.map(r => jsonToString(r.data)).toSeq.toDF("json")
-        dfRaw.withColumn("parsed", from_json($"json", schema.get))
-          .select($"parsed.*")
+          //.grouped(100)
+        val rdd = session.sparkContext.parallelize(data.map(r => Json4sToStructConverter.convertObject(r.data, schema.get)).toSeq)
+        SQLUtils.internalCreateDataFrame(rdd, schema.get)
     }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
@@ -233,6 +243,54 @@ object JsonValidator {
   }
   def validateJsonSchema(schema: JsonSchema, data: String): Seq[ValidationMessage] = {
     schema.validate(parser.readTree(data)).asScala.toSeq
+  }
+}
+
+/**
+ * Converts a Json4s JValue into InternalRows using a given Schema.
+ * InternalRows can be used to create an RDD/DataFrame very efficiently.
+ */
+object Json4sToStructConverter {
+
+  def convert(value: Any, dataType: DataType): Any = {
+    (value, dataType) match {
+      case (x: Product, tpe: StructType) => convertProduct(x, tpe)
+      case (json: JObject, tpe: StructType) => convertObject(json, tpe)
+      case (json: JArray, tpe: ArrayType) => json.arr.map(convert(_, tpe.elementType))
+      case (json: JString, tpe: StringType) => UTF8String.fromString(json.s)
+      case (json: JLong, tpe: LongType) => json.num
+      case (json: JLong, tpe: IntegerType) => json.num.toInt
+      case (json: JInt, tpe: LongType) => json.num.toLong
+      case (json: JInt, tpe: IntegerType) => json.num.toInt
+      case (json: JInt, tpe: DecimalType) => BigDecimal(json.num)
+      case (json: JDecimal, tpe: DecimalType) => json.num
+      case (json: JDecimal, tpe: DoubleType) => json.num.toDouble
+      case (json: JDouble, tpe: DoubleType) => json.num
+      case (json: JDouble, tpe: FloatType) => json.num.toFloat
+      case (json: JBool, tpe: BooleanType) => json.value
+      case (json: JString, tpe: TimestampType) => CatalystTypeConverters.convertToCatalyst(
+        Try(OffsetDateTime.parse(json.s).toInstant)
+          .toOption.getOrElse(Timestamp.valueOf(LocalDateTime.parse(json.s)))
+      )
+      case (JNothing | JNull, _) => null
+    }
+  }
+
+  def convertObject(obj: JObject, schema: StructType): InternalRow = {
+    val row = new GenericInternalRow(schema.length)
+    schema.zipWithIndex.foreach {
+      case (field,idx) => row.update(idx, convert(obj \ field.name, field.dataType))
+    }
+    row
+  }
+
+  def convertProduct(x: Product, schema: StructType): InternalRow = {
+    val row = new GenericInternalRow(schema.length)
+    val values = ProductUtil.attributesWithValuesForCaseClass(x).toMap
+    schema.zipWithIndex.foreach {
+      case (field,idx) => row.update(idx, convert(values.get(field.name).orElse(null), field.dataType))
+    }
+    row
   }
 }
 
