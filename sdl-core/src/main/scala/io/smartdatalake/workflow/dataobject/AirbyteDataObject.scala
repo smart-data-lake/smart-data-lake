@@ -26,34 +26,24 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.json.JsonUtils._
-import io.smartdatalake.util.json.{JsonUtils, SchemaConverter}
-import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import org.apache.spark.SparkEnv
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
-import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.custom.SQLUtils
+import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.unsafe.types.UTF8String
-import org.json4s
+import org.apache.spark.sql.{DataFrame, DatasetHelper}
 import org.json4s.Formats
-import org.json4s.JsonAST._
 import org.json4s.jackson.JsonMethods.compact
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.sql.Timestamp
-import java.time.{LocalDateTime, OffsetDateTime}
 import scala.jdk.CollectionConverters._
 import scala.reflect.{ClassTag, classTag}
-import scala.util.Try
 
 /**
  * Uses an Airbyte Connector to read data from a data source.
@@ -64,6 +54,8 @@ import scala.util.Try
  *
  * Limitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.
  * In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
+ *
+ * Also note that the getDataFrame method is not lazy in Exec-Phase. It will will query the Airbyte Connector before creating the DataFrame.
  *
  * @param id DataObject identifier
  * @param config Configuration for the source
@@ -112,7 +104,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
     configuredStream = Some(
       ConfiguredAirbyteStream(stream.get, SyncModeEnum.full_refresh, if (incrementalCursorFields.nonEmpty) Some(incrementalCursorFields) else None, DestinationSyncModeEnum.append, primary_key = None)
     )
-    schema = Some(SchemaConverter.convert(jsonToString(configuredStream.get.stream.json_schema)))
+    schema = Some(JsonSchemaConverter.convertParsedSchemaToSpark(configuredStream.get.stream.json_schema))
     logger.info(s"($id) got schema: ${schema.get.simpleString}")
   }
 
@@ -136,19 +128,8 @@ case class AirbyteDataObject(override val id: DataObjectId,
               None
             case _ => None
           }
-        // split data into blocks to avoid getting out of memory, save blocks to Spark BlockManager
-        val blocks = data
-          .map(r => JsonUtils.convertObjectToCatalyst(r.data, schema.get))
-          .grouped(maxRecordsPerPartition)
-          .map {
-            records =>
-              val blockId = SQLUtils.getNewBlockId
-              SparkEnv.get.blockManager.putIterator(blockId, records.toIterator, StorageLevel.MEMORY_AND_DISK_SER)
-              blockId
-          }
-        // create RDD and DataFrame from blocks
-        val rdd = SQLUtils.createBlockRDD[InternalRow](blocks.toSeq)
-        SQLUtils.internalCreateDataFrame(rdd, schema.get)
+        val rows = data.map(r => JsonUtils.convertObjectToCatalyst(r.data, schema.get))
+        DatasetHelper.parallelizeInternalRows(rows, schema.get, maxRecordsPerPartition)
     }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
