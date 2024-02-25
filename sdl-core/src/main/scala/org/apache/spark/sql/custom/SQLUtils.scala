@@ -19,13 +19,24 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{BlockRDD, RDD}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.storage.{BlockId, TempLocalBlockId}
+
+import java.util.UUID
+import scala.reflect.ClassTag
 
 object SQLUtils {
   def internalCreateDataFrame(catalystRows: RDD[InternalRow], schema: StructType, isStreaming: Boolean = false)(implicit session: SparkSession): DataFrame = {
     session.internalCreateDataFrame(catalystRows, schema, isStreaming)
   }
+  def createBlockRDD[T: ClassTag](blockIds: Seq[BlockId])(implicit session: SparkSession) = {
+    new BlockRDD[T](session.sparkContext, blockIds.toArray)
+  }
+  def getNewBlockId = TempLocalBlockId(UUID.randomUUID())
+
+
+
 }

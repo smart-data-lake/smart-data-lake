@@ -37,7 +37,7 @@ case $op in
       echo '{"type": "LOG", "log": {"level": "ERROR", "message": "1 jsonfile parameter expected, got '$JSONFILE_PARAM_CNT'"}}'
       exit -1
     fi
-    echo '{ "type": "CATALOG", "catalog": { "streams": [ { "name": "mystream", "json_schema": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "produkttyp": { "type": "string" }, "flag": { "type": "boolean" }, "artikelID": { "type": "string" }, "price": { "type": "number" }, "artikelbezeichnung": { "type": "string" }, "updated": { "type": "string", "format": "date-time" } } }, "supported_sync_modes": [ "full_refresh" ] } ] } }'
+    echo '{ "type": "CATALOG", "catalog": { "streams": [ { "name": "mystream", "json_schema": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "produkttyp": { "type": "string" }, "flag": { "type": "boolean" }, "artikelID": { "type": "string" }, "price": { "type": "number" }, "artikelbezeichnung": { "type": "string" }, "updated": { "type": "string", "format": "date-time" }, "updatedNTZ": { "type": "string", "format": "date-time", "airbyte_type": "timestamp_without_timezone" } } }, "supported_sync_modes": [ "full_refresh" ] } ] } }'
     ;;
 
   read)
@@ -45,7 +45,7 @@ case $op in
       echo '{"type": "LOG", "log": {"level": "ERROR", "message": "2 jsonfile parameter expected, got '$JSONFILE_PARAM_CNT'"}}'
       exit -1
     fi
-    echo '{"type": "RECORD", "record": {"stream": "mystream", "data": {"produkttyp": "TEST", "flag": true, "artikelID": "123", "price": 2345.67, "artikelbezeichnung": "Test Auto", "updated": "2022-11-22T01:23:45"}, "emitted_at": 1640029476000}}'
+    echo '{"type": "RECORD", "record": {"stream": "mystream", "data": {"produkttyp": "TEST", "flag": true, "artikelID": "123", "price": 2345.67, "artikelbezeichnung": "Test Auto", "updated": "2022-11-22T01:23:45", "updatedNTZ": "2022-11-22T01:23:45"}, "emitted_at": 1640029476000}}'
     ;;
 
 esac
