@@ -1,9 +1,8 @@
 package io.smartdatalake.util.json
 
+import io.smartdatalake.util.json.SchemaConverter._
 import org.apache.spark.sql.types._
 import org.json4s._
-import io.smartdatalake.util.json.SchemaConverter._
-import org.json4s
 
 import scala.annotation.tailrec
 
@@ -189,7 +188,13 @@ class SchemaConverter(inputSchema: JObject,
       throw new IllegalStateException(s"type is empty in schema at $name")
     case jsonObj: JObject =>
       val resolvedJsonObj = resolveRefs(jsonObj)
-      val jsonType = (resolvedJsonObj \ SchemaFieldFormat).toOption
+      // prepare SchemaFieldFormat (Airbyte extension)
+      val temporalTypeWithoutTimeZone = (resolvedJsonObj \ SchemaFieldAirbyteType).toOption.collect { case x: JString => x }
+        .exists(_.s.endsWith("without_timezone"))
+      val jsonFormat = (resolvedJsonObj \ SchemaFieldFormat).toOption.collect { case x: JString => x }
+        .map(str => JString(str.s + (if (temporalTypeWithoutTimeZone) "-ntz" else "")))
+      // prepare jsonType: format as higher prio than fieldType.
+      val jsonType = jsonFormat
         .orElse((resolvedJsonObj \ SchemaFieldType).toOption)
         .orElse((resolvedJsonObj \ SchemaFieldOneOf).toOption)
       assert(jsonType.isDefined, throw new IllegalArgumentException(s"No 'type'-field in schema at <$name>"))
@@ -258,6 +263,7 @@ object SchemaConverter {
   private val SchemaFieldName = "name"
   private val SchemaFieldType = "type"
   private val SchemaFieldFormat = "format"
+  private val SchemaFieldAirbyteType = "airbyte_type"
   private val SchemaFieldOneOf = "oneOf"
   private val SchemaFieldId = "id"
   private val SchemaFieldProperties = "properties"
@@ -268,13 +274,15 @@ object SchemaConverter {
   private val SchemaRoot = "/"
   private val Definitions = "definitions"
   private val Reference = "$ref"
-  private val SimpleTypeMap = Map(
+  private val SimpleTypeMap = Map[String,DataType](
     "string" -> StringType,
-    "number" -> DoubleType,
-    "float" -> FloatType,
+    "number" -> DecimalType.SYSTEM_DEFAULT,
+    "float" -> DoubleType,
     "integer" -> LongType,
     "boolean" -> BooleanType,
-    "date-time" -> TimestampType
+    "date-time" -> TimestampType,
+    "date-time-ntz" -> TimestampNTZType,
+    "date" -> DateType
   )
 
   def convertStrict(schemaContent: String): StructType = {

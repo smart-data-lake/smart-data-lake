@@ -30,6 +30,7 @@ import org.json4s.{Formats, JBool, JDecimal, JObject, JString}
 
 import java.nio.file.Files
 import java.sql.Timestamp
+import java.time.LocalDateTime
 import scala.collection.mutable
 
 class AirbyteDataObjectTest extends DataObjectTestSuite {
@@ -58,8 +59,8 @@ class AirbyteDataObjectTest extends DataObjectTestSuite {
     )
     dataObject.prepare
     val actual = dataObject.getSparkDataFrame()(contextExec)
-    val expected = Seq(("TEST", true, "123", 2345.67, "Test Auto", Timestamp.valueOf("2022-11-22 01:23:45")))
-      .toDF("produkttyp", "flag", "artikelID", "price", "artikelbezeichnung", "updated")
+    val expected = Seq(("TEST", true, "123", 2345.67, "Test Auto", Timestamp.valueOf("2022-11-22 01:23:45"), LocalDateTime.parse("2022-11-22T01:23:45")))
+      .toDF("produkttyp", "flag", "artikelID", "price", "artikelbezeichnung", "updated", "updatedNTZ")
     val resultat = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("wsl cmd test", Seq())(actual)(expected)
     assert(resultat)
