@@ -1,7 +1,7 @@
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.json.SchemaConverter
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types.StructType
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.{DefaultFormats, Formats, JObject}
@@ -9,7 +9,7 @@ import org.json4s.{DefaultFormats, Formats, JObject}
 import scala.collection.mutable
 
 /**
- * Methods to parse Arbyte message stresam
+ * Methods to parse Arbyte message stream
  */
 private[smartdatalake] object AirbyteMessage extends SmartDataLakeLogger {
   import org.json4s._
@@ -178,9 +178,7 @@ private[smartdatalake] case class AirbyteStream(
                                                  namespace: Option[String] = None
                                                ) {
   def getSparkSchema: StructType = {
-    import org.json4s.jackson.JsonMethods._
-    implicit val formats: Formats = DefaultFormats
-    SchemaConverter.convert(compact(json_schema \ "properties"))
+    JsonSchemaConverter.convertParsedSchemaToSpark(json_schema)
   }
 }
 
