@@ -21,12 +21,14 @@ package io.smartdatalake.util.misc
 
 import org.apache.commons.pool2.impl.GenericObjectPool
 
+import java.sql.Connection
+
 object WithResourcePool {
   /**
    * tries executing some function and returns the resource afterwards to the pool
    */
-  def exec[A, B](pool: GenericObjectPool[A])(func: A => B): B = {
-    val resource = pool.borrowObject()
+  def exec[A, B](pool: ConnectionPool[A])(func: A => B): B = {
+    val resource = pool.borrowObject
     try {
       val result = func(resource)
       result

@@ -20,13 +20,10 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
-import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil, SmartDataLakeLogger, WithResourcePool}
+import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
-import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
-import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
-import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
@@ -36,7 +33,6 @@ import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.types.StructType
 
 import java.sql.{DriverManager, ResultSet, Statement, Connection => SqlConnection}
-import java.time.Duration
 
 /**
  * Connection information for jdbc tables.
@@ -55,6 +51,8 @@ import java.time.Duration
  * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
  *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
+ * @param connectionPoolClassName Optional class name of an implementation of JdbcConnectionPool. By default JdbcConnectionPoolImpl is used.
+ *                                In addition JdbcConnectionPool implementations must also have a constructor with a JdbcTableConnection as argument.
  * @param directTableOverwrite flag to enable overwriting target tables directly without creating temporary table.
  *                         Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
  *                         For SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
@@ -72,6 +70,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                connectionPoolMaxWaitTimeSec: Int = 600,
                                @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None,
+                               connectionPoolClassName: Option[String] = None,
                                directTableOverwrite: Boolean = false,
                                override val metadata: Option[ConnectionMetadata] = None,
                                ) extends Connection with SmartDataLakeLogger {
@@ -82,6 +81,18 @@ case class JdbcTableConnection(override val id: ConnectionId,
 
   // prepare catalog implementation
   val catalog: JdbcCatalog = JdbcCatalog.fromJdbcDriver(driver, this)
+
+  // connection pool - instantiate using connectionPoolClassName if defined, otherwise use JdbcConnectionPoolImpl
+  val pool: ConnectionPool[SqlConnection] = connectionPoolClassName.map(className =>
+    try {
+      val clazz = Environment.classLoader().loadClass(className)
+      val constructor = clazz.getConstructor(classOf[JdbcTableConnection])
+      constructor.newInstance(this).asInstanceOf[ConnectionPool[SqlConnection]]
+    } catch {
+      case e: NoSuchMethodException => throw ConfigurationException(s"($id) Connection Pool class $className needs constructor with one parameter of type JdbcConnectionPool: ${e.getMessage}", Some("connectionPoolClassName"), e)
+      case e: Exception => throw ConfigurationException(s"($id) Cannot instantiate Connection Pool class $className: ${e.getMessage}", Some("connectionPoolClassName"), e)
+    }
+  ).getOrElse(new DefaultConnectionPool[SqlConnection](maxParallelConnections, connectionPoolMaxIdleTimeSec, connectionPoolMaxWaitTimeSec, Unit => JdbcConnectionFactory.getConnection(this), _.close))
 
   /**
    * Get a connection from the pool and execute an arbitrary function
@@ -153,18 +164,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
     execWithJdbcConnection{ _ => () }
   }
 
-  private def getConnection: SqlConnection = {
-    Class.forName(driver)
-    if (authMode.isDefined) authMode.get match {
-      case m: BasicAuthMode => DriverManager.getConnection(url, m.userSecret.resolve(), m.passwordSecret.resolve())
-      case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
-    } else DriverManager.getConnection(url)
-  }
-
   def getAuthModeSparkOptions: Map[String,String] = {
     if (authMode.isDefined) authMode.get match {
       case m: BasicAuthMode => Map( "user" -> m.userSecret.resolve(), "password" -> m.passwordSecret.resolve())
-      case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
+      case _ => throw new IllegalArgumentException(s"($id) ${authMode.getClass.getSimpleName} not supported.")
     } else Map()
   }
 
@@ -211,36 +214,6 @@ case class JdbcTableConnection(override val id: ConnectionId,
     }
   }
 
-  // setup connection pool
-  val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory)
-  pool.setMaxTotal(maxParallelConnections)
-  pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close jdbc connection if not in use
-  pool.setMaxWait(Duration.ofSeconds(connectionPoolMaxWaitTimeSec))
-
-  private class JdbcClientPoolFactory extends BasePooledObjectFactory[SqlConnection] {
-    override def create(): SqlConnection = {
-      val connection = getConnection
-      initConnection(connection)
-    }
-
-    private def initConnection(connection: SqlConnection): SqlConnection = {
-      connectionInitSql.foreach(initSql => {
-        var stmt: Statement = null
-        try {
-          stmt = connection.createStatement()
-          stmt.execute(initSql)
-        } finally {
-          if (stmt != null) stmt.close()
-        }
-      })
-      connection.setAutoCommit(autoCommit)
-      connection
-    }
-
-    override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
-    override def destroyObject(p: PooledObject[SqlConnection]): Unit = p.getObject.close()
-  }
-
   /**
    * Begin database transaction. Note that depending on the isolation level of the database, changes from concurrent
    * connections might not be available inside the transaction once it is started. So make sure that any required writes
@@ -255,12 +228,12 @@ case class JdbcTableConnection(override val id: ConnectionId,
    */
   class JdbcTransaction(connection: JdbcTableConnection) extends SmartDataLakeLogger {
     logger.info(s"($id) begin transaction")
-    private val jdbcConnection: SqlConnection = connection.pool.borrowObject()
+    private val jdbcConnection: SqlConnection = connection.pool.borrowObject
 
     def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
       connection.execWithJdbcStatement(jdbcConnection, doCommit = false) { stmt =>
         if (logging) logger.info(s"($id) execJdbcStatement in transaction: $sql")
-        if (autoCommit) logger.warn("autoCommit is enabled, so statement will be committed immediately")
+        if (autoCommit) logger.warn(s"($id) autoCommit is enabled, so statement will be committed immediately")
         stmt.execute(sql)
       }
     }
@@ -299,5 +272,37 @@ case class JdbcTableConnection(override val id: ConnectionId,
 object JdbcTableConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableConnection = {
     extract[JdbcTableConnection](config)
+  }
+}
+
+/**
+ * Helper methods to create and initialize JDBC connection
+ *
+ * Note: These methods are separated from JdbcTableConnection by intention to avoid using them JDBC connections without pool.
+ * Jdbc connections should be created and managed by a pool.
+ */
+object JdbcConnectionFactory {
+  def getConnection(jdbcTableConnection: JdbcTableConnection): SqlConnection = {
+    // create connection
+    Class.forName(jdbcTableConnection.driver)
+    val connection = if (jdbcTableConnection.authMode.isDefined) jdbcTableConnection.authMode.get match {
+      case m: BasicAuthMode => DriverManager.getConnection(jdbcTableConnection.url, m.userSecret.resolve(), m.passwordSecret.resolve())
+      case _ => throw new IllegalArgumentException(s"${jdbcTableConnection.authMode.getClass.getSimpleName} not supported.")
+    } else DriverManager.getConnection(jdbcTableConnection.url)
+
+    // init connection
+    jdbcTableConnection.connectionInitSql.foreach(initSql => {
+      var stmt: Statement = null
+      try {
+        stmt = connection.createStatement()
+        stmt.execute(initSql)
+      } finally {
+        if (stmt != null) stmt.close()
+      }
+    })
+    connection.setAutoCommit(jdbcTableConnection.autoCommit)
+
+    // return
+    connection
   }
 }

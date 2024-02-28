@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import io.smartdatalake.util.filetransfer.SshUtil
-import io.smartdatalake.util.misc.WithResourcePool
+import io.smartdatalake.util.misc.{DefaultConnectionPool, WithResourcePool}
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}
@@ -43,6 +43,7 @@ import java.time.Duration
  * @param ignoreHostKeyVerification do not validate host key if true, default is false
  * @param maxParallelConnections number of parallel sftp connections created by an instance of this connection
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
+ * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
  * @param metadata
  */
 case class SFtpFileRefConnection(override val id: ConnectionId,
@@ -53,6 +54,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
                                  ignoreHostKeyVerification: Boolean = false,
                                  maxParallelConnections: Int = 1,
                                  connectionPoolMaxIdleTimeSec: Int = 3,
+                                 connectionPoolMaxWaitTimeSec: Int = 600,
                                  override val metadata: Option[ConnectionMetadata] = None
                                  ) extends Connection {
   require(maxParallelConnections > 0, s"maxParallelConnections must be greater than 0, but is $maxParallelConnections")
@@ -80,14 +82,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   }
 
   // setup connection pool
-  val pool = new GenericObjectPool[SFTPClient](new SFtpClientPoolFactory)
-  pool.setMaxTotal(maxParallelConnections)
-  pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
-  private class SFtpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
-    override def create(): SFTPClient = createSshClient.newSFTPClient()
-    override def wrap(sftp: SFTPClient): PooledObject[SFTPClient] = new DefaultPooledObject(sftp)
-    override def destroyObject(p: PooledObject[SFTPClient]): Unit = p.getObject.close()
-}
+  val pool = new DefaultConnectionPool[SFTPClient](maxParallelConnections, connectionPoolMaxIdleTimeSec, connectionPoolMaxWaitTimeSec, Unit => createSshClient.newSFTPClient(), _.close)
 
   override def factory: FromConfigFactory[Connection] = SFtpFileRefConnection
 }
