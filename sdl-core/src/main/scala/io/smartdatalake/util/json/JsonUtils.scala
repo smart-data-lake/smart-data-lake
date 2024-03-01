@@ -67,7 +67,7 @@ object JsonUtils {
       case (x: Product, tpe: StructType) => convertProductToCatalyst(x, tpe)
       case (json: JObject, tpe: StructType) => convertObjectToCatalyst(json, tpe)
       case (json: JArray, tpe: ArrayType) => json.arr.map(convertToCatalyst(_, tpe.elementType))
-      case (json: JString, tpe: StringType) => UTF8String.fromString(json.s)
+      case (json: JString, tpe: StringType) => json.s
       case (json: JLong, tpe: LongType) => json.num
       case (json: JLong, tpe: IntegerType) => json.num.toInt
       case (json: JInt, tpe: LongType) => json.num.toLong
@@ -75,6 +75,7 @@ object JsonUtils {
       case (json: JInt, tpe: DecimalType) => BigDecimal(json.num)
       case (json: JDecimal, tpe: DecimalType) => json.num
       case (json: JDecimal, tpe: DoubleType) => json.num.toDouble
+      case (json: JDouble, tpe: DecimalType) => BigDecimal(json.num)
       case (json: JDouble, tpe: DoubleType) => json.num
       case (json: JDouble, tpe: FloatType) => json.num.toFloat
       case (json: JBool, tpe: BooleanType) => json.value
