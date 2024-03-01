@@ -61,7 +61,6 @@ case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDa
     }.toSeq
   }
 
-  @tailrec
   private def flattenDf(df: DataFrame): DataFrame = {
     val complexFields = getComplexFields(df)
     complexFields.foldLeft(df){
