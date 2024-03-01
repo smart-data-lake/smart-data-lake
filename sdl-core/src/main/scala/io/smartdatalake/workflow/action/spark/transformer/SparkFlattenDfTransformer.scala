@@ -64,17 +64,17 @@ case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDa
   @tailrec
   private def flattenDf(df: DataFrame): DataFrame = {
     val complexFields = getComplexFields(df)
-    if (complexFields.isEmpty) return df;
-    val (colName, colType) = complexFields.head
-    val newDf = colType match {
-      case StructType(fields) => {
-        val inner = for (n <- fields) yield n.name
-        val expanded = for (k <- inner) yield col(colName + '.' + k).alias(colName + '_' + k)
-        df.select(col("*") +: expanded: _*).drop(colName)
-      }
-      case a: ArrayType => df.withColumn(colName, explode_outer(col(colName)))
+    complexFields.foldLeft(df){
+      case (df, (colName, colType)) =>
+        val newDf = colType match {
+          case StructType(fields) =>
+            fields.map(_.name).foldLeft(df) {
+              case (df, name) => df.withColumn(colName + '_' + name, col(colName + '.' + name))
+            }.drop(colName)
+          case a: ArrayType => df.withColumn(colName, explode_outer(col(colName)))
+        }
+        flattenDf(newDf)
     }
-    flattenDf(newDf)
   }
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame =
     flattenDf(df)
