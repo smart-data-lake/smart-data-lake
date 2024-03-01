@@ -4590,6 +4590,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/SparkFlattenDfTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
@@ -5057,6 +5059,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/SparkFlattenDfTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
@@ -5287,6 +5291,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/SparkFlattenDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
               }, {
@@ -6382,6 +6388,30 @@
         "additionalProperties" : false,
         "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.\nThe code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame\nand a map of options and has to return a DataFrame, see also ( [[fnTransformType]] ).\nNotebook-cells starting with \"//!IGNORE\" will be ignored."
       },
+      "SparkFlattenDfTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "SparkFlattenDfTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "enableExplode" : {
+            "type" : "boolean",
+            "description" : "Enables exploding Arrays in the Dataframe, therefore potentially increasing the number of rows. Default is set to \"false\""
+          }
+        },
+        "title" : "SparkFlattenDfTransformer",
+        "required" : [ "type" ],
+        "additionalProperties" : false,
+        "description" : "Returns a flattened Dataframe from another DataFrame\nwith a nested schema. Schemas in the form:\n\n|---parent\n\n|------|child1\n\n|------|child2\n\nare transformed to the following flat columns:\n\n|---parent_child1\n\n|---parent_child2"
+      },
       "SparkRepartitionTransformer" : {
         "type" : "object",
         "properties" : {
@@ -6772,6 +6802,8 @@
               "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/SparkFlattenDfTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
             }, {
