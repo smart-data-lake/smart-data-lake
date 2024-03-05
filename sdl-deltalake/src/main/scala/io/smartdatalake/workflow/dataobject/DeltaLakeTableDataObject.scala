@@ -267,7 +267,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         } else {
           // insert
           if (finalSaveMode == SDLSaveMode.Overwrite) {
-            if (partitionValues.isEmpty) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+            if (partitionValues.isEmpty && !options.get("partitionOverwriteMode").contains("dynamic")) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this DeltaLakeTableDataObject to enable delta lake dynamic partitioning and get around this exception.")
             dfWriter
               .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
               .option("mergeSchema", allowSchemaEvolution)
