@@ -157,7 +157,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("io.delta.sql.DeltaSparkSessionExtension"),
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
-    require(isDbExisting, s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
+    require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
     if (!isTableExisting) {
       require(path.isDefined, s"($id) If DeltaLake table does not exist yet, path must be set.")
       if (filesystem.exists(hadoopPath)) {
@@ -380,7 +380,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
-    context.sparkSession.catalog.databaseExists(table.db.get)
+    context.sparkSession.catalog.databaseExists(table.getDbName)
   }
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {

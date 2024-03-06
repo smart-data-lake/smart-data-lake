@@ -63,6 +63,8 @@ case class Table(
 
   def fullName: String = Seq(catalog,db,Some(name)).flatten.mkString(".")
 
+  def getDbName: String = Seq(catalog,db).flatten.mkString(".")
+
   def nameParts: Seq[String] = fullName.split('.').toSeq
 
   private[smartdatalake] def tableIdentifier: TableIdentifier = {
