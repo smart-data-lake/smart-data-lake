@@ -452,8 +452,8 @@
         <monix.version>3.4.0</monix.version>
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
-        <snowflake-spark.version>2.12.0</snowflake-spark.version>
-        <snowflake-snowpark.version>1.9.0</snowflake-snowpark.version>
+        <snowflake-spark.version>2.15.0</snowflake-spark.version>
+        <snowflake-snowpark.version>1.11.0</snowflake-snowpark.version>
         <keycloak.version>22.0.1</keycloak.version>
         <delta.version>2.4.0</delta.version>
         <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
