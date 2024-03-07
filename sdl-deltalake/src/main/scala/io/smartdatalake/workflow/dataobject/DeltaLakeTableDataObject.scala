@@ -267,12 +267,23 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         } else {
           // insert
           if (finalSaveMode == SDLSaveMode.Overwrite) {
-            if (partitionValues.isEmpty) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
-            dfWriter
-              .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
-              .option("mergeSchema", allowSchemaEvolution)
-              .mode(SparkSaveMode.from(finalSaveMode))
-              .save() // atomic replace (replaceWhere) doesn't work with Table API
+            val overwriteModeisDynamic = options.get("partitionOverwriteMode").contains("dynamic")
+            (partitionValues.isEmpty, overwriteModeisDynamic) match {
+              case (true, false) => throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this DeltaLakeTableDataObject to enable delta lake dynamic partitioning and get around this exception.")
+              case (true, true) => { 
+                dfWriter
+                .option("mergeSchema", allowSchemaEvolution)
+                .mode(SparkSaveMode.from(finalSaveMode))
+                .save() // atomic replace (replaceWhere) doesn't work with Table API
+              }
+              case _ => {
+                dfWriter
+                .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
+                .option("mergeSchema", allowSchemaEvolution)
+                .mode(SparkSaveMode.from(finalSaveMode))
+                .save() // atomic replace (replaceWhere) doesn't work with Table API
+              }
+            }
           } else {
             dfWriter
               .mode(SparkSaveMode.from(finalSaveMode))
