@@ -32,7 +32,7 @@ import java.time.LocalDateTime
 private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: String, appName: String, hadoopConf: Configuration) extends ActionDAGRunStateStore[HadoopFileStateId] with SmartDataLakeLogger {
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
-  private val indexFile = new Path(hadoopStatePath, "index")
+  private val indexFile = new Path(hadoopStatePath, "index.json")
   val currentStatePath: Path = new Path(hadoopStatePath, "current")
   val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
