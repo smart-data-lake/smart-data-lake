@@ -61,11 +61,11 @@ case class Table(
     this.copy(catalog = catalog.orElse(catalogParam), db = db.orElse(dbParam))
   }
 
-  def fullName: String = Seq(catalog,db,Some(name)).flatten.mkString(".")
+  def fullName: String = nameParts.mkString(".")
 
-  def getDbName: String = Seq(catalog,db).flatten.mkString(".")
+  def getDbName: String = nameParts.init.mkString(".")
 
-  def nameParts: Seq[String] = fullName.split('.').toSeq
+  def nameParts: Seq[String] = Seq(catalog, db, Some(name)).flatten
 
   private[smartdatalake] def tableIdentifier: TableIdentifier = {
     TableIdentifier(name, db, catalog)

@@ -82,7 +82,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("iceberg1.default"), name = "custom_df_copy_partitioned", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = IcebergTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
     targetDO.dropTable

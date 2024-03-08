@@ -46,7 +46,6 @@ import org.apache.spark.sql.connector.catalog.{Identifier, SupportsNamespaces, T
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import java.time.Instant
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
@@ -463,7 +462,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
-    getSparkCatalog.namespaceExists(Array(table.db.get))
+    getSparkCatalog.namespaceExists(table.nameParts.init.toArray)
   }
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
