@@ -206,7 +206,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     // second dag run
     {
       val delaySecs = 1
-      Thread.sleep(delaySecs*1000 + 500) // make sure to wait 1s
+      Thread.sleep(delaySecs*1000 + 1000) // make sure to wait some time
       val action1Delay1s = action1Delay10s.copy(
         executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - $delaySecs)"))))
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay1s))

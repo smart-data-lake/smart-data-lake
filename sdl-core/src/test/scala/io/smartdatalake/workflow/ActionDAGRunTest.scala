@@ -96,14 +96,14 @@ class ActionDAGRunTest extends FunSuite {
     // write first state
     {
       stateStore.saveState(state)
-      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index").toString)(session.sparkContext.hadoopConfiguration)
+      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
       assert(index.linesIterator.count(_.trim.nonEmpty) == 1)
     }
 
     // write second state
     {
       stateStore.saveState(state)
-      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index").toString)(session.sparkContext.hadoopConfiguration)
+      val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
       assert(index.linesIterator.count(_.trim.nonEmpty) == 2)
     }
   }
