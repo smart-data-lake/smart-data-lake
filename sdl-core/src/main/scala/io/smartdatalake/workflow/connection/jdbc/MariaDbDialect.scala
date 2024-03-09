@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.connection.jdbc
 
+import org.apache.spark.sql.connector.catalog.Identifier
 import org.apache.spark.sql.connector.expressions.NamedReference
 import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, GeneralAggregateFunc}
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcUtils}
@@ -70,7 +71,7 @@ private case object MariaDbDialect extends JdbcDialect {
   }
 
   override def quoteIdentifier(colName: String): String = {
-    s"`$colName`"
+    s"`${colName}`"
   }
 
   override def schemasExists(conn: java.sql.Connection, options: JDBCOptions, schema: String): Boolean = {
@@ -89,7 +90,7 @@ private case object MariaDbDialect extends JdbcDialect {
       case _: Exception =>
         logWarning("Cannot show schemas.")
     }
-    schemaBuilder.result
+    schemaBuilder.result()
   }
 
   override def getTableExistsQuery(table: String): String = {
@@ -139,27 +140,27 @@ private case object MariaDbDialect extends JdbcDialect {
     throw new SQLFeatureNotSupportedException("Schema comments are not supported in MariaDB.")
   }
 
-  // See https://mariadb.com/kb/en/create-index/
-  override def createIndex(indexName: String, tableName: String, columns: Array[NamedReference],
+  // See c
+  override def createIndex(indexName: String, tableIdent: Identifier, columns: Array[NamedReference],
                            columnsProperties: java.util.Map[NamedReference, java.util.Map[String, String]],
                            properties: java.util.Map[String, String]): String = {
     val columnList = columns.map(col => quoteIdentifier(col.fieldNames.head))
     val (indexType, indexPropertyList) = JdbcUtils.processIndexProperties(properties, "mysql")
 
     s"CREATE INDEX ${quoteIdentifier(indexName)} $indexType ON" +
-      s" ${quoteIdentifier(tableName)} (${columnList.mkString(", ")})" +
+      s" ${quoteIdentifier(tableIdent.name())} (${columnList.mkString(", ")})" +
       s" ${indexPropertyList.mkString(" ")}"
   }
 
   // See https://mariadb.com/kb/en/show-index/
-  override def indexExists(conn: java.sql.Connection, indexName: String, tableName: String, options: JDBCOptions): Boolean = {
-    val sql = s"SHOW INDEXES FROM ${quoteIdentifier(tableName)} WHERE key_name = '$indexName'"
+  override def indexExists(conn: java.sql.Connection, indexName: String, tableIdent: Identifier, options: JDBCOptions): Boolean = {
+    val sql = s"SHOW INDEXES FROM ${quoteIdentifier(tableIdent.name())} WHERE key_name = '$indexName'"
     JdbcUtils.checkIfIndexExists(conn, sql, options)
   }
 
   // See https://mariadb.com/kb/en/drop-index/
-  override def dropIndex(indexName: String, tableName: String): String = {
-    s"DROP INDEX ${quoteIdentifier(indexName)} ON $tableName"
+  override def dropIndex(indexName: String, tableIdent: Identifier): String = {
+    s"DROP INDEX ${quoteIdentifier(indexName)} ON ${tableIdent.name()}"
   }
 
   override def dropSchema(schema: String, cascade: Boolean): String = {

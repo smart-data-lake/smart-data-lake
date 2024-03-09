@@ -31,7 +31,7 @@ import org.scalatest.Matchers.intercept
  */
 object SnowparkIT extends App {
 
-  implicit val sparkSession = TestUtil.sessionHiveCatalog
+  implicit val sparkSession = TestUtil.session
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
 

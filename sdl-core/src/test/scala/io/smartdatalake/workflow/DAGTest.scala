@@ -54,7 +54,7 @@ class TestEventListener extends DAGEventListener[TestNode] with SmartDataLakeLog
     maxConcurrentRuns.set(Math.max(concurrentRuns.get,maxConcurrentRuns.get))
     nodeStarts.append(node.nodeId)
     logger.info(s"${node.nodeId} started (" + concurrentRuns.get +" job(s) running currently)") }
-  override def onNodeFailure(exception: Throwable)(node: TestNode): Unit = { logger.error(s"${node.nodeId} failed with ${exception.getClass.getSimpleName}"); concurrentRuns.decrementAndGet }
+  override def onNodeFailure(exception: Throwable, partialResults: Seq[DAGResult] = Seq())(node: TestNode): Unit = { logger.error(s"${node.nodeId} failed with ${exception.getClass.getSimpleName}"); concurrentRuns.decrementAndGet }
   override def onNodeSkipped(exception: Throwable)(node: TestNode): Unit = logger.warn(s"${node.nodeId} skipped because ${exception.getClass.getSimpleName}")
   override def onNodeSuccess(result: Seq[DAGResult])(node: TestNode): Unit = { logger.info(s"${node.nodeId} succeeded"); concurrentRuns.decrementAndGet }
 }
@@ -62,7 +62,7 @@ class TestEventListener extends DAGEventListener[TestNode] with SmartDataLakeLog
 class DAGTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   before {
-    execCntPerNode.clear
+    execCntPerNode.clear()
   }
 
   test("create and run dag: linear unordered") {

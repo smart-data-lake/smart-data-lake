@@ -2,7 +2,7 @@ package io.smartdatalake.meta
 
 import io.smartdatalake.definitions.{AuthMode, SaveModeOptions}
 import io.smartdatalake.meta.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
@@ -13,7 +13,8 @@ import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, Hou
 import org.reflections.Reflections
 import scaladoc.Tag
 
-import scala.collection.JavaConverters._
+import scala.reflect.internal.Symbols
+import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
 
 
@@ -45,7 +46,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[CustomDfTransformerConfig]
   )
 
-  def getReflections = new Reflections("io.smartdatalake")
+  def getReflections = ReflectionUtil.getReflections("io.smartdatalake")
 
   /**
    * Finds all relevant types according to the config and generates GenericTypeDefs for them.
@@ -103,7 +104,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
         .toSet
       val methodsWithoutParams = typeDef.tpe.decls.filter(_.isMethod).map(_.asMethod)
         .filter(m => m.paramLists.isEmpty || m.paramLists.map(_.size) == List(0))
-        .map(m => (m.name.toString,extractOptionalType(m.typeSignature.resultType)))
+        .flatMap(m => extractOptionalResultType(m).map(t => (m.name.toString,t)))
         .toSet
       val propagatedAttributes = candidateAttributes.filter(candidateAttribute => {
         methodsWithoutParams.contains((candidateAttribute.name,candidateAttribute.tpe))
@@ -112,9 +113,17 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     } else typeDef
   }
 
-  private def extractOptionalType(tpe: Type) = {
-    if (tpe <:< typeOf[scala.Option[_]]) tpe.typeArgs.head
-    else tpe
+  private def extractOptionalResultType(m: MethodSymbol): Option[Type] = {
+    try {
+      val tpe = m.typeSignature.resultType
+      val t = if (tpe <:< typeOf[scala.Option[_]]) tpe.typeArgs.head else tpe
+      Some(t)
+    } catch {
+      // reflection might cause "illegal cyclic reference involving class InterfaceAudience" with Annotation from InterfaceAudience in hadoop-annotations library.
+      case e: Symbols#CyclicReference =>
+        logger.warn(s"Could not extractOptionalResultType from ${m.toString}: ${e.getMessage}. This is caused by using reflection when hadoop-annotations being in the classpath.")
+        None
+    }
   }
 
   def typeDefForClass(tpe: Type, interestingSuperTypes: Seq[Type] = Seq(), baseType: Option[Type] = None): GenericTypeDef = {
@@ -124,7 +133,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     val name = tpe.typeSymbol.name.toString
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
     val description = scaladoc.map(formatScaladocWithTags(_, !_.isInstanceOf[Tag.Param]))
-    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString)).getOrElse(Map())) else Seq()
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
     GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
   }
 

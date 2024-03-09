@@ -19,13 +19,13 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.FromConfigFactory
+import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfsTransformer
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -53,5 +53,11 @@ case class ScalaClassGenericDfsTransformer(override val name: String = "scalaTra
     customTransformer.transformPartitionValues(options, partitionValues)
   }
 
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDfsTransformer
+  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassGenericDfsTransformer
+}
+
+object ScalaClassGenericDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassGenericDfsTransformer = {
+    extract[ScalaClassGenericDfsTransformer](config)
+  }
 }

@@ -21,7 +21,8 @@ package io.smartdatalake.lab
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeedCompanion}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, CanHandlePartitions, CanWriteSparkDataFrame, DataObject, FileRefDataObject, HadoopFileDataObject, HasHadoopStandardFilestore, HiveTableDataObject, TableDataObject}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
@@ -39,11 +40,15 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def get(topLevelPartitions: Seq[String]): DataFrame = {
     if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called get(...) with topLevelPartitions ${topLevelPartitions.mkString(",")}")
     val topLevelPartitionColumn = partitionColumns.head
-    dataObject.getSparkDataFrame(topLevelPartitions.map(p => PartitionValues(Map(topLevelPartitionColumn -> p))))(context)
+    getWithPartitions(topLevelPartitions.map(p => Map(topLevelPartitionColumn -> p)))
   }
   def getWithPartitions(partitions: Seq[Map[String,String]]): DataFrame = {
     if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
-    dataObject.getSparkDataFrame(partitions.map(PartitionValues(_)))(context)
+    implicit val subFeedHelper: SparkSubFeed.type = SparkSubFeed
+    val partitionValues = partitions.map(pv => PartitionValues(pv))
+    dataObject.getDataFrame(partitionValues, SparkSubFeed.subFeedType)(context)
+      .where(partitionValues.map(_.getFilterExpr).reduce(_ or _))
+      .asInstanceOf[SparkDataFrame].inner
   }
   def write(dataFrame: DataFrame, topLevelPartitions: Seq[String] = Seq()): Unit = {
     writeWithPartitions(dataFrame, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
@@ -63,11 +68,15 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
 
-  def infos: Map[String,String] = {
+  /**
+   * Returns information about this DataObject, such as statistics, table name, ...
+   * @param updateStats if true, more costly operations such as "analyze table" are executed before returning results.
+   */
+  def infos(updateStats: Boolean = false): Map[String,String] = {
     Seq(
       Some(dataObject).collect{case o: TableDataObject => ("table", o.table.fullName)},
       Some(dataObject).collect{case o: FileRefDataObject => ("path", o.getPath(context))}
-    ).flatten.toMap
+    ).flatten.toMap ++ dataObject.getStats(updateStats)(context).mapValues(_.toString)
   }
 
   def partitionColumns: Seq[String] = dataObject match {
@@ -75,7 +84,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => Seq()
   }
   def partitions: Seq[Map[String,String]] = dataObject match {
-    case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString))
+    case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString).toMap)
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
   def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head))

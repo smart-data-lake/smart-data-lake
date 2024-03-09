@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions}
+import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -70,13 +70,19 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val resultat = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("CustomDf2DeltaTable",Seq())(actual)(expected)
     assert(resultat)
+
+    // check statistics
+    assert(targetDO.getStats().apply(TableStatsType.NumRows.toString) == 2)
+    val colStats = targetDO.getColumnStats()
+    assert(colStats.apply("num").get(ColumnStatsType.Max.toString).contains(1))
+    assert(colStats.apply("text").get(ColumnStatsType.Max.toString).contains("Foo!"))
   }
 
   test("Write data partitioned") {
 
     // setup DataObjects
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("iceberg1.default"), name = "custom_df_copy_partitioned", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = IcebergTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
     targetDO.dropTable

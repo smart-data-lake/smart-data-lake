@@ -21,4 +21,4 @@ package io.smartdatalake.meta.dagexporter
 
 import io.smartdatalake.workflow.action.ActionMetadata
 
-case class SimplifiedAction(metadata: Option[ActionMetadata], inputIds: Seq[String], outputIds: Seq[String])
+private[dagexporter] case class SimplifiedAction(metadata: Option[ActionMetadata], inputIds: Seq[String], outputIds: Seq[String])

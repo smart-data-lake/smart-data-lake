@@ -3,7 +3,7 @@ package io.smartdatalake.util.misc
 import java.lang.management.{BufferPoolMXBean, ManagementFactory}
 import java.util.{Timer, TimerTask}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Utils to monitor memory usage and shutdown cause

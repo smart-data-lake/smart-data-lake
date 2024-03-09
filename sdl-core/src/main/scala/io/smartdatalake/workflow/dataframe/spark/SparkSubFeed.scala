@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
@@ -49,7 +50,8 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val isSkipped: Boolean = false,
                         override val isDummy: Boolean = false,
                         override val filter: Option[String] = None,
-                        @transient override val observation: Option[DataFrameObservation] = None
+                        @transient override val observation: Option[DataFrameObservation] = None,
+                        override val metrics: Option[MetricsMap] = None
                        )
   extends DataFrameSubFeed {
   @transient
@@ -113,11 +115,11 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     } else this.copy(filter = None, observation = None)
   }
   override def persist: SparkSubFeed = {
-    this.dataFrame.foreach(_.inner.persist) // Spark's persist & cache can be called without referencing the resulting DataFrame
+    this.dataFrame.foreach(_.inner.persist()) // Spark's persist & cache can be called without referencing the resulting DataFrame
     this
   }
   override def unpersist: SparkSubFeed = {
-    this.dataFrame.foreach(_.inner.unpersist) // Spark's unpersist can be called without referencing the resulting DataFrame
+    this.dataFrame.foreach(_.inner.unpersist()) // Spark's unpersist can be called without referencing the resulting DataFrame
     this
   }
   override def isStreaming: Option[Boolean] = dataFrame.map(_.inner.isStreaming)
@@ -146,6 +148,9 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = partitionValues, filter = filter)
       .applyFilter
   }
+  override def withMetrics(metrics: MetricsMap): SparkSubFeed = this.copy(metrics = Some(metrics))
+  def appendMetrics(metrics: MetricsMap): SparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+
 }
 
 object SparkSubFeed extends DataFrameSubFeedCompanion {
@@ -279,5 +284,10 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
 
   def apply( dataFrame: SparkDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues]): SparkSubFeed = {
     SparkSubFeed(Some(dataFrame), dataObjectId: DataObjectId, partitionValues)
+  }
+
+  override def coalesce(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
 }

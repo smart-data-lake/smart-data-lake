@@ -39,8 +39,8 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 
 class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
-  import sessionHiveCatalog.implicits._
+  protected implicit val session: SparkSession = TestUtil.session
+  import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)

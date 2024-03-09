@@ -39,7 +39,7 @@ case class SmartDataLakeBuilderLab[T](
                                        private val dataObjectCatalogFactory: (InstanceRegistry, ActionPipelineContext) => T,
                                        private val userClassLoader: Option[ClassLoader] = None
                                      ) {
-  @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader)
+  @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader, session.sparkContext.hadoopConfiguration)
   @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
   @transient val data: T = dataObjectCatalogFactory(registry, context)
 }

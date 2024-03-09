@@ -23,6 +23,7 @@ import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructT
 import com.snowflake.snowpark.{Column, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
@@ -38,7 +39,8 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val isSkipped: Boolean = false,
                            override val isDummy: Boolean = false,
                            override val filter: Option[String] = None,
-                           @transient override val observation: Option[DataFrameObservation] = None
+                           @transient override val observation: Option[DataFrameObservation] = None,
+                           override val metrics: Option[MetricsMap] = None
                           )
   extends DataFrameSubFeed {
   @transient
@@ -137,6 +139,11 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   override def movePartitionColumnsLast(partitions: Seq[String]): SnowparkSubFeed = {
     withDataFrame(dataFrame.map(x => x.movePartitionColsLast(partitions)))
   }
+
+  override def withMetrics(metrics: MetricsMap): SnowparkSubFeed = {
+    this.copy(metrics = Some(metrics))
+  }
+  def appendMetrics(metrics: MetricsMap): SnowparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 }
 
 object SnowparkSubFeed extends DataFrameSubFeedCompanion {
@@ -264,5 +271,10 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
     SnowparkSchema(StructType(fields.map(_.asInstanceOf[SnowparkField].inner)))
+  }
+
+  override def coalesce(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SnowparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
 }

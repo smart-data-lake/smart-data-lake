@@ -24,6 +24,7 @@ import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig, SdlConfigObjec
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -45,7 +46,7 @@ trait PartitionValueTransformer {
 
   private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
     val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct, executionModeResultOptions) // note that stream is lazy -> distinct is only calculated if transformPartitionValues creates a mapping.
-    thisPartitionValuesMap.map(newMapping => partitionValuesMap.mapValues(newMapping))
+    thisPartitionValuesMap.map(newMapping => partitionValuesMap.mapValues(newMapping).toMap)
       .getOrElse(partitionValuesMap)
   }
 }
@@ -61,7 +62,7 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
   /**
    * Optional function to implement validations in prepare phase.
    */
-  def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = Unit
+  def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = ()
   /**
    * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
    */
@@ -132,14 +133,18 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
   final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
+    // prepare default options
+    val defaultOptions = Seq(
+      IS_EXEC -> context.isExecPhase.toString
+    ).toMap
     // transform
-    transformWithOptions(actionId, partitionValues, df, dataObjectId, options ++ runtimeOptionsReplaced ++ executionModeResultOptions ++ previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _))
+    transformWithOptions(actionId, partitionValues, df, dataObjectId, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions ++ previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _))
   }
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
     runtimeOptions.mapValues {
       expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get)
+    }.filter(_._2.isDefined).mapValues(_.get).toMap
   }
 }
 object OptionsGenericDfTransformer {

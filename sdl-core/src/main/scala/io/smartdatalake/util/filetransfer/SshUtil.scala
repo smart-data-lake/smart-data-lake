@@ -29,7 +29,7 @@ import java.io.{InputStream, OutputStream}
 import java.net.{InetAddress, Proxy, Socket}
 import java.util
 import javax.net.SocketFactory
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.Try
 
@@ -96,11 +96,11 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
       }
       if (newglobPathElementsTodo.isEmpty) {
         fileAttrs.filter(!_.isDirectory)
-          .map( a => (globPathElementsResolved :+ a.getName).mkString("/"))
+          .map( a => (globPathElementsResolved :+ a.getName).mkString("/")).toSeq
       }
       else {
         fileAttrs.filter(_.isDirectory)
-          .flatMap( f => lsGlobElement( basePath, globPathElementsResolved :+ f.getName, newglobPathElementsTodo ))
+          .flatMap( f => lsGlobElement( basePath, globPathElementsResolved :+ f.getName, newglobPathElementsTodo )).toSeq
       }
     }
     val (basePath, childPathElements) = splitPathElements(path)
@@ -121,7 +121,7 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     if (deleteSource) sftp.rm(srcPath)
 
     // return
-    copiedFiles
+    copiedFiles.toSeq
   }
 
   def getInputStream(path: String, onCloseFunc: () => Unit)(implicit sftp: SFTPClient): InputStream = {
@@ -163,18 +163,27 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     val path = new Path(filename)
 
     // override methods
-    def getChild(file: String): HDFSFile = {
+    override def getChild(file: String): HDFSFile = {
       val childFilename = filename + (if (!filename.last.equals('/')) "/" else "") + file
       new HDFSFile(childFilename, copiedFiles, overwrite)
     }
 
-    def getOutputStream: java.io.OutputStream = {
-      // update stats
-      copiedFiles.append(filename)
-      hdfs.create(path, overwrite)
+    override def getOutputStream: java.io.OutputStream = {
+      getOutputStream(false)
     }
 
-    def getTargetDirectory(dirname: String): LocalDestFile = {
+    override def getOutputStream(append: Boolean): OutputStream = {
+      // update stats
+      copiedFiles.append(filename)
+      if (append) hdfs.append(path)
+      else hdfs.create(path, overwrite)
+    }
+
+    override def getLength: Long = {
+      hdfs.getFileStatus(path).getLen
+    }
+
+    override def getTargetDirectory(dirname: String): LocalDestFile = {
       val tgtDir = getChild(dirname)
       // check parent directory
       if (hdfs.exists(path) && hdfs.isFile(path)) throw new IOException(path + " existiert bereits als file")
@@ -185,7 +194,7 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
       tgtDir
     }
 
-    def getTargetFile(filename: String): LocalDestFile = {
+    override def getTargetFile(filename: String): LocalDestFile = {
       val tgtFile = getChild(filename)
       // create parent directory if missing
       //if (!fs.exists(path)) println( s"creating directory $path" )
@@ -195,11 +204,11 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
       tgtFile
     }
 
-    def setLastAccessedTime(atime: Long): Unit = {/*NOP*/} //hdfs.setTimes(path, -1, atime) // access time is not relevant on hdfs
+    override def setLastAccessedTime(atime: Long): Unit = {/*NOP*/} //hdfs.setTimes(path, -1, atime) // access time is not relevant on hdfs
 
-    def setLastModifiedTime(mtime: Long): Unit = hdfs.setTimes(path, mtime, mtime) // set access time the same as modification time
+    override def setLastModifiedTime(mtime: Long): Unit = hdfs.setTimes(path, mtime, mtime) // set access time the same as modification time
 
-    def setPermissions(perms: Int): Unit = hdfs.setPermission(path, new FsPermission(perms.toShort))
+    override def setPermissions(perms: Int): Unit = hdfs.setPermission(path, new FsPermission(perms.toShort))
   }
 
   /**

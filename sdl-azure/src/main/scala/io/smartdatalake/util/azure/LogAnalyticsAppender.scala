@@ -31,6 +31,7 @@ import org.apache.logging.log4j.spi.DefaultThreadContextMap
 import org.apache.logging.log4j.util.ReadOnlyStringMap
 import org.apache.logging.log4j.{Level, Marker, ThreadContext}
 import org.apache.spark.TaskContext
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.util
 import java.util.concurrent.TimeUnit
@@ -50,13 +51,15 @@ import scala.concurrent.duration.FiniteDuration
 class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend[LogEvent]], layout: JsonTemplateLayout, filter: Option[Filter] = None, maxDelayMillis: Option[Int] = None)
   extends AbstractAppender(name, filter.orNull, layout, /*ignoreExceptions*/ false, Array()) {
 
+  private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
+
   private var msgBuffer = collection.mutable.Buffer[LogEvent]()
 
   /**
    * Method to set backend later. This is useful if backend configuration is not available from the start, but logging should already collect events.
    */
   def updateBackend(backend: LogAnalyticsBackend[LogEvent]): Unit = {
-    assert(this.backend.isEmpty)
+    if (this.backend.nonEmpty) logger.warn("LogAnalyticsBackend was already initialized, it will be overwritten.")
     this.backend = Some(backend)
   }
 
@@ -79,7 +82,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
         val tmp = msgBuffer
         msgBuffer = collection.mutable.Buffer[LogEvent]()
         tmp
-      }
+      }.toSeq
       // don't include sending in synchronized block as it might take a longer time (or even hang...)
       backend.get.send(msgBufferToSend)
     }
@@ -88,7 +91,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
   override def start(): Unit = {
     super.start()
     import monix.execution.Scheduler.{global => scheduler}
-    val duration = FiniteDuration(maxDelayMillis.getOrElse(1000), TimeUnit.MILLISECONDS)
+    val duration = FiniteDuration(maxDelayMillis.getOrElse(1000).toLong, TimeUnit.MILLISECONDS)
     scheduler.scheduleAtFixedRate(duration, duration)(flush())
     sys.addShutdownHook(flush())
     println("LogAnalyticsAppender started")
@@ -103,7 +106,7 @@ class LogAnalyticsAppender(name: String, var backend: Option[LogAnalyticsBackend
   private def enrichSparkLocalProperties(event: LogEvent) = {
     // If we are on an executor, we have a TaskContext
     // On executors we need to enrich LogEvent with SDLB information from spark local properties
-    if (TaskContext.get != null) new LogEventWithSparkLocalProperties(event)
+    if (TaskContext.get() != null) new LogEventWithSparkLocalProperties(event)
     else event
   }
 }
@@ -171,7 +174,7 @@ object LogEventWithSparkLocalProperties {
   def getContextData: ReadOnlyStringMap = {
     val tc = TaskContext.get()
     if (tc != null) {
-      cachedContextData.getOrElseUpdate(tc.stageId, {
+      cachedContextData.getOrElseUpdate(tc.stageId(), {
         val data = new DefaultThreadContextMap()
         AppUtil.MDC_SDLB_PROPERTIES
           .flatMap(k => Option((k, tc.getLocalProperty(k))))

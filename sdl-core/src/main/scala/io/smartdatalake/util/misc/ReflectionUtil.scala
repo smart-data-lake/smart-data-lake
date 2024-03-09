@@ -21,8 +21,8 @@ package io.smartdatalake.util.misc
 
 import org.reflections.Reflections
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe._
 
 object ReflectionUtil {
@@ -42,6 +42,10 @@ object ReflectionUtil {
   def getTraitImplClasses[T: TypeTag](implicit reflections: Reflections): Seq[Class[_]] = {
     val baseCls = mirror.runtimeClass(typeOf[T].typeSymbol.asClass)
     reflections.getSubTypesOf(baseCls).asScala.toSeq
+  }
+
+  def classToType(cls: Class[_]): Type = {
+    mirror.classSymbol(cls).toType
   }
 
 }

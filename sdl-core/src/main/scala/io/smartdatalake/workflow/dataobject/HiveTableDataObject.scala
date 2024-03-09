@@ -24,9 +24,11 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, CompactionUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -34,7 +36,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicExceptio
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
-import scala.collection.JavaConverters._
+import java.sql.Timestamp
+import scala.jdk.CollectionConverters._
 
 /**
  * [[DataObject]] of type Hive.
@@ -120,7 +123,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${path}. The table will be written with new path definition ${hadoopPathHolder}!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
@@ -169,7 +172,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     require(!isRecursiveInput, "($id) HiveTableDataObject cannot write dataframe when dataobject is also used as recursive input ")
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
@@ -182,7 +185,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   private def writeDataFrameInternal(df: DataFrame, createTableOnly:Boolean, partitionValues: Seq[PartitionValues] = Seq(), saveModeOptions: Option[SaveModeOptions] = None)
-                                    (implicit context: ActionPipelineContext): Unit = {
+                                    (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) session.createDataFrame(List[Row]().asJava, df.schema) else df
 
@@ -201,28 +204,40 @@ case class HiveTableDataObject(override val id: DataObjectId,
         } else {
           throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
         }
-      case _ => Unit
+      case _ => ()
     }
 
-    // write table and fix acls
-    HiveUtil.writeDfToHive( dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), numInitialHdfsPartitions=numInitialHdfsPartitions )
+    // write table and collect Spark metrics
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
+      HiveUtil.writeDfToHive(dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), numInitialHdfsPartitions = numInitialHdfsPartitions)
+    )
+
+    // apply acls
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
+
+    // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"Analyze table ${table.fullName}.")
-      HiveUtil.analyze(table, partitions, partitionValues)
+      val simpleColumns = SparkSchema(dfPrepared.schema).filter(_.dataType.isSimpleType).columns
+      HiveUtil.analyze(table, simpleColumns, partitions, partitionValues)
     }
 
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
+
+    // return
+    metrics
   }
 
-  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
-    df.write
-      .partitionBy(partitions:_*)
-      .format(OutputType.Parquet.toString)
-      .mode(SparkSaveMode.from(finalSaveMode))
-      .save(path.toString)
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
+    SparkStageMetricsListener.execWithMetrics( this.id,
+      df.write
+        .partitionBy(partitions: _*)
+        .format(OutputType.Parquet.toString)
+        .mode(SparkSaveMode.from(finalSaveMode))
+        .save(path.toString)
+    )
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
@@ -281,6 +296,58 @@ case class HiveTableDataObject(override val id: DataObjectId,
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     HiveUtil.dropTable(table, hadoopPath, filesystem = Some(filesystem))
+  }
+
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      val pathStats = HdfsUtil.getPathStats(hadoopPath)(filesystem)
+      val lastModifiedAt = pathStats.get(TableStatsType.LastModifiedAt.toString).map(_.asInstanceOf[Long])
+      var catalogStats = HiveUtil.getCatalogStats(table)(context.sparkSession)
+      val lastAnalyzedAt = catalogStats.get(TableStatsType.LastAnalyzedAt.toString).map(_.asInstanceOf[Long])
+      // analyze only if table is modified after it was last analyzed
+      if (update && lastModifiedAt.isDefined && (lastAnalyzedAt.isEmpty || lastAnalyzedAt.exists(lastModifiedAt.get > _))) {
+        logger.info(s"($id) compute statistics: update=$update lastModifiedAt=$lastModifiedAt lastAnalyzedAt=$lastAnalyzedAt")
+        try {
+          HiveUtil.analyzeTable(table)(context.sparkSession)
+        } catch {
+          case ex: Exception => logger.warn(s"($id) failed to compute statistics ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        }
+      }
+      val columnStats = getColumnStats(update, lastModifiedAt)
+      // get catalog stats again, as they might have changed through analyzeTable or getColumnStats
+      catalogStats = HiveUtil.getCatalogStats(table)(context.sparkSession)
+      pathStats ++ getPartitionStats ++ catalogStats + (TableStatsType.Columns.toString -> columnStats)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get table stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map(TableStatsType.Info.toString -> e.getMessage)
+    }
+  }
+
+  override def getColumnStats(update: Boolean = false, lastModifiedAt: Option[Long] = None)(implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = {
+    try {
+      val catalogStats = HiveUtil.getCatalogStats(table)(context.sparkSession)
+      val lastAnalyzedColumnsAt = catalogStats.get(TableStatsType.LastAnalyzedColumnsAt.toString).map(_.asInstanceOf[Long])
+      // analyze only if table is modified after it was last analyzed
+      if (update && lastModifiedAt.isDefined && (lastAnalyzedColumnsAt.isEmpty || lastAnalyzedColumnsAt.exists(lastModifiedAt.get > _))) {
+        val sizeInBytes = catalogStats(TableStatsType.TableSizeInBytes.toString).asInstanceOf[BigInt]
+        val metadata = context.sparkSession.sessionState.catalog.getTableMetadata(table.tableIdentifier)
+        val simpleColumns = SparkSchema(metadata.schema).filter(_.dataType.isSimpleType).columns
+        // analyze only if table is not too large (analyzing all columns is expensive)
+        if (sizeInBytes <= Environment.analyzeTableColumnMaxBytesThreshold) {
+          logger.info(s"($id) compute column statistics: update=$update lastModifiedAt=$lastModifiedAt lastAnalyzedAt=$lastAnalyzedColumnsAt sizeInBytes=$sizeInBytes")
+          HiveUtil.analyzeTableColumns(table, simpleColumns)(context.sparkSession)
+        } else {
+          logger.warn(s"($id) Columns stats not calculated because table size ($sizeInBytes Bytes) is bigger than setting analyzeTableColumnMaxBytesThreshold (${Environment.analyzeTableColumnMaxBytesThreshold} Bytes)")
+        }
+      }
+      // get columns stats from table
+      HiveUtil.getCatalogColumnStats(table)(context.sparkSession)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map()
+    }
   }
 
   override def factory: FromConfigFactory[DataObject] = HiveTableDataObject

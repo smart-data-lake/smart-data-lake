@@ -29,20 +29,28 @@ import org.scalatest.FunSuite
 
 class StandardizeColNamesTransformerTest extends FunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  val colNamesTransformer = StandardizeColNamesTransformer()
-
   test("dots in column names are removed") {
+    val colNamesTransformer = StandardizeColNamesTransformer()
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("one.dot", "two.do.ts"))
 
     val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
     assert(transformed.schema.columns == Seq("onedot", "twodots"))
+  }
+
+  test("blanks in column names are replaces") {
+    val colNamesTransformer = StandardizeColNamesTransformer(removeNonStandardSQLNameChars=false, replaceNonStandardSQLNameCharsWithUnderscores = true)
+    val df = SparkDataFrame(Seq((1, 1, 1), (2, 2,2)).toDF("one dot", "two-do-ts", "value of property!in$$"))
+
+    val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    assert(transformed.schema.columns == Seq("one_dot", "two_do_ts", "value_of_property_in_"))
   }
 
 }

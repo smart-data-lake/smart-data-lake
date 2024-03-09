@@ -24,19 +24,24 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.delta.DeltaLog
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.util.Try
 
 /**
  * [[DataObject]] of type DeltaLakeTableDataObject.
@@ -116,7 +121,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
-        if (thisIsTableExisting) new Path(session.sql(s"DESCRIBE DETAIL ${table.fullName}").head.getAs[String]("location"))
+        if (thisIsTableExisting) new Path(getDetails.head().getAs[String]("location"))
         else getAbsolutePath
       }
 
@@ -127,7 +132,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path $path. The table will use the existing path definition $hadoopPathHolder!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
@@ -148,11 +153,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     super.prepare
-    if (connection.exists(_.checkDeltaLakeSparkOptions)) {
+    if (connection.exists(_.checkDeltaLakeSparkOptions) && !UCFileSystemFactory.isDatabricksEnv) { // check not needed if on Databricks UC environment (and actionally it fails because this is configured differently on Databricks)
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("io.delta.sql.DeltaSparkSessionExtension"),
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
-    require(isDbExisting, s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
+    require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
     if (!isTableExisting) {
       require(path.isDefined, s"($id) If DeltaLake table does not exist yet, path must be set.")
       if (filesystem.exists(hadoopPath)) {
@@ -216,7 +221,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
@@ -229,7 +234,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
-                    (implicit context: ActionPipelineContext): Unit = {
+                    (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     val dfPrepared = if (createTableOnly) {
@@ -239,17 +244,20 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
+    val userMetadata = s"${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}"
+    session.conf.set("spark.databricks.delta.commitInfo.userMetadata", userMetadata)
     val dfWriter = saveModeTargetDf.write
       .format("delta")
       .options(options)
       .option("path", hadoopPath.toString)
+      .option("userMetadata", userMetadata)
 
-    if (isTableExisting) {
+    val sparkMetrics = if (isTableExisting) {
       if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
-      } else {
+      } else SparkStageMetricsListener.execWithMetrics(this.id, {
         if (partitions.isEmpty) {
           dfWriter
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
@@ -259,12 +267,23 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         } else {
           // insert
           if (finalSaveMode == SDLSaveMode.Overwrite) {
-            if (partitionValues.isEmpty) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
-            dfWriter
-              .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
-              .option("mergeSchema", allowSchemaEvolution)
-              .mode(SparkSaveMode.from(finalSaveMode))
-              .save() // atomic replace (replaceWhere) doesn't work with Table API
+            val overwriteModeisDynamic = options.get("partitionOverwriteMode").contains("dynamic")
+            (partitionValues.isEmpty, overwriteModeisDynamic) match {
+              case (true, false) => throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this DeltaLakeTableDataObject to enable delta lake dynamic partitioning and get around this exception.")
+              case (true, true) => { 
+                dfWriter
+                .option("mergeSchema", allowSchemaEvolution)
+                .mode(SparkSaveMode.from(finalSaveMode))
+                .save() // atomic replace (replaceWhere) doesn't work with Table API
+              }
+              case _ => {
+                dfWriter
+                .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
+                .option("mergeSchema", allowSchemaEvolution)
+                .mode(SparkSaveMode.from(finalSaveMode))
+                .save() // atomic replace (replaceWhere) doesn't work with Table API
+              }
+            }
           } else {
             dfWriter
               .mode(SparkSaveMode.from(finalSaveMode))
@@ -272,18 +291,40 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
               .save() // it seems generally more stable to work without Table API
           }
         }
-      }
-    } else {
+      })
+    } else SparkStageMetricsListener.execWithMetrics(this.id,
       dfWriter
         .partitionBy(partitions: _*)
         .saveAsTable(table.fullName)
-    }
+    )
+
+    // get delta table operational metrics
+    val dfHistory = DeltaTable.forName(session, table.fullName).history(1)
+    if (logger.isDebugEnabled) dfHistory.show(false)
+    val latestHistoryEntry = dfHistory.select("operationMetrics", "userMetadata").head()
+    assert(latestHistoryEntry.getString(1) == userMetadata, s"($id) current delta lake history entry is not written by this spark application (userMetadata should be $userMetadata). Is there someone else writing to this table?!")
+    val deltaMetrics = dfHistory.select("operationMetrics").head().getMap[String,String](0)
+      // normalize names lowercase with underscore
+      .map{case (k,v) => (DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
+      // standardize naming
+      .map{
+        case ("num_output_rows", v) => "rows_inserted" -> v
+        case ("num_updated_rows", v) => "rows_updated" -> v
+        case ("num_deleted_rows", v) => "rows_deleted" -> v
+        case ("num_target_rows_inserted", v) => "rows_inserted" -> v
+        case ("num_target_rows_updated", v) => "rows_updated" -> v
+        case ("num_target_rows_deleted", v) => "rows_deleted" -> v
+        case (k,v) => k -> v
+      }
 
     // vacuum delta lake table
     vacuum
 
     // fix acls
     if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
+
+    // return
+    sparkMetrics ++ deltaMetrics
   }
 
   /**
@@ -293,7 +334,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    *
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): Unit = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
@@ -334,7 +375,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       // execute delta lake statement
-      mergeStmt.execute()
+      SparkStageMetricsListener.execWithMetrics(this.id,
+        mergeStmt.execute()
+      )
     }
   }
 
@@ -348,7 +391,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
-    context.sparkSession.catalog.databaseExists(table.db.get)
+    context.sparkSession.catalog.databaseExists(table.getDbName)
   }
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
@@ -386,7 +429,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val (pvs,d) = PerformanceUtils.measureDuration(
-      if(isTableExisting) PartitionValues.fromDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct)
+      if(isTableExisting) PartitionValues.fromDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct())
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
@@ -407,7 +450,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
     partitionValues.foreach {
       case (pvExisting, pvNew) =>
-        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit))
+        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit).toMap)
         logger.info(s"($id) Partition $pvExisting moved to $pvNew")
     }
   }
@@ -417,8 +460,64 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     HiveUtil.dropTable(table, hadoopPath, doPurge = false)
   }
 
-  override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
+  def getDetails(implicit session: SparkSession): DataFrame = {
+    DeltaTable.forName(session, table.fullName).detail()
+  }
 
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      implicit val session = context.sparkSession
+      import session.implicits._
+      val dfHistory = DeltaTable.forName(session, table.fullName).history()
+        .select("timestamp", "userMetadata").as[(Long,String)]
+      val (_,lastCommitMsg) = dfHistory.head()
+      val (oldestSnapshot,_) = dfHistory.head()
+      val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, properties) = getDetails
+        .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head()
+      val numRows = DeltaTable.forName(session, table.fullName).toDF.count() // This is actionally calculated by Metadata only :-)
+      val deltaStats = Map(TableStatsType.CreatedAt.toString -> createdAt, TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.LastCommitMsg.toString -> lastCommitMsg, TableStatsType.NumDataFilesCurrent.toString -> numDataFilesCurrent, TableStatsType.SizeInBytesCurrent.toString -> sizeInBytesCurrent, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshot, TableStatsType.NumRows.toString -> numRows)
+      val columnStats = getColumnStats(update, Some(lastModifiedAt))
+      HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ deltaStats ++ getPartitionStats + (TableStatsType.Columns.toString -> columnStats)
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map("info" -> e.getMessage)
+    }
+  }
+
+  override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
+    try {
+      val session = context.sparkSession
+      import session.implicits._
+      val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
+      val snapshot = deltaLog.unsafeVolatileSnapshot
+      val columns = snapshot.schema.fieldNames
+      def getAgg(col: String) = struct(
+        min($"stats.minValues"(col)).as("minValue"),
+        max($"stats.maxValues"(col)).as("maxValue"),
+        sum($"stats.nullCount"(col)).as("nullCount")
+      ).as(col)
+      val metricsRow = snapshot.allFiles
+        .select(from_json($"stats", snapshot.statsSchema).as("stats"))
+        .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg):_*).head()
+      columns.map {
+        c =>
+          val struct = metricsRow.getStruct(metricsRow.fieldIndex(c))
+          c -> Map(
+            ColumnStatsType.NullCount.toString -> struct.getAs[Long]("nullCount"),
+            ColumnStatsType.Min.toString -> struct.getAs[Any]("minValue"),
+            ColumnStatsType.Max.toString -> struct.getAs[Any]("maxValue")
+          )
+      }.toMap
+    } catch {
+      case e: Exception =>
+        logger.error(s"($id} Could not get column stats: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Map()
+    }
+
+  }
+
+  override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {

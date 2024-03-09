@@ -21,7 +21,7 @@ package io.smartdatalake.meta.atlas
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.meta.GenericTypeUtil
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import io.smartdatalake.workflow.dataobject.{HttpTimeoutConfig, WebserviceFileDataObject}
 import org.json4s.Extraction.decompose
@@ -48,11 +48,11 @@ case class AtlasTypeUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogger {
    *
    * @return atlas response.
    */
-  def export(implicit instanceRegistry: InstanceRegistry): Unit = {
+  def `export`(implicit instanceRegistry: InstanceRegistry): Unit = {
 
     val atlasDefinedTypes = atlasDefinedTypeNames
 
-    val reflections = new Reflections("io.smartdatalake")
+    val reflections = ReflectionUtil.getReflections("io.smartdatalake")
     val sdlEntityTypes = GenericTypeUtil.typeDefs(reflections).map(AtlasTypeDef.apply)
 
     val classificationTypes = Set(Map("name" -> "app"), Map("name" -> atlasConfig.getAppName, "superTypes" -> Seq("app")))

@@ -55,6 +55,12 @@ import java.time.Duration
  * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
  *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
+ * @param directTableOverwrite flag to enable overwriting target tables directly without creating temporary table.
+ *                         Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
+ *                         For SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
+ *                         Default is directTableWrite=false, this will write data first into a temporary table, and then use
+ *                         a "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
+ *                         Also note that SDLSaveMode.Merge always creates a temporary table.
  */
 case class JdbcTableConnection(override val id: ConnectionId,
                                url: String,
@@ -64,9 +70,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                maxParallelConnections: Int = 3,
                                connectionPoolMaxIdleTimeSec: Int = 3,
                                connectionPoolMaxWaitTimeSec: Int = 600,
-                               override val metadata: Option[ConnectionMetadata] = None,
                                @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") autoCommit: Boolean = false,
-                               connectionInitSql: Option[String] = None
+                               connectionInitSql: Option[String] = None,
+                               directTableOverwrite: Boolean = false,
+                               override val metadata: Option[ConnectionMetadata] = None,
                                ) extends Connection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
@@ -92,18 +99,34 @@ case class JdbcTableConnection(override val id: ConnectionId,
       val result = func(stmt)
       if (doCommit && !autoCommit) conn.commit()
       result
+    } catch {
+      case e: Exception =>
+        conn.rollback()
+        throw e
     } finally {
       if (stmt != null) stmt.close()
     }
   }
 
   /**
-   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
+   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary sql statement
+   * @return true if the first result is a ResultSet object; false if it is an update count or there are no results (see also Jdbc.Statement.execute())
    */
   def execJdbcStatement(sql:String, logging: Boolean = true) : Boolean = {
     execWithJdbcConnection(execWithJdbcStatement(_, doCommit = true) { stmt =>
       if (logging) logger.info(s"execJdbcStatement: $sql")
       stmt.execute(sql)
+    })
+  }
+
+  /**
+   * Get a JDBC connection from the pool, create a JDBC statement and execute an arbitrary function
+   * @return row count for SQL Data Manipulation Language (DML) statements (see also Jdbc.Statement.execute())
+   */
+  def execJdbcDmlStatement(sql: String, logging: Boolean = true): Int = {
+    execWithJdbcConnection(execWithJdbcStatement(_, doCommit = true) { stmt =>
+      if (logging) logger.info(s"execJdbcDmlStatement: $sql")
+      stmt.executeUpdate(sql)
     })
   }
 
@@ -127,7 +150,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
   }
 
   def test(): Unit = {
-    execWithJdbcConnection{ _ => Unit }
+    execWithJdbcConnection{ _ => () }
   }
 
   private def getConnection: SqlConnection = {

@@ -32,7 +32,7 @@ import org.apache.spark.annotation.DeveloperApi
 case class SecretProviderConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate SecretProvider
   private[smartdatalake] val provider: SecretProvider = try {
-    val clazz = Environment.classLoader.loadClass(className)
+    val clazz = Environment.classLoader().loadClass(className)
     val constructor = clazz.getConstructor(classOf[Map[String,String]])
     constructor.newInstance(options.getOrElse(Map())).asInstanceOf[SecretProvider]
   } catch {

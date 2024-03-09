@@ -21,7 +21,7 @@ package io.smartdatalake.definitions
 import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
-import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil, SmartDataLakeLogger}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
@@ -35,7 +35,7 @@ import java.net.URI
  * - by the global.environment configuration file section
  * - by a custom [[io.smartdatalake.app.SmartDataLakeBuilder]] implementation for your environment, which sets these variables directly.
  */
-object Environment {
+object Environment extends SmartDataLakeLogger {
 
   // this class loader needs to be overridden to find custom classes in some environments (e.g. Polynote)
   def classLoader(): ClassLoader = {
@@ -421,10 +421,11 @@ object Environment {
         EnvironmentUtil.getSdlParameter("fileSystemFactory")
           .map(CustomCodeUtil.getClassInstanceByName[FileSystemFactory])
           .getOrElse{
-            if (UCFileSystemFactory.needUcFileSystem) new UCFileSystemFactory()
+            if (UCFileSystemFactory.isDatabricksEnv) new UCFileSystemFactory()
             else new DefaultFileSystemFactory()
           }
       )
+      logger.info(s"fileSystemFactory initialized with ${_fileSystemFactory.get.getClass.getName}")
     }
     _fileSystemFactory.get
   }
@@ -457,6 +458,35 @@ object Environment {
     _caseSensitive.get
   }
   var _caseSensitive: Option[Boolean] = None
+
+  /**
+   * Whether HadoopFileActionDAGRunStateStore should update an index file.
+   * If true the information for a run are appended to the index file when the run is finished (final).
+   * The index file is needed by the UI if it reads directly from the filesystem.
+   * Default is false.
+   */
+  def hadoopFileStateStoreIndexAppend: Boolean = {
+    if (_hadoopFileStateStoreIndexAppend.isEmpty) {
+      _hadoopFileStateStoreIndexAppend = Some(EnvironmentUtil.getSdlParameter("hadoopFileStateStoreIndexAppend").exists(_.toBoolean))
+    }
+    _hadoopFileStateStoreIndexAppend.get
+  }
+  var _hadoopFileStateStoreIndexAppend: Option[Boolean] = None
+
+  /**
+   * Threshold for analyzing table columns.
+   * If table size is bigger than analyzeTableColumnMaxThresholdBytes, table columns are not analyzed.
+   */
+  def analyzeTableColumnMaxBytesThreshold: Int = {
+    if (_analyzeTableColumnMaxBytesThreshold.isEmpty) {
+      _analyzeTableColumnMaxBytesThreshold = Some(
+        EnvironmentUtil.getSdlParameter("analyzeTableColumnMaxBytesThreshold")
+          .map(_.toInt).getOrElse(1024*1024*1024) // 1G
+      )
+    }
+    _analyzeTableColumnMaxBytesThreshold.get
+  }
+  var _analyzeTableColumnMaxBytesThreshold: Option[Int] = None
 
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(

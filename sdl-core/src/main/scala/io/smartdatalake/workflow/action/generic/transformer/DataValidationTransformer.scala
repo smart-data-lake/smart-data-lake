@@ -56,7 +56,7 @@ object DataValidationTransformer extends FromConfigFactory[GenericDfTransformer]
 }
 
 sealed trait ValidationRule {
-  def prepare(implicit context: ActionPipelineContext): Unit = Unit
+  def prepare(implicit context: ActionPipelineContext): Unit = ()
   def getValidationColumn(implicit helper: DataFrameFunctions): GenericColumn
 }
 

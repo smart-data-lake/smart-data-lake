@@ -23,7 +23,7 @@ import org.apache.spark.python.PythonHelper
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.SparkSession
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 private[smartdatalake] object PythonUtil {
 

@@ -35,7 +35,7 @@ import java.nio.file.{Files, Path}
 
 class SFtpFileRefDataObjectTest extends FunSuite with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
 
-  implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  implicit val session: SparkSession = TestUtil.session
   implicit val registry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 

@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
@@ -111,14 +112,16 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
             updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result)), Some(transformPartitionValues))
           )
           executionModeResultOptions = result.options
-        case _ => Unit
+        case _ => ()
       }
     }
     inputSubFeeds = inputSubFeeds.map{ subFeed =>
       // prepare input SubFeed
       val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
       val isRecursive = recursiveInputs.exists(_.id == subFeed.dataObjectId)
-      preprocessInputSubFeedCustomized(subFeed, ignoreFilter, isRecursive)
+      // reset potentially skipped SubFeeds to deliver data as well.
+      val reactivatedSubFeed = subFeed.clearSkipped().asInstanceOf[S]
+      preprocessInputSubFeedCustomized(reactivatedSubFeed, ignoreFilter, isRecursive)
     }
     outputSubFeeds = outputSubFeeds.map(subFeed => addRunIdPartitionIfNeeded(outputMap(subFeed.dataObjectId), subFeed))
     (inputSubFeeds, outputSubFeeds)
@@ -141,21 +144,30 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
-    outputs.map { output =>
-      val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
-      logWritingStarted(subFeed)
-      val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
-      val (result, d) = PerformanceUtils.measureDuration {
-        writeSubFeed(subFeed, isRecursiveInput)
-      }
-      result.metrics.foreach { m =>
-        val metricsToAdd = if (result.noData.contains(true)) m + ("no_data"->true) else m // manually add no_data metric
-        if(m.nonEmpty) addRuntimeMetrics(Some(context.executionId), Some(output.id), GenericMetrics(s"$id-${output.id}", 1, metricsToAdd))
-      }
-      val allMetrics = runtimeData.getFinalMetrics(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())
-      logWritingFinished(subFeed, allMetrics, d)
-      result.subFeed
+    // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
+    // This way metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
+    val (outputSubFeeds,taskFailedException) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException])) {
+      case ((outputSubFeeds, taskFailedException), output) =>
+        // find SubFeed for output and write it
+        val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
+        if (taskFailedException.isEmpty) {
+          logWritingStarted(subFeed)
+          val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
+          try {
+            val (outputSubFeed, d) = PerformanceUtils.measureDuration {
+              writeSubFeed(subFeed, isRecursiveInput)
+            }
+            logWritingFinished(outputSubFeed, d)
+            (outputSubFeeds :+ outputSubFeed, None)
+          } catch {
+            case ex: TaskFailedException => (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex))
+          }
+        } else (outputSubFeeds :+ subFeed, taskFailedException)
     }
+    // if there is a TaskFailedException, enrich it will all results and throw it.
+    taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
+    // return processed SubFeeds
+    outputSubFeeds
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
@@ -190,18 +202,25 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   override final def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = try {
+    require(context.isExecPhase, throw new IllegalStateException(s"context.phase=${context.phase} but should be Exec for executing action!"))
     validateInputSubFeeds(subFeeds)
     if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
     // prepare
     var (inputSubFeeds, outputSubFeeds) = prepareInputSubFeeds(subFeeds)
-    // transform
-    outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
-    // check and adapt output SubFeeds
-    outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
-    // write output
-    outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
-    // return
-    outputSubFeeds
+    try {
+      // transform
+      outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
+      // check and adapt output SubFeeds
+      outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
+      // write output
+      outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
+      // return
+      outputSubFeeds
+    } catch {
+      case ex: NoDataToProcessWarning => throw ex // pass on to outer exception handler
+      case ex: TaskFailedException => throw ex // pass on to outer exception handler
+      case ex: Exception => throw TaskFailedException(id.id, ex, Some(outputSubFeeds.collect{case x: SubFeed => x}))
+    }
   } catch {
     // throw exception with skipped output subfeeds if "no data"
     case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
@@ -225,7 +244,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.info(s"($id) start writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${sortedPartitionValues.mkString(" ")}" else ""))
   }
 
-  protected def logWritingFinished(subFeed: S, metrics: Map[String,Any], duration: Duration)(implicit context: ActionPipelineContext): Unit = {
+  protected def logWritingFinished(subFeed: SubFeed, duration: Duration)(implicit context: ActionPipelineContext): Unit = {
+    val metrics = subFeed.metrics.getOrElse(Map())
     val metricsLog = orderMetrics(metrics, SortedSet("count", "records_written", "num_tasks"))
       .map( x => x._1+"="+x._2).mkString(" ")
     logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
@@ -336,21 +356,17 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * @param isRecursive If subfeed is recursive (input & output)
    * @return false if there was no data to process, otherwise true.
    */
-  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[S]
+  protected def writeSubFeed(subFeed: S, isRecursive: Boolean)(implicit context: ActionPipelineContext): S
 
 }
+object ActionSubFeedsImpl {
+  type MetricsMap = Map[String, Any]
+}
 
-/**
- * Return value of writing a SubFeed.
- * @param noData true if there was no data to write, otherwise false. If unknown set to None.
- * @param metrics Depending on the engine, metrics are received by a listener (SparkSubFeed) or can be returned directly by filling this attribute (FileSubFeed).
- */
-case class WriteSubFeedResult[S <: SubFeed](subFeed: S, noData: Option[Boolean], metrics: Option[Map[String, Any]] = None)
-
-case class SubFeedExpressionData(partitionValues: Seq[Map[String,String]], isDAGStart: Boolean, isSkipped: Boolean)
+case class SubFeedExpressionData(partitionValues: Seq[Map[String,String]], isDAGStart: Boolean, isSkipped: Boolean, metrics: Map[String,String])
 case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData])
 object SubFeedsExpressionData {
   def fromSubFeeds(subFeeds: Seq[SubFeed]): SubFeedsExpressionData = {
-    SubFeedsExpressionData(subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped))).toMap)
+    SubFeedsExpressionData(subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).mapValues(_.toString).toMap))).toMap)
   }
 }

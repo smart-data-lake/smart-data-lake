@@ -33,7 +33,7 @@ import org.scalatestplus.scalacheck.Checkers
   */
 class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogger {
 
-  implicit lazy val session: SparkSession = TestUtil.sessionWithoutHive
+  implicit lazy val session: SparkSession = TestUtil.session
 
   test("Schema with same column names and types need to be identical") {
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
@@ -152,8 +152,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
     assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
 
-    assert(oldEvoDf.count>0)
-    assert(newEvoDf.count>0)
+    assert(oldEvoDf.count()>0)
+    assert(newEvoDf.count()>0)
   }
 
   test("DataFrame columns should be sorted in a specific order") {
@@ -380,8 +380,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(oldEvoDf.schema.map(s => s.dataType).distinct == Seq(StringType))
 
-    assert(oldEvoDf.count>0)
-    assert(newEvoDf.count>0)
+    assert(oldEvoDf.count()>0)
+    assert(newEvoDf.count()>0)
   }
 
   test("Columns of result are ordered by default according to oldDf, then newColumns, then cols2Ignore") {
@@ -413,10 +413,10 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("b3").dataType == IntegerType)
 
-    oldEvoDf.cache
-    assert(oldEvoDf.count>0)
-    assert(oldEvoDf.where(col("b.b3").isNull).count>0)
-    assert(newEvoDf.count>0)
+    oldEvoDf.cache()
+    assert(oldEvoDf.count()>0)
+    assert(oldEvoDf.where(col("b.b3").isNull).count()>0)
+    assert(newEvoDf.count()>0)
   }
 
   test("Changed data type in struct type") {
@@ -431,8 +431,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("b2").dataType == StringType)
 
-    assert(oldEvoDf.count>0)
-    assert(newEvoDf.count>0)
+    assert(oldEvoDf.count()>0)
+    assert(newEvoDf.count()>0)
   }
 
   test("Changed data type of array type") {
@@ -447,8 +447,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(oldEvoDf.schema("b").dataType.asInstanceOf[ArrayType].elementType == DoubleType)
 
-    assert(oldEvoDf.select(explode(col("b"))).count>0)
-    assert(newEvoDf.select(explode(col("b"))).count>0)
+    assert(oldEvoDf.select(explode(col("b"))).count()>0)
+    assert(newEvoDf.select(explode(col("b"))).count()>0)
   }
 
   test("New column in array type of struct type") {
@@ -463,8 +463,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(oldEvoDf.schema("b").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]("b3").dataType == IntegerType)
 
-    assert(oldEvoDf.select(explode(col("b.b3"))).count>0)
-    assert(newEvoDf.select(explode(col("b.b3"))).count>0)
+    assert(oldEvoDf.select(explode(col("b.b3"))).count()>0)
+    assert(newEvoDf.select(explode(col("b.b3"))).count()>0)
   }
 
   test("Deleted column in array type of struct type") {
@@ -479,7 +479,7 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(newEvoDf.schema("b").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]("b3").dataType == IntegerType)
 
-    assert(oldEvoDf.select(explode(col("b.b3"))).count>0)
-    assert(newEvoDf.select(explode(col("b.b3"))).count>0)
+    assert(oldEvoDf.select(explode(col("b.b3"))).count()>0)
+    assert(newEvoDf.select(explode(col("b.b3"))).count()>0)
   }
 }

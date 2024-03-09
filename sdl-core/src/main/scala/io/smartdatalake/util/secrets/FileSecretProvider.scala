@@ -43,7 +43,7 @@ object GenericFileSecretProvider extends SecretProvider {
  * @param file filename of property file to read secrets from
  */
 class FileSecretProvider(file: String) extends SecretProvider {
-  def this(options: Map[String, String]) {
+  def this(options: Map[String, String]) = {
     this(
       options.getOrElse("file", throw new ConfigurationException(s"Cannot create FileSecretProvider, option 'file' missing."))
     )
@@ -52,7 +52,7 @@ class FileSecretProvider(file: String) extends SecretProvider {
 }
 object FileSecretProvider {
   def getSecretFromFile(file: String, name: String): String = {
-    val props = Using.resource(scala.io.Source.fromFile(file))(_.getLines.toSeq)
+    val props = Using.resource(scala.io.Source.fromFile(file))(_.getLines().toSeq)
     val namePrefix = name + "="
     props.find(_.startsWith(namePrefix))
       .map(_.stripPrefix(namePrefix))

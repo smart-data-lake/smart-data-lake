@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.connection.Connection
 import org.json4s.Formats
 import org.json4s.ext.EnumNameSerializer
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object AgentClient {
   def prepareHoconInstructions(actionToSerialize: Action, connectionsToSerialize: Seq[Connection], agent: Agent, executionPhase: ExecutionPhase): SDLMessage = {

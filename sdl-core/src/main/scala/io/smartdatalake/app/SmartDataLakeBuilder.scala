@@ -331,7 +331,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           val latestRunState = stateStore.recoverRunState(latestStateId)
           if (!latestRunState.isFinal || latestRunState.isFailed) {
             // start recovery
-            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered (${latestRunState.appConfig}")
+            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered: ConfigToRecover=${latestRunState.appConfig} ConfigGiven=${appConfig}")
             recoverRun(appConfig, stateStore, latestRunState)._2
           } else {
             val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
@@ -384,7 +384,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
       .filter { case (id, info) => info.hasCompleted }
-    val initialSubFeeds = actionsToSkip.flatMap(_._2.results.map(_.subFeed)).toSeq
+    val initialSubFeeds = actionsToSkip.flatMap(_._2.results).toSeq
     // get latest DataObject state and overwrite with current DataObject state
     val lastStateId = stateStore.getLatestStateId(Some(runState.runId - 1))
     val lastRunState = lastStateId.map(stateStore.recoverRunState)
@@ -614,7 +614,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
             if (actionsSelected.exists(_.isAsynchronous)) {
               if (context.hasSparkSession) {
                 // stop active streaming queries
-                context.sparkSession.streams.active.foreach(_.stop)
+                context.sparkSession.streams.active.foreach(_.stop())
                 // if there were exceptions, throw first one
                 context.sparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
               }
@@ -628,12 +628,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           if (!Environment.stopStreamingGracefully) {
             if (context.hasSparkSession) {
               context.sparkSession.streams.awaitAnyTermination()
-              context.sparkSession.streams.active.foreach(_.stop) // stopping other streaming queries gracefully
+              context.sparkSession.streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
             }
             actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context) // notify about this asynchronous iteration
           } else {
             if (context.hasSparkSession) {
-              context.sparkSession.streams.active.foreach(_.stop)
+              context.sparkSession.streams.active.foreach(_.stop())
             }
             logger.info("Stopped streaming gracefully")
           }

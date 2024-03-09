@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.dag
 
-import com.github.mdr.ascii.graph.Graph
+import org.scalameta.ascii.graph.Graph
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import monix.eval.Task
@@ -47,10 +47,10 @@ private[smartdatalake] trait DAGResult {
 }
 
 private[smartdatalake] trait DAGEventListener[T <: DAGNode] {
-  def onNodeStart(node: T)
-  def onNodeSuccess(results: Seq[DAGResult])(node: T)
-  def onNodeFailure(exception: Throwable)(node: T)
-  def onNodeSkipped(exception: Throwable)(node: T)
+  def onNodeStart(node: T): Unit
+  def onNodeSuccess(results: Seq[DAGResult])(node: T): Unit
+  def onNodeFailure(exception: Throwable, partialResults: Seq[DAGResult] = Seq())(node: T): Unit
+  def onNodeSkipped(exception: Throwable)(node: T): Unit
 }
 
 /**
@@ -163,10 +163,13 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
         // if severity is low, notify that task is skipped
         notify(node, eventListener.onNodeSkipped(ex))
         resultRaw
+      case Failure(ex: TaskFailedException) =>
+        notify(node, eventListener.onNodeFailure(ex, ex.results.getOrElse(Seq())))
+        resultRaw
       case Failure(ex) =>
         // pass Failure for all other exceptions
         notify(node, eventListener.onNodeFailure(ex))
-        Failure(TaskFailedException(node.nodeId, ex))
+        Failure(TaskFailedException(node.nodeId, ex, None))
     }
     // return
     result
@@ -307,7 +310,7 @@ object DAG extends SmartDataLakeLogger {
       val (startNodeIds, nonStartNodeIds) = incomingIds.partition(_._2.isEmpty)
       assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
       // remove start nodes from incoming node list of remaining nodes
-      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.mapValues(_.filterNot(startNodeIds.isDefinedAt))
+      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.mapValues(_.filterNot(startNodeIds.isDefinedAt)).toMap
       val newSortedNotes = sortedNodes ++ startNodeIds.keys.toSeq.sorted
       if (nonStartNodeIdsWithoutIncomingStartNodes.isEmpty) newSortedNotes
       else go(newSortedNotes, nonStartNodeIdsWithoutIncomingStartNodes)

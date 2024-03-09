@@ -19,16 +19,20 @@
 
 package io.smartdatalake.workflow
 
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FileUtil, Path, PathFilter}
+import org.apache.hadoop.fs.{FileSystem, Path, PathFilter}
 
-import scala.io.Codec
+import java.time.LocalDateTime
 
 private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: String, appName: String, hadoopConf: Configuration) extends ActionDAGRunStateStore[HadoopFileStateId] with SmartDataLakeLogger {
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
+  private val indexFile = new Path(hadoopStatePath, "index.json")
   val currentStatePath: Path = new Path(hadoopStatePath, "current")
   val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
@@ -41,12 +45,12 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
    */
   override def saveState(state: ActionDAGRunState): Unit = synchronized {
     // write state file
-    val fileName = saveStateToFile(state)
+    val (filename, filePath) = saveStateToFile(state)
     // if succeeded:
     // - delete temporary state file from current directory
     // - move previous failed attempt files from current to succeeded directory
     if (state.isSucceeded) {
-      filesystem.delete(new Path(currentStatePath, fileName), false)
+      filesystem.delete(new Path(currentStatePath, filename), false)
       getFiles(Some(currentStatePath))
         .filter( stateFile => stateFile.runId==state.runId && stateFile.attemptId<state.attemptId)
         .foreach { stateFile =>
@@ -55,9 +59,30 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
           logger.info(s"renamed ${stateFile.path} -> $tgtFile")
         }
     }
+    // if final, update index file if enabled
+    if (state.isFinal && Environment.hadoopFileStateStoreIndexAppend) {
+      val relativeFile = hadoopStatePath.toUri.relativize(filePath.toUri).toString
+      val indexEntry = IndexEntry.from(state, relativeFile)
+      val newContent = indexEntry.toJson + "\n"
+      if (filesystem.exists(indexFile)) {
+        try {
+          HdfsUtil.appendHadoopFile(indexFile, newContent)
+          logger.info("appended current run to index file")
+        } catch {
+          case _: UnsupportedOperationException =>
+            var currentContent = HdfsUtil.readHadoopFile(indexFile)
+            if (!currentContent.endsWith("\n")) currentContent = currentContent + "\n"
+            HdfsUtil.writeHadoopFile(indexFile, currentContent + newContent)
+            logger.info("recreated index file including current run (append not supported by filesystem implementation)")
+        }
+      } else {
+        HdfsUtil.writeHadoopFile(indexFile, newContent)
+        logger.info("created index file with current run")
+      }
+    }
   }
 
-  def saveStateToFile(state: ActionDAGRunState): String = {
+  def saveStateToFile(state: ActionDAGRunState): (String, Path) = {
     val path = if (state.isSucceeded) succeededStatePath else currentStatePath
     val json = state.toJson
     val fileName = s"$appName${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.runId}${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}${state.attemptId}.json"
@@ -65,7 +90,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
     HdfsUtil.writeHadoopFile(file, json)
     logger.info(s"updated state into $file")
     // return
-    fileName
+    (fileName, file)
   }
 
   /**
@@ -126,6 +151,32 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
 
 case class HadoopFileStateId(path: Path, appName: String, runId: Int, attemptId: Int) extends StateId {
   def getSortAttrs: (Int, Int) = (runId, attemptId)
+}
+
+private case class IndexActionEntry(state: RuntimeEventState, dataObjects: Seq[DataObjectId])
+private case class IndexEntry(name: String, runId: Int, attemptId: Int, feedSel: String,
+                      runStartTime: LocalDateTime, attemptStartTime: LocalDateTime, runEndTime: Option[LocalDateTime],
+                      status: RuntimeEventState, actions: Map[ActionId,IndexActionEntry],
+                      buildVersion: Option[String], appVersion: Option[String], path: String) {
+  def toJson: String = {
+    val str = ActionDAGRunState.toJson(this)
+    assert(str.linesIterator.size == 1) // index entry should be serialized to one json line!
+    str
+  }
+}
+private object IndexEntry {
+  def from(state: ActionDAGRunState, relativePath: String) = {
+    implicit val localDateTimeOrdering: Ordering[LocalDateTime] = _ compareTo _
+    val runEndTime = state.actionsState.values.flatMap(_.endTstmp).toSeq.sorted.lastOption
+    val actionsState = state.actionsState.mapValues(a => IndexActionEntry(a.state, a.dataObjectsState.map(_.dataObjectId))).toMap
+    IndexEntry(
+      state.appConfig.appName, state.runId, state.attemptId, state.appConfig.feedSel,
+      state.runStartTime, state.attemptStartTime, runEndTime,
+      state.finalState.get, actionsState,
+      state.buildVersionInfo.map(_.version),
+      state.appVersion, relativePath
+    )
+  }
 }
 
 private[smartdatalake] object HadoopFileActionDAGRunStateStore {

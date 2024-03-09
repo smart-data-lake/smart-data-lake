@@ -193,7 +193,7 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
   testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
 
-  override def beforeAll() {
+  override def beforeAll(): Unit = {
     xlsxTempFilePath = createTempFile(createXSSFWorkbook(), XlsxSuffix)
     xlsTempFilePath = createTempFile(createHSSFWorkbook(), XlsSuffix)
     xlsxTempDir = createTempDir

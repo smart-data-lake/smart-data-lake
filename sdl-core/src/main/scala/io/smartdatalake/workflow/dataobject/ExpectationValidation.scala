@@ -123,7 +123,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     } else Map()
   }
 
-  def validateExpectations(dfJob: GenericDataFrame, dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobMetrics: Map[String, _])(implicit context: ActionPipelineContext): Map[String, _] = {
+  def validateExpectations(dfJob: GenericDataFrame, dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobMetrics: Map[String, _])(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
     // the evaluation of expectations is made with Spark expressions
     // collect metrics with scope = JobPartition
     val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(dfJob, partitionValues)
@@ -153,9 +153,9 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     // throw exception on error, but log metrics before
     val errors = validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Error)
     if (errors.nonEmpty) logger.error(s"($id) Expectation validation failed with metrics "+updatedMetrics.map{case(k,v) => s"$k=$v"}.mkString(" "))
-    errors.foreach(result => throw ExpectationValidationException(result._2))
+    val exceptions = errors.map(result => ExpectationValidationException(result._2)).toSeq
     // return consolidated and updated metrics
-    updatedMetrics
+    (updatedMetrics, exceptions)
   }
 
   private def setupConstraintsValidation(df: GenericDataFrame): GenericDataFrame = {

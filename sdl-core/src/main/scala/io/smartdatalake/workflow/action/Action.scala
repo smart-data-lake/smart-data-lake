@@ -232,7 +232,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     if (isAsynchronousProcessStarted) return
     // evaluate metrics fail condition if defined
-    metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
+    metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c, outputSubFeeds))
     // process postRead/Write hooks
     inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
@@ -241,7 +241,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Executes operations needed to cleanup after executing an action failed.
    */
-  def postExecFailed(implicit context: ActionPipelineContext): Unit = Unit
+  def postExecFailed(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
@@ -259,13 +259,11 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String)(implicit context: ActionPipelineContext): Unit = {
+  private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
-    val metrics = {
-      getRuntimeMetrics().flatMap{
-        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-        case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
-      }.toSeq
+    val metrics = subFeeds.map(subFeed => (subFeed.dataObjectId, subFeed.metrics)).flatMap {
+      case (dataObjectId, Some(metrics)) => metrics.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+      case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
     }
     metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
       .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched expression "$condition""""))
@@ -341,25 +339,16 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Adds a runtime metric for this Action
    */
-  def addRuntimeMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
+  def addAsyncMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
     if (dataObjectId.isDefined) {
       if (outputs.exists(_.id == dataObjectId.get)) try {
         runtimeData.addMetric(executionId, dataObjectId.get, metric)
       } catch {
-        case e: LateArrivingMetricException => logger.error(s"($id) ${e.msg}")
         case e: AssertionError => logger.error(s"($id) ${e.getMessage}")
       }
       else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metric")
     } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metric.getId})")
     if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metric.getAsText)
-  }
-
-  /**
-   * Get the latest metrics for all DataObjects and a given SDLExecutionId.
-   * @param executionId ExecutionId to get metrics for. If empty metrics for last ExecutionId are returned.
-   */
-  def getRuntimeMetrics(executionId: Option[ExecutionId] = None): Map[DataObjectId, Option[ActionMetrics]] = {
-    outputs.map(dataObject => (dataObject.id, runtimeData.getMetrics(dataObject.id, executionId))).toMap
   }
 
   /**

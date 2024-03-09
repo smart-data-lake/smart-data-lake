@@ -23,15 +23,16 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SchemaUtil}
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
-import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions._
@@ -125,7 +126,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   // Define partition columns
   override val partitions: Seq[String] = if (Environment.caseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
 
-  // TODO: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
+  // Note: Spark jdbc data source does not execute Spark observations, e.g. CopyWithMergeModeActionTest fails...
   // Using generic observations is forced therefore.
   override val forceGenericObservation = true
 
@@ -185,7 +186,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
       val newDataType = resolvedExpr.dataType
       if (context.isExecPhase) {
-        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head.get(0))
+        val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head().get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
         logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
@@ -291,7 +292,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
     validateSchemaMin(SparkSchema(df.schema), "write")
@@ -306,24 +307,31 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     finalSaveMode match {
 
       case SDLSaveMode.Overwrite =>
-        overwriteTableWithDataframe(df, partitionValues)
+        val metrics = overwriteTableWithDataframe(df, partitionValues)
+        metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
 
       case SDLSaveMode.Merge =>
         // write to tmp-table and merge by primary key
+        if (connection.directTableOverwrite) logger.warn(s"($id) directTableOverwrite=true can not be applied with SaveMode=Merge")
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
 
       case SDLSaveMode.Append =>
         // write target table with SaveMode.Append
-        writeDataFrameInternalWithAppend(df, table.fullName)
+        val metrics = writeDataFrameInternal(df, table.fullName, SaveMode.Append)
+        metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
     }
   }
 
-  private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    try {
+  private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): MetricsMap = {
+    if (connection.directTableOverwrite) {
+      writeDataFrameInternal(df, table.fullName, SaveMode.Overwrite)
+    } else try {
       // create & write to temp-table
-      val tableSchema = connection.catalog.getSchemaFromTable(table.fullName)
-      writeToTempTable(df, tableSchema)
+      val tableSchema = getExistingSchema.get
+      val metrics = writeToTempTable(df, tableSchema)
       overwriteTableWithTempTableInTransaction(partitionValues)
+      // return
+      metrics
     } finally {
       // cleanup temp table
       connection.dropTable(tmpTable.fullName)
@@ -346,7 +354,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  private def writeToTempTable(df: DataFrame, tempTableSchema: StructType)(implicit context: ActionPipelineContext): Unit = {
+  private def writeToTempTable(df: DataFrame, tempTableSchema: StructType)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     // cleanup temp table if existing
     if(connection.catalog.isTableExisting(tmpTable.fullName)) {
@@ -355,7 +363,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
     // create & write to temp-table
     connection.createTableFromSchema(tmpTable.fullName, tempTableSchema, options)
-    writeDataFrameInternalWithAppend(df, tmpTable.fullName)
+    writeDataFrameInternal(df, tmpTable.fullName, SaveMode.Append)
   }
 
   /**
@@ -363,32 +371,35 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): Unit = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
     try {
       // write data to temp table
-      writeToTempTable(df, df.schema)
+      val metrics = writeToTempTable(df, df.schema)
       // prepare SQL merge statement
       val mergeStmt = SQLUtil.createMergeStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       // execute
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       logger.debug(s"($id) merge statement: $mergeStmt")
-      connection.execJdbcStatement(mergeStmt)
+      val rowAffected = connection.execJdbcDmlStatement(mergeStmt)
+      metrics + ("rows_affected" -> rowAffected)
     } finally {
       // cleanup temp table
       connection.dropTable(tmpTable.fullName)
     }
   }
 
-  private def writeDataFrameInternalWithAppend(df: DataFrame, tableName: String): Unit = {
+  private def writeDataFrameInternal(df: DataFrame, tableName: String, saveMode: SaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     // No need to define any partitions as parallelization will be defined according to the data frame's partitions
-    df.write.mode(SaveMode.Append).format("jdbc")
-      .options(options)
-      .options(connection.getAuthModeSparkOptions)
-      .option("dbtable", tableName)
-      .save
+    SparkStageMetricsListener.execWithMetrics(this.id,
+      df.write.mode(saveMode).format("jdbc")
+        .options(options)
+        .options(connection.getAuthModeSparkOptions)
+        .option("dbtable", tableName)
+        .save()
+    )
   }
 
   override def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
@@ -469,7 +480,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      PartitionValues.fromDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct)
+      PartitionValues.fromDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct())
     } else Seq()
   }
 

@@ -29,7 +29,9 @@ import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutp
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 
 /**
- * [[Action]] to transfer files between SFtp, Hadoop and local Fs.
+ * [[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.
+ * As data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.
+ * If you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back.
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
@@ -78,7 +80,7 @@ case class FileTransferAction(override val id: ActionId,
     outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))))
   }
 
-  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[FileSubFeed] = {
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) fileTransfer.exec(fileRefMapping)
@@ -86,7 +88,7 @@ case class FileTransferAction(override val id: ActionId,
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->filesWritten) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    WriteSubFeedResult(subFeed, Some(fileRefMapping.isEmpty), Some(metrics))
+    subFeed.withMetrics(metrics)
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {

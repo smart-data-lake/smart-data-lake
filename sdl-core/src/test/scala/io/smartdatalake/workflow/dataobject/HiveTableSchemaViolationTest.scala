@@ -29,11 +29,10 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
 import java.nio.file.Files
-import scala.collection.mutable._
 
 class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAndAfter with SmartDataLakeLogger {
 
-  protected implicit val session: SparkSession = sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry

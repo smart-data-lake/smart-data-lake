@@ -24,9 +24,10 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.DataFrame
@@ -38,39 +39,52 @@ import org.apache.spark.sql.functions.col
  * PartitionValues are inferred if parameter of writeSparkDataFrame is empty.
  * writeSparkDataFrame mimicks overwrite mode, also for partitions.
  */
-case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(), override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None) extends DataObject with CanHandlePartitions with TransactionalTableDataObject {
+case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(),
+                          override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None, tableName: String = "mock",
+                          override val constraints: Seq[Constraint] = Seq(),
+                          override val expectations: Seq[Expectation] = Seq()
+                         ) extends DataObject with CanHandlePartitions with TransactionalTableDataObject with ExpectationValidation {
 
   // variables to store mock values. They are filled using writeSparkDataFrame
   private var dataFrameMock: Option[DataFrame] = None
-  private var partitionValuesMock: Seq[PartitionValues] = Seq()
+  private var partitionedDataFrameMock: Option[Map[PartitionValues,DataFrame]] = None
+  private var partitionValuesMock: Set[PartitionValues] = Set()
 
-  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = partitionValuesMock
+  override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = partitionValuesMock.toSeq
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
-    dataFrameMock.getOrElse(throw NoDataToProcessWarning("mock", s"($id) dataFrameMock not initialized"))
+    if (partitions.nonEmpty) {
+      partitionedDataFrameMock
+        .map(_.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).values.reduce(_ unionAll _))
+        .orElse(schemaMin.map(subFeedCompanion.getEmptyDataFrame(_, id).asInstanceOf[SparkDataFrame].inner))
+        .getOrElse(throw NoDataToProcessWarning("mock", s"($id) partitionedDataFrameMock not initialized"))
+    } else {
+      dataFrameMock
+        .getOrElse(throw NoDataToProcessWarning("mock", s"($id) dataFrameMock not initialized"))
+    }
   }
 
-  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
     assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
-    val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) {
-      // infer partition values
-      df.select(partitions.map(col):_*).collect.map(row => PartitionValues(partitions.map(p => (p,row.getAs[Any](p))).toMap)).toSeq
-    } else partitionValues
 
-    if (partitions.nonEmpty && dataFrameMock.isDefined) {
+    if (partitions.nonEmpty) {
       // mimick partition overwrite
-      dataFrameMock = Some(
-        dataFrameMock.get
-        .where(subFeedCompanion.not(PartitionValues.createFilterExpr(partitionValues)).asInstanceOf[SparkColumn].inner)
-        .unionAll(df)
+      val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) PartitionValues.fromDataFrame(df.select(partitions.map(col):_*))
+      else partitionValues
+      val newDataFrames = inferredPartitionValues.map(pv => (pv, df.where(getPartitionValueFilter(pv)))).toMap
+      partitionedDataFrameMock = Some(
+        partitionedDataFrameMock.getOrElse(Map()) ++ newDataFrames
       )
       partitionValuesMock = partitionValuesMock ++ inferredPartitionValues
+      dataFrameMock = None
     } else {
       // overwrite all
       dataFrameMock = Some(df)
-      partitionValuesMock = inferredPartitionValues
+      partitionValuesMock = Set()
+      partitionedDataFrameMock = None
     }
+    Map("records_written" -> df.collect().length) // enforce evaluate all columns by '.collect', so that constraints or RuntimeFailTransformer work as expected
   }
 
   def register(implicit instanceRegistry: InstanceRegistry): MockDataObject = {
@@ -82,18 +96,20 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
   override val metadata: Option[DataObjectMetadata] = None
   override val options: Map[String,String] = Map()
 
-  override var table: Table = Table(Some("mock"), id.id, primaryKey = primaryKey)
+  override var table: Table = Table(Some("mock"), tableName, primaryKey = primaryKey)
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = true
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = true
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
-    partitionValuesMock = Seq()
+    partitionValuesMock = Set()
     dataFrameMock = None
+    partitionedDataFrameMock = None
   }
 
   private implicit val subFeedCompanion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
+  private def getPartitionValueFilter(pv: PartitionValues) = pv.getFilterExpr.asInstanceOf[SparkColumn].inner
 
   override def factory: FromConfigFactory[DataObject] = MockDataObject
 

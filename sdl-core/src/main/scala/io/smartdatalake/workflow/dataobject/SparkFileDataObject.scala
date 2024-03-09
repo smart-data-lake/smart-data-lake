@@ -21,22 +21,23 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, ProcessingLogicException}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
 import org.apache.spark.sql.functions.{col, input_file_name, lit}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 
 import java.time.format.DateTimeFormatter
@@ -144,7 +145,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       .format(readFormat)
       .options(options)
       .load(path)
-      .withOptionalColumn(filenameColumn, input_file_name)
+      .withOptionalColumn(filenameColumn, input_file_name())
     val dfWithPartitions = partitions.foldLeft(df) {
       case (df, p) => df.withColumn(p, functions.lit("dummyString"))
     }
@@ -216,7 +217,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
 
     // add filename column
-    df = df.withOptionalColumn(filenameColumn, input_file_name)
+    df = df.withOptionalColumn(filenameColumn, input_file_name())
 
     // configure observer to get files processed for incremental execution mode
     if (filesObservers.nonEmpty && context.isExecPhase) {
@@ -380,12 +381,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
     if (filesObservers.size > 1) logger.warn(s"($id) files observation is not yet well supported when using from multiple actions in parallel")
     // force creating filenameColumn, and drop the it later again
     val forcedFilenameColumn = "__filename"
-    if (filenameColumn.isEmpty) df = df.withColumn(forcedFilenameColumn, input_file_name)
+    if (filenameColumn.isEmpty) df = df.withColumn(forcedFilenameColumn, input_file_name())
     // initialize observers
     df = filesObservers.foldLeft(df) {
       case (df, (actionId, observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
     }
-    filesObservers.clear
+    filesObservers.clear()
     // drop forced filenameColumn
     if (filenameColumn.isEmpty) df = df.drop(forcedFilenameColumn)
     // return
@@ -483,7 +484,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * @param partitionValues The partition layout to write.
    */
   final override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
@@ -520,11 +521,11 @@ trait SparkFileDataObject extends HadoopFileDataObject
         } else {
           throw new ProcessingLogicException(s"($id) OverwritePreserveDirectories without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
         }
-      case _ => Unit
+      case _ => ()
     }
 
     // write
-    try {
+    val metrics = try {
       writeSparkDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
     } catch {
       // cleanup partition directory on failure to ensure restartability for PartitionDiffMode.
@@ -538,20 +539,28 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // rename files according to SparkRepartitionDef
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
+
+    // return
+    metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
   }
 
-  override private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     val hadoopPathString = path.toString
     logger.info(s"($id) Writing DataFrame to $hadoopPathString")
 
-    df.write.format(format)
-      .mode(SparkSaveMode.from(finalSaveMode))
-      .options(options)
-      .optionalPartitionBy(partitions)
-      .save(hadoopPathString)
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
+      df.write.format(format)
+        .mode(SparkSaveMode.from(finalSaveMode))
+        .options(options)
+        .optionalPartitionBy(partitions)
+        .save(hadoopPathString)
+    )
 
     // recreate current schema file, it gets deleted by SaveMode.Overwrite - this is to avoid schema inference and remember the schema if there is no data.
     if (SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite) createSchemaFile(df)
+
+    // return
+    metrics
   }
 
   /**
@@ -586,7 +595,7 @@ object SparkFileDataObject extends SmartDataLakeLogger {
   private[smartdatalake] def getFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Seq[String] = {
     val fileSources = df.queryExecution.executedPlan.collect { case x: FileSourceScanExec => x }
     if (fileSources.isEmpty) throw new IllegalStateException(s"($id) No FileSourceScanExec found in execution plan to check if there is data to process")
-    fileSources.flatMap(_.inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath))
+    fileSources.flatMap(_.inputRDD.asInstanceOf[FileScanRDD].filePartitions.flatMap(_.files).map(_.filePath.toString()))
   }
   private[smartdatalake] def tryGetFilesProcessedFromSparkPlan(id: String, df: Dataset[_]): Option[Seq[String]] = try {
     Some(getFilesProcessedFromSparkPlan(id, df))

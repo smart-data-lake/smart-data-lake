@@ -20,8 +20,6 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.StructType
 
 import scala.reflect.runtime.universe.Type
 
@@ -62,4 +60,20 @@ trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaVali
   override def atlasQualifiedName(prefix: String): String = s"${table.db.getOrElse("default")}.${table.name}"
 
   override def atlasName: String = id.id
+
+  /**
+   * Returns statistics about this DataObject from the catalog. Depending on it's type this can be
+   * - min
+   * - max
+   * - num_nulls -> Completness %
+   * - distinct_count -> Uniqness %
+   * - avg_col_len	11
+   * - max_col_len	13
+   * - ...
+   * @param update if true, more costly operations such as "analyze table ... compute statistics for all columns" are executed before returning results.*
+   * @param lastModifiedAt can be given to avoid update if there has been no new data written to the table.
+   * @return column statistics about this DataObject
+   */
+  def getColumnStats(update: Boolean = false, lastModifiedAt: Option[Long] = None)(implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = Map()
+
 }

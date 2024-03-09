@@ -21,16 +21,17 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -43,7 +44,7 @@ import java.nio.file.Files
 
 class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogger with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -140,10 +141,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       val runState = stateStore.recoverRunState(stateId)
       assert(runState.runId >= 3)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state)
+      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id , RuntimeEventState.SKIPPED))
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState.head._2.results.head.subFeed.partitionValues.isEmpty)
+      assert(runState.actionsState.head._2.results.head.partitionValues.isEmpty)
     }
   }
 
@@ -184,7 +185,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -200,12 +201,12 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
               case 2 =>
                 // stop streaming query
                 logger.info("stopping streaming query")
-                session.streams.active.find(_.name == event.progress.name).get.stop
-              case _ => Unit
+                session.streams.active.find(_.name == event.progress.name).get.stop()
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -222,15 +223,15 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     val action1InfoSdl1 = action1.getRuntimeInfo(Some(SDLExecutionId(1))).get
     assert(action1InfoSdl1.state == RuntimeEventState.SUCCEEDED) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
-    assert(action1InfoSdl1.results.head.mainMetrics.isEmpty) // no metrics for SDL execution 1 of streaming actions
+    assert(getFirstMetrics(action1InfoSdl1)("records_written") == 1)
     val action1InfoSdl2 = action1.getRuntimeInfo(Some(SDLExecutionId(2))).get
     assert(action1InfoSdl2.state == RuntimeEventState.STREAMING) // State for SDL execution 2 is reported as STREAMING by streaming action
     val action1InfoStream1 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(0))).get
     assert(action1InfoStream1.state == RuntimeEventState.SUCCEEDED)
-    assert(action1InfoStream1.results.head.mainMetrics("records_written") == 1)
+    assert(getFirstMetrics(action1InfoStream1)("records_written") == 1)
     val action1InfoStream2 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(1))).get
     assert(action1InfoStream2.state == RuntimeEventState.SUCCEEDED)
-    assert(action1InfoStream2.results.head.mainMetrics("records_written") == 1)
+    assert(getFirstMetrics(action1InfoStream2)("records_written") == 1)
 
     // check state after streaming is terminated
     {
@@ -240,10 +241,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       // only one SDL run executed (streaming action is asynchronous)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId,s.state))
+      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId,s.state)).toMap
       val expectedActionsState = Map((action1.id, (SDLExecutionId(1), RuntimeEventState.SUCCEEDED))) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
       assert(resultActionsState == expectedActionsState)
-      assert(runState.actionsState(action1.id).results.head.mainMetrics.isEmpty) // no metrics for SDL execution 1 of streaming actions
+      assert(getFirstMetrics(runState.actionsState(action1.id))("records_written") == 1)
     }
   }
 
@@ -291,7 +292,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -308,11 +309,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
-              case _ => Unit
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -362,7 +363,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare partition diff action
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[FailTransformer].getName)))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[RuntimeFailTransformer].getName)))
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
     // prepare streaming action
@@ -373,7 +374,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -390,11 +391,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
-              case _ => Unit
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -464,7 +465,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -480,7 +481,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -527,7 +528,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare streaming action
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[FailTransformer].getName)))
+      , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[RuntimeFailTransformer].getName)))
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
     // prepare partition diff action
@@ -624,7 +625,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener: StreamingQueryListener = new StreamingQueryListener {
       var dfSrc2Written = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = Unit
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -641,11 +642,11 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
-              case _ => Unit
+              case _ => ()
             }
         }
       }
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = Unit
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -675,6 +676,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // check data after streaming is terminated
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102", "20190101"))
   }
+
+  def getFirstMetrics(info: RuntimeInfo): MetricsMap = info.results.head.metrics.getOrElse(Map())
 }
 
 /**

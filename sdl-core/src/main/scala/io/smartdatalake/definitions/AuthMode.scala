@@ -42,13 +42,13 @@ sealed trait AuthMode {
    * This method is called in prepare phase through the data object.
    * It allows the check configuration and setup variables.
    */
-  private[smartdatalake] def prepare(): Unit = Unit
+  private[smartdatalake] def prepare(): Unit = ()
 
   /**
    * This method is called after exec phase throught the postExec method of the data object.
    * It allows to release any resources that were reserved.
    */
-  private[smartdatalake] def close(): Unit = Unit
+  private[smartdatalake] def close(): Unit = ()
 }
 
 /**
@@ -150,7 +150,7 @@ case class CustomHttpAuthMode(className: String, options: Map[String,StringOrSec
   private[smartdatalake] override def getHeaders: Map[String, String] = impl.getHeaders
 }
 trait CustomHttpAuthModeLogic extends HttpHeaderAuth {
-  def prepare(options: Map[String,StringOrSecret]): Unit = Unit
+  def prepare(options: Map[String,StringOrSecret]): Unit = ()
 }
 
 /**

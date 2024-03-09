@@ -41,7 +41,8 @@ case class HttpProxyConfig(host: String, port: Int)
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
 /**
- * [[DataObject]] to call webservice and return response as InputStream
+ * [[DataObject]] to call webservice and return response as InputStream.
+ * The corresponding Action to process the response should be a FileTransferAction.
  * This is implemented as FileRefDataObject because the response is treated as some file content.
  * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
  * All possible query parameter values must be given in configuration.
@@ -140,7 +141,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     new ByteArrayInputStream(getResponse(Some(query)))
   }
 
-  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * @param path      is ignored for webservices
@@ -154,13 +155,13 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
         val bytes = this.toByteArray
         postResponse(bytes, None)
       } match {
-        case Success(_) => Unit
+        case Success(_) => ()
         case Failure(e) => throw new RuntimeException(s"($id) Could not post to webservice: ${e.getMessage}", e)
       }
     }
   }
 
-  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)

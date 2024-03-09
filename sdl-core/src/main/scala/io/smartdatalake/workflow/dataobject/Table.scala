@@ -18,14 +18,16 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import org.apache.spark.sql.catalyst.TableIdentifier
+
 /**
  * Table attributes
  *
  * @param catalog     Optional catalog to be used for this table. If null default catalog is used.
  *                    If there exists a connection with catalog value for the DataObject and this field is not defined, it will be set to the connections catalog value.
- * @param db          database-schema to be used for this table.
-                      If there exists a connection for the DataObject and this field is not defined, it will be set to the connections database value .
- *                    Called db for backwards-compatibility because for hive tables, db and schema mean the same thing.
+ * @param db database-schema to be used for this table.
+ *           If there exists a connection for the DataObject and this field is not defined, it will be set to the connections database value .
+ *           Called db for backwards-compatibility because for hive tables, db and schema mean the same thing.
  * @param name        table name
  * @param query       optional select query
  * @param primaryKey  optional sequence of primary key columns
@@ -59,9 +61,15 @@ case class Table(
     this.copy(catalog = catalog.orElse(catalogParam), db = db.orElse(dbParam))
   }
 
-  def fullName: String = Seq(catalog,db,Some(name)).flatten.mkString(".")
+  def fullName: String = nameParts.mkString(".")
 
-  def nameParts: Seq[String] = fullName.split('.').toSeq
+  def getDbName: String = nameParts.init.mkString(".")
+
+  def nameParts: Seq[String] = Seq(catalog, db, Some(name)).flatten
+
+  private[smartdatalake] def tableIdentifier: TableIdentifier = {
+    TableIdentifier(name, db, catalog)
+  }
 }
 
 /**

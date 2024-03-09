@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,81 +22,12 @@ package io.smartdatalake.workflow.action.generic.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB, EncryptDecryptGCM, EncryptDecryptSupport}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.expressions.UserDefinedFunction
-
-import java.security.SecureRandom
-import java.util.Base64
-import javax.crypto.spec.{GCMParameterSpec, SecretKeySpec}
-import javax.crypto.{Cipher, SecretKey}
-import org.apache.spark.sql.functions.{col, udf}
-
-trait EncryptDecrypt {
-  def keyAsBytes: Array[Byte]
-
-  val cryptUDF: UserDefinedFunction = udf(encrypt _)
-  private val ALGORITHM_STRING: String = "AES/GCM/PKCS5Padding"
-  private val IV_SIZE = 128
-  private val TAG_BIT_LENGTH = 128
-
-  private val secureRandom = new SecureRandom()
-
-
-  def process(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
-
-    encryptColumns.foldLeft(df) {
-      case (dfTemp, colName) => dfTemp.withColumn(colName, cryptUDF(col(colName)))
-    }
-  }
-
-  private def generateAesKey(keyBytes: Array[Byte]): SecretKey = {
-    new SecretKeySpec(keyBytes, "AES")
-  }
-
-  def encrypt(message: String): String = {
-    val aesKey: SecretKey = generateAesKey(keyAsBytes)
-    val gcmParameterSpec = generateGcmParameterSpec()
-
-    val cipher = Cipher.getInstance(ALGORITHM_STRING)
-    cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
-
-    val encryptedMessage = cipher.doFinal(message.getBytes)
-    encodeData(gcmParameterSpec, encryptedMessage)
-  }
-
-  def decrypt(encryptedDataString: String): String = {
-    val aesKey: SecretKey = generateAesKey(keyAsBytes)
-    val (gcmParameterSpec, encryptedMessage) = decodeData(encryptedDataString)
-
-    val cipher = Cipher.getInstance(ALGORITHM_STRING)
-    cipher.init(Cipher.DECRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
-
-    val message = cipher.doFinal(encryptedMessage)
-    new String(message)
-  }
-
-  private def generateGcmParameterSpec(): GCMParameterSpec = {
-    val iv = new Array[Byte](IV_SIZE)
-    secureRandom.nextBytes(iv)
-    new GCMParameterSpec(TAG_BIT_LENGTH, iv)
-  }
-
-  private def encodeData(gcmParameterSpec: GCMParameterSpec, encryptedMessage: Array[Byte]): String = {
-    val data = gcmParameterSpec.getIV ++ encryptedMessage
-    Base64.getEncoder.encodeToString(data)
-  }
-
-  private def decodeData(encodedData: String): (GCMParameterSpec, Array[Byte]) = {
-    val data = Base64.getDecoder.decode(encodedData)
-    val iv = data.take(IV_SIZE)
-    val gcmParameterSpec = new GCMParameterSpec(TAG_BIT_LENGTH, iv)
-    val encryptedMessage = data.drop(IV_SIZE)
-    (gcmParameterSpec, encryptedMessage)
-  }
-}
 
 /**
  * Encryption of specified columns using AES/GCM algorithm.
@@ -106,22 +37,29 @@ trait EncryptDecrypt {
  * @param encryptColumns List of columns [columnA, columnB] to be encrypted
  * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
  *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
+ * @param algorithm      Specify: "GCM" (AES/GCM/NoPadding), "ECB" (AES/ECB/PKCS5Padding),
+ *                       alternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM
  */
 case class EncryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      encryptColumns: Seq[String],
                                      @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
                                      private val key: Option[StringOrSecret],
+                                     algorithm: String = "GCM"
                                     )
-  extends SparkDfTransformer with EncryptDecrypt {
+  extends SparkDfTransformer with EncryptDecryptSupport {
   private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
+  private val keyBytes: Array[Byte] = cur_key.resolve().getBytes
 
-  override def keyAsBytes: Array[Byte] = cur_key.resolve().getBytes
-
-  override val cryptUDF: UserDefinedFunction = udf(encrypt _)
+  val crypt: EncryptDecrypt = algorithm match {
+    case "GCM" => new EncryptDecryptGCM(keyBytes)
+    case "ECB" => new EncryptDecryptECB(keyBytes)
+    case classname if classname.contains(".") => loadEncryptDecryptClass(classname, keyBytes)
+    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
+  }
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    process(df, encryptColumns)
+    crypt.encryptColumns(df, encryptColumns)
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
@@ -130,41 +68,5 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
 object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): EncryptColumnsTransformer = {
     extract[EncryptColumnsTransformer](config)
-  }
-}
-
-/**
- * Decryption of specified columns using AES/GCM algorithm.
- *
- * @param name           name of the transformer
- * @param description    Optional description of the transformer
- * @param decryptColumns List of columns [columnA, columnB] to be encrypted
- * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
- *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
- */
-case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
-                                     override val description: Option[String] = None,
-                                     decryptColumns: Seq[String],
-                                     @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
-                                     private val key: Option[StringOrSecret],
-                                     algorithm: String = "AES/CBC/PKCS5Padding"
-                                    )
-  extends SparkDfTransformer with EncryptDecrypt {
-  private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
-
-  override def keyAsBytes: Array[Byte] = cur_key.resolve().getBytes
-
-  override val cryptUDF: UserDefinedFunction = udf(decrypt _)
-
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
-    process(df, decryptColumns)
-  }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = DecryptColumnsTransformer
-}
-
-object DecryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DecryptColumnsTransformer = {
-    extract[DecryptColumnsTransformer](config)
   }
 }

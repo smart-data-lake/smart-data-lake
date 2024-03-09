@@ -35,7 +35,7 @@ class LabCatalogGeneratorTest extends FunSuite {
     val path = Paths.get(s"$srcDir/${packageName.split('.').mkString("/")}/$className.scala")
     assert(Files.exists(path))
     assert(Using.resource(Source.fromFile(path.toFile)) {
-      x => x.getLines.exists(_.contains("dataObjectParquet12"))
+      x => x.getLines().exists(_.contains("dataObjectParquet12"))
     })
   }
 }

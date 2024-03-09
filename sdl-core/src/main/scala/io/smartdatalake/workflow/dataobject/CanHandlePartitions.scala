@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, TableStatsType}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
@@ -33,6 +33,8 @@ trait CanHandlePartitions { this: DataObject =>
 
   /**
    * Definition of partition columns
+   *
+   * Example: `[dt]`
    */
   def partitions: Seq[String]
 
@@ -40,7 +42,11 @@ trait CanHandlePartitions { this: DataObject =>
    * Definition of partitions that are expected to exists.
    * This is used to validate that partitions being read exists and don't return no data.
    * Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
-   * example: "elements['yourColName'] > 2017"
+   *
+   * Example: "elements['yourColName'] > 2017"
+   *
+   * If empty (default) all partition are expected to exists.
+   *
    * @return true if partition is expected to exist.
    */
   private[smartdatalake] def expectedPartitionsCondition: Option[String]
@@ -89,7 +95,7 @@ trait CanHandlePartitions { this: DataObject =>
     val session = context.sparkSession
     expectedPartitionsCondition.map{ condition =>
       // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
-      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString), pv.hashCode))
+      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString).toMap, pv.hashCode))
       val expectedHashCodes = partitionsValuesStringWithHashCode
         .map{ case (elements, hashCode) => PartitionValueFilterExpressionData(elements, hashCode)}
         .filter(p => SparkExpressionUtil.evaluateBoolean(id, None, condition, p))
@@ -124,5 +130,12 @@ trait CanHandlePartitions { this: DataObject =>
     val missingCols = if (Environment.caseSensitive) primaryKeyCols.diff(df.columns)
     else primaryKeyCols.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing primary key cols ${missingCols.mkString(", ")} on $role")
+  }
+
+  private[smartdatalake] def getPartitionStats(implicit context: ActionPipelineContext): Map[String,Any] = {
+    if (partitions.nonEmpty) {
+      val partitionValues = PartitionValues.sort(partitions, listPartitions)
+      Map(TableStatsType.NumPartitions.toString -> partitionValues.size, TableStatsType.MinPartition.toString -> partitionValues.head.toString, TableStatsType.MaxPartition.toString -> partitionValues.last.toString)
+    } else Map()
   }
 }

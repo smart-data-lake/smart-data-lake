@@ -46,6 +46,7 @@ trait DataFrameFunctions {
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
+  def coalesce(columns: GenericColumn*): GenericColumn
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn
   def stringType: GenericDataType
   def arrayType(dataType: GenericDataType): GenericDataType

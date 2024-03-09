@@ -34,6 +34,8 @@ import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
 import org.apache.spark.{sql => spark}
 import com.snowflake.snowpark
 import com.snowflake.snowpark.SaveMode
+import io.smartdatalake.metrics.SparkStageMetricsListener
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -51,6 +53,8 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param comment      An optional comment to add to the table after writing a DataFrame to it
+ * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
+ *                     These options override connection.options.
  * @param metadata     meta data
  */
 // TODO: we should add virtual partitions as for JdbcTableDataObject and KafkaDataObject, so that PartitionDiffMode can be used...
@@ -61,6 +65,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val expectations: Seq[Expectation] = Seq(),
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
+                                    sparkOptions: Map[String, String] = Map(),
                                     comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -80,6 +85,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) A SnowFlake schema name must be added as the 'db' parameter of a SnowflakeTableDataObject.")
   }
 
+  // Note: Spark snowflake data source does not execute Spark observations. This is the same for Spark jdbc data source, see also JdbcTableDataObject.
+  // Using generic observations is forced therefore.
+  override val forceGenericObservation = true
+
+  private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
 
   // Get a Spark DataFrame with the table contents for Spark transformations
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {
@@ -87,7 +97,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getSnowflakeOptions(table.db.get))
+      .options(connection.getSnowflakeAuthOptions(table.db.get))
+      .options(instanceSparkOptions)
       .options(queryOrTable)
       .load()
     df
@@ -95,7 +106,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   // Write a Spark DataFrame to the Snowflake table
   override def writeSparkDataFrame(df: spark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
-                                  (implicit context: ActionPipelineContext): Unit = {
+                                  (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
     validateSchemaMin(SparkSchema(df.schema), role = "write")
     implicit val helper = SparkSubFeed
@@ -110,25 +121,30 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     //  snowparkSession.sql(s"delete from $fullyQualifiedTableName where $deleteCondition")
     //  finalSaveMode = SDLSaveMode.Append
     //}
-
-    df.write
-      .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getSnowflakeOptions(table.db.get))
-      .options(Map("dbtable" -> fullyQualifiedTableName))
-      .mode(SparkSaveMode.from(finalSaveMode))
-      .save()
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
+      df.write
+        .format(SNOWFLAKE_SOURCE_NAME)
+        .options(connection.getSnowflakeAuthOptions(table.db.get))
+        .options(instanceSparkOptions)
+        .options(Map("dbtable" -> fullyQualifiedTableName))
+        .mode(SparkSaveMode.from(finalSaveMode))
+        .save()
+    )
 
     if (comment.isDefined) {
       val sql = s"comment on table ${connection.database}.${table.fullName} is '$comment';"
       connection.execSnowflakeStatement(sql)
     }
+
+    // return
+    metrics
   }
 
   override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     df match {
       // TODO: initSparkDataFrame has empty implementation
       case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
-      case sparkDf: SnowparkDataFrame => Unit
+      case sparkDf: SnowparkDataFrame => ()
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
     }
   }
@@ -145,10 +161,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
   private[smartdatalake] override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
 
-  private[smartdatalake] override def writeSubFeed(subFeed: DataFrameSubFeed, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
-    writeDataFrame(subFeed.dataFrame.get, partitionValues, isRecursiveInput, saveModeOptions)
-  }
-  override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): Unit = {
+  override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     df match {
       case sparkDf: SparkDataFrame => writeSparkDataFrame(sparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
       case snowparkDf: SnowparkDataFrame => writeSnowparkDataFrame(snowparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
@@ -186,14 +199,27 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * Write a Snowpark DataFrame to Snowflake, used in Snowpark actions
    */
   def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                            (implicit context: ActionPipelineContext): Unit = {
+                            (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
 
     // TODO: what to do with isRecursiveInput...
     // TODO: merge mode not yet implemented
     assert(saveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
 
-    df.write.mode(SnowparkSaveMode.from(saveMode)).saveAsTable(table.fullName)
+    // use asynchronous writer to get query id
+    val asyncWriter = df.write.mode(SnowparkSaveMode.from(saveMode)).async.saveAsTable(table.fullName)
+    asyncWriter.getResult()
+
+    // retrieve metrics from result scan
+    val dfResultScan = snowparkSession.sql(s"SELECT * FROM TABLE(RESULT_SCAN(${asyncWriter.getQueryId()}))")
+    dfResultScan.first().map(row => dfResultScan.schema.names.map(_.toLowerCase.replace(" ","_")).zip(row.toSeq).toMap).getOrElse(Map())
+      // standardize naming
+      .map {
+        case ("number_of_rows_inserted", v) => "rows_inserted" -> v
+        case ("number_of_rows_updated", v) => "rows_updated" -> v
+        case ("number_of_rows_deleted", v) => "rows_deleted" -> v
+        case (k, v) => k -> v
+      }
   }
 }
 

@@ -24,7 +24,7 @@ import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
-import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -34,6 +34,7 @@ import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql
 
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -44,11 +45,11 @@ class EncryptColumnsTransformerTest extends FunSuite {
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
-  test("test column encryption and decryption") {
+  def run_test(enc_type: String): sql.DataFrame = {
     val sdlb = new DefaultSmartDataLakeBuilder()
 
     val config = ConfigFactory.parseString(
-      """
+      s"""
         |actions = {
         |   actenc = {
         |     type = CopyAction
@@ -61,6 +62,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
         |       key = "A%D*G-KaPdSgVkYp"
+        |       algorithm = ${enc_type}
         |     }]
         |   }
         |   actdec = {
@@ -74,6 +76,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
         |       key = "A%D*G-KaPdSgVkYp"
+        |       algorithm = ${enc_type}
         |     }]
         |   }
         |}
@@ -96,14 +99,13 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
     val globalConfig = GlobalConfig.from(config)
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val session: SparkSession = sparkSessionBuilder(withHive = true, globalConfig.sparkOptions.getOrElse(Map())).getOrCreate()
+    implicit val session: SparkSession = TestUtil.session
     import session.implicits._
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:actenc,ids:actdec")
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = s"ids:actenc,ids:actdec")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
-    assert(srcDO != None)
     val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
@@ -118,15 +120,46 @@ class EncryptColumnsTransformerTest extends FunSuite {
     val dfEnc = enc.getSparkDataFrame()
     val colName = dfEnc.columns
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
-    val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect.toList
+    val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect().toList
+    dfEnc.show(false)
+    print(s"### ${enc_type} encrypted dataFrame")
     assert(testCol != Seq("Foo", "Space", "Space"))
+    if (enc_type === "GCM") {
+      assert(testCol(1) !== testCol(2), "2 encrypted items should not result in the same ciphertext with GCM")
+    } else if (enc_type === "ECB") {
+      assert(testCol(1) === testCol(2), "2 encrypted items should result in the same ciphertext with ECB")
+    }
 
     // check the decoded DataFrame
     val dec = instanceRegistry.get[ParquetFileDataObject]("dec")
     val dfDec = dec.getSparkDataFrame()
+    dfDec.show(false)
+    print(s"### ${enc_type} decrypted dataFrame")
+
     val colDecName = dfDec.columns
     assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
-    val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect.toList
+    val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect().toList
     assert(testDecCol == Seq("Foo", "Space", "Space"))
+    dfEnc
+  }
+
+  test("test column encryption and decryption") {
+    run_test("GCM")
+  }
+
+  test("test ECB column encryption and decryption") {
+    val df = run_test("ECB")
+    assert(df.select("c2").take(2)(1).getAs[String]("c2") === "0RK5Cr5ax1OXlBO7Q+BHxA==")
+  }
+
+  test("test column encryption, unsupported algorithm") {
+    intercept[ConfigurationException]{
+      run_test("notSupported")
+    }
+  }
+
+  test("test column encryption and decryption with Class Name") {
+    val df = run_test("io.smartdatalake.util.crypt.EncryptDecryptECB")
+    assert(df.select("c2").take(2)(1).getAs[String]("c2") === "0RK5Cr5ax1OXlBO7Q+BHxA==")
   }
 }

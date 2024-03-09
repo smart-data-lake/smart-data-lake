@@ -83,7 +83,7 @@ private[smartdatalake] object ProductUtil {
    * Case classes and Maps are formatted as key=value list.
    */
   private[smartdatalake] def formatObj(obj: Any, truncateListLimit: Int = 10): String = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     // recursive function to add an object to the message
     def addObjToBuilder(msg: StringBuilder, inputObj: Any, spacing: Boolean = true): Unit = {
@@ -168,8 +168,9 @@ private[smartdatalake] object ProductUtil {
   def createEncoder(tpe: Type): ExpressionEncoder[_] = {
     val mirror = ScalaReflection.mirror
     val cls = mirror.runtimeClass(tpe)
-    val serializer = ScalaReflection.serializerForType(tpe)
-    val deserializer = ScalaReflection.deserializerForType(tpe)
+    val encoder = ScalaReflection.encoderFor(tpe)
+    val serializer = ScalaReflection.serializerFor(encoder)
+    val deserializer = ScalaReflection.deserializerFor(encoder)
     new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
   }
 

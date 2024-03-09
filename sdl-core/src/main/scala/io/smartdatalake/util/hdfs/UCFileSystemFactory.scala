@@ -23,11 +23,8 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-import org.apache.hadoop.fs.permission.FsPermission
-import org.apache.hadoop.util.Progressable
 
 import java.lang.reflect.Method
-import java.net.URI
 
 
 /**
@@ -45,6 +42,16 @@ class UCFileSystemFactory extends FileSystemFactory {
 
 object UCFileSystemFactory {
 
+  /**
+   * Checks if Databricks classes exist on classpath
+   */
+  def isDatabricksEnv: Boolean = dbUtils.nonEmpty
+
+  /**
+   * Checks if Databricks FSUtils are configured for Unity Catalog.
+   * Note: This seems to be an unreliable information, as it depends on wether and how a spark session is initialized.
+   * @return
+   */
   def needUcFileSystem: Boolean = dbUtils.exists(_.isUnityCatalogEnabled)
 
   def getDbUtils: DbUtilsInterface = UCFileSystemFactory.dbUtils
@@ -66,7 +73,7 @@ object UCFileSystemFactory {
 private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeHelperClass: Class[_]) extends SmartDataLakeLogger {
 
   def checkPermissionAccess[X](pathAndActions: Seq[_], withUnityCatalog: java.lang.Boolean, code : => X): X = {
-    checkPermissionMethod.invoke(fsUtilsInst, pathAndActions, withUnityCatalog, code _).asInstanceOf[X]
+    checkPermissionMethod.invoke(fsUtilsInst, pathAndActions, withUnityCatalog, () => code).asInstanceOf[X]
   }
   private lazy val checkPermissionMethod = getMethod(fsUtilsInst.getClass, "checkPermission", Seq(classOf[Seq[_]], classOf[Boolean], classOf[Function0[_]]))
   checkPermissionMethod.setAccessible(true)
@@ -81,9 +88,10 @@ private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeH
     isUnityCatalogEnabledMethod.invoke(fsUtilsInst).asInstanceOf[java.lang.Boolean]
   }
   private lazy val isUnityCatalogEnabledMethod = getMethod(fsUtilsInst.getClass, "isUnityCatalogEnabled", Seq())
-  getFSMethod.setAccessible(true)
+  isUnityCatalogEnabledMethod.setAccessible(true)
 
   def registerPathAccess(path: Path): Unit = {
+    logger.info(s"register path access for $path")
     registerPathAccessMethod.invoke(null, path, None) // invoking static method
   }
   private lazy val registerPathAccessMethod: Method = getMethod(credentialScopeHelperClass, "registerPathAccess", Seq(classOf[Path], classOf[Option[_]]))

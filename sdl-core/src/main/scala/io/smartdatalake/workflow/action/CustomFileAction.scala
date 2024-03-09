@@ -72,7 +72,7 @@ case class CustomFileAction(override val id: ActionId,
     outputSubFeed.copy(fileRefMapping = Some(output.translateFileRefs(inputFileRefs)))
   }
 
-  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[FileSubFeed] = {
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
@@ -87,7 +87,7 @@ case class CustomFileAction(override val id: ActionId,
       val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
       val filePathPairs = fileRefMapping.map{ m => (m.src.fullPath, m.tgt.fullPath)}
       val nbOfPartitions = math.max(filePathPairs.size / filesPerPartition, 1)
-      val transformedDs = filePathPairs.toDS.repartition(nbOfPartitions)
+      val transformedDs = filePathPairs.toDS().repartition(nbOfPartitions)
         .map { case (srcPath, tgtPath) =>
           val hadoopSrcPath = new Path(srcPath)
           val hadoopTgtPath = new Path(tgtPath)
@@ -100,7 +100,7 @@ case class CustomFileAction(override val id: ActionId,
         }
 
       // execute the data set and log results
-      val results = transformedDs.collect
+      val results = transformedDs.collect()
       results.foreach { case (_, tgt, ex) =>
         if (ex.isEmpty) logger.info(s"transformed $tgt")
         else logger.error(s"transformed $tgt with error $ex")
@@ -110,7 +110,7 @@ case class CustomFileAction(override val id: ActionId,
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->fileRefMapping.size.toLong) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    WriteSubFeedResult(subFeed, Some(fileRefMapping.isEmpty), Some(metrics))
+    subFeed.withMetrics(metrics)
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {

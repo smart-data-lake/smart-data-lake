@@ -37,7 +37,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import scala.util.Using
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 
 /**

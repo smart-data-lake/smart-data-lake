@@ -32,8 +32,22 @@ import org.apache.spark.sql.DataFrame
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)
- * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
- * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomDfsTransformer]].
+ *
+ * To define the transformation a class implementing the trait [[CustomDfsTransformer]] has to be created.
+ * There are two methods to define of defining transformation:
+ *
+ * 1) Overwrite the generic transform function of CustomDfsTransformer: Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has
+ * to return a map of output DataObjectIds with DataFrames. The exact signature is `transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]`.
+ *
+ * 2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
+ * Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
+ * The transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.
+ * Using this method you can avoid writing code to prepare DataFrames and Options from the corresponding Map parameters.
+ * It also allows the UI to display input parameter details of your transformation.
+ *
+ * Note that the following options are passed by default to the transformation:
+ * - isExec: defined as `context.isExecPhase`
+ * - outputDataObjectId: defined as outputDataObject.id if transformation has only one output DataObject configured.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
@@ -44,12 +58,15 @@ import org.apache.spark.sql.DataFrame
  */
 case class ScalaClassSparkDfsTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](className)
-  override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
+
+  override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     customTransformer.transform(context.sparkSession, options, dfs)
   }
-  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
-   customTransformer.transformPartitionValues(options, partitionValues)
+
+  override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
+    customTransformer.transformPartitionValues(options, partitionValues)
   }
+
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDfsTransformer
 }
 

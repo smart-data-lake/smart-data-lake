@@ -272,13 +272,13 @@ case class SQLFractionExpectation(override val name: String, override val descri
           (col.map(SparkColumn), Map(n -> pct))
         }
       val cols = colsAndUpdatedMetrics.flatMap(_._1)
-      val updatedMetrics = metrics.filterKeys(!_.startsWith(totalName)) ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
+      val updatedMetrics = metrics.filterKeys(!_.startsWith(totalName)).toMap ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
       (cols, updatedMetrics)
     } else {
       val countExpectation = getMetric[Long](dataObjectId,metrics,name)
       val countTotal = getMetric[Long](dataObjectId,metrics,totalMetric)
       val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal)
-      val updatedMetrics = metrics.filterKeys(_ != totalName) + (name -> pct)
+      val updatedMetrics = metrics.filterKeys(_ != totalName).toMap + (name -> pct)
       (col.map(SparkColumn).toSeq, updatedMetrics)
     }
   }

@@ -21,7 +21,7 @@ package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config.{ExcludeFromSchemaExport, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, ScaladocUtil, jsonschema}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -34,10 +34,11 @@ import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.reflect.runtime.universe.{ClassSymbol, Type, TypeRef, typeOf}
+import scala.collection.compat._
 
 /**
  * Create Json schema elements from generic type definitions.
@@ -59,6 +60,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     // get generic type definitions
     val typeDefs = GenericTypeUtil.typeDefs(reflections)
       .filter(_.isFinal) // only case classes
+      .filter(typeDef => ! (typeDef.tpe <:< typeOf[ExcludeFromSchemaExport])) // remove classes that should not be shown in the schema
 
     // define registry and converter
     val registry = new DefinitionRegistry
@@ -106,8 +108,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     def fromGenericTypeDef(typeDef: GenericTypeDef): JsonObjectDef = {
       val typeProperty = if(typeDef.baseTpe.isDefined) Seq(("type", JsonConstDef(typeDef.name))) else Seq()
       val attributes = getTypeAttributesForJsonSchema(typeDef)
-      val jsonAttributes = typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a)))
-      val properties = ListMap(jsonAttributes:_*)
+      // to break recursive conversion this has to be a function and evaluated lazy. Otherwise there might happen a stack overflow with ProxyAction.
+      val properties = new LazyListMapWrapper(() => ListMap((typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a)))):_*))
       val required = typeProperty.map(_._1) ++ attributes.filter(_.isRequired).map(_.name)
       jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
     }
@@ -121,11 +123,14 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       }
     }
 
-    def fromCaseClass(cls: ClassSymbol): JsonObjectDef = {
+    def fromCaseClass(cls: ClassSymbol, isDeprecated: Option[Boolean] = None): JsonObjectDef = {
       convertedCaseClasses.getOrElseUpdate(cls, {
         logger.debug(s"Converting case class ${cls.fullName}")
         val typeDef = GenericTypeUtil.typeDefForClass(cls.toType)
-        fromGenericTypeDef(typeDef)
+        // this might result in stack overflow because ProxyAction includes an Action again.
+        // It is solved by using lazy property processing, see type LazyListMapWrapper of JsonSchemaObj.properties.
+        val jsonObjDef = fromGenericTypeDef(typeDef)
+        jsonObjDef.copy(deprecated = Seq(jsonObjDef.deprecated,isDeprecated).flatten.maxOption)
       })
     }
     private val convertedCaseClasses: mutable.Map[ClassSymbol, JsonObjectDef] = mutable.Map()
@@ -154,13 +159,25 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           else refDefs.head
         }
         case t if registry.typeExists(t) => registry.getJsonRefDef(t, isDeprecated)
-        case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass)
+        case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass, isDeprecated)
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
           val baseCls = getClass.getClassLoader.loadClass(t.typeSymbol.fullName)
           val subTypeClssSym = reflections.getSubTypesOf(baseCls).asScala
             .map(mirror.classSymbol)
           logger.debug(s"ParsableFromConfig ${baseCls.getSimpleName} has sub types ${subTypeClssSym.map(_.name.toString)}")
           JsonOneOfDef(subTypeClssSym.map(c => addTypeProperty(fromCaseClass(c), c.fullName)).toSeq, description, deprecated = isDeprecated)
+        case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
+          val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
+          assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
+          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString.trim).toSeq), deprecated = isDeprecated)
+        case t if t.typeSymbol.asClass.isJavaEnum =>
+          // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
+          val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
+          val firstClassNamePart = classNamePartsIterator.takeWhile(_.head.isLower)
+          val javaEnumClassName = (firstClassNamePart :+ classNamePartsIterator.drop(firstClassNamePart.length).mkString("$")).mkString(".")
+          val enumValues = getClass.getClassLoader.loadClass(javaEnumClassName).getEnumConstants.map(_.toString)
+          assert(enumValues.nonEmpty, s"Java enum values for ${t.typeSymbol.fullName}/$javaEnumClassName not found")
+          JsonStringDef(description, enum = Some(enumValues.toSeq), deprecated = isDeprecated)
         case t if t.typeSymbol.asClass.isSealed =>
           val subTypeClss = t.typeSymbol.asClass.knownDirectSubclasses
           logger.debug(s"Sealed trait ${t.typeSymbol.fullName} has sub types ${subTypeClss.map(_.name.toString)}")
@@ -181,18 +198,6 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
             case 2 => throw new IllegalStateException(s"Key type for Map must be String, but is ${t.typeArgs.head.typeSymbol.fullName}")
             case _ => throw new IllegalStateException(s"Can not handle List with elements of type ${t.typeArgs.map(_.typeSymbol.fullName).mkString(",")}")
           }
-        case t: TypeRef if t.pre <:< typeOf[Enumeration] =>
-          val enumValues = t.pre.members.filter(m => !m.isMethod && !m.isType  && m.typeSignature.typeSymbol.name.toString == "Value")
-          assert(enumValues.nonEmpty, s"Enumeration values for ${t.typeSymbol.fullName} not found")
-          JsonStringDef(description, enum = Some(enumValues.map(_.name.toString.trim).toSeq), deprecated = isDeprecated)
-        case t if t.typeSymbol.asClass.isJavaEnum =>
-          // we assume that if a java enum is an inner class, it's parent starts with capital letter. In that case it has to be separated by '$' instead of '.' to be found by Java classloader.
-          val classNamePartsIterator = t.typeSymbol.fullName.split("\\.")
-          val firstClassNamePart = classNamePartsIterator.takeWhile(_.head.isLower)
-          val javaEnumClassName = (firstClassNamePart :+ classNamePartsIterator.drop(firstClassNamePart.length).mkString("$")).mkString(".")
-          val enumValues = getClass.getClassLoader.loadClass(javaEnumClassName).getEnumConstants.map(_.toString)
-          assert(enumValues.nonEmpty, s"Java enum values for ${t.typeSymbol.fullName}/$javaEnumClassName not found")
-          JsonStringDef(description, enum = Some(enumValues.toSeq), deprecated = isDeprecated)
         case t =>
           logger.warn(s"Json schema creator for ${t.typeSymbol.fullName} missing. Creating type as existingJavaType.")
           JsonStringDef(description, existingJavaType = Some(t.typeSymbol.fullName), deprecated = isDeprecated)
@@ -207,7 +212,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
 
     def addTypeProperty(jsonDef: JsonObjectDef, className: String): JsonObjectDef = {
       val typeName = if (className.startsWith("io.smartdatalake")) className.split('.').last else className
-      jsonDef.copy(properties = ListMap("type" -> JsonConstDef(typeName)) ++ jsonDef.properties, required = jsonDef.required :+ "type")
+      jsonDef.copy(properties = new LazyListMapWrapper(() => ListMap("type" -> JsonConstDef(typeName)) ++ jsonDef.properties), required = jsonDef.required :+ "type")
     }
 
     private val mirror = scala.reflect.runtime.currentMirror

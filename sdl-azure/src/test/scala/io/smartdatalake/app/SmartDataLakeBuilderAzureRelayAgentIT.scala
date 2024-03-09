@@ -37,7 +37,7 @@ import scala.concurrent.Future
  */
 object SmartDataLakeBuilderAzureRelayAgentIT extends App {
 
-  protected implicit val session: SparkSession = TestUtil.sessionWithoutHive
+  protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
@@ -49,7 +49,7 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   // setup input DataObject
   val srcDO = CsvFileDataObject("src1", "target/relay_agent_dummy_connection/remote-file")(sdlb.instanceRegistry)
   val dfSrc1 = Seq("testData").toDF("testColumn")
-  srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContextWithoutHive(sdlb.instanceRegistry))
+  srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
   val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;EntityPath=tbb-test-connection;SharedAccessKey="
   val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None, azureRelayURL = Some(azureRelayUrl))

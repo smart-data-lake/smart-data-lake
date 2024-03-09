@@ -32,7 +32,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
  */
 class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
-  private implicit val session: SparkSession = TestUtil.sessionHiveCatalog
+  private implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
   // here fullHistorize and incrementalHistorize differ:
