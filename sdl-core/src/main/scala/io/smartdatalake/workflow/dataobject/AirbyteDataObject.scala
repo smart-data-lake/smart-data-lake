@@ -26,17 +26,17 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.json.JsonUtils._
-import io.smartdatalake.util.json.SchemaConverter
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.from_json
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.confluent.json.JsonSchemaConverter
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, DatasetHelper}
 import org.json4s.Formats
 import org.json4s.jackson.JsonMethods.compact
 
@@ -46,13 +46,23 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.{ClassTag, classTag}
 
 /**
+ * Uses an Airbyte Connector to read data from a data source.
+ * See https://docs.airbyte.com/integrations/sources/ for the list of available sources.
  *
- * Limitations: Connectors have only access to locally mounted directories
+ * An Airbyte Connector is started using shell commands and streams json data into the AirbyteDataObject using stdout pipe.
+ * Airbyte Connectors are often written in Python. See https://docs.airbyte.com/connector-development/ for developing a custom connector.
+ *
+ * Limitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.
+ * In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
+ *
+ * Also note that the getDataFrame method is not lazy in Exec-Phase. It will will query the Airbyte Connector before creating the DataFrame.
  *
  * @param id DataObject identifier
  * @param config Configuration for the source
  * @param streamName The stream name to read. Must match an entry of the catalog of the source.
  * @param incrementalCursorFields Some sources need a specification of the cursor field for incremental mode
+ * @param maxRecordsPerPartition Maximum number of records to put into one Spark partition.
+ *                               This helps to limit memory usage, as Spark will offload partitions to disk if memory is scarce.
  * @param cmd command to launch airbyte connector. Normally this is of type [[DockerRunScript]].
  */
 case class AirbyteDataObject(override val id: DataObjectId,
@@ -60,6 +70,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
                              streamName: String,
                              cmd: ParsableScriptDef,
                              incrementalCursorFields: Seq[String] = Seq(),
+                             maxRecordsPerPartition: Int = 100000,
                              override val schemaMin: Option[GenericSchema] = None,
                              override val metadata: Option[DataObjectMetadata] = None)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
@@ -93,14 +104,13 @@ case class AirbyteDataObject(override val id: DataObjectId,
     configuredStream = Some(
       ConfiguredAirbyteStream(stream.get, SyncModeEnum.full_refresh, if (incrementalCursorFields.nonEmpty) Some(incrementalCursorFields) else None, DestinationSyncModeEnum.append, primary_key = None)
     )
-    schema = Some(SchemaConverter.convert(jsonToString(configuredStream.get.stream.json_schema)))
+    schema = Some(JsonSchemaConverter.convertParsedSchemaToSpark(configuredStream.get.stream.json_schema))
     logger.info(s"($id) got schema: ${schema.get.simpleString}")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getDataFrame")
     implicit val session = context.sparkSession
-    import session.implicits._
 
     val df = context.phase match {
       // init phase -> return empty dataframe
@@ -109,10 +119,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
       // exec phase -> read: return data
       case ExecutionPhase.Exec =>
         val configuredCatalog = ConfiguredAirbyteCatalog(List(configuredStream.get))
-        // TODO:
-        //  For now we read everything on the driver, this could be a memory problem.
-        //  But the question is how to split into multiple launchConnector runs, or limit the number of rows per batch?
-        //  Maybe we could do something similar to spark.sql.files.maxPartitionBytes and create multiple partitions on the driver?
+        // get data iterator
         val data = launchConnector(Operation.read, Some(config), Some(configuredCatalog), state)
           .flatMap {
             case x: AirbyteRecordMessage => Some(x)
@@ -121,9 +128,8 @@ case class AirbyteDataObject(override val id: DataObjectId,
               None
             case _ => None
           }
-        val dfRaw = data.map(r => jsonToString(r.data)).toSeq.toDF("json")
-        dfRaw.withColumn("parsed", from_json($"json", schema.get))
-          .select($"parsed.*")
+        val rows = data.map(r => JsonUtils.convertObjectToCatalyst(r.data, schema.get))
+        DatasetHelper.parallelizeInternalRows(rows, schema.get, maxRecordsPerPartition)
     }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
@@ -235,4 +241,3 @@ object JsonValidator {
     schema.validate(parser.readTree(data)).asScala.toSeq
   }
 }
-

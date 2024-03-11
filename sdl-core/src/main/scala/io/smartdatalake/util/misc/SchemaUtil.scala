@@ -21,15 +21,15 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
-import io.smartdatalake.util.json.{SchemaConverter => JsonSchemaConverter}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
+import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 
 import java.io.{BufferedReader, InputStreamReader}
@@ -137,7 +137,7 @@ object SchemaUtil {
   }
 
   def getSchemaFromJsonSchema(jsonSchemaContent: String, strictTyping: Boolean, additionalPropertiesDefault: Boolean): StructType = {
-    JsonSchemaConverter.convert(jsonSchemaContent, strictTyping, additionalPropertiesDefault)
+    JsonSchemaConverter.convertToSpark(jsonSchemaContent, strictTyping, additionalPropertiesDefault)
   }
 
   def getSchemaFromAvroSchema(avroSchemaContent: String): StructType = {
