@@ -19,7 +19,9 @@
 
 package com.snowflake.snowpark.custom
 
-import com.snowflake.snowpark.DataFrame
+import com.snowflake.snowpark.Column.expr
+import com.snowflake.snowpark.{DataFrame, Window}
+import com.snowflake.snowpark.functions.{col, row_number}
 import com.snowflake.snowpark.types.{DataType, NumericType, StructType}
 
 object SnowparkUtils {
@@ -27,4 +29,10 @@ object SnowparkUtils {
   def showString(df: DataFrame, numRows: Int = 10, width: Int = 200): String = df.showString(numRows, width)
   def explainString(df: DataFrame): String = df.explainString
   def schemaTreeString(schema: StructType, level: Int = Int.MaxValue): String = schema.treeString(level)
+
+  def deduplicateByRankExpression(df: DataFrame, primaryKeyColumns: Seq[String], rankingExpression: String): DataFrame = {
+    df.withColumn("_rank", row_number.over(
+      Window.partitionBy(primaryKeyColumns.map(col): _*).orderBy(expr(rankingExpression).desc)
+    ))
+  }
 }
