@@ -28,6 +28,8 @@ import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.ExplainMode
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, expr, row_number}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -118,6 +120,16 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns: _*)
       (SparkDataFrame(dfObserved), observation)
     }
+  }
+
+  override def deduplicateByRankExpression(primaryKeyColumns: Seq[String], rankingExpression: String): GenericDataFrame = {
+
+    val deduplicatedDf = inner.withColumn("_rank", row_number.over(
+      Window.partitionBy(primaryKeyColumns.map(col):_*).orderBy(expr(rankingExpression).desc)
+    ))
+    
+    SparkDataFrame(deduplicatedDf)
+    
   }
 }
 

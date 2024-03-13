@@ -216,6 +216,8 @@ trait GenericDataFrame extends GenericTypedObject {
    */
   def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
 
+  def deduplicateByRankExpression(primaryKeyColumns: Seq[String], rankingExpression: String ): GenericDataFrame
+
 }
 
 /**

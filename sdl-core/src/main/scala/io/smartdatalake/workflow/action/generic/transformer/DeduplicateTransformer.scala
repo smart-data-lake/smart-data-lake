@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param rankingExpression Ranking expression to determine duplicates
  * @param primaryKeyColumns Optional list of primary key columns
  */
-case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, val rankingExpression: String, val primaryKeyColumns: Option[Seq[String]] = None) extends GenericDfTransformer {
+case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: String, primaryKeyColumns: Option[Seq[String]] = None) extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
 
@@ -43,7 +43,7 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
 
 
 
-    df
+    df.deduplicateByRankExpression(primaryKeyColumns.get, rankingExpression)
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = ConvertNullValuesTransformer
