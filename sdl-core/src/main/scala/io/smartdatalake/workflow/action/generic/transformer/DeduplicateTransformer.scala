@@ -30,8 +30,10 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Returns dataframe with only unique columns based on a primary key
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
+ * @param rankingExpression Ranking expression to determine duplicates
+ * @param primaryKeyColumns Optional list of primary key columns
  */
-case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None) extends GenericDfTransformer {
+case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, val rankingExpression: String, val primaryKeyColumns: Option[Seq[String]] = None) extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
 
