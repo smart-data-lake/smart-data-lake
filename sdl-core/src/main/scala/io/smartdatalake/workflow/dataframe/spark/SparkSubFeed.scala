@@ -290,4 +290,6 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
+
+  override def row_number: GenericColumn = SparkColumn(functions.row_number())
 }

@@ -277,4 +277,6 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SnowparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
+
+  override def row_number: GenericColumn = SnowparkColumn(functions.row_number())
 }

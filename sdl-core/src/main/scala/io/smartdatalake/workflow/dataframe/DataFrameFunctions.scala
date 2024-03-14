@@ -59,4 +59,7 @@ trait DataFrameFunctions {
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
    */
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+
+  def row_number: GenericColumn
+
 }
