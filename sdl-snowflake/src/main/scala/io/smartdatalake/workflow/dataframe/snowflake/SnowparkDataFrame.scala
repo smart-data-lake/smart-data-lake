@@ -19,7 +19,6 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
-
 import com.snowflake.snowpark.custom.SnowparkUtils
 import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
@@ -107,12 +106,6 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this.cache, observation)
-  }
-
-  override def deduplicateByRankExpression(primaryKeyColumns: Seq[String], rankingExpression: String): GenericDataFrame = {
-    val deduplicatedDf = SnowparkUtils.deduplicateByRankExpression(inner, primaryKeyColumns, rankingExpression)
-
-    SnowparkDataFrame(deduplicatedDf)
   }
 }
 

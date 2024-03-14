@@ -29,10 +29,4 @@ object SnowparkUtils {
   def showString(df: DataFrame, numRows: Int = 10, width: Int = 200): String = df.showString(numRows, width)
   def explainString(df: DataFrame): String = df.explainString
   def schemaTreeString(schema: StructType, level: Int = Int.MaxValue): String = schema.treeString(level)
-
-  def deduplicateByRankExpression(df: DataFrame, primaryKeyColumns: Seq[String], rankingExpression: String): DataFrame = {
-    df.withColumn("_rank", row_number.over(
-      Window.partitionBy(primaryKeyColumns.map(col): _*).orderBy(expr(rankingExpression).desc)
-    ))
-  }
 }

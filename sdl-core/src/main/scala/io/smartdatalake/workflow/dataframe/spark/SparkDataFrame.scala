@@ -121,16 +121,6 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       (SparkDataFrame(dfObserved), observation)
     }
   }
-
-  override def deduplicateByRankExpression(primaryKeyColumns: Seq[String], rankingExpression: String): GenericDataFrame = {
-
-    val deduplicatedDf = inner.withColumn("_rank", row_number.over(
-      Window.partitionBy(primaryKeyColumns.map(col):_*).orderBy(expr(rankingExpression).desc)
-    ))
-    
-    SparkDataFrame(deduplicatedDf)
-    
-  }
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
