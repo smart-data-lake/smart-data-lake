@@ -60,6 +60,8 @@ trait DataFrameFunctions {
    */
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
 
+  def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn
+
   def row_number: GenericColumn
 
 }

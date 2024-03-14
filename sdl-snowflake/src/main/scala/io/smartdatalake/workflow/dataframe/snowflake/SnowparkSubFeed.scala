@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructType}
-import com.snowflake.snowpark.{Column, functions}
+import com.snowflake.snowpark.{Column, Window, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -279,4 +279,13 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def row_number: GenericColumn = SnowparkColumn(functions.row_number())
+
+  override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
+    SnowparkColumn(aggFunction.apply().asInstanceOf[SnowparkColumn]
+      .inner.over(
+        Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*
+          )
+          .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
+    )
+  }
 }

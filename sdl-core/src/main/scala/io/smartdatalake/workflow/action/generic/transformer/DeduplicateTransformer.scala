@@ -41,9 +41,13 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
+    // TODO: Implement primary key from action id
 
 
-    df.deduplicateByRankExpression(primaryKeyColumns.get, rankingExpression)
+    df.withColumn("_rank", window(() => row_number, primaryKeyColumns.get.map(col), expr(rankingExpression).desc))
+      .where(col("_rank").===(lit(1)))
+      .drop("_rank")
+
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = ConvertNullValuesTransformer

@@ -26,6 +26,7 @@ import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, functions}
 
@@ -292,4 +293,14 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def row_number: GenericColumn = SparkColumn(functions.row_number())
+
+  override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
+      SparkColumn(aggFunction.apply().asInstanceOf[SparkColumn]
+        .inner.over(
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner):_*
+            )
+            .orderBy(orderBy.asInstanceOf[SparkColumn].inner))
+      )
+
+  }
 }
