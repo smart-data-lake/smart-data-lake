@@ -283,8 +283,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
     SnowparkColumn(aggFunction.apply().asInstanceOf[SnowparkColumn]
       .inner.over(
-        Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*
-          )
+        Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
           .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
     )
   }

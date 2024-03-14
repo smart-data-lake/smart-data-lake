@@ -297,8 +297,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
       SparkColumn(aggFunction.apply().asInstanceOf[SparkColumn]
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner):_*
-            )
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner):_*)
             .orderBy(orderBy.asInstanceOf[SparkColumn].inner))
       )
 
