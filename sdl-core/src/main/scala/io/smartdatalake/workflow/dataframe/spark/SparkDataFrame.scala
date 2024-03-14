@@ -240,6 +240,8 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = inner.expr.sql
+
+  override def desc: GenericColumn = SparkColumn(inner.desc)
 }
 
 case class SparkField(inner: StructField) extends GenericField {
