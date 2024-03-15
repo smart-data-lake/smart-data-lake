@@ -67,10 +67,14 @@ class ActionDAGRunTest extends FunSuite {
     val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
     val migratedState = ActionDAGRunState.fromJson(stateContent)
     assert(migratedState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion)
-    assert(migratedState.actionsState.head._2.inputIds.nonEmpty)
-    assert(migratedState.actionsState.head._2.outputIds.nonEmpty)
-    assert(migratedState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("test" -> 1))))
-    assert(migratedState.actionsState.head._2.results.head.getClass.getSimpleName == "SparkSubFeed")
+    val stateLoadTest = migratedState.actionsState("load-test")
+    assert(stateLoadTest.results.head.getClass.getSimpleName == "SparkSubFeed")
+    assert(stateLoadTest.inputIds.nonEmpty)
+    assert(stateLoadTest.outputIds.nonEmpty)
+    assert(stateLoadTest.results.head.partitionValues == Seq(PartitionValues(Map("test" -> 1))))
+    val stateFilerefTest = migratedState.actionsState("fileref-test")
+    assert(stateFilerefTest.results.head.getClass.getSimpleName == "FileSubFeed")
+    assert(stateFilerefTest.results.head.asInstanceOf[FileSubFeed].fileRefMapping.get.head.src.partitionValues == PartitionValues(Map("test" -> "123")))
   }
 
   test("append to state index file") {

@@ -60,6 +60,41 @@
       "outputIds" : [ {
         "id" : "test-out"
       } ]
+    },
+    "fileref-test" : {
+      "executionId" : {
+        "type" : "SDLExecutionId",
+        "runId" : 23,
+        "attemptId" : 1
+      },
+      "state" : "SUCCEEDED",
+      "startTstmp" : "2023-11-20T05:09:13.695718",
+      "duration" : "PT0.341792S",
+      "results" : [ {
+        "subFeed" : {
+          "type" : "FileSubFeed",
+          "dataObjectId" : "stg-test",
+          "partitionValues" : [ ],
+          "isDAGStart" : false,
+          "isSkipped" : false,
+          "fileRefMapping" : [ {
+            "src" : {
+              "fullPath" : "",
+              "fileName" : "result",
+              "partitionValues" : {"elements" : {"test": "123"}}
+            },
+            "tgt" : {
+              "fullPath" : "stg-test/result.csv",
+              "fileName" : "result",
+              "partitionValues" : {"elements" : {}}
+            }
+          } ]
+        },
+        "mainMetrics" : {
+          "files_written" : 1
+        }
+      } ],
+      "dataObjectsState" : [ ]
     }
   },
   "isFinal" : true,

@@ -77,10 +77,12 @@ class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
               result =>
                 if (logger.isDebugEnabled) logger.debug(s"migrating result $result")
                 val subFeed = result \ "subFeed" transformField {
-                  case (name, partitionValues) if name == "partitionValues" =>
+                  case (name, partitionValues: JArray) if name == "partitionValues" =>
                     (name, JArray(partitionValues.children.map {
                       entry => entry \ "elements"
                     }))
+                  case (name, partitionValues: JObject) if name == "partitionValues" =>
+                    (name, partitionValues \ "elements")
                 }
                 result.removeField {
                   case (name, _) => name == "subFeed"
