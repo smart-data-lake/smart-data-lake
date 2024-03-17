@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
@@ -296,6 +296,28 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating2")
     intercept[AnalysisException](targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
+  }
+
+  test("returns correct metrics") {
+    val srcDO = MockDataObject("src1").register
+    val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+
+    val targetTable = Table(db = Some("default"), name = "test_metrics", query = None)
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
+    instanceRegistry.register(targetDO)
+    targetDO.dropTable
+
+    // prepare & start load
+    val testAction = CopyAction(id = s"actionA", inputId = srcDO.id, outputId = targetDO.id)
+    val srcSubFeed = SparkSubFeed(None, "src1", partitionValues = Seq())
+    val tgtSubFeed = testAction.exec(Seq(srcSubFeed))(contextExec.copy(currentAction = Some(testAction))).head
+    assert(!tgtSubFeed.metrics.flatMap(_.get("records_written")).contains(0), "records_written should be >0 or removed")
+    assert(!tgtSubFeed.metrics.flatMap(_.get("bytes_written")).contains(0), "bytes_written should be >0 or removed")
+    assert(!tgtSubFeed.metrics.flatMap(_.get("no_data")).contains(true), "no_data should not be true")
+    assert(tgtSubFeed.metrics.flatMap(_.get("count")).contains(3))
+    assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))
   }
 
 }

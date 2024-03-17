@@ -280,7 +280,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     setSparkJobMetadata(None)
     if (breakDataFrameOutputLineage) outputSubFeed = outputSubFeed.breakLineage
     // get expectations metrics and check violations
-    output match {
+    outputSubFeed = output match {
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
         val (metrics,exceptions) = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
@@ -291,6 +291,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case _ =>
         outputSubFeed
     }
+    // cleanup inconsistent Spark recordsWritten-metric
+    val recordsWritten = outputSubFeed.metrics.flatMap(_.get("records_written"))
+    val count = outputSubFeed.metrics.flatMap(_.get("count"))
+    if (recordsWritten.contains(0) && count.nonEmpty) outputSubFeed = outputSubFeed.withMetrics(outputSubFeed.metrics.get - "records_written" - "bytes_written").asInstanceOf[DataFrameSubFeed]
+    // add no_data metric
+    if (count.contains(0) || (count.isEmpty && recordsWritten.contains(0))) outputSubFeed = outputSubFeed.appendMetrics(Map[String,Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
+    // return
+    outputSubFeed
   }
 
   /**
@@ -353,8 +361,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         assert(!preparedSubFeed.isStreaming.getOrElse(false), s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingMode.getClass.getSimpleName}")
         assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
-        var metrics = output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
-        if (metrics.get("records_written").contains(0)) metrics = metrics + ("no_data" -> true)
+        val metrics = output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
         // return
         preparedSubFeed.withMetrics(metrics).asInstanceOf[DataFrameSubFeed]
     }
