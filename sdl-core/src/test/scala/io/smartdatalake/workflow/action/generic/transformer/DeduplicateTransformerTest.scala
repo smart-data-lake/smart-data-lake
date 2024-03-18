@@ -37,7 +37,7 @@ class DeduplicateTransformerTest extends FunSuite{
   implicit val instanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  test("deduplication test") {
+  test("deduplication test with primary key") {
 
     // prepare
     val deduplicateTransformer = DeduplicateTransformer(rankingExpression = "coalesce(updated_at, created_at)", primaryKeyColumns = Some(Seq("id")))
@@ -53,9 +53,11 @@ class DeduplicateTransformerTest extends FunSuite{
       (2, "2019-05-26 13:37:10", "2023-06-16 01:55:49"),
     ).toDF("id", "created_at", "updated_at").select($"id", $"created_at".cast(TimestampType), $"updated_at".cast(TimestampType)))
 
+    // execute
     val transformedDf = deduplicateTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
-    assert( transformedDf.collect == resultDf.collect)
+    // check
+    assert(transformedDf.collect == resultDf.collect)
   }
 
 }
