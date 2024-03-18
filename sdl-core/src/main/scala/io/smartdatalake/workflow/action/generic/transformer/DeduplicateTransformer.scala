@@ -50,7 +50,7 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
 
   }
 
-  override def factory: FromConfigFactory[GenericDfTransformer] = ConvertNullValuesTransformer
+  override def factory: FromConfigFactory[GenericDfTransformer] = DeduplicateTransformer
 }
 
 object DeduplicateTransformer extends FromConfigFactory[GenericDfTransformer] {
