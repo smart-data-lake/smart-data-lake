@@ -22,8 +22,11 @@ package io.smartdatalake.workflow.action.generic.transformer
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataobject.TableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
@@ -41,11 +44,25 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
-    // TODO: Implement primary key from action id
+    var primaryKeys = primaryKeyColumns
 
-    require(primaryKeyColumns.nonEmpty, "There are no primary key columns defined ether by parameter nor by detection with actionId.")
 
-    df.withColumn("_rank", window(() => row_number, primaryKeyColumns.get.map(col), expr(rankingExpression).desc))
+    if(primaryKeys.isEmpty) {
+      val actionById = Environment.instanceRegistry.get[Action](objectId = actionId)
+
+      if(actionById != None && actionById.outputs.length == 1) {
+
+        actionById.outputs.head match {
+          case dataObject: TableDataObject => primaryKeys = dataObject.table.primaryKey
+          case _ => None
+        }
+      }
+
+    }
+
+    require(primaryKeys.nonEmpty, "There are no primary key columns defined ether by parameter nor by detection with actionId.")
+
+    df.withColumn("_rank", window(() => row_number, primaryKeys.get.map(col), expr(rankingExpression).desc))
       .where(col("_rank").===(lit(1)))
       .drop("_rank")
 
