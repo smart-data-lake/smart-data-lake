@@ -43,6 +43,7 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
 
     // TODO: Implement primary key from action id
 
+    require(primaryKeyColumns.nonEmpty, "There are no primary key columns defined ether by parameter nor by detection with actionId.")
 
     df.withColumn("_rank", window(() => row_number, primaryKeyColumns.get.map(col), expr(rankingExpression).desc))
       .where(col("_rank").===(lit(1)))
