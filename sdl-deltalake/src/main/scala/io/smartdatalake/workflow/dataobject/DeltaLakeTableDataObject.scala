@@ -30,6 +30,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactor
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -102,7 +103,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -518,6 +519,32 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
+
+
+  private var incrementalOutputTableVersionState: Option[String] = None
+
+  /**
+   * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
+   * The state is just a string. It's semantics is internal to the DataObject.
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   *
+   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+
+    incrementalOutputTableVersionState = Some(context.sparkSession
+      .sql(s"SELECT MAX(version) FROM (DESCRIBE HISTORY ${table.fullName})")
+      .collect().head.getAs[String](1)
+    )
+
+  }
+
+  /**
+   * Return the state of the last increment or empty if no increment was processed.
+   */
+  override def getState: Option[String] = {
+    incrementalOutputTableVersionState
+  }
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
