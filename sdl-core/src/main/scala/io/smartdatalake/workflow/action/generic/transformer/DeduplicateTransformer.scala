@@ -44,15 +44,14 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
-    val primaryKeys: Option[Seq[String]] = primaryKeyColumns match {
-      case Some(x) => Some(x)
-      case None => Some(Environment.instanceRegistry.get[Action](objectId = actionId)).getOrElse(Option.empty[Action]) match {
-        case action: Action if action.outputs.length == 1 => action.outputs.head match {
+    val primaryKeys: Option[Seq[String]] = primaryKeyColumns.orElse(
+      Some(Environment.instanceRegistry.get[Action](objectId = actionId)).getOrElse(Option.empty[Action]) match {
+        case action: Action => action.outputs.head match {
           case dataObject: TableDataObject => dataObject.table.primaryKey
           case _ => Option.empty[Seq[String]]
         }
-      }
-    }
+      })
+
 
     require(primaryKeys.nonEmpty, "There are no primary key columns defined ether by parameter nor by detection with actionId.")
 
