@@ -45,7 +45,7 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
     import functions._
 
     val primaryKeys: Option[Seq[String]] = primaryKeyColumns.orElse(
-      Some(Environment.instanceRegistry.get[Action](objectId = actionId)).getOrElse(Option.empty[Action]) match {
+      Option(Environment.instanceRegistry.get[Action](objectId = actionId)).getOrElse(Option.empty[Action]) match {
         case action: Action => action.outputs.head match {
           case dataObject: TableDataObject => dataObject.table.primaryKey
           case _ => Option.empty[Seq[String]]
