@@ -295,11 +295,19 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def row_number: GenericColumn = SparkColumn(functions.row_number())
 
   override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
-      SparkColumn(aggFunction.apply().asInstanceOf[SparkColumn]
+
+    partitionBy.foreach(c => assert(c.isInstanceOf[SparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(c)))
+
+    assert(orderBy.isInstanceOf[SparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(orderBy))
+
+    aggFunction.apply() match {
+      case sparkAggFunctionColumn: SparkColumn => SparkColumn(sparkAggFunctionColumn
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner):_*)
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner): _*)
             .orderBy(orderBy.asInstanceOf[SparkColumn].inner))
       )
+      case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
+    }
 
   }
 }
