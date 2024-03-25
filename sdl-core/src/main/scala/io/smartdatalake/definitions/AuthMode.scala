@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.definitions
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.util.webservice.KeycloakUtil
@@ -169,11 +170,11 @@ case class PublicKeyAuthMode(@Deprecated @deprecated("Use `user` instead", "2.5.
  */
 case class SSLCertsAuthMode (
                             keystorePath: String,
-                            keystoreType: Option[String],
+                            keystoreType: String = "JKS",
                             @Deprecated @deprecated("Use `keystorePass` instead", "2.5.0") private val keystorePassVariable: Option[String] = None,
                             private val keystorePass: Option[StringOrSecret],
                             truststorePath: String,
-                            truststoreType: Option[String],
+                            truststoreType: String = "JKS",
                             @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
                             private val truststorePass: Option[StringOrSecret]
                            ) extends AuthMode {
@@ -192,16 +193,14 @@ case class SASLSCRAMAuthMode (
                                  @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None,
                                  private val password: Option[StringOrSecret],
                                  sslMechanism: String,
-                                 truststorePath: String,
-                                 truststoreType: Option[String],
+                                 truststorePath: Option[String],
+                                 truststoreType: String = "JKS",
                                  @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
                                  private val truststorePass: Option[StringOrSecret],
                                ) extends AuthMode {
-  private val _password: StringOrSecret = password.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(passwordVariable.get))
-  private val _truststorePass = truststorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(truststorePassVariable.get))
-
-  private[smartdatalake] val passwordSecret: StringOrSecret = _password
-  private[smartdatalake] val truststorePassSecret: StringOrSecret  = _truststorePass
+  private[smartdatalake] val passwordSecret: StringOrSecret = password.orElse(passwordVariable.map(SecretsUtil.convertSecretVariableToStringOrSecret))
+    .getOrElse(throw ConfigurationException(s"password or passwordVariable must be defined."))
+  private[smartdatalake] val truststorePassSecret: Option[StringOrSecret]  = truststorePass.orElse(truststorePassVariable.map(SecretsUtil.convertSecretVariableToStringOrSecret))
 }
 
 
