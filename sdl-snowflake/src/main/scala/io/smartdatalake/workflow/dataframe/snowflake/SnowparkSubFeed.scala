@@ -281,10 +281,19 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def row_number: GenericColumn = SnowparkColumn(functions.row_number())
 
   override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
-    SnowparkColumn(aggFunction.apply().asInstanceOf[SnowparkColumn]
-      .inner.over(
-        Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
-          .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
-    )
+
+    partitionBy.foreach(c => assert(c.isInstanceOf[SnowparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(c)))
+
+    assert(orderBy.isInstanceOf[SnowparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(orderBy))
+
+    aggFunction.apply() match {
+      case snowparkAggFunctionColumn: SnowparkColumn => SnowparkColumn(snowparkAggFunctionColumn
+        .inner.over(
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
+            .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
+      )
+      case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
+    }
+
   }
 }
