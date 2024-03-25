@@ -201,10 +201,20 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val df = context.sparkSession.table(table.fullName)
+
+    val df = if(incrementalOutputTableVersionState.isDefined)
+      context.sparkSession.read.format("delta")
+        .option("readChangeFeed", "true")
+        .option("startingVersion", incrementalOutputTableVersionState.get)
+        .table(table.fullName)
+    else
+      context.sparkSession.table(table.fullName)
+
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
+
+
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
