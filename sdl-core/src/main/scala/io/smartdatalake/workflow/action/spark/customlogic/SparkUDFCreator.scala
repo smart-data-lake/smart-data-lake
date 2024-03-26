@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
 
@@ -38,7 +39,9 @@ case class SparkUDFCreatorConfig(className: String, options: Option[Map[String,S
     constructor.newInstance().asInstanceOf[SparkUDFCreator]
   } catch {
     case e: NoSuchMethodException => throw ConfigurationException(s"SparkUDFCreatorConfig class $className needs constructor without parameters: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
-    case e: Exception => throw ConfigurationException(s"Cannot instantiate SparkUDFCreatorConfig class $className: ${e.getMessage}", Some("globalConfig.sparkUDFs"), e)
+    case e: Exception =>
+      val cause = getRootCause(e)
+      throw ConfigurationException(s"Cannot instantiate SparkUDFCreatorConfig class $className: ${cause.getClass.getSimpleName} ${cause.getMessage}", Some("globalConfig.sparkUDFs"), e)
   }
   private[smartdatalake] def getUDF: UserDefinedFunction = creator.get(options.getOrElse(Map()))
 }
