@@ -542,11 +542,17 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
+    if (incrementalOutputTableVersionState.isEmpty) activateCdf()
+
     incrementalOutputTableVersionState = Some(context.sparkSession
       .sql(s"SELECT MAX(version) FROM (DESCRIBE HISTORY ${table.fullName})")
       .collect().head.getAs[String](1)
     )
 
+  }
+
+  private def activateCdf()(implicit context: ActionPipelineContext): Unit = {
+    context.sparkSession.sql(s"ALTER TABLE ${table.fullName} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
   }
 
   /**
