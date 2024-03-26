@@ -207,7 +207,7 @@ case class SASLSCRAMAuthMode (
 /**
  * Interface to generalize authentication for HTTP requests
  */
-private[smartdatalake] trait HttpHeaderAuth {
+trait HttpHeaderAuth {
   /**
    * Return additional headers to add/overwrite in http request.
    */
