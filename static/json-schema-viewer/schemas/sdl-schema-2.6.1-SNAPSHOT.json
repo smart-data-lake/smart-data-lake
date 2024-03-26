@@ -6697,7 +6697,7 @@
           }
         },
         "title" : "SASLSCRAMAuthMode",
-        "required" : [ "type", "username", "sslMechanism", "truststorePath" ],
+        "required" : [ "type", "username", "sslMechanism" ],
         "additionalProperties" : false,
         "description" : "Validate by SASL_SSL Authentication : user / password and truststore"
       },
