@@ -206,7 +206,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       context.sparkSession.read.format("delta")
         .option("readChangeFeed", "true")
         .option("startingVersion", incrementalOutputTableVersionState.get)
-        .table(table.fullName)
+        .table(table.fullName) // TODO: filter on insert, update_postimage and drop additional columns added by cdc
     else
       context.sparkSession.table(table.fullName)
 
@@ -221,6 +221,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+
+    // TODO: activate cdc -> use hiveutil alter table properties or delta library
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -542,12 +544,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
+    // TODO: incrementalOutputTableVersionSte = state
     if (incrementalOutputTableVersionState.isEmpty) activateCdf()
 
     incrementalOutputTableVersionState = Some(context.sparkSession
       .sql(s"SELECT MAX(version) FROM (DESCRIBE HISTORY ${table.fullName})")
       .collect().head.getAs[String](1)
-    )
+    ) // TODO: Via delta library
 
   }
 
@@ -559,6 +562,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    * Return the state of the last increment or empty if no increment was processed.
    */
   override def getState: Option[String] = {
+
+    // TODO: history read
     incrementalOutputTableVersionState
   }
 }
