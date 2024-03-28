@@ -110,6 +110,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   def prepare(context: ActionPipelineContext): Unit = {
     implicit val phaseContext: ActionPipelineContext = context.copy(phase = ExecutionPhase.Prepare)
+    // prepare state listeners
+    stateListeners.foreach(_.prepare(phaseContext))
     // run prepare for every node
     run[DummyDAGResult](phaseContext.phase) {
       case (node: InitDAGNode, _) =>

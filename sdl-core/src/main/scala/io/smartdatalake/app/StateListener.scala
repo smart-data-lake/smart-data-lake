@@ -53,7 +53,12 @@ case class StateListenerConfig(className: String, options: Option[Map[String,Str
 trait StateListener {
 
   /**
-   * Called on initialization to check environment
+   * Called in prepare phase to check configuration
+   */
+  def prepare(context: ActionPipelineContext): Unit = ()
+
+  /**
+   * Called in init phase to check environment
    */
   def init(context: ActionPipelineContext): Unit = ()
 
