@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
@@ -163,8 +163,7 @@ class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
     }
 
     // check
-    assert(thrown.isInstanceOf[TaskFailedException])
-    assert(thrown.getMessage == "Task copy_with_deduplication failed. Root cause is 'IllegalArgumentException: requirement failed: There are no primary key columns defined ether by parameter nor by detection with actionId.'")
+    assert(thrown.cause.isInstanceOf[ConfigurationException])
   }
 
   test("deduplication test with primary key columns detection") {

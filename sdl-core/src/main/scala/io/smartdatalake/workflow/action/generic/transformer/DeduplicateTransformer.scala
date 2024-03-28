@@ -21,10 +21,10 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataobject.TableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -40,25 +40,20 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
 
-
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
 
-    val primaryKeys: Option[Seq[String]] = primaryKeyColumns.orElse(
-      Option(Environment.instanceRegistry.get[Action](objectId = actionId)).getOrElse(Option.empty[Action]) match {
-        case action: Action => action.outputs.head match {
-          case dataObject: TableDataObject => dataObject.table.primaryKey
-          case _ => Option.empty[Seq[String]]
-        }
-      })
+    val primaryKey: Seq[String] = primaryKeyColumns.orElse {
+      val action = Environment.instanceRegistry.get[DataFrameActionImpl](actionId)
+      action.mainOutput match {
+        case dataObject: TableDataObject => dataObject.table.primaryKey
+        case _ => None
+      }
+    }.getOrElse(throw ConfigurationException("There are no primary key columns defined ether by parameter nor by detection with actionId."))
 
-
-    require(primaryKeys.nonEmpty, "There are no primary key columns defined ether by parameter nor by detection with actionId.")
-
-    df.withColumn("_rank", window(() => row_number, primaryKeys.get.map(col), expr(rankingExpression).desc))
-      .where(col("_rank").===(lit(1)))
+    df.withColumn("_rank", window(() => row_number, primaryKey.map(col), expr(rankingExpression).desc))
+      .where(col("_rank") === lit(1))
       .drop("_rank")
-
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = DeduplicateTransformer
