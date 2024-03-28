@@ -223,8 +223,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-
-    // TODO: activate cdc -> use hiveutil alter table properties or delta library
+    HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> true))(context.sparkSession)
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -551,10 +550,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       Some(incrementalOutputExpr.get)
     })
 
-  }
-
-  private def activateCdf()(implicit context: ActionPipelineContext): Unit = {
-    context.sparkSession.sql(s"ALTER TABLE ${table.fullName} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
   }
 
   /**
