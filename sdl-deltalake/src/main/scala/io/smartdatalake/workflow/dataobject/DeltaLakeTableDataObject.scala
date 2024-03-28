@@ -206,7 +206,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       context.sparkSession.read.format("delta")
         .option("readChangeFeed", "true")
         .option("startingVersion", incrementalOutputTableVersionState.get)
-        .table(table.fullName) // TODO: filter on insert, update_postimage and drop additional columns added by cdc
+        .table(table.fullName)
+        .where(expr("_change_type IN ('insert','update_postimage')"))
+        .drop("_change_type", "_commit_version", "_commit_timestamp")
     else
       context.sparkSession.table(table.fullName)
 
