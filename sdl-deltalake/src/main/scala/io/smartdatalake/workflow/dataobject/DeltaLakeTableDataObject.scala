@@ -202,10 +202,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
-    val df = if(incrementalOutputTableVersionState.isDefined)
+    val df = if(incrementalOutputExpr.isDefined)
       context.sparkSession.read.format("delta")
         .option("readChangeFeed", "true")
-        .option("startingVersion", incrementalOutputTableVersionState.get)
+        .option("startingVersion", incrementalOutputExpr.get)
         .table(table.fullName)
         .where(expr("_change_type IN ('insert','update_postimage')"))
         .drop("_change_type", "_commit_version", "_commit_timestamp")
@@ -535,7 +535,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
 
 
-  private var incrementalOutputTableVersionState: Option[String] = None
+  private var incrementalOutputExpr: Option[String] = None
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
@@ -546,13 +546,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
-    // TODO: incrementalOutputTableVersionSte = state
-    if (incrementalOutputTableVersionState.isEmpty) activateCdf()
-
-    incrementalOutputTableVersionState = Some(context.sparkSession
-      .sql(s"SELECT MAX(version) FROM (DESCRIBE HISTORY ${table.fullName})")
-      .collect().head.getAs[String](1)
-    ) // TODO: Via delta library
+    incrementalOutputExpr = state.orElse({
+      assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
+      Some(incrementalOutputExpr.get)
+    })
 
   }
 
@@ -561,12 +558,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Return the state of the last increment or empty if no increment was processed.
+   * Return the last table version
    */
   override def getState: Option[String] = {
 
-    // TODO: history read
-    incrementalOutputTableVersionState
+    val dfHistory = DeltaTable.forName(table.fullName).history(1)
+    val latestVersion = dfHistory.select("version").head.getAs[String](1)
+
+    Option(latestVersion)
   }
 }
 
