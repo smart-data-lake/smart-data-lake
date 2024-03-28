@@ -28,6 +28,8 @@ import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.ExplainMode
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, expr, row_number}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -238,6 +240,8 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = inner.expr.sql
+
+  override def desc: GenericColumn = SparkColumn(inner.desc)
 }
 
 case class SparkField(inner: StructField) extends GenericField {

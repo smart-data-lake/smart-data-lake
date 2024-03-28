@@ -60,8 +60,7 @@ class InstanceRegistry {
    * Retrieve a registered instance.
    *
    * @param objectId the id of the instance.
-   * @return  an option value with the instance registered with this id
-   *          or `None` if no instance is registered with this id.
+   * @return the instance registered with this id
    */
   def get[A <: SdlConfigObject](objectId: ConfigObjectId): A = instances(objectId).asInstanceOf[A]
 

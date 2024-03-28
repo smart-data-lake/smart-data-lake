@@ -26,6 +26,7 @@ import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, functions}
 
@@ -289,5 +290,24 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def coalesce(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
+  }
+
+  override def row_number: GenericColumn = SparkColumn(functions.row_number())
+
+  override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
+
+    partitionBy.foreach(c => assert(c.isInstanceOf[SparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(c)))
+
+    assert(orderBy.isInstanceOf[SparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(orderBy))
+
+    aggFunction.apply() match {
+      case sparkAggFunctionColumn: SparkColumn => SparkColumn(sparkAggFunctionColumn
+        .inner.over(
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner): _*)
+            .orderBy(orderBy.asInstanceOf[SparkColumn].inner))
+      )
+      case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
+    }
+
   }
 }

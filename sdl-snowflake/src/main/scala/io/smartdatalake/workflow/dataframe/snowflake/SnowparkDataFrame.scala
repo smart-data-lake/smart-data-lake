@@ -228,6 +228,8 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = throw new NotImplementedError(s"Converting column back to sql expression is not supported by Snowpark")
+
+  override def desc: GenericColumn = SnowparkColumn(inner.desc)
 }
 
 case class SnowparkField(inner: StructField) extends GenericField {

@@ -61,8 +61,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   // this must be lazy because inputs / outputs is evaluated later in subclasses
   // Note: we don't yet decide for a main input as inputs might be skipped at runtime, but we can already create a prioritized list.
   protected lazy val prioritizedMainInputCandidates: Seq[DataObject] = getMainDataObjectCandidates(mainInputId, inputs, "input")
-  protected lazy val mainOutput: DataObject = getMainDataObjectCandidates(mainOutputId, outputs, "output").head
-  protected def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
+  private[smartdatalake] lazy val mainOutput: DataObject = getMainDataObjectCandidates(mainOutputId, outputs, "output").head
+  private[smartdatalake] def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
     // take first data object which has as SubFeed which is not skipped
     prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped || context.appConfig.isDryRun)
       .getOrElse(prioritizedMainInputCandidates.head) // otherwise just take first candidate

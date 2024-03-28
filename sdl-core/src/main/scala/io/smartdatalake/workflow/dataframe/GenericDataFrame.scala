@@ -284,6 +284,8 @@ trait GenericColumn extends GenericTypedObject {
    * Convert expression to SQL representation
    */
   def exprSql: String
+
+  def desc: GenericColumn
 }
 
 /**

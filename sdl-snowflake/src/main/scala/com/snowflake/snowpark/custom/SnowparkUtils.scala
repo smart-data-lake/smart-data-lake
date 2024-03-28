@@ -19,7 +19,9 @@
 
 package com.snowflake.snowpark.custom
 
-import com.snowflake.snowpark.DataFrame
+import com.snowflake.snowpark.Column.expr
+import com.snowflake.snowpark.{DataFrame, Window}
+import com.snowflake.snowpark.functions.{col, row_number}
 import com.snowflake.snowpark.types.{DataType, NumericType, StructType}
 
 object SnowparkUtils {
