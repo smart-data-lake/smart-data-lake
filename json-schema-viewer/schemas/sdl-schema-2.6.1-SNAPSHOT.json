@@ -4570,6 +4570,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DeduplicateTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
@@ -5039,6 +5041,8 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
               }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DeduplicateTransformer"
+              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
@@ -5271,6 +5275,8 @@
                 "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DeduplicateTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
               }, {
@@ -5983,6 +5989,37 @@
         "required" : [ "type", "decryptColumns" ],
         "additionalProperties" : false,
         "description" : "Decryption of specified columns using AES/GCM algorithm."
+      },
+      "DeduplicateTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "DeduplicateTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "rankingExpression" : {
+            "type" : "string",
+            "description" : "Ranking expression to determine duplicates"
+          },
+          "primaryKeyColumns" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Optional list of primary key columns"
+          }
+        },
+        "title" : "DeduplicateTransformer",
+        "required" : [ "type", "rankingExpression" ],
+        "additionalProperties" : false,
+        "description" : "Returns dataframe with only unique columns based on a primary key"
       },
       "EncryptColumnsTransformer" : {
         "type" : "object",
@@ -6782,6 +6819,8 @@
               "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/DeduplicateTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
             }, {
