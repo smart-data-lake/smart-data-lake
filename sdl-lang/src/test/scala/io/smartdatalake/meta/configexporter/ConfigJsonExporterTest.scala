@@ -19,18 +19,21 @@
 
 package io.smartdatalake.meta.configexporter
 
-import org.json4s.StringInput
+import com.github.tomakehurst.wiremock.client.WireMock.{postRequestedFor, urlPathMatching, verify}
+import io.smartdatalake.testutils.TestUtil
+import org.apache.hadoop.conf.Configuration
 import org.json4s.jackson.JsonMethods
+import org.json4s.{StringInput, _}
 import org.scalatest.FunSuite
 
 import java.io.File
-import org.json4s.JsonDSL._
-import org.json4s._
 
 class ConfigJsonExporterTest extends FunSuite {
+  private val descriptionPath = getClass.getResource("/dagexporter/description").getPath
 
   test("export config") {
-    val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter").getPath), descriptionPath = Some(getClass.getResource("/dagexporter/description").getPath))
+    val exporterConfig = ConfigJsonExporterConfig(Seq(getClass.getResource("/dagexporter").getPath), descriptionPath = Some(descriptionPath))
+    implicit val hadoopConf: Configuration = new Configuration()
     val actualOutput = ConfigJsonExporter.exportConfigJson(exporterConfig)
     val actualJsonOutput = JsonMethods.parse(StringInput(actualOutput))
     assert((actualJsonOutput \ "actions").children.size === 8)
@@ -44,7 +47,7 @@ class ConfigJsonExporterTest extends FunSuite {
     assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" === JString("Documentation for TestTransformer.\nThis should be exported by ConfigJsonExporter!"))
   }
 
-  test("test main") {
+  test("test main file export") {
     val fileName = "target/exportedConfig.json"
     ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-f", fileName))
     assert(new File(fileName).exists())
@@ -55,5 +58,21 @@ class ConfigJsonExporterTest extends FunSuite {
     assert(new File("exportedConfig.json").exists())
   }
 
+  test("test main api uplaod") {
+    val port = 18080 // for some reason, only the default port seems to work
+    val httpsPort = 18443
+    val host = "127.0.0.1"
+    val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
+    val target = s"http://localhost:$port/api/v1?repo=abc"
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-t", target, "-d", descriptionPath, "--uploadDescriptions"))
+    verify(postRequestedFor(urlPathMatching("/api/v1/config?.*")))
+    verify(postRequestedFor(urlPathMatching("/api/v1/description?.*")))
+    wireMockServer.stop()
+  }
+
+  val port = 8080 // for some reason, only the default port seems to work
+  val httpsPort = 8443
+  val host = "127.0.0.1"
+  val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
 
 }

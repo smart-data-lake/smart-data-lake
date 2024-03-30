@@ -161,6 +161,10 @@ object TestUtil extends SmartDataLakeLogger {
       .willReturn(aResponse().withBody("{{request.path.[0]}}"))
     )
 
+    stubFor(post(urlPathMatching("/api/v1/.*"))
+      .willReturn(aResponse().withStatus(200))
+    )
+
     stubFor(get(urlEqualTo("/good/no_auth/"))
       .willReturn(aResponse().withStatus(200))
     )
