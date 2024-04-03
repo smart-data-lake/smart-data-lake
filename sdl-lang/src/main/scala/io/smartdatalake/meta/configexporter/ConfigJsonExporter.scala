@@ -233,7 +233,8 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       case (config, path) =>
         val className = getConfigValue(config.root(), path.init :+ "className").unwrapped().asInstanceOf[String]
         val classInstance = CustomCodeUtil.getClassInstanceByName[CustomTransformMethodDef](className)
-        val parameters = classInstance.getCustomTransformMethodParameterInfo
+        val wrapper = classInstance.customTransformMethod.map(new CustomTransformMethodWrapper(_))
+        val parameters = wrapper.map(_.getParameterInfo)
         if (parameters.isDefined) {
           val parametersValue = ConfigValueFactory.fromIterable(parameters.get.map(p => ConfigValueFactory.fromMap(p.toMap.asJava)).asJava)
           updateConfigValue(config.root(), path.init :+ "_parameters", parametersValue).asInstanceOf[ConfigObject].toConfig

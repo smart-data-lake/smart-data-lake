@@ -121,6 +121,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       (SparkDataFrame(dfObserved), observation)
     }
   }
+  override def apply(columnName: String): GenericColumn = SparkColumn(inner.apply(columnName))
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
@@ -240,8 +241,8 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = inner.expr.sql
-
   override def desc: GenericColumn = SparkColumn(inner.desc)
+  override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
 }
 
 case class SparkField(inner: StructField) extends GenericField {

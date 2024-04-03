@@ -64,4 +64,7 @@ trait DataFrameFunctions {
 
   def row_number: GenericColumn
 
+  def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn
+  def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
+  def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
 }

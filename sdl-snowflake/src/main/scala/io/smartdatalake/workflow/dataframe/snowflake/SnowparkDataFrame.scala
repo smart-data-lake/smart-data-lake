@@ -107,6 +107,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this.cache, observation)
   }
+  override def apply(columnName: String): GenericColumn = SnowparkColumn(inner.apply(columnName))
 }
 
 case class SnowparkGroupedDataFrame(inner: RelationalGroupedDataFrame) extends GenericGroupedDataFrame {
@@ -228,8 +229,11 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = throw new NotImplementedError(s"Converting column back to sql expression is not supported by Snowpark")
-
   override def desc: GenericColumn = SnowparkColumn(inner.desc)
+  override def apply(extraction: Any): GenericColumn = extraction match {
+    case str: String => SnowparkColumn(inner.apply(str))
+    case idx: Int => SnowparkColumn(inner.apply(idx))
+  }
 }
 
 case class SnowparkField(inner: StructField) extends GenericField {

@@ -192,7 +192,7 @@ case class HistorizeAction(
     transformerDefs.foreach(_.prepare(id))
   }
 
-  private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val capturedTs = getReferenceTimestamp
     val pks = output.table.primaryKey.get // existance is validated earlier
 
