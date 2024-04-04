@@ -325,7 +325,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   test("incremental output mode with inserts") {
 
     // create data object
-    val targetTable = Table(db = Some("default"), name = "test_inc")
+    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append, options = Map("delta.enableChangeDataFeed" -> "true"))
     targetDO.dropTable
@@ -366,6 +366,34 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
     targetDO.setState(None) // to get the full dataframe
     targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 8
+  }
+
+  test("incremental output mode without primary keys") {
+
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc")
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append, options = Map("delta.enableChangeDataFeed" -> "true"))
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+
+    // test
+    val thrown = intercept[IllegalArgumentException] {
+      targetDO.setState(newState1)
+      targetDO.getSparkDataFrame()(contextExec)
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+    assert(thrown.getMessage == s"requirement failed: PrimaryKey for table [${targetDO.table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+
   }
 
 }
