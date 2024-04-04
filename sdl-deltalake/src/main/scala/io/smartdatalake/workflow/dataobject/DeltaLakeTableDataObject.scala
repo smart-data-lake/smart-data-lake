@@ -548,10 +548,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
-    incrementalOutputExpr = state.orElse({
-      assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
-      Some(incrementalOutputExpr.get)
-    })
+    incrementalOutputExpr = state
 
   }
 
