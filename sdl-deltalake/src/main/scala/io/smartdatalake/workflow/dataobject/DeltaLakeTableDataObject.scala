@@ -204,6 +204,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     val df = if(incrementalOutputExpr.isDefined) {
 
+      require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+
       // TODO: implement deduplication of multiple update_postimage by table.primary_key
 
       context.sparkSession.read.format("delta")
