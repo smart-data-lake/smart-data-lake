@@ -38,6 +38,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, Spar
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.delta.DeltaLog
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -206,14 +207,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
       require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
 
-      // TODO: implement deduplication of multiple update_postimage by table.primary_key
+      val windowSpec = Window.partitionBy(table.primaryKey.get.mkString(",")).orderBy(col("_commit_timestamp").desc)
 
       context.sparkSession.read.format("delta")
         .option("readChangeFeed", "true")
         .option("startingVersion", incrementalOutputExpr.get)
         .table(table.fullName)
         .where(expr("_change_type IN ('insert','update_postimage')"))
-        .drop("_change_type", "_commit_version", "_commit_timestamp")
+        .withColumn("rank", rank().over(windowSpec))
+        .where("rank == 1")
+        .drop("rank", "_change_type", "_commit_version", "_commit_timestamp")
 
     } else
       context.sparkSession.table(table.fullName)
