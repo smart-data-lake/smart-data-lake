@@ -202,14 +202,18 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
-    val df = if(incrementalOutputExpr.isDefined)
+    val df = if(incrementalOutputExpr.isDefined) {
+
+      // TODO: implement deduplication of multiple update_postimage by table.primary_key
+
       context.sparkSession.read.format("delta")
         .option("readChangeFeed", "true")
         .option("startingVersion", incrementalOutputExpr.get)
         .table(table.fullName)
         .where(expr("_change_type IN ('insert','update_postimage')"))
         .drop("_change_type", "_commit_version", "_commit_timestamp")
-    else
+
+    } else
       context.sparkSession.table(table.fullName)
 
     validateSchemaMin(SparkSchema(df.schema), "read")
