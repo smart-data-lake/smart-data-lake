@@ -223,8 +223,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-
-    if(isTableExisting) HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> true))(context.sparkSession)
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
