@@ -35,21 +35,35 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
   extends FileTransfer with SmartDataLakeLogger {
   assert(parallelism>0, "parallelism must be greater than 0")
 
-  override def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit = {
+  override def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
     assert(fileRefPairs != null, "fileRefPairs is null - FileTransfer must be initialized first")
-    parallelize(fileRefPairs).foreach { m =>
-      logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${m.tgt.toStringShort}")
-      // get streams
-      Using.resource(srcDO.createInputStream(m.src.fullPath)) { is =>
-        Using.resource( tgtDO.createOutputStream(m.tgt.fullPath, overwrite)) { os =>
-          // transfer data
-          Try(copyStream(is, os)) match {
-            case Success(r) => r
-            case Failure(e) => throw new RuntimeException(s"Could not copy ${srcDO.toStringShort}:${m.src.toStringShort} -> ${tgtDO.toStringShort}:${m.tgt.toStringShort}: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
-          }
-        }
-      }
-    }
+    parallelize(fileRefPairs).flatMap { m =>
+      // get input streams - note that one FileRef pair might create multiple input streams, e.g. for Webservice with paging.
+      srcDO.createInputStreams(m.src.fullPath)
+        .zipWithIndex.map {
+          case (is,idx) =>
+              Using.resource(is) { is =>
+                val tgt = if (srcDO.createsMultiInputStreams) {
+                  // add index to filename and adapt full path with new filename
+                  val fileNameWithIdx = m.tgt.fileName.replaceFirst("([^.]*)\\.", "$1-"+idx+".")
+                  m.tgt.copy(fileName = fileNameWithIdx, fullPath = m.tgt.fullPath.replaceFirst(m.tgt.fileName+"$", fileNameWithIdx))
+                }
+                else {
+                  require(idx == 0, s"${srcDO.id} created multiple InputStreams, but createsMultiInputStreams=false")
+                  m.tgt
+                }
+                logger.info(s"Copy ${srcDO.id}:${m.src.toStringShort} -> ${tgtDO.id}:${tgt.toStringShort}")
+                Using.resource(tgtDO.createOutputStream(tgt.fullPath, overwrite)) { os =>
+                  // transfer data
+                  Try(copyStream(is, os)) match {
+                    case Success(r) => r
+                    case Failure(e) => throw new RuntimeException(s"Could not copy ${srcDO.toStringShort}:${m.src.toStringShort} -> ${tgtDO.toStringShort}:${m.tgt.toStringShort}: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
+                  }
+                }
+                m.copy(tgt = tgt)
+              }
+        }.toSeq
+    }.seq
   }
 
   private def parallelize(fileRefPairs: Seq[FileRefMapping]) = {

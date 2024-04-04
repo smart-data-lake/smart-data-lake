@@ -49,6 +49,8 @@ case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
  *
  * @param partitionDefs   list of partitions with list of possible values for every entry
  * @param partitionLayout definition of partitions in query string. Use %<partitionColName>% as placeholder for partition column value in layout.
+ * @param pagingLinkRegex if Webservice implements paging, configure a regular expression to extract a link for the next page.
+ *                        Example: "\slink=(\S*)"
  */
 case class WebserviceFileDataObject(override val id: DataObjectId,
                                     url: String,
@@ -62,6 +64,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     followRedirects: Boolean = false,
                                     partitionDefs: Seq[WebservicePartitionDefinition] = Seq(),
                                     override val partitionLayout: Option[String] = None,
+                                    pagingLinkRegex: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
@@ -76,6 +79,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
 
+  override def createsMultiInputStreams: Boolean = pagingLinkRegex.isDefined
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     // prepare auth mode if defined
     authMode.foreach(_.prepare())
@@ -87,8 +92,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @param query optional URL with replaced placeholders to call
    * @return Response as Array[Byte]
    */
-  def getResponse(query: Option[String] = None): Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, query.map(url + _))
+  def getResponse(url: String): Array[Byte] = {
+    val webserviceClient = ScalaJWebserviceClient(this, Some(url))
 
     webserviceClient.get() match {
       case Success(c) => c
@@ -133,12 +138,31 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Same as getResponse, but returns response as InputStream
+   * getResponse, implement paging, return as InputStreams
    *
    * @param query it should be possible to define the partition to read as query string, but this is not yet implemented
    */
-  override def createInputStream(query: String)(implicit context: ActionPipelineContext): InputStream = {
-    new ByteArrayInputStream(getResponse(Some(query)))
+  override def createInputStreams(query: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
+    val targetUrl = url + query
+    val responses: Iterator[Array[Byte]] = new Iterator[Array[Byte]]() {
+      var nextLink: Option[String] = Some(targetUrl)
+      override def hasNext: Boolean = nextLink.isDefined
+      override def next(): Array[Byte] = {
+        assert(nextLink.nonEmpty)
+        val response = getResponse(nextLink.get)
+        nextLink = pagingLinkRegex.flatMap{ patternStr =>
+          val pattern = patternStr.r.unanchored
+          new String(response) match {
+            case pattern(link) =>
+              logger.debug(s"next pagingLink found: $link")
+              Some(link)
+            case _ => None
+          }
+        }
+        response
+      }
+    }
+    responses.map(e => new ByteArrayInputStream(e))
   }
 
   override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
