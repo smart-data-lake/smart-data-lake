@@ -322,37 +322,50 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))
   }
 
-  test("incremental output mode") {
+  test("incremental output mode with inserts") {
 
     // create data object
     val targetTable = Table(db = Some("default"), name = "test_inc")
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append, options = Map("delta.enableChangeDataFeed" -> "true"))
     targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
 
     // write test data 1
     val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
 
     // test 1
-    targetDO.setState(None) // initialize incremental output with empty state
+    targetDO.setState(newState1)
     targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
-    val newState1 = targetDO.getState
+
 
     // append test data 2
     val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
     targetDO.writeSparkDataFrame(df2)
+    val newState2 = targetDO.getState
 
     // test 2
-    targetDO.setState(newState1)
-    val df2result = targetDO.getSparkDataFrame()(contextExec)
-    df2result.count() shouldEqual 1
-    val newState2 = targetDO.getState
-    assert(newState1.get < newState2.get)
+    targetDO.setState(newState2)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 1
 
-    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 5
+    // append test data 3
+    val df3 = Seq((6, "T", 5), (7, "R", 7), (8, "T", 2)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df3)
+    val newState3 = targetDO.getState
+
+    // test 3
+    targetDO.setState(newState3)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 3
+
+    assert(newState1.get < newState2.get)
+    assert(newState2.get < newState3.get)
+
+    targetDO.setState(None) // to get the full dataframe
+    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 8
   }
 
 }
