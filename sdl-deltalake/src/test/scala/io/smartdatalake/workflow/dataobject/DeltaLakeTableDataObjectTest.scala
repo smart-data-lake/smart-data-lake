@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
 import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.scalatest.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
@@ -45,6 +46,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
+  val contextInit: ActionPipelineContext = context.copy(phase = ExecutionPhase.Init)
 
   before {
     instanceRegistry.clear()
@@ -318,6 +320,39 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(!tgtSubFeed.metrics.flatMap(_.get("no_data")).contains(true), "no_data should not be true")
     assert(tgtSubFeed.metrics.flatMap(_.get("count")).contains(3))
     assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))
+  }
+
+  test("incremental output mode") {
+
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc")
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append, options = Map("delta.enableChangeDataFeed" -> "true"))
+    targetDO.dropTable
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+
+    // test 1
+    targetDO.setState(None) // initialize incremental output with empty state
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
+    val newState1 = targetDO.getState
+
+    // append test data 2
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+
+    // test 2
+    targetDO.setState(newState1)
+    val df2result = targetDO.getSparkDataFrame()(contextExec)
+    df2result.count() shouldEqual 1
+    val newState2 = targetDO.getState
+    assert(newState1.get < newState2.get)
+
+    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 5
   }
 
 }

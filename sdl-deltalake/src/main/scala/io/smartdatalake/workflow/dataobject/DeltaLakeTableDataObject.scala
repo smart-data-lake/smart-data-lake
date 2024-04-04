@@ -558,7 +558,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def getState: Option[String] = {
 
     val dfHistory = DeltaTable.forName(table.fullName).history(1)
-    val latestVersion = dfHistory.select("version").head.getAs[String](1)
+    val latestVersion = String.valueOf(dfHistory.select("version").head.get(0))
 
     Option(latestVersion)
   }
