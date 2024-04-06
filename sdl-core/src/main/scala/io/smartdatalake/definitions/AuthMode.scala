@@ -211,5 +211,5 @@ trait HttpHeaderAuth {
   /**
    * Return additional headers to add/overwrite in http request.
    */
-  private[smartdatalake] def getHeaders: Map[String,String] = Map()
+  def getHeaders: Map[String,String] = Map()
 }
