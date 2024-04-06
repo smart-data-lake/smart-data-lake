@@ -964,6 +964,10 @@
             },
             "description" : "Some sources need a specification of the cursor field for incremental mode"
           },
+          "maxRecordsPerPartition" : {
+            "type" : "integer",
+            "description" : "Maximum number of records to put into one Spark partition.\nThis helps to limit memory usage, as Spark will offload partitions to disk if memory is scarce."
+          },
           "schemaMin" : {
             "type" : "string",
             "description" : "An optional, minimal schema that a [[DataObject]] schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]] , that is,\nwhen reading or writing Spark data frames from/to the underlying data container. [[io.smartdatalake.workflow.action.Action]] s that work with files ignore the `schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist."
@@ -975,7 +979,7 @@
         "title" : "AirbyteDataObject",
         "required" : [ "type", "config", "streamName", "cmd" ],
         "additionalProperties" : false,
-        "description" : "Limitations: Connectors have only access to locally mounted directories"
+        "description" : "Uses an Airbyte Connector to read data from a data source.\nSee https://docs.airbyte.com/integrations/sources/ for the list of available sources.\n\nAn Airbyte Connector is started using shell commands and streams json data into the AirbyteDataObject using stdout pipe.\nAirbyte Connectors are often written in Python. See https://docs.airbyte.com/connector-development/ for developing a custom connector.\n\nLimitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.\nIn order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase. It will will query the Airbyte Connector before creating the DataFrame."
       },
       "AvroFileDataObject" : {
         "type" : "object",
