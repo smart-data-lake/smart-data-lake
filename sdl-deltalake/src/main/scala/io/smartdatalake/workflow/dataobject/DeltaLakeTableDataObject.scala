@@ -243,6 +243,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     } else
       context.sparkSession.table(table.fullName)
 
+    if(!propertyExists("delta.enableChangeDataFeed") && incrementalOutputExpr.isDefined) activateCdc()
+
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
