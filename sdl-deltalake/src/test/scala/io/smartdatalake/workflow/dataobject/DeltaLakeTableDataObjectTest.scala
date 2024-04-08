@@ -405,11 +405,17 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
     val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
+
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+    val newState2 = targetDO.getState
 
     // test
     val thrown = intercept[IllegalArgumentException] {
-      targetDO.setState(newState1)
-      targetDO.getSparkDataFrame()(contextExec)
+      targetDO.setState(newState2)
+      targetDO.getSparkDataFrame()(contextExec).count()
     }
 
     // check
