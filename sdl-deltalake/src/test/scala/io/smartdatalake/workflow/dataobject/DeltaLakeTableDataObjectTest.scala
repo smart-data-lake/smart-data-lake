@@ -329,7 +329,6 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
-    targetDO.setState(None) // initialize incremental output with empty state
 
     // write test data 1
     val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
