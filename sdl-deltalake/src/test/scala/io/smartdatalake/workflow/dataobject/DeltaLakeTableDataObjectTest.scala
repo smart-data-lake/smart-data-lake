@@ -28,6 +28,7 @@ import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
+import org.apache.spark.sql.delta.DeltaAnalysisException
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.scalatest.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -320,6 +321,32 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(!tgtSubFeed.metrics.flatMap(_.get("no_data")).contains(true), "no_data should not be true")
     assert(tgtSubFeed.metrics.flatMap(_.get("count")).contains(3))
     assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))
+  }
+
+  test("incremental output mode without cdc activated") {
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+
+    // test
+    val thrown = intercept[DeltaAnalysisException] {
+      val newState1 = targetDO.getState
+      targetDO.setState(newState1)
+      targetDO.getSparkDataFrame()(contextExec).count()
+    }
+
+    // check
+    assert(thrown.isInstanceOf[DeltaAnalysisException])
+    assert(thrown.getMessage.startsWith("Error getting change data for range [0 , 0]"))
   }
 
   test("incremental output mode with inserts") {
