@@ -571,6 +571,17 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     incrementalOutputExpr = state
   }
 
+  /**
+   * Return the state of the last increment or empty if no increment was processed.
+   */
+  override def getState: Option[String] = {
+
+    val latestSnapshot = getIcebergTable.currentSnapshot().snapshotId().toString
+
+    Option(latestSnapshot)
+
+  }
+
 }
 
 object IcebergTableDataObject extends FromConfigFactory[DataObject] {
