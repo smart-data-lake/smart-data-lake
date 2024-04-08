@@ -221,9 +221,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
-    if (isTableExisting) activateCdc()
+    implicit val session: SparkSession = context.sparkSession
 
-    val df = if(incrementalOutputExpr.isDefined) {
+    val cdcActivated = propertyExistsWithValue("delta.enableChangeDataFeed", "true")
+
+    val df = if(cdcActivated && incrementalOutputExpr.isDefined) {
 
       require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
 
