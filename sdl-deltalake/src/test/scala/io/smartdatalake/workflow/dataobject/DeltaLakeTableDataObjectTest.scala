@@ -327,7 +327,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // create data object
     val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append, options = Map("delta.enableChangeDataFeed" -> "true"))
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
     targetDO.setState(None) // initialize incremental output with empty state
 
@@ -373,7 +373,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // create data object
     val targetTable = Table(db = Some("default"), name = "test_inc")
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append, options = Map("delta.enableChangeDataFeed" -> "true"))
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
     targetDO.setState(None) // initialize incremental output with empty state
 
@@ -401,7 +401,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // create data object
     val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), options = Map("delta.enableChangeDataFeed" -> "true"))
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath))
     targetDO.dropTable
     targetDO.setState(None) // initialize incremental output with empty state
 
