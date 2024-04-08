@@ -201,7 +201,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
+  private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
+    // TODO: implement check if property already exists
+    HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> "true"))(context.sparkSession)
+  }
+
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+
+    if (isTableExisting) activateCdc()
 
     val df = if(incrementalOutputExpr.isDefined) {
 
@@ -233,11 +240,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
 
-    if(isTableExisting) activateCdc()
-  }
-
-  private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
-    HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> "true"))(context.sparkSession)
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
