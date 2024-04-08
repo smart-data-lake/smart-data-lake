@@ -323,7 +323,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))
   }
 
-  test("incremental output mode without cdc activated") {
+  test("normal output mode without cdc activated") {
     // create data object
     val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
@@ -337,15 +337,11 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     targetDO.writeSparkDataFrame(df1)
 
     // test
-    val thrown = intercept[DeltaAnalysisException] {
-      val newState1 = targetDO.getState
-      targetDO.setState(newState1)
-      targetDO.getSparkDataFrame()(contextExec).count()
-    }
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
 
     // check
-    assert(thrown.isInstanceOf[DeltaAnalysisException])
-    assert(thrown.getMessage.startsWith("Error getting change data for range [0 , 0]"))
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
   }
 
   test("incremental output mode with inserts") {
