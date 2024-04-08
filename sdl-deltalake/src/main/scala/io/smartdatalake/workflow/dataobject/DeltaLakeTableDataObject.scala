@@ -30,7 +30,6 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactor
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -202,8 +201,22 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
-    // TODO: implement check if property already exists
-    HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> "true"))(context.sparkSession)
+    implicit val session: SparkSession = context.sparkSession
+    if(!propertyExists("delta.enableChangeDataFeed") && isTableExisting) HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> "true"))
+  }
+
+  private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
+    val details = DeltaTable.forName(session, table.fullName).detail()
+    val properties = details.select("properties").head.getMap[String, String](0)
+
+    properties.contains(name)
+  }
+
+  private def propertyExistsWithValue(name: String, value: String) (implicit session: SparkSession): Boolean = {
+    val details = DeltaTable.forName(session, table.fullName).detail()
+    val properties = details.select("properties").head.getMap[String, String](0)
+
+    properties.exists(_ == name -> value)
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
