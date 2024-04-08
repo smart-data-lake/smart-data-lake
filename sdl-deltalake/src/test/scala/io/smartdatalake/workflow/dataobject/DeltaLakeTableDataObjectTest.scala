@@ -438,11 +438,13 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
-
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
 
     // do updates and inserts
     session.sql("INSERT INTO test_inc VALUES (5, 'T', 7) ")
-    val newState1 = targetDO.getState
+    val newState2 = targetDO.getState
     session.sql("INSERT INTO test_inc VALUES (6, 'U', 3) ")
     session.sql("UPDATE test_inc SET p = 'Z', value = 8 WHERE id = 1")
     session.sql("UPDATE test_inc SET p = 'W', value = 1 WHERE id = 1")
@@ -450,7 +452,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // test
     val resultDf = Seq((5, "T", 7), (6, "U", 3), (1, "W", 1)).toDF("id", "p", "value")
 
-    targetDO.setState(newState1)
+    targetDO.setState(newState2)
     val testDf = targetDO.getSparkDataFrame()(contextExec)
 
     testDf.count() shouldEqual 3 // 2x new insert + 1x the latest update
