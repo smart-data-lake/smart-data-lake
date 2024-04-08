@@ -110,7 +110,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val housekeepingMode: Option[HousekeepingMode] = None,
                                   override val metadata: Option[DataObjectMetadata] = None)
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -557,6 +557,19 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = IcebergTableDataObject
+
+  private var incrementalOutputExpr: Option[String] = None
+
+  /**
+   * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
+   * The state is just a string. It's semantics is internal to the DataObject.
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   *
+   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    incrementalOutputExpr = state
+  }
 
 }
 
