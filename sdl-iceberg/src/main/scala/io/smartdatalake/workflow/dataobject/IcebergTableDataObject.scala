@@ -109,8 +109,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val expectedPartitionsCondition: Option[String] = None,
                                   override val housekeepingMode: Option[HousekeepingMode] = None,
                                   override val metadata: Option[DataObjectMetadata] = None)
-                                 (@transient implicit val instanceRegistry: InstanceRegistry,
-                                  @transient implicit val context: ActionPipelineContext)
+                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
 
   /**
