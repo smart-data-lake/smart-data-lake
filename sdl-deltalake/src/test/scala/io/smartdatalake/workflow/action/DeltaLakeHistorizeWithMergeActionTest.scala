@@ -289,7 +289,7 @@ import java.time.LocalDateTime
        outputId = tgtDO.id
      )
 
-     val l1 = Seq((1, "doe", "john", 5, "new")).toDF("id", "lastname", "firstname", "rating", "operation")
+     val l1 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
      srcDO.writeSparkDataFrame(l1)(context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
      action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
