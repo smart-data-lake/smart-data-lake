@@ -144,7 +144,7 @@ case class HistorizeAction(
     _saveModeOptions = if (mergeModeEnable && mergeModeDeletedRecordsConditionExpr.isDefined) {
       // customize update/insert condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = Seq(TechnicalTableColumn.delimited, Historization.historizeHashColName)
+      val updateCols = Seq(TechnicalTableColumn.delimited)
       val insertCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
       val insertColsToIgnore = Seq(Historization.historizeOperationColName, mergeModeCDCColumn.get)
       val insertValuesOverride = Map(Historization.historizeDummyColName -> "true")
