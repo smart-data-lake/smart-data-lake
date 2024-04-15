@@ -69,7 +69,10 @@ case class CustomFileAction(override val id: ActionId,
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
-    outputSubFeed.copy(fileRefMapping = Some(output.translateFileRefs(inputFileRefs)))
+    val fileRefMapping = output.translateFileRefs(inputFileRefs)
+    val partitionValues = if (outputSubFeed.partitionValues.nonEmpty || output.partitions.isEmpty) outputSubFeed.partitionValues
+    else fileRefMapping.map(_.tgt.partitionValues).distinct
+    outputSubFeed.copy(fileRefs = Some(fileRefMapping.map(_.tgt)), fileRefMapping = Some(fileRefMapping), partitionValues = partitionValues)
   }
 
   override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {

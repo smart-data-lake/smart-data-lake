@@ -26,7 +26,7 @@ import io.smartdatalake.util.filetransfer.{FileTransfer, StreamFileTransfer}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed, SubFeed}
 
 /**
  * [[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.
@@ -77,7 +77,10 @@ case class FileTransferAction(override val id: ActionId,
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
     logger.info(s"($id) got ${inputFileRefs.size} files to copy")
-    outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))))
+    val fileRefMapping = fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))
+    val partitionValues = if (outputSubFeed.partitionValues.nonEmpty || output.partitions.isEmpty) outputSubFeed.partitionValues
+    else fileRefMapping.map(_.tgt.partitionValues).distinct
+    outputSubFeed.copy(fileRefs = Some(fileRefMapping.map(_.tgt)), fileRefMapping = Some(fileRefMapping), partitionValues = partitionValues)
   }
 
   override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {

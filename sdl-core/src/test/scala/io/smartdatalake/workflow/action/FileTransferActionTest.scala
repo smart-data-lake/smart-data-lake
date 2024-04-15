@@ -421,7 +421,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     assert(r1.size == 1)
   }
 
-  test("copy partitioned webservice output to hadoop file") {
+  test("copy partitioned webservice output with fixed partition values to hadoop file") {
 
     val feed = "filetransfer"
     val tgtDir = "testTgt"
@@ -431,7 +431,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     // For testing we will read something from Spark UI API...
     val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
       , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq("applications","version"))), partitionLayout = Some("/%subject%?test")) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
-    val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'))
+    val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("subject"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -440,6 +440,33 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
+
+    val r1 = tgtDO.getFileRefs(Seq())
+    assert(r1.map(_.fileName).toSet == Set("applications.test.json", "version.test.json"))
+  }
+
+
+  test("copy partitioned webservice output with input partition values to hadoop file") {
+
+    val feed = "filetransfer"
+    val tgtDir = "testTgt"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // setup DataObjects
+    // For testing we will read something from Spark UI API...
+    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
+      , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq())), partitionLayout = Some("/%subject%?test")) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
+    val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("subject"))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
 
     val r1 = tgtDO.getFileRefs(Seq())
     assert(r1.map(_.fileName).toSet == Set("applications.test.json", "version.test.json"))

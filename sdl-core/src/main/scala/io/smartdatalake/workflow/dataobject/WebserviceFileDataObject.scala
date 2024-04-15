@@ -77,7 +77,10 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
 
-  override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
+  override def expectedPartitionsCondition: Option[String] = {
+    if (partitionDefs.exists(_.values.isEmpty)) Some("false") // if some partitionDef values is not defined, we cannot now what partitions exist...
+    else None // all partitions are expected to exist
+  }
 
   override def createsMultiInputStreams: Boolean = pagingLinkRegex.isDefined
 
@@ -200,7 +203,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
       // as partitionValues don't need to define a value for every partition, we need to create all partition values and filter them
       val allPartitionValues = createAllPartitionValues
       if (partitionValues.isEmpty || partitionValues.contains(PartitionValues(Map()))) allPartitionValues
-      else allPartitionValues.filter(allPv => partitionValues.exists(_.elements.forall(filterPvElement => allPv.get(filterPvElement._1).contains(filterPvElement._2))))
+      else if (allPartitionValues.nonEmpty) allPartitionValues.filter(allPv => partitionValues.exists(_.elements.forall(filterPvElement => allPv.get(filterPvElement._1).contains(filterPvElement._2))))
+      else partitionValues
     } else Seq(PartitionValues(Map())) // create empty default PartitionValue
     // create one FileRef for every PartitionValue
     partitionValuesToProcess.map(createFileRef)
