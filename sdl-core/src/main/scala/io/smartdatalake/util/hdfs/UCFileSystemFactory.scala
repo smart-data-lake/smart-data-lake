@@ -72,14 +72,6 @@ object UCFileSystemFactory {
  */
 private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeHelperClass: Class[_]) extends SmartDataLakeLogger {
 
-  //As of 14.04.2024, Databricks provides the checkPermission method with two different signatures depenending on where the clusters are hosted.
-  private lazy val checkPermissionMethod = try {
-      getMethod(fsUtilsInst.getClass, "checkPermission", Seq(classOf[Seq[_]], classOf[Boolean], classOf[Function0[_]]))
-    }
-    catch {
-      case nsm: NoSuchMethodException => getMethod(fsUtilsInst.getClass, "checkPermission", Seq(classOf[Seq[_]], classOf[Boolean], classOf[Option[_]], classOf[Function0[_]]));
-    }
-  checkPermissionMethod.setAccessible(true)
 
   def getFS(path: String): FileSystem = {
     getFSMethod.invoke(fsUtilsInst, path).asInstanceOf[FileSystem]
