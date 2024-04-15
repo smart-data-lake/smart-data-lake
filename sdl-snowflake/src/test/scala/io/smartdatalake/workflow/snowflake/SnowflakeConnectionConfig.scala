@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 
 /**
  * Configuration of Snowflake connection for integration tests
- * Please ensure that the environnement Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE,
+ * Please ensure that the environment Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE,
  * SNOWFLAKE_USER and SNOWFLAKE_PASSWORD are set in order to connect to Snowflake.
  */
 object SnowflakeConnectionConfig {
@@ -38,4 +38,3 @@ object SnowflakeConnectionConfig {
     authMode = BasicAuthMode(Some(StringOrSecret(sys.env("SNOWFLAKE_USER"))), Some(StringOrSecret(sys.env("SNOWFLAKE_PASSWORD"))))
   )
 }
-

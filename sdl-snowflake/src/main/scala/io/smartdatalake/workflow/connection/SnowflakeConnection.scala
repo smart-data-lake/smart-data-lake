@@ -23,10 +23,13 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{JdbcExecution, JdbcUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcCatalog}
 import net.snowflake.spark.snowflake.Utils
+import org.apache.commons.pool2.impl.GenericObjectPool
+import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
-import java.sql.ResultSet
+import java.sql.{ResultSet, Connection => SqlConnection}
 
 /**
  * Connection information for Snowflake databases.
@@ -50,11 +53,19 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                authMode: AuthMode,
                                sparkOptions: Map[String, String] = Map(),
                                override val metadata: Option[ConnectionMetadata] = None
-                              ) extends Connection with SmartDataLakeLogger {
+                              ) extends Connection with JdbcExecution with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode])
   private var _snowparkSession: Option[Session] = None
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
+
+  // prepare JDBC catalog implementation
+  val catalog: JdbcCatalog = new DefaultJdbcCatalog(this)
+  // setup JDBC connection pool for metadata and ddl queries
+  override val pool: GenericObjectPool[SqlConnection] = JdbcUtil.createConnectionPool(maxParallelConnections = 3, connectionPoolMaxIdleTimeSec = 3, connectionPoolMaxWaitTimeSec = 600, () => Utils.getJDBCConnection(getSnowflakeAuthOptions("")), initSql = None, autoCommit = false)
+  // set autoCommit=false as recommended
+  override val autoCommit: Boolean = false
+  override val jdbcDialect: JdbcDialect = JdbcDialects.get("snowflake")
 
   def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
     if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
