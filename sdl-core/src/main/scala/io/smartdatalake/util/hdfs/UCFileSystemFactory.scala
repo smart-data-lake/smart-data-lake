@@ -72,11 +72,6 @@ object UCFileSystemFactory {
  */
 private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeHelperClass: Class[_]) extends SmartDataLakeLogger {
 
-  def checkPermissionAccess[X](pathAndActions: Seq[_], withUnityCatalog: java.lang.Boolean, code : => X): X = {
-    checkPermissionMethod.invoke(fsUtilsInst, pathAndActions, withUnityCatalog, () => code).asInstanceOf[X]
-  }
-  private lazy val checkPermissionMethod = getMethod(fsUtilsInst.getClass, "checkPermission", Seq(classOf[Seq[_]], classOf[Boolean], classOf[Function0[_]]))
-  checkPermissionMethod.setAccessible(true)
 
   def getFS(path: String): FileSystem = {
     getFSMethod.invoke(fsUtilsInst, path).asInstanceOf[FileSystem]
@@ -104,7 +99,7 @@ private[smartdatalake] class DbUtilsInterface(fsUtilsInst: Any, credentialScopeH
       cls.getMethod(name, parameterTypes:_*)
     } catch {
       case e:NoSuchMethodException =>
-        val otherMethodsWithSameName = cls.getMethods.filter(_.getName == "registerPathAccess")
+        val otherMethodsWithSameName = cls.getMethods.filter(_.getName == name)
         logger.warn(s"${e.getClass.getSimpleName}: ${e.getMessage}. Alternative methods with same name: ${otherMethodsWithSameName.map(_.toString).mkString(", ")}")
         throw e
     }
