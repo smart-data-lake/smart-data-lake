@@ -115,7 +115,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getSnowflakeAuthOptions(table.db.get))
+      .options(connection.getJdbcAuthOptions(table.db.get))
       .options(instanceSparkOptions)
       .options(queryOrTable)
       .load()
@@ -127,22 +127,21 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                   (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
     validateSchemaMin(SparkSchema(df.schema), role = "write")
-    implicit val helper = SparkSubFeed
-    var finalSaveMode: SDLSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+    var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented
     assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
 
     // Handle overwrite partitions: delete partitions data and then append data
-    //if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite) {
-    //  val deleteCondition = PartitionValues.createFilterExpr(partitionValues).exprSql
-    //  snowparkSession.sql(s"delete from $fullyQualifiedTableName where $deleteCondition")
-    //  finalSaveMode = SDLSaveMode.Append
-    //}
+    if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite) {
+      deletePartitions(partitionValues)
+      finalSaveMode = SDLSaveMode.Append
+    }
+
     val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
       df.write
         .format(SNOWFLAKE_SOURCE_NAME)
-        .options(connection.getSnowflakeAuthOptions(table.db.get))
+        .options(connection.getJdbcAuthOptions(table.db.get))
         .options(instanceSparkOptions)
         .options(Map("dbtable" -> table.fullName))
         .mode(SparkSaveMode.from(finalSaveMode))
@@ -218,7 +217,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
-    connection.execJdbcStatement(s"drop table ${table.fullName}")
+    connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
@@ -236,19 +235,24 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                             (implicit context: ActionPipelineContext): MetricsMap = {
-    assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
+    var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
-    // TODO: what to do with isRecursiveInput...
     // TODO: merge mode not yet implemented
-    assert(saveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
+    assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
+
+    // Handle overwrite partitions: delete partitions data and then append data
+    if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite && isTableExisting) {
+      deletePartitions(partitionValues)
+      finalSaveMode = SDLSaveMode.Append
+    }
 
     // use asynchronous writer to get query id
-    val asyncWriter = df.write.mode(SnowparkSaveMode.from(saveMode)).async.saveAsTable(table.fullName)
+    val asyncWriter = df.write.mode(SnowparkSaveMode.from(finalSaveMode)).async.saveAsTable(table.fullName)
     asyncWriter.getResult()
 
     // retrieve metrics from result scan
-    val dfResultScan = snowparkSession.sql(s"SELECT * FROM TABLE(RESULT_SCAN(${asyncWriter.getQueryId()}))")
-    dfResultScan.first().map(row => dfResultScan.schema.names.map(_.toLowerCase.replace(" ","_")).zip(row.toSeq).toMap).getOrElse(Map())
+    val dfResultScan = snowparkSession.sql(s"SELECT * FROM TABLE(RESULT_SCAN('${asyncWriter.getQueryId()}'))")
+    dfResultScan.first().map(row => dfResultScan.schema.names.map(_.toLowerCase.replace(" ","_").replace("\"","")).zip(row.toSeq).toMap).getOrElse(Map())
       // standardize naming
       .map {
         case ("number_of_rows_inserted", v) => "rows_inserted" -> v
@@ -273,7 +277,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
-      connection.execSnowflakeStatement(deletePartitionsStatement(partitionValues))
+      connection.execJdbcStatement(deletePartitionsStatement(partitionValues))
     }
   }
 
@@ -313,7 +317,7 @@ object SnowparkSaveMode {
     case Append => SaveMode.Append
     case ErrorIfExists => SaveMode.ErrorIfExists
     case Ignore => SaveMode.Ignore
-    case OverwritePreserveDirectories => SaveMode.Append // Append with spark, but delete files before with hadoop
-    case OverwriteOptimized => SaveMode.Append // Append with spark, but delete partitions before with hadoop
+    case OverwritePreserveDirectories => throw new NotImplementedError("SaveMode OverwritePreserveDirectories is not implemented for SnowflakeDataObject")
+    case OverwriteOptimized => throw new NotImplementedError("SaveMode OverwriteOptimized is not implemented for SnowflakeDataObject")
   }
 }

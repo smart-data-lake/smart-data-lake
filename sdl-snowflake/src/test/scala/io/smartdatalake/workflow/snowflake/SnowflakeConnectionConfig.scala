@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.snowflake
 import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.SnowflakeConnection
+import io.smartdatalake.workflow.dataobject.HttpProxyConfig
 
 /**
  * Configuration of Snowflake connection for integration tests
@@ -35,6 +36,7 @@ object SnowflakeConnectionConfig {
     warehouse = sys.env("SNOWFLAKE_WAREHOUSE"),
     database = sys.env("SNOWFLAKE_DATABASE"),
     role = sys.env("SNOWFLAKE_ROLE"),
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("SNOWFLAKE_USER"))), Some(StringOrSecret(sys.env("SNOWFLAKE_PASSWORD"))))
+    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("SNOWFLAKE_USER"))), Some(StringOrSecret(sys.env("SNOWFLAKE_PASSWORD")))),
+    //proxy = Some(HttpProxyConfig(host = "<host>", port = <port>))
   )
 }
