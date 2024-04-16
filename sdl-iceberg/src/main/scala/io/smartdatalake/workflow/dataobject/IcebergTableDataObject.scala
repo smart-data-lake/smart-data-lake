@@ -576,9 +576,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    */
   override def getState: Option[String] = {
 
-    val latestSnapshot =  getIcebergTable.currentSnapshot().snapshotId().toString
-
-    Option(latestSnapshot)
+    incrementalOutputExpr
 
   }
 
