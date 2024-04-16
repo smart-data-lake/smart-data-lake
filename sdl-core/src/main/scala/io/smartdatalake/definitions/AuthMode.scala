@@ -141,7 +141,8 @@ case class KeycloakClientSecretAuthMode(
 }
 
 /**
- * Connect with custom HTTP authentication
+ * Connect with custom HTTP-header based authentication
+ *
  * @param className class name implementing trait [[CustomHttpAuthModeLogic]]
  * @param options Options to pass to the custom auth mode logic in prepare function.
  */

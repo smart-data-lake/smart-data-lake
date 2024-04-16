@@ -34,20 +34,46 @@ import org.apache.tika.Tika
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
+/**
+ * List of partitions possible values for this partition
+ * @param name partition name
+ * @param values possible values for this partition
+ */
 case class WebservicePartitionDefinition(name: String, values: Seq[String])
 
+/**
+ * Proxy configuration used to make HTTP-connection.
+ * @param host proxy host
+ * @param port proxy port
+ */
 case class HttpProxyConfig(host: String, port: Int)
 
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
 /**
- * [[DataObject]] to call webservice and return response as InputStream.
- * The corresponding Action to process the response should be a FileTransferAction.
- * This is implemented as FileRefDataObject because the response is treated as some file content.
- * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
- * All possible query parameter values must be given in configuration.
+ * [[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.
  *
- * @param partitionDefs   list of partitions with list of possible values for every entry
+ * The corresponding Action to process the response or upload data should be a FileTransferAction.
+ * This is implemented as FileRefDataObject because the response / upload data is treated as some file content.
+ *
+ * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
+ *
+ * Query parameter (partitions) and possible values can be configured through `partitionDefs` attribute.
+ * If no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG.
+ *
+ * @param url URL of the webservice
+ * @param additionalHeaders Additional headers to pass with the http request
+ * @param timeouts optional configuration of HTTP timeouts
+ * @param authMode Optional configuration of webservice authentication. Supported `AuthMode`s are BasicAuthMode and CustomHttpAuthMode.
+ *                 CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
+ * @param mimeType Optionally specify mime-type of Webservice response. If not specified `tika`-library is used to guess the type.
+ * @param writeMethod HTTP method used when uploading data to a webservice.
+ *                    Default method is POST.
+ * @param proxy optional Proxy configuration used to make HTTP-connection.
+ * @param followRedirects if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param partitionDefs Optional list of partitions and possible partition values.
+ *                      Partitions and their values are mapped as query parameter in webservice requests.
+ *                      Multiple values are translated into multiple requests. Each request handles one combination of partition values.
  * @param partitionLayout definition of partitions in query string. Use %<partitionColName>% as placeholder for partition column value in layout.
  * @param pagingLinkRegex if Webservice implements paging, configure a regular expression to extract a link for the next page.
  *                        Example: "\slink=(\S*)"
@@ -56,7 +82,6 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     url: String,
                                     additionalHeaders: Map[String, String] = Map(),
                                     timeouts: Option[HttpTimeoutConfig] = None,
-                                    readTimeoutMs: Option[Int] = None,
                                     authMode: Option[AuthMode] = None,
                                     mimeType: Option[String] = None,
                                     writeMethod: WebserviceMethod = WebserviceMethod.Post,

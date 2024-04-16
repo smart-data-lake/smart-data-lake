@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
+import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, get, stubFor, urlEqualTo}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{BasicAuthMode, SDLSaveMode}
@@ -46,17 +47,26 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
   val sshUser = "test"
   val sshPwd = "test"
 
+  private var wireMockServer: WireMockServer = _
+  val port = 8080 // for some reason, only the default port seems to work
+  val httpsPort = 8443
+  val host = "127.0.0.1"
+
   override protected def beforeAll(): Unit = {
     sshd = TestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
+    wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
   }
 
   override protected def afterAll(): Unit = {
     sshd.stop()
+    wireMockServer.stop()
   }
 
   before {
     instanceRegistry.clear()
     instanceRegistry.register(SFtpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshUser))), ignoreHostKeyVerification = true))
+    wireMockServer.resetAll()
+    TestUtil.setupWebserviceStubs()
   }
 
   test("copy file from sftp to hadoop without partitions") {
@@ -477,11 +487,6 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     val feed = "filetransfer"
     val tgtDir = "testTgt"
     val tempDir = Files.createTempDirectory(feed)
-
-    val port = 8080 // for some reason, only the default port seems to work
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
 
     // first response has a reference to the next page
     stubFor(get(urlEqualTo("/good/getWithPaging/1"))
