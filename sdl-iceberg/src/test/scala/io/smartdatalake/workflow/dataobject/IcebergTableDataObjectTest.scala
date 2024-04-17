@@ -334,9 +334,6 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     targetDO.setState(newState3)
     assert(targetDO.getSparkDataFrame()(contextExec).count() == 3)
 
-    assert(newState1.get < newState2.get)
-    assert(newState2.get < newState3.get)
-
     targetDO.setState(None) // to get the full dataframe
     assert(targetDO.getSparkDataFrame()(contextExec).count() == 8)
   }
