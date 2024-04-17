@@ -37,7 +37,7 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
 
   override def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
     assert(fileRefPairs != null, "fileRefPairs is null - FileTransfer must be initialized first")
-    parallelize(fileRefPairs).flatMap { m =>
+    parallelize(fileRefPairs).iterator.flatMap { m =>
       // get input streams - note that one FileRef pair might create multiple input streams, e.g. for Webservice with paging.
       srcDO.createInputStreams(m.src.fullPath)
         .zipWithIndex.map {
@@ -63,7 +63,7 @@ private[smartdatalake] class StreamFileTransfer(override val srcDO: FileRefDataO
                 m.copy(tgt = tgt)
               }
         }.toSeq
-    }.seq
+    }.toSeq
   }
 
   private def parallelize(fileRefPairs: Seq[FileRefMapping]) = {
