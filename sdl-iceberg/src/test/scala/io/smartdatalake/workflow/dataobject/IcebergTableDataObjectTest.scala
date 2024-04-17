@@ -341,4 +341,38 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(targetDO.getSparkDataFrame()(contextExec).count() == 8)
   }
 
+  test("incremental output mode without primary keys") {
+
+    // create data object
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc")
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 4)
+
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+    val newState2 = targetDO.getState
+
+    // test
+    val thrown = intercept[IllegalArgumentException] {
+      targetDO.setState(newState2)
+      targetDO.getSparkDataFrame()(contextExec).count()
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+    assert(thrown.getMessage == s"requirement failed: PrimaryKey for table [${targetDO.table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+
+  }
+
 }
