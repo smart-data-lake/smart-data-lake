@@ -751,7 +751,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val port = 8080 // for some reason, only the default port seems to work
     val httpsPort = 8443
     val host = "127.0.0.1"
-    val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
+    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    TestUtil.setupWebserviceStubs()
 
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()

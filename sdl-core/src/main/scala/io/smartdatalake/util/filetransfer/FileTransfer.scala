@@ -41,7 +41,8 @@ trait FileTransfer {
   /**
    * Executes the file transfer
    * @param fileRefPairs: mapping from input to output file references.
+   * @return number of files handled.
    */
-  def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Unit
+  def exec(fileRefPairs: Seq[FileRefMapping])(implicit context: ActionPipelineContext): Seq[FileRefMapping]
 
 }

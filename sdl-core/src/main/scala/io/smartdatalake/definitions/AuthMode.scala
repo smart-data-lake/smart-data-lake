@@ -75,7 +75,7 @@ case class TokenAuthMode(@Deprecated @deprecated("Use `token` instead", "2.5.0")
   private val _token =  token.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(tokenVariable.get))
 
   private[smartdatalake] val tokenSecret: StringOrSecret = _token
-  private[smartdatalake] override def getHeaders: Map[String, String] = {
+  override def getHeaders: Map[String, String] = {
     Map("Authorization" -> s"Bearer ${tokenSecret.resolve()}")
   }
 }
@@ -91,7 +91,7 @@ case class AuthHeaderMode(
                          ) extends AuthMode with HttpHeaderAuth {
   private val _secret = secret.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(secretVariable.get))
   private[smartdatalake] val stringOrSecret: StringOrSecret = _secret
-  private[smartdatalake] override def getHeaders: Map[String,String] = Map(headerName -> stringOrSecret.resolve())
+  override def getHeaders: Map[String,String] = Map(headerName -> stringOrSecret.resolve())
 }
 
 /**
@@ -126,7 +126,7 @@ case class KeycloakClientSecretAuthMode(
     // check connection
     keycloakClient.tokenManager().getAccessToken.getToken
   }
-  private[smartdatalake] override def getHeaders: Map[String,String] = {
+  override def getHeaders: Map[String,String] = {
     assert(keycloakClient!=null, "keycloak client not initialized")
     val token = keycloakClient.tokenManager.getAccessToken.getToken
     Map("Authorization" -> s"Bearer $token")
@@ -141,14 +141,15 @@ case class KeycloakClientSecretAuthMode(
 }
 
 /**
- * Connect with custom HTTP authentication
+ * Connect with custom HTTP-header based authentication
+ *
  * @param className class name implementing trait [[CustomHttpAuthModeLogic]]
  * @param options Options to pass to the custom auth mode logic in prepare function.
  */
 case class CustomHttpAuthMode(className: String, options: Map[String,StringOrSecret]) extends AuthMode with HttpHeaderAuth {
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomHttpAuthModeLogic](className)
   private[smartdatalake] override def prepare(): Unit = impl.prepare(options)
-  private[smartdatalake] override def getHeaders: Map[String, String] = impl.getHeaders
+  override def getHeaders: Map[String, String] = impl.getHeaders
 }
 trait CustomHttpAuthModeLogic extends HttpHeaderAuth {
   def prepare(options: Map[String,StringOrSecret]): Unit = ()
@@ -211,5 +212,5 @@ trait HttpHeaderAuth {
   /**
    * Return additional headers to add/overwrite in http request.
    */
-  private[smartdatalake] def getHeaders: Map[String,String] = Map()
+  def getHeaders: Map[String,String] = Map()
 }
