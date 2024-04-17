@@ -226,21 +226,17 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
-    // TODO: Refactor to a more functional way
-    val df = if(incrementalOutputExpr.isDefined) {
-
-      require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
-
-      val d = if(incrementalOutputExpr.contains("0")) context.sparkSession.table(table.fullName)
-      else context.sparkSession.read.format("iceberg") // TODO: Implement the cdc view because incremental load only returns append operations
-        .option("start-snapshot-id", incrementalOutputExpr.get)
-        .table(table.fullName)
-
-      incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
-
-      d
-
-    } else context.sparkSession.table(table.fullName)
+    val df = incrementalOutputExpr match {
+      case Some(snapshotId) =>
+        require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+        val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
+                            else context.sparkSession.read.format("iceberg") // TODO: Implement the cdc view because incremental load only returns append operations
+                              .option("start-snapshot-id", snapshotId)
+                              .table(table.fullName)
+        incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
+        icebergTable
+      case _ => context.sparkSession.table(table.fullName)
+    }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
