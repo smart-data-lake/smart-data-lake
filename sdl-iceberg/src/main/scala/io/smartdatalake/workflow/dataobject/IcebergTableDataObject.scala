@@ -226,20 +226,23 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
-    val df = if(incrementalOutputExpr.isDefined && !incrementalOutputExpr.contains("0")) {
+    val df = if(incrementalOutputExpr.isDefined) {
 
       require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
 
-      context.sparkSession.read.format("iceberg")
+      val d = if(incrementalOutputExpr.contains("0")) context.sparkSession.table(table.fullName)
+      else context.sparkSession.read.format("iceberg")
         .option("start-snapshot-id", incrementalOutputExpr.get)
         .table(table.fullName)
+
+      incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
+
+      d
 
     } else context.sparkSession.table(table.fullName)
 
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
-
-    incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
 
     df
   }
