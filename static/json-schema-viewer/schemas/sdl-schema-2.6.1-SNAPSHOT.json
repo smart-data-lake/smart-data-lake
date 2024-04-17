@@ -4287,13 +4287,15 @@
             "const" : "WebserviceFileDataObject"
           },
           "url" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "URL of the webservice"
           },
           "additionalHeaders" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
-            }
+            },
+            "description" : "Additional headers to pass with the http request"
           },
           "timeouts" : {
             "type" : "object",
@@ -4308,9 +4310,6 @@
             "title" : "HttpTimeoutConfig",
             "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
             "additionalProperties" : false
-          },
-          "readTimeoutMs" : {
-            "type" : "integer"
           },
           "authMode" : {
             "oneOf" : [ {
@@ -4329,31 +4328,38 @@
               "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-            } ]
+            } ],
+            "description" : "Optional configuration of webservice authentication. Supported`AuthMode` s are BasicAuthMode and CustomHttpAuthMode.\nCustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module."
           },
           "mimeType" : {
-            "type" : "string"
+            "type" : "string",
+            "description" : "Optionally specify mime-type of Webservice response. If not specified`tika` -library is used to guess the type."
           },
           "writeMethod" : {
             "type" : "string",
+            "description" : "HTTP method used when uploading data to a webservice.\nDefault method is POST.",
             "enum" : [ "Delete", "Put", "Post", "Get" ]
           },
           "proxy" : {
             "type" : "object",
             "properties" : {
               "host" : {
-                "type" : "string"
+                "type" : "string",
+                "description" : "proxy host"
               },
               "port" : {
-                "type" : "integer"
+                "type" : "integer",
+                "description" : "proxy port"
               }
             },
             "title" : "HttpProxyConfig",
             "required" : [ "host", "port" ],
-            "additionalProperties" : false
+            "additionalProperties" : false,
+            "description" : "Proxy configuration used to make HTTP-connection."
           },
           "followRedirects" : {
-            "type" : "boolean"
+            "type" : "boolean",
+            "description" : "if redirects should be followed when creating HTTP-connection. Default is false because of security concerns."
           },
           "partitionDefs" : {
             "type" : "array",
@@ -4361,24 +4367,31 @@
               "type" : "object",
               "properties" : {
                 "name" : {
-                  "type" : "string"
+                  "type" : "string",
+                  "description" : "partition name"
                 },
                 "values" : {
                   "type" : "array",
                   "items" : {
                     "type" : "string"
-                  }
+                  },
+                  "description" : "possible values for this partition"
                 }
               },
               "title" : "WebservicePartitionDefinition",
               "required" : [ "name", "values" ],
-              "additionalProperties" : false
+              "additionalProperties" : false,
+              "description" : "List of partitions possible values for this partition"
             },
-            "description" : "list of partitions with list of possible values for every entry"
+            "description" : "Optional list of partitions and possible partition values.\nPartitions and their values are mapped as query parameter in webservice requests.\nMultiple values are translated into multiple requests. Each request handles one combination of partition values."
           },
           "partitionLayout" : {
             "type" : "string",
             "description" : "definition of partitions in query string. Use %<partitionColName>% as placeholder for partition column value in layout."
+          },
+          "pagingLinkRegex" : {
+            "type" : "string",
+            "description" : "if Webservice implements paging, configure a regular expression to extract a link for the next page.\nExample: \"\\slink=(\\S*)\""
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -4387,7 +4400,7 @@
         "title" : "WebserviceFileDataObject",
         "required" : [ "type", "url" ],
         "additionalProperties" : false,
-        "description" : "[[DataObject]] to call webservice and return response as InputStream.\nThe corresponding Action to process the response should be a FileTransferAction.\nThis is implemented as FileRefDataObject because the response is treated as some file content.\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\nAll possible query parameter values must be given in configuration."
+        "description" : "[[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.\n\nThe corresponding Action to process the response or upload data should be a FileTransferAction.\nThis is implemented as FileRefDataObject because the response / upload data is treated as some file content.\n\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\n\nQuery parameter (partitions) and possible values can be configured through `partitionDefs` attribute.\nIf no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG."
       },
       "XmlFileDataObject" : {
         "type" : "object",
@@ -6642,7 +6655,7 @@
         "title" : "CustomHttpAuthMode",
         "required" : [ "type", "className", "options" ],
         "additionalProperties" : false,
-        "description" : "Connect with custom HTTP authentication"
+        "description" : "Connect with custom HTTP-header based authentication"
       },
       "KeycloakClientSecretAuthMode" : {
         "type" : "object",
