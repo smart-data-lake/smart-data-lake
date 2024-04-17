@@ -375,4 +375,41 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   }
 
+  test("incremental output mode with updates and inserts") {
+
+    // create data object
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath))
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 4)
+
+    // do updates and inserts
+    session.sql(s"INSERT INTO ${targetTable.fullName} VALUES (5, 'T', 7) ")
+    val newState2 = targetDO.getState
+    session.sql(s"INSERT INTO ${targetTable.fullName} VALUES (6, 'U', 3) ")
+    session.sql(s"UPDATE ${targetTable.fullName} SET p = 'Z', value = 8 WHERE id = 1")
+    session.sql(s"UPDATE ${targetTable.fullName} SET p = 'W', value = 1 WHERE id = 1")
+
+    // test
+    val resultDf = Seq((5, "T", 7), (6, "U", 3), (1, "W", 1)).toDF("id", "p", "value")
+
+    targetDO.setState(newState2)
+    val testDf = targetDO.getSparkDataFrame()(contextExec)
+
+    assert(testDf.count() == 3) // 2x new insert + 1x the latest update
+
+    testDf.collect() sameElements resultDf.collect()
+
+  }
+
 }
