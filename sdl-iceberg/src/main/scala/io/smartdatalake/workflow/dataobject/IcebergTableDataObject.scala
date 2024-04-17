@@ -225,9 +225,22 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val df = context.sparkSession.table(table.fullName)
+
+    val df = if(incrementalOutputExpr.isDefined && !incrementalOutputExpr.contains("0")) {
+
+      require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+
+      context.sparkSession.read.format("iceberg")
+        .option("start-snapshot-id", incrementalOutputExpr.get)
+        .table(table.fullName)
+
+    } else context.sparkSession.table(table.fullName)
+
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
+
+    incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
+
     df
   }
 
@@ -568,7 +581,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
-    incrementalOutputExpr = state
+
+    incrementalOutputExpr = state.orElse(Some("0"))
   }
 
   /**
