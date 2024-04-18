@@ -227,6 +227,7 @@ object Historization extends SmartDataLakeLogger {
         .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, timestampOld)
       )
       .drop(existingCapturedCol)
+    // TODO: activate update of dl_hash if dl_hash in target is null
     // return
     dfOperationVersioned
   }
