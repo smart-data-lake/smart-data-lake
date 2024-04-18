@@ -268,9 +268,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     applyAcls
   }
 
-  override def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream = {
+  override def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     Try(filesystem.open(new Path(path))) match {
-      case Success(r) => r
+      case Success(r) => Iterator(r)
       case Failure(e) => throw new RuntimeException(s"Can't create InputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
   }

@@ -24,6 +24,13 @@ import java.io.InputStream
 
 trait CanCreateInputStream {
 
-  def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream
+  def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream]
+
+  /**
+   * Set to true if this DataObject can create multiple InputStreams for one path, e.g. return an Iterator[InputStreams] with multiple entries.
+   * In this case SDLB will read all InputStreams from the iterator, and add an additional index-number to the output path.
+   */
+
+  def createsMultiInputStreams: Boolean = false
 
 }
