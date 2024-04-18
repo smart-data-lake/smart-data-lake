@@ -242,7 +242,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                |, identifier_columns => array('${table.primaryKey.get.mkString("','")}')
                |)""".stripMargin)
 
-          // read insert and update_after events
+          // read cdc events
           val temporaryViewName = table.name + "_changes"
 
           val windowSpec = Window.partitionBy(table.primaryKey.get.mkString(",")).orderBy(col("_change_ordinal").desc)
