@@ -234,7 +234,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
           else {
 
-          // activate cdc view
+          // activate temporary cdc view
           context.sparkSession.sql(
             s"""CALL ${getIcebergCatalog.name}.system.create_changelog_view(table => '${getIdentifier.toString}'
                |, options => map('start-snapshot-id', '${snapshotId}')
