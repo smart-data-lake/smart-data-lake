@@ -195,7 +195,7 @@ object Historization extends SmartDataLakeLogger {
     val dfExistingHashed = if (dfExisting.columns.contains(historizeHashColName)) {
       dfExisting
     } else {
-      addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true)
+      addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
     }
     // join existing with new and determine operations needed
     val dfOperations = dfExistingHashed.as("existing")
