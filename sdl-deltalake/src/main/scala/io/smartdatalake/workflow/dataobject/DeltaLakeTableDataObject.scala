@@ -202,7 +202,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    if(!propertyExists("delta.enableChangeDataFeed") && isTableExisting) HiveUtil.alterTableProperties(table, Map("delta.enableChangeDataFeed" -> "true"))
+    if(!propertyExists(EnableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(EnableCdcFeedProperty -> "true"))
   }
 
   private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
@@ -219,11 +219,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     properties.exists(_ == name -> value)
   }
 
+  @transient private val EnableCdcFeedProperty = "delta.enableChangeDataFeed"
+
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
     implicit val session: SparkSession = context.sparkSession
 
-    val cdcActivated = propertyExistsWithValue("delta.enableChangeDataFeed", "true")
+    val cdcActivated = propertyExistsWithValue(EnableCdcFeedProperty, "true")
 
     val df = if(cdcActivated && incrementalOutputExpr.isDefined) {
 
@@ -243,7 +245,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     } else
       context.sparkSession.table(table.fullName)
 
-    if(!propertyExists("delta.enableChangeDataFeed") && incrementalOutputExpr.isDefined) activateCdc()
+    if(!propertyExists(EnableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
 
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
