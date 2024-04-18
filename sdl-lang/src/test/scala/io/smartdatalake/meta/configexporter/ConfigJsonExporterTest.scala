@@ -19,7 +19,7 @@
 
 package io.smartdatalake.meta.configexporter
 
-import com.github.tomakehurst.wiremock.client.WireMock.{postRequestedFor, urlPathMatching, verify}
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, put, putRequestedFor, stubFor, urlPathMatching, verify}
 import io.smartdatalake.testutils.TestUtil
 import org.apache.hadoop.conf.Configuration
 import org.json4s.jackson.JsonMethods
@@ -59,20 +59,17 @@ class ConfigJsonExporterTest extends FunSuite {
   }
 
   test("test main api uplaod") {
-    val port = 18080 // for some reason, only the default port seems to work
-    val httpsPort = 18443
+    val port = 8080 // for some reason, only the default port seems to work
+    val httpsPort = 8443
     val host = "127.0.0.1"
-    val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
+    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    stubFor(put(urlPathMatching("/api/v1/.*"))
+      .willReturn(aResponse().withStatus(200))
+    )
     val target = s"http://localhost:$port/api/v1?repo=abc"
     ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-t", target, "-d", descriptionPath, "--uploadDescriptions"))
-    verify(postRequestedFor(urlPathMatching("/api/v1/config?.*")))
-    verify(postRequestedFor(urlPathMatching("/api/v1/description?.*")))
+    verify(putRequestedFor(urlPathMatching("/api/v1/config?.*")))
+    verify(putRequestedFor(urlPathMatching("/api/v1/description?.*")))
     wireMockServer.stop()
   }
-
-  val port = 8080 // for some reason, only the default port seems to work
-  val httpsPort = 8443
-  val host = "127.0.0.1"
-  val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
-
 }
