@@ -43,6 +43,8 @@ import org.apache.iceberg.spark.{Spark3Util, SparkSchemaUtil, SparkWriteOptions}
 import org.apache.iceberg.types.TypeUtil
 import org.apache.iceberg.{PartitionSpec, TableProperties}
 import org.apache.spark.sql.connector.catalog.{Identifier, SupportsNamespaces, TableCatalog}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, expr, rank}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -230,9 +232,27 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       case Some(snapshotId) =>
         require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
         val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
-                            else context.sparkSession.read.format("iceberg") // TODO: Implement the cdc view because incremental load only returns append operations
-                              .option("start-snapshot-id", snapshotId)
-                              .table(table.fullName)
+          else {
+
+          // activate cdc view
+          context.sparkSession.sql(
+            s"""CALL ${getIcebergCatalog.name}.system.create_changelog_view(table => '${getIdentifier.toString}'
+               |, options => map('start-snapshot-id', '${snapshotId}')
+               |, compute_updates => true
+               |, identifier_columns => array('${table.primaryKey.get.mkString("','")}')
+               |)""".stripMargin)
+
+          // read insert and update_after events
+          val temporaryViewName = table.name + "_changes"
+
+          val windowSpec = Window.partitionBy(table.primaryKey.get.mkString(",")).orderBy(col("_change_ordinal").desc)
+          context.sparkSession.read
+            .table(temporaryViewName)
+            .where(expr("_change_type IN ('INSERT','UPDATE_AFTER')"))
+            .withColumn("rank", rank().over(windowSpec))
+            .where("rank == 1")
+            .drop("rank", "_change_type", "_change_ordinal", "_commit_snapshot_id")
+        }
         incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
         icebergTable
       case _ => context.sparkSession.table(table.fullName)
