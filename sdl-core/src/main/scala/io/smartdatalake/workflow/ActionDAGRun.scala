@@ -66,6 +66,8 @@ private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainIn
 }
 
 private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SDLExecutionId, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], initialDataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], actionsSkipped: Map[ActionId, RuntimeInfo]) extends SmartDataLakeLogger {
+  private val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
+  private val appVersion = AppUtil.getManifestVersion
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-${executionId.runId}", parallelism)
 
@@ -235,8 +237,6 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    */
   def saveState(phase: ExecutionPhase, changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
-    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
-    val appVersion = AppUtil.getManifestVersion
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo, appVersion)
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))

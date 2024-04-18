@@ -110,33 +110,30 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
 
 case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartDataLakeLogger {
 
-  private val uploadWsClients = Seq("config", "schema", "stats", "description").map(
-    tpe => (tpe -> ScalaJWebserviceClient(URIUtil.appendPath(baseUrl, tpe), Map(), None, None, None, followRedirects = true))
-  ).toMap
-
   override def writeConfig(document: String, version: Option[String]): Unit = {
     upload(document.getBytes("UTF-8"), "config", Seq(version.map("version" -> _)).flatten.toMap)
   }
 
-  override def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
-    upload(document.getBytes("UTF-8"), "schema", Map("dataObjectId" -> dataObjectId.id, "version" -> version.toString))
+  override def writeSchema(document: String, dataObjectId: DataObjectId, tstamp: Long): Unit = {
+    upload(document.getBytes("UTF-8"), s"dataobject/schema/${dataObjectId.id}", Map("tstamp" -> tstamp.toString))
   }
 
-  override def writeStats(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
-    upload(document.getBytes("UTF-8"), "stats", Map("dataObjectId" -> dataObjectId.id, "version" -> version.toString))
+  override def writeStats(document: String, dataObjectId: DataObjectId, tstamp: Long): Unit = {
+    upload(document.getBytes("UTF-8"), s"dataobject/stats/${dataObjectId.id}", Map("tstamp" -> tstamp.toString))
   }
 
   override def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = {
     upload(content, "description",  Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
   }
 
-  private def upload(content: Array[Byte], tpe: String, additionalParams: Map[String,String] = Map()): Unit = {
+  private def upload(content: Array[Byte], subPath: String, additionalParams: Map[String,String] = Map()): Unit = {
     val defaultUploadCategoryParams = Map(
       "tenant" -> (if (!baseUrl.contains("tenant=")) Some(UploadDefaults.privateTenant) else None),
       "env" -> (if (!baseUrl.contains("env=")) Some(UploadDefaults.envDefault) else None),
-    ).filter(_._2.nonEmpty).mapValues(_.get)
+    ).filter(_._2.nonEmpty).mapValues(_.get).toMap
     assert(baseUrl.contains("repo="), throw new IllegalArgumentException(s"repository not defined in upload target=$baseUrl, add query parameter 'repo' to target, e.g. https://<host>?repo=<repository>"))
-    logger.info(s"Uploading $tpe "+additionalParams.map{case (k,v) => s"$k=$v"}.mkString(" "))
-    uploadWsClients(tpe).post(content, uploadMimeType, defaultUploadCategoryParams ++ additionalParams).get
+    logger.info(s"Uploading $subPath "+additionalParams.map{case (k,v) => s"$k=$v"}.mkString(" "))
+    val wsClient = ScalaJWebserviceClient(URIUtil.appendPath(baseUrl, subPath), Map(), None, None, None, followRedirects = true)
+    wsClient.put(content, uploadMimeType, defaultUploadCategoryParams ++ additionalParams).get
   }
 }

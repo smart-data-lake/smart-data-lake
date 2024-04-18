@@ -17,7 +17,7 @@ import scala.util.Failure
 /**
  * Upload final state to given baseUrl. This is mainly used to upload state to the backend of the UI.
  * Config options:
- * - baseUrl: API base URL for upload. Add tenant, repo (required), env and version as query parameters, e.g. https://<host>?tenant=<tenant>&repo=<repository>&env=<environment>"
+ * - baseUrl: API base URL for upload. Add tenant, repo (required) and env as query parameters, e.g. https://<host>?tenant=<tenant>&repo=<repository>&env=<environment>"
  *   Default for tenant is "PrivateTenant". For this case the API should use the userId of authenticated user as tenant.
  *   Default for environment is 'std'.
  * - uploadStageDir: optional (but recommended) hadoop directory to save state if upload fails temporarily.
@@ -33,7 +33,7 @@ class StateUploader(options: Map[String,StringOrSecret]) extends StateListener w
   private val defaultUploadCategoryParams = Map(
     "tenant" -> (if (!baseUrl.contains("tenant=")) Some(UploadDefaults.privateTenant) else None),
     "env" -> (if (!baseUrl.contains("env=")) Some(UploadDefaults.envDefault) else None)
-  ).filter(_._2.nonEmpty).mapValues(_.get)
+  ).filter(_._2.nonEmpty).mapValues(_.get).toMap
   private val uploadWsClient = ScalaJWebserviceClient(URIUtil.appendPath(baseUrl, "state"), additionalHeaders = Map(), timeouts = None, authMode = None, proxy = None, followRedirects = true)
   private[smartdatalake] var stageStateStore: Option[HadoopFileActionDAGRunStateStore] = None
   private val uploadedExecutionIds = mutable.Set[ExecutionId]()
@@ -54,7 +54,7 @@ class StateUploader(options: Map[String,StringOrSecret]) extends StateListener w
       try { // stop on first upload error
         stagedStates.foreach { file =>
           val body = HdfsUtil.readHadoopFile(file.path)
-          logger.debug(s"POST: params=$defaultUploadCategoryParams body=$body")
+          logger.debug(s"POST: ${defaultUploadCategoryParams.map{case (k,v) => s"$k=$v"}.mkString(" ")} body=${body.take(250)}")
           uploadWsClient.post(body.getBytes("UTF-8"), uploadMimeType, defaultUploadCategoryParams)
             .recoverWith{ case ex => Failure(new IllegalStateException(s"Failed on retrying to upload staged state file $file to $baseUrl: ${ex.getMessage}", ex))}
             .get
