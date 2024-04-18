@@ -311,10 +311,11 @@ import java.time.LocalDateTime
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
      action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
      action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
-     action2.exec(Seq(srcSubFeed))(context2)
+     action2.exec(Seq(srcSubFeed2))(context2)
 
      // expectation dl_hash should not have null values
-     assert(session.table(s"${tgtTable.fullName}").where($"dl_hash".isNull).count() == 0)
+     assert(tgtDO.getSparkDataFrame()(context2).where($"dl_hash".isNull).count() == 0)
+
 
    }
  }
