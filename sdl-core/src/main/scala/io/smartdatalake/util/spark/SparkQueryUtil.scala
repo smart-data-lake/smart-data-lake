@@ -24,6 +24,14 @@ import org.apache.spark.sql.SparkSession
 import io.smartdatalake.workflow.dataobject.Table
 
 object SparkQueryUtil extends SmartDataLakeLogger {
+  /**
+   * This method is used to execute SQL-statements configured at the DataObject-level.
+   * In order to avoid using another catalog that is not explicitly stated in the SQL-Statement,
+   * the catalogs and schemas of the given DataObject are set as default.
+   * @param session Spark Session
+   * @param stmt Desired SQL statement to be executed.
+   * @param table DataObject in which the SQLStatement is configured
+   */
   def executeSqlStatementBasedOnTable(session: SparkSession, stmt: String, table: Table): Unit = {
     try {
       val newStmt: String = (table.catalog, table.db) match {
