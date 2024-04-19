@@ -138,7 +138,7 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
   def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = None
 
   // lookup custom transform method
-  override private[smartdatalake] lazy val customTransformMethod = {
+  @transient override private[smartdatalake] lazy val customTransformMethod = {
     val transformMethods = CustomCodeUtil.getClassMethodsByName(getClass, "transform")
       .filter(_.owner != typeOf[CustomDfsTransformer].typeSymbol) // remove default transform-method implementation of CustomDfsTransformer
     require(transformMethods.size == 1, """
