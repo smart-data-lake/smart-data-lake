@@ -113,7 +113,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val preReadSql: Option[String] = None,
                                   override val postReadSql: Option[String] = None,
                                   override val preWriteSql: Option[String] = None,
-                                  override val postWriteSql: Option[String] = None),
+                                  override val postWriteSql: Option[String] = None)
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
 
