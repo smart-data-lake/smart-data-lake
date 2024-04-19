@@ -113,6 +113,9 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
 
   override def factory: FromConfigFactory[DataObject] = MockDataObject
 
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
+
+
 }
 
 object MockDataObject extends FromConfigFactory[DataObject] {

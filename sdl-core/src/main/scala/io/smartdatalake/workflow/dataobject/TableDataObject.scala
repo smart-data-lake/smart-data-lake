@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -76,31 +75,4 @@ trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaVali
    * @return column statistics about this DataObject
    */
   def getColumnStats(update: Boolean = false, lastModifiedAt: Option[Long] = None)(implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = Map()
-
-  val preReadSql: Option[String] = None
-  val postReadSql: Option[String] = None
-  val preWriteSql: Option[String] = None
-  val postWriteSql: Option[String] = None
-
-  override def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    super.preRead(partitionValues)
-    prepareAndExecSql(preReadSql, Some("preReadSql"), partitionValues)
-  }
-
-  override def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    super.postRead(partitionValues)
-    prepareAndExecSql(postReadSql, Some("postReadSql"), partitionValues)
-  }
-
-  override def preWrite(implicit context: ActionPipelineContext): Unit = {
-    super.preWrite
-    prepareAndExecSql(preWriteSql, Some("preWriteSql"), Seq()) // no partition values here...
-  }
-
-  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    super.postWrite(partitionValues)
-    prepareAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
-  }
-
-  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit
 }

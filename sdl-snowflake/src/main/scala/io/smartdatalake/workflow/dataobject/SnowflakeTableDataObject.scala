@@ -63,6 +63,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val schemaMin: Option[GenericSchema] = None,
                                     override val constraints: Seq[Constraint] = Seq(),
                                     override val expectations: Seq[Expectation] = Seq(),
+                                    override val preReadSql: Option[String] = None,
+                                    override val postReadSql: Option[String] = None,
+                                    override val preWriteSql: Option[String] = None,
+                                    override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
                                     sparkOptions: Map[String, String] = Map(),
@@ -220,6 +224,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         case ("number_of_rows_deleted", v) => "rows_deleted" -> v
         case (k, v) => k -> v
       }
+  }
+
+  override def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    if (sqlOpt.nonEmpty) connection.execSnowflakeStatement(sqlOpt.get).next()
   }
 }
 

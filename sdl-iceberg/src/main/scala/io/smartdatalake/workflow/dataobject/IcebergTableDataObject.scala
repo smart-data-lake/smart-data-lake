@@ -28,7 +28,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -109,7 +109,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   connectionId: Option[ConnectionId] = None,
                                   override val expectedPartitionsCondition: Option[String] = None,
                                   override val housekeepingMode: Option[HousekeepingMode] = None,
-                                  override val metadata: Option[DataObjectMetadata] = None)
+                                  override val metadata: Option[DataObjectMetadata] = None,
+                                  override val preReadSql: Option[String] = None,
+                                  override val postReadSql: Option[String] = None,
+                                  override val preWriteSql: Option[String] = None,
+                                  override val postWriteSql: Option[String] = None),
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
 
@@ -559,6 +563,10 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = IcebergTableDataObject
 
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    sqlOpt.foreach(stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
 }
 
 object IcebergTableDataObject extends FromConfigFactory[DataObject] {
