@@ -29,7 +29,7 @@ import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, EnvironmentUtil}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
