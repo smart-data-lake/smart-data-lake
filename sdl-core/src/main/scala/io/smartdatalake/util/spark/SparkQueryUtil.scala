@@ -36,12 +36,12 @@ object SparkQueryUtil extends SmartDataLakeLogger {
     try {
       val newStmt: String = (table.catalog, table.db) match {
         case (None, None) => stmt;
-        case (Some(cat), None) => f"USE CATALOG $cat; $stmt";
+        case (Some(cat), None) => f"USE CATALOG $cat;$stmt";
         case (None, Some(db)) => f"USE SCHEMA $db;$stmt";
         case (Some(cat), Some(db)) => f"USE CATALOG $cat;USE SCHEMA $db;$stmt";
       }
       logger.info(s"Executing SQL statement: $newStmt")
-      session.sql(newStmt)
+      newStmt.split(";").foreach(session.sql(_))
     } catch {
       case e: Exception =>
         logger.warn(s"Error in SQL statement '$stmt':\n${e.getMessage}")
