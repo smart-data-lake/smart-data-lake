@@ -23,11 +23,19 @@ import io.smartdatalake.definitions.Environment
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.types._
 
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * implements columns wise encryption/decryptions
+ *  encrypted columns have data type String.
+ *  The original data type is stored in DataFrame metadata and stored if supported.
+ *  During the decryption the original data type is restored, metadata is maintained.
+ */
 trait EncryptDecrypt extends Serializable {
+  private val metadata_key = "decryptedType"
   protected def keyAsBytes: Array[Byte]
 
   protected def encryptUDF: UserDefinedFunction = udf(encrypt _)
@@ -40,13 +48,24 @@ trait EncryptDecrypt extends Serializable {
 
   def encryptColumns(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
     encryptColumns.foldLeft(df) {
-      case (dfTemp, colName) => dfTemp.withColumn(colName, encryptUDF(col(colName)))
+      case (dfTemp, colName) => {
+        val metadata = new MetadataBuilder().putString(metadata_key, dfTemp.schema(colName).dataType.toString()).build()
+        dfTemp.withColumn(colName, encryptUDF(col(colName)).as(colName,metadata))
+      }
     }
   }
 
   def decryptColumns(df: DataFrame, encryptColumns: Seq[String]): DataFrame = {
     encryptColumns.foldLeft(df) {
-      case (dfTemp, colName) => dfTemp.withColumn(colName, decryptUDF(col(colName)))
+      case (dfTemp, colName) => {
+        if (dfTemp.schema(colName).metadata.contains(metadata_key)) {
+          val col_type = dfTemp.schema(colName).metadata.getString(metadata_key).replace("Type", "")
+          val data_type = DataType.fromDDL(col_type)
+          dfTemp.withColumn(colName, decryptUDF(col(colName)).cast(data_type))
+        } else {
+          dfTemp.withColumn(colName, decryptUDF(col(colName)))
+        }
+      }
     }
   }
 
