@@ -308,6 +308,63 @@ import java.time.LocalDateTime
        mergeModeEnable = true
      )
 
+     val l2 = Seq((1, "doe", "john", 4)).toDF("id", "lastname", "firstname", "rating")
+     srcDO.writeSparkDataFrame(l2)(context2)
+     val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
+     action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
+     action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
+     action2.exec(Seq(srcSubFeed2))(context2)
+
+     // expectation dl_hash should not have null values
+     assert(tgtDO.getSparkDataFrame()(context2).where($"dl_hash".isNull).count() == 0)
+
+
+   }
+
+   test("update hash on existing non updated rows") {
+
+     // setup DataObjects
+     val srcTable = Table(Some("default"), "historize_input")
+     val srcPath = tempPath + s"/${srcTable.fullName}"
+     val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+     instanceRegistry.register(srcDO)
+     val tgtTable = Table(Some("default"), "historize_output", primaryKey = Some(Seq("id")))
+     val tgtPath = tempPath + s"/${tgtTable.fullName}"
+     val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tgtPath), table = tgtTable, allowSchemaEvolution = true)
+     val context = TestUtil.getDefaultActionPipelineContext
+     tgtDO.dropTable(context)
+     instanceRegistry.register(tgtDO)
+
+     // prepare & start 1st load with merge mode
+     val refTimestamp1 = LocalDateTime.now()
+     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+     val action1 = HistorizeAction("ha",
+       inputId = srcDO.id,
+       outputId = tgtDO.id)
+
+     val l1 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
+     srcDO.writeSparkDataFrame(l1)(context1)
+     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+     action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
+     action1.exec(Seq(srcSubFeed))(context1)
+
+
+     // expectation dl_hash should not have null values
+     //assert(tgtDO.getSparkDataFrame()(context1).where($"dl_hash".isNull).count() == 0)
+
+
+     // prepare & start 2st load
+     val refTimestamp2 = LocalDateTime.now()
+     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+     val action2 = HistorizeAction("ha",
+       inputId = srcDO.id,
+       outputId = tgtDO.id,
+       mergeModeEnable = true
+     )
+
+     val l2 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
+     srcDO.writeSparkDataFrame(l2)(context2)
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
      action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
      action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
