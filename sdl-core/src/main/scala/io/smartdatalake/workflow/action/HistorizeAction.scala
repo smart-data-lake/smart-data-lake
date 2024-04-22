@@ -156,7 +156,7 @@ case class HistorizeAction(
     } else if (mergeModeEnable) {
       // customize update condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = if (input.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(TechnicalTableColumn.delimited) // This
+      val updateCols = if (input.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(TechnicalTableColumn.delimited)
         else Seq(TechnicalTableColumn.delimited, Historization.historizeHashColName)
 
       val insertCondition =  Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
