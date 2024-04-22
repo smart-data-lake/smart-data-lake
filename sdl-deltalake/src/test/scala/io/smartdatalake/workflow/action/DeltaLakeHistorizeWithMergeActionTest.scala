@@ -297,7 +297,7 @@ import java.time.LocalDateTime
      action1.exec(Seq(srcSubFeed))(context1)
 
      // 1. expectation schema should not have dl_hash column
-     assert(!session.table(s"${tgtTable.fullName}").columns.contains("dl_hash"))
+     assert(!tgtDO.getSparkDataFrame()(context1).columns.contains("dl_hash"))
 
      // prepare & start 2st load
      val refTimestamp2 = LocalDateTime.now()
