@@ -349,11 +349,6 @@ import java.time.LocalDateTime
      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
      action1.exec(Seq(srcSubFeed))(context1)
 
-
-     // expectation dl_hash should not have null values
-     //assert(tgtDO.getSparkDataFrame()(context1).where($"dl_hash".isNull).count() == 0)
-
-
      // prepare & start 2st load
      val refTimestamp2 = LocalDateTime.now()
      val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
