@@ -365,6 +365,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       } else {
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
       }
+
+      mergeStmt = if(saveModeOptions.updateExistingCondition.isDefined) mergeStmt.whenMatched(saveModeOptions.updateExistingConditionExpr.getOrElse(lit(true))).updateAll()
+        else mergeStmt
+
       // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
       mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
         // create merge statement
