@@ -27,6 +27,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
+import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
@@ -366,7 +367,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
       }
 
-      mergeStmt = if(saveModeOptions.updateExistingCondition.isDefined) mergeStmt.whenMatched(saveModeOptions.updateExistingConditionExpr.getOrElse(lit(true))).updateAll()
+      mergeStmt = if(saveModeOptions.updateExistingCondition.isDefined) {
+        val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName))
+        mergeStmt.whenMatched(saveModeOptions.updateExistingConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
+      }
         else mergeStmt
 
       // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
