@@ -200,7 +200,7 @@ object Historization extends SmartDataLakeLogger {
     // join existing with new and determine operations needed
     val dfOperations = dfExistingHashed.as("existing")
       .where(existingDelimitedCol === doomsday) // only current records needed
-      .select((primaryKey :+ TechnicalTableColumn.captured :+ historizeHashColName).map(col):_*)
+      .select((primaryKey :+ TechnicalTableColumn.captured :+ TechnicalTableColumn.delimited :+ historizeHashColName).map(col):_*)
       .join(dfNewHashed.as("new"), primaryKey, "full")
       .withColumn("_operations",
          // 1. primary key matched and attributes have changed -> update record to close existing version, insert record to create new version
@@ -212,6 +212,9 @@ object Historization extends SmartDataLakeLogger {
          // 3. record only in existing data -> update record to close existing version
         .when(existingHashCol.isNotNull and newHashCol.isNull,
            array(lit(HistorizationRecordOperations.updateClose)))
+        // 4. primary key matched, no attribute changes, but <historizeHashColName> column has been added -> update existing record
+        .when((existingHashCol.isNotNull and newHashCol.isNotNull and hashColEqualsExpr) && !dfExisting.columns.contains(historizeHashColName),
+          array(lit(HistorizationRecordOperations.updateExisting)))
       )
     // add versioning data
     val dfOperationVersioned = dfOperations
@@ -221,13 +224,14 @@ object Historization extends SmartDataLakeLogger {
       .withColumn(TechnicalTableColumn.captured,
          when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, timestampNew)
         .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, existingCapturedCol) // is needed vor merge join condition
+        .when(col(historizeOperationColName) === HistorizationRecordOperations.updateExisting, existingCapturedCol)
       )
       .withColumn(TechnicalTableColumn.delimited,
          when(col(historizeOperationColName) === HistorizationRecordOperations.insertNew, doomsday)
         .when(col(historizeOperationColName) === HistorizationRecordOperations.updateClose, timestampOld)
+        .when(col(historizeOperationColName) === HistorizationRecordOperations.updateExisting, existingDelimitedCol)
       )
-      .drop(existingCapturedCol)
-    // TODO: activate update of dl_hash if dl_hash in target is null
+      .drop(existingCapturedCol, existingDelimitedCol)
     // return
     dfOperationVersioned
   }
@@ -372,6 +376,7 @@ object Historization extends SmartDataLakeLogger {
 }
 
 object HistorizationRecordOperations {
+  val updateExisting = "updateExisting"
   val updateClose = "updateClose"
   val insertNew = "insertNew"
 }
