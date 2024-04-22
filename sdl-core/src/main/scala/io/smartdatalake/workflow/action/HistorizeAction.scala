@@ -158,11 +158,11 @@ case class HistorizeAction(
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
       val updateCols = if (input.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(TechnicalTableColumn.delimited)
         else Seq(TechnicalTableColumn.delimited, Historization.historizeHashColName)
-
+      val updateExistingCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateExisting}'")
       val insertCondition =  Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
       val insertColsToIgnore = Seq(Historization.historizeOperationColName)
       val additionalMergePredicate = Some((s"new.${TechnicalTableColumn.captured} = existing.${TechnicalTableColumn.captured}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
+      Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, updateExistingCondition = updateExistingCondition, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
     } else {
       // force SDLSaveMode.Overwrite otherwise
       Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
