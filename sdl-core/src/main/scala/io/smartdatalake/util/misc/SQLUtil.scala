@@ -21,6 +21,7 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject.Table
 
@@ -51,6 +52,8 @@ object SQLUtil {
     val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
     val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
     val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(columns.diff(targetTable.primaryKey.get)).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
+    val updateExistingConditionStr = saveModeOptions.updateExistingCondition.map(c => s" AND $c").getOrElse("")
+    val updateExistingSpecStr = columns.diff(Seq(Historization.historizeOperationColName)).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
     val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
     val insertCols = columns.diff(saveModeOptions.insertColumnsToIgnore)
     val insertSpecStr = insertCols.map(quoteCaseSensitiveColumn).reduce(_+", "+_)
@@ -60,6 +63,7 @@ object SQLUtil {
     | USING (SELECT * from $tmpTableName) as new
     | ON $joinConditionStr $additionalMergePredicateStr $deleteClauseStr
     | WHEN MATCHED $updateConditionStr THEN UPDATE SET $updateSpecStr
+    | ${if (saveModeOptions.updateExistingCondition.isDefined) s"WHEN MATCHED $updateExistingConditionStr THEN UPDATE SET $updateExistingSpecStr" else ""}
     | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
     """.stripMargin
   }
