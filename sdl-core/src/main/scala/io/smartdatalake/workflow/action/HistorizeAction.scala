@@ -269,10 +269,15 @@ case class HistorizeAction(
     if (existingDf.isDefined) {
       if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
+      // if context is init check if column needs to be added -> save in needsHashColumn
+      if (!context.isExecPhase) existingDfNeedsHashColumn = Some(existingDf.get.columns.contains(Historization.historizeHashColName))
+      val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("not correctly initialised"))
       // note that schema evolution is done by output DataObject
-      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist)
+      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
     } else Historization.getInitialHistoryWithHashCol(newFeedDf, refTimestamp, historizeWhitelist, historizeBlacklist)
   }
+
+  private var existingDfNeedsHashColumn: Option[Boolean] = None
 
   // TODO: make generic
   protected def incrementalCDCHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], mergeModeDeletedRecordsConditionExpr: Column, refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
@@ -289,6 +294,11 @@ case class HistorizeAction(
 
   private def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime = {
     context.referenceTimestamp.getOrElse(LocalDateTime.now)
+  }
+
+  override private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
+    super.reset
+    existingDfNeedsHashColumn = None
   }
 
   override def factory: FromConfigFactory[Action] = HistorizeAction

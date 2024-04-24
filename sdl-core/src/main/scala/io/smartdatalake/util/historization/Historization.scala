@@ -177,7 +177,8 @@ object Historization extends SmartDataLakeLogger {
                            primaryKey: Seq[String],
                            referenceTimestamp: LocalDateTime,
                            historizeWhitelist: Option[Seq[String]],
-                           historizeBlacklist: Option[Seq[String]])
+                           historizeBlacklist: Option[Seq[String]],
+                           addExistingDfHashColumn: Boolean)
                           (implicit session: SparkSession): DataFrame = {
     import session.implicits._
     // Current timestamp (used for insert and update operations, for "new" value)
@@ -192,7 +193,7 @@ object Historization extends SmartDataLakeLogger {
     val hashColEqualsExpr = existingHashCol === newHashCol
     // add hash column
     val dfNewHashed = addHashCol(dfNew, historizeWhitelist, historizeBlacklist, useHash = true)
-    val dfExistingHashed = if (dfExisting.columns.contains(historizeHashColName)) {
+    val dfExistingHashed = if (addExistingDfHashColumn) {
       dfExisting
     } else {
       addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
