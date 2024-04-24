@@ -31,7 +31,7 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * implements columns wise encryption/decryptions
  *  encrypted columns have data type String.
- *  The original data type is stored in DataFrame metadata and stored if supported.
+ *  The original data type is stored in DataFrame metadata and saved to output format if supported (Parquet, Hive, Delta, Iceberg).
  *  During the decryption the original data type is restored, metadata is maintained.
  */
 trait EncryptDecrypt extends Serializable {
