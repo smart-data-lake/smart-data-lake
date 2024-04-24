@@ -211,7 +211,7 @@ object AppUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * read version from package manifest (not defined if project is executed in IntellJ)
+   * read version from package manifest (not defined if project is executed in IntelliJ)
    */
   def getManifestVersion: Option[String] = {
     Option(getClass.getPackage.getImplementationVersion)

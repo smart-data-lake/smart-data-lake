@@ -1,27 +1,27 @@
 package io.smartdatalake.meta.configexporter
 
-import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue, ConfigValueFactory, ConfigValueType}
+import com.typesafe.config._
 import configs.ConfigObject
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException, InstanceRegistry}
+import io.smartdatalake.app.AppUtil
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
-import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger, UploadDefaults}
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomTransformMethodDef}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomTransformMethodDef
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
 
-import java.nio.file.{Files, Paths, StandardOpenOption}
 import scala.jdk.CollectionConverters._
+import scala.util.Using
 
-case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, filename: String = "exportedConfig.json", enrichOrigin: Boolean = true, descriptionPath: Option[String] = None)
+case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, target: String = "file:./exportedConfig.json", enrichOrigin: Boolean = true, descriptionPath: Option[String] = None, uploadDescriptions: Boolean = false)
 
 object ConfigJsonExporter extends SmartDataLakeLogger {
 
@@ -34,18 +34,21 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .action((value, c) => c.copy(configPaths = value.split(',')))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('f', "filename")
-      .optional()
-      .action((value, c) => c.copy(filename = value))
-      .text("File to export configuration to. Default: exportedConfig.json")
+      .action((value, c) => c.copy(target = "file:"+value))
+      .text("Deprecated: Use target instead. File to export configuration to.")
+    opt[String]('t', "target")
+      .action((value, c) => c.copy(target = value))
+      .text("Target URI to export configuration to. Can be file:./xyz.json but also API baseUrl like https://ui-demo.test.com/api/v1. Default: file:./exportedConfig.json")
     opt[Boolean]("enrichOrigin")
-      .optional()
       .action((value, c) => c.copy(enrichOrigin = value))
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
     opt[String]('d', "descriptionPath")
-      .optional()
       .action((value, c) => c.copy(descriptionPath = Some(value)))
-      .text("Path to markdown files that contain column descriptions of DataObjects. If set, these descriptions are exported to the visualizer.")
-    help("help").text("Display the help text.")
+      .text("Path to markdown files that contain column descriptions of DataObjects. If set, the exported config is enriched with the column descriptions.")
+    opt[Unit]("uploadDescriptions")
+      .action((_, c) => c.copy(uploadDescriptions = true))
+      .text("Upload description markdown files to visualizer backend.")
+    help("help").text("Export resolved configuration as Json document which can be used by the visualizer.")
   }
 
   /**
@@ -53,35 +56,61 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    * Additionally a separate file with the mapping of first class config objects to source code origin is created.
    */
   def main(args: Array[String]): Unit = {
-    val exporterConfig = ConfigJsonExporterConfig()
     // Parse all command line arguments
-    parser.parse(args, exporterConfig) match {
-      case Some(exporterConfig) =>
+    parser.parse(args, ConfigJsonExporterConfig()) match {
+      case Some(config) =>
 
         // create json
-        val configAsJson = exportConfigJson(exporterConfig)
+        implicit val hadoopConf: Configuration = new Configuration()
+        val configAsJson = exportConfigJson(config)
 
-        // write file
-        logger.info(s"Writing config json to file ${exporterConfig.filename}")
-        val path = Paths.get(exporterConfig.filename)
-        if (path.getParent != null) Files.createDirectories(path.getParent)
-        Files.write(path, configAsJson.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        // create document writer depending on target uri scheme
+        val writer = ExportWriter.apply(config.target)
+
+        // write export config
+        val version = if (!config.target.contains("version=")) AppUtil.getManifestVersion.orElse(Some(UploadDefaults.versionDefault)) else None
+        writer.writeConfig(configAsJson, version)
+
+        // write descriptions
+        if (config.uploadDescriptions) {
+          require(config.descriptionPath.nonEmpty, "descriptionPath must be set if uploadDescriptions=true")
+          implicit val filesystem: FileSystem = Environment.fileSystemFactory.getFileSystem(new Path(config.descriptionPath.get), hadoopConf)
+          val configSections: Seq[(String,String => ConfigObjectId)] = Seq(
+            (ConfigParser.CONFIG_SECTION_DATAOBJECTS, DataObjectId),
+            (ConfigParser.CONFIG_SECTION_ACTIONS, ActionId),
+            (ConfigParser.CONFIG_SECTION_CONNECTIONS, ConnectionId)
+          )
+          configSections.foreach{
+            case (section, idFactory)  =>
+              val path = new Path(config.descriptionPath.get, section)
+              if (filesystem.exists(path)) {
+                logger.info(s"Searching $section files in $path")
+                RemoteIteratorWrapper(filesystem.listStatusIterator(path))
+                  .filterNot(_.isDirectory)
+                  .foreach { p =>
+                    val content = Using.resource(filesystem.open(p.getPath)) {
+                      is =>is.readAllBytes
+                    }
+                    writer.writeFile(content, p.getPath.getName, version)
+                  }
+              }
+          }
+        }
 
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 
-  def exportConfigJson(exporterConfig: ConfigJsonExporterConfig): String = {
-    implicit val defaultHadoopConf: Configuration = new Configuration()
-    var sdlConfig = ConfigLoader.loadConfigFromFilesystem(exporterConfig.configPaths, defaultHadoopConf)
+  def exportConfigJson(config: ConfigJsonExporterConfig)(implicit hadoopConf: Configuration): String = {
+    var sdlConfig = ConfigLoader.loadConfigFromFilesystem(config.configPaths, hadoopConf)
     // remove additional config paths introduced by system properties...
     val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
     sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config,key) => config.withoutPath(key))
     // enrich origin of first class config objects
-    if (exporterConfig.enrichOrigin) sdlConfig = enrichOrigin(exporterConfig.configPaths, sdlConfig)
+    if (config.enrichOrigin) sdlConfig = enrichOrigin(config.configPaths, sdlConfig)
     // enrich optional column description from description files
-    exporterConfig.descriptionPath.foreach(path => sdlConfig = enrichColumnDescription(path, sdlConfig))
+    config.descriptionPath.foreach(path => sdlConfig = enrichColumnDescription(path, sdlConfig))
     // enrich optional source documentation for custom classes from scaladoc
     sdlConfig = enrichCustomClassScalaDoc(sdlConfig)
     // enrich optional custom transformer parameter info
