@@ -1613,6 +1613,22 @@
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
           },
+          "preReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
+          "postReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
+          "preWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
+          "postWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
           "saveMode" : {
             "type" : "string",
             "description" : "[[SDLSaveMode]] to use when writing files, default is \"overwrite\". Overwrite, Append and Merge are supported for now.",
@@ -2530,6 +2546,22 @@
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
+          },
+          "preReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
+          "postReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
+          "preWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
+          },
+          "postWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not\nexplicitly defined, the ones present in the configured \"table\" object are used."
           }
         },
         "title" : "IcebergTableDataObject",
@@ -3877,6 +3909,22 @@
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
           },
+          "preReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before reading input table. It uses the SnowflakeConnection for the target database."
+          },
+          "postReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after reading input table and before action is finished. It uses the SnowflakeConnection for the target database."
+          },
+          "preWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before writing output table. It uses the SnowflakeConnection for the target database."
+          },
+          "postWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after writing output table. It uses the SnowflakeConnection for the target database."
+          },
           "saveMode" : {
             "type" : "string",
             "description" : "spark[[SDLSaveMode]] to use when writing files, default is \"overwrite\"",
@@ -4211,6 +4259,18 @@
               } ]
             },
             "description" : "Map of expectation name and definition to evaluate on write, see [[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
+          },
+          "preReadSql" : {
+            "type" : "string"
+          },
+          "postReadSql" : {
+            "type" : "string"
+          },
+          "preWriteSql" : {
+            "type" : "string"
+          },
+          "postWriteSql" : {
+            "type" : "string"
           },
           "numInitialHdfsPartitions" : {
             "type" : "integer"
