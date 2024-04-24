@@ -74,7 +74,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
-        |       key = ${test_key}
+        |       key = "${test_key}"
         |       algorithm = ${enc_type}
         |     }]
         |   }
@@ -88,7 +88,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
-        |       key = ${test_key}
+        |       key = "${test_key}"
         |       algorithm = ${enc_type}
         |     }]
         |   }
@@ -154,7 +154,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     dfEnc
   }
 
-  test("test column encryption and decryption") {
+  test("test GCM column encryption and decryption") {
     run_test("GCM")
   }
 
