@@ -40,11 +40,13 @@ class EncryptDecryptECB(keyBytes: Array[Byte]) extends EncryptDecrypt {
   }
 
   override def encrypt(message: String): String = {
+    if (message == null) return message
     val data = cipherEncrypt.doFinal(message.getBytes())
     Base64.getEncoder.encodeToString(data)
   }
 
   override def decrypt(encryptedDataString: String): String = {
+    if (encryptedDataString == null) return encryptedDataString
     val data = Base64.getDecoder.decode(encryptedDataString)
     val message = cipherDecrypt.doFinal(data)
     new String(message)

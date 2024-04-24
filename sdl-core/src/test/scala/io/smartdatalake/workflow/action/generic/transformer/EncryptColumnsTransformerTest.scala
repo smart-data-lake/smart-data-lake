@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.testutils.TestUtil
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.scalatest.FunSuite
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
@@ -30,20 +30,33 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
-import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
+import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql
+import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.types._
 
 import java.nio.file.Files
 import java.time.LocalDateTime
 
+case class Test_Record(
+                        id: Integer,
+                        str: String,
+                        fl: Float,
+                        db: Double,
+                        lo: Long
+                      )
+
 class EncryptColumnsTransformerTest extends FunSuite {
+  implicit val session: SparkSession = TestUtil.session
+  import session.implicits._
   private val tempDir = Files.createTempDirectory("test")
 
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
+  val test_key = "A%D*G-KaPdSgVkYp"
 
   def run_test(enc_type: String): sql.DataFrame = {
     val sdlb = new DefaultSmartDataLakeBuilder()
@@ -61,7 +74,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
-        |       key = "A%D*G-KaPdSgVkYp"
+        |       key = "${test_key}"
         |       algorithm = ${enc_type}
         |     }]
         |   }
@@ -75,7 +88,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
         |     transformers = [{
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
-        |       key = "A%D*G-KaPdSgVkYp"
+        |       key = "${test_key}"
         |       algorithm = ${enc_type}
         |     }]
         |   }
@@ -99,8 +112,6 @@ class EncryptColumnsTransformerTest extends FunSuite {
 
     val globalConfig = GlobalConfig.from(config)
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val session: SparkSession = TestUtil.session
-    import session.implicits._
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = s"ids:actenc,ids:actdec")
@@ -143,7 +154,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     dfEnc
   }
 
-  test("test column encryption and decryption") {
+  test("test GCM column encryption and decryption") {
     run_test("GCM")
   }
 
@@ -161,5 +172,45 @@ class EncryptColumnsTransformerTest extends FunSuite {
   test("test column encryption and decryption with Class Name") {
     val df = run_test("io.smartdatalake.util.crypt.EncryptDecryptECB")
     assert(df.select("c2").take(2)(1).getAs[String]("c2") === "0RK5Cr5ax1OXlBO7Q+BHxA==")
+  }
+
+  test("colEncrypt null value test") {
+    val df = Seq(
+      (1, "a"), (2, null)
+    ).toDF("id", "str")
+    val cols = Seq("id","str")
+    val crypt: EncryptDecrypt = new EncryptDecryptECB(test_key.getBytes())
+    val df_enc = crypt.encryptColumns(df, cols)
+    // null values should result in null values during column encryption
+    assert(df_enc.select("str").take(2)(1).isNullAt(0))
+  }
+
+  test("colEncrypt data type test") {
+    val df = Seq(
+      (1,"a"), (2, "b"), (3, null)
+    ).toDF("id", "str")
+      .withColumn("fl", lit(3.41f))
+      .withColumn("db", lit(3.41d))
+      .withColumn("lo", lit(3456L))
+
+    val cols = Seq("id","str", "fl", "db", "lo")
+    val crypt: EncryptDecrypt = new EncryptDecryptECB(test_key.getBytes())
+    val df_enc = crypt.encryptColumns(df, cols)
+    val file = "./test_enc.parquet"
+
+    // write/read to CSV file -> would result in String columns, since CSV does not store Metadata
+    //df_enc.write.mode(SaveMode.Overwrite).format("csv").option("header", true).save(file)
+    //val df_enc_file = session.read.format("csv").option("header", true).load(file)
+
+    // write/read to parquet file
+    df_enc.write.mode(SaveMode.Overwrite).parquet(file)
+    val df_enc_file = session.read.parquet(file)
+
+    val df_dec = crypt.decryptColumns(df_enc_file, cols)
+    assert(df_dec.schema("id").dataType == IntegerType)
+    assert(df_dec.schema("str").dataType == StringType)
+    assert(df_dec.schema("fl").dataType == FloatType)
+    assert(df_dec.schema("db").dataType == DoubleType)
+    assert(df_dec.schema("lo").dataType == LongType)
   }
 }
