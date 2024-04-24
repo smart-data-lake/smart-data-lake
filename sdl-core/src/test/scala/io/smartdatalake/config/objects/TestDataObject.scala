@@ -27,6 +27,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataobject._
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -65,6 +66,7 @@ case class TestDataObject( id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = TestDataObject
 
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {

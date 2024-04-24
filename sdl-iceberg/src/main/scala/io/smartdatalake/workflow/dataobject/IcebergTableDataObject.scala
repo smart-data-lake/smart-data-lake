@@ -28,7 +28,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -92,6 +92,14 @@ import scala.util.Try
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata meta data
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
  */
 case class IcebergTableDataObject(override val id: DataObjectId,
                                   path: Option[String],
@@ -108,7 +116,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   connectionId: Option[ConnectionId] = None,
                                   override val expectedPartitionsCondition: Option[String] = None,
                                   override val housekeepingMode: Option[HousekeepingMode] = None,
-                                  override val metadata: Option[DataObjectMetadata] = None)
+                                  override val metadata: Option[DataObjectMetadata] = None,
+                                  override val preReadSql: Option[String] = None,
+                                  override val postReadSql: Option[String] = None,
+                                  override val preWriteSql: Option[String] = None,
+                                  override val postWriteSql: Option[String] = None)
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
 
@@ -558,6 +570,10 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = IcebergTableDataObject
 
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    sqlOpt.foreach(stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
 }
 
 object IcebergTableDataObject extends FromConfigFactory[DataObject] {

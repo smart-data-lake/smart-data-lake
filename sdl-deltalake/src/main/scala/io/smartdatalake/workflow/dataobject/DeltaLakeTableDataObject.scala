@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -72,6 +72,14 @@ import scala.util.Try
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table DeltaLake table to be written by this output
  * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
@@ -93,6 +101,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
                                     override val constraints: Seq[Constraint] = Seq(),
                                     override val expectations: Seq[Expectation] = Seq(),
+                                    override val preReadSql: Option[String] = None,
+                                    override val postReadSql: Option[String] = None,
+                                    override val preWriteSql: Option[String] = None,
+                                    override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
@@ -518,6 +530,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
+
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
