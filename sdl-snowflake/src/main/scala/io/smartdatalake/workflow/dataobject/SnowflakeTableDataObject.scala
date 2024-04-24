@@ -50,6 +50,10 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param table        Snowflake table to be written by this output
  * @param constraints  List of row-level [[Constraint]]s to enforce when writing to this data object.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table. It uses the SnowflakeConnection for the target database.
+ * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. It uses the SnowflakeConnection for the target database.
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. It uses the SnowflakeConnection for the target database.
+ * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. It uses the SnowflakeConnection for the target database.
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param comment      An optional comment to add to the table after writing a DataFrame to it

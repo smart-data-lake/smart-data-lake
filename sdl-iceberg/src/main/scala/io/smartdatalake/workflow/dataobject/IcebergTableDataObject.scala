@@ -93,6 +93,14 @@ import scala.util.Try
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata meta data
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
  */
 case class IcebergTableDataObject(override val id: DataObjectId,
                                   path: Option[String],
