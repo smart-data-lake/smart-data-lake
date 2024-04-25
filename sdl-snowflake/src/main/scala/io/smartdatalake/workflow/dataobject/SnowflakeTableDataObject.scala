@@ -263,7 +263,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   override def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    if (sqlOpt.nonEmpty) connection.execSnowflakeStatement(sqlOpt.get).next()
+    if (sqlOpt.nonEmpty) connection.execJdbcStatement(sqlOpt.get)
   }
 
   /**
