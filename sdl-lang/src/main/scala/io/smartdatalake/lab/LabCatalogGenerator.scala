@@ -50,50 +50,53 @@ case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirecto
  * because it needs to parse the configuration, incl. potential transformers defined.
  * In Maven this can be done by defining the following additional plugins and adding `sdl-lang` as additional project dependency:
  * ```
- *                         <!-- generate catalog scala code. -->
- *                        <plugin>
- *                                <groupId>org.codehaus.mojo</groupId>
- *                                <artifactId>exec-maven-plugin</artifactId>
- *                                <version>3.1.0</version>
- *                                <executions>
- *                                       <execution>
- *                                                <id>generate-catalog</id>
- *                                                <phase>prepare-package</phase>
- *                                                <goals><goal>java</goal></goals>
- *                                                <configuration>
- *                                                        <mainClass>io.smartdatalake.lab.LabCatalogGenerator</mainClass>
- *                                                        <arguments>
- *                                                                <argument>--config</argument><argument>./config,./envConfig/ci.conf</argument>
- *                                                                <argument>--srcDirectory</argument><argument>./src/main/scala-generated</argument>
- *                                                                <argument>--packageName</argument><argument>io.smartdatalake.generated</argument>
- *                                                                <argument>--dataObjectCatalogClassName</argument><argument>DataObjectCatalog</argument>
- *                                                                <argument>--actionCatalogClassName</argument><argument>DataObjectCatalog</argument>
- *                                                        </arguments>
- *                                                        <classpathScope>compile</classpathScope>
- *                                                </configuration>
- *                                        </execution>
- *                                </executions>
- *                        </plugin>
- *
- *                      <!-- Compiles Scala sources. -->
- *                        <plugin>
- *                                <groupId>net.alchim31.maven</groupId>
- *                                <artifactId>scala-maven-plugin</artifactId>
- *                                <executions>
- *                                        <!-- add additional execution to compile generated catalog (see id generate-catalog) -->
- *                                        <execution>
- *                                                <id>compile-catalog</id>
- *                                                <phase>prepare-package</phase>
- *                                                <goals><goal>compile</goal></goals>
- *                                                <configuration>
- *                                                        <sourceDir>./src/main/scala-generated</sourceDir>
- *                                                                <!--additionalClasspathElements>
- *                                                                <additionalClasspathElement>target/classes</additionalClasspathElement>
- *                                                        </additionalClasspathElements-->
- *                                                </configuration>
- *                                        </execution>
- *                                </executions>
- *                        </plugin>
+ *      <profile>
+ *          <id>generate-catalog</id>
+ *          <build>
+ *              <plugins>
+ *                  <!-- generate catalog scala code. -->
+ *                  <plugin>
+ *                      <groupId>org.codehaus.mojo</groupId>
+ *                      <artifactId>exec-maven-plugin</artifactId>
+ *                      <version>3.1.0</version>
+ *                      <executions>
+ *                          <execution>
+ *                              <id>generate-catalog</id>
+ *                              <phase>prepare-package</phase>
+ *                              <goals><goal>java</goal></goals>
+ *                              <configuration>
+ *                                  <mainClass>io.smartdatalake.lab.LabCatalogGenerator</mainClass>
+ *                                  <arguments>
+ *                                      <argument>--config</argument><argument>./config,./envConfig/dev.conf</argument>
+ *                                      <argument>--srcDirectory</argument><argument>./src/main/scala-generated</argument>
+ *                                      <argument>--packageName</argument><argument>io.smartdatalake.generated</argument>
+ *                                  </arguments>
+ *                                  <classpathScope>compile</classpathScope>
+ *                              </configuration>
+ *                          </execution>
+ *                      </executions>
+ *                  </plugin>
+ *                  <!-- Compiles generated Scala sources. -->
+ *                  <plugin>
+ *                      <groupId>net.alchim31.maven</groupId>
+ *                      <artifactId>scala-maven-plugin</artifactId>
+ *                      <executions>
+ *                          <!-- add additional execution to compile generated catalog (see id generate-catalog) -->
+ *                          <execution>
+ *                              <id>compile-catalog</id>
+ *                              <phase>prepare-package</phase>
+ *                              <goals>
+ *                                  <goal>compile</goal>
+ *                              </goals>
+ *                              <configuration>
+ *                                  <sourceDir>./src/main/scala-generated</sourceDir>
+ *                              </configuration>
+ *                          </execution>
+ *                      </executions>
+ *                  </plugin>
+ *              </plugins>
+ *          </build>
+ *      </profile>
  * ```
  */
 object LabCatalogGenerator extends SmartDataLakeLogger {

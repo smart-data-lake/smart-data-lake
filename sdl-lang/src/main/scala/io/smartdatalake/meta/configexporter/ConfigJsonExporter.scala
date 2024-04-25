@@ -54,6 +54,53 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   /**
    * Takes as input an SDL Config and exports it as one json document, everything resolved.
    * Additionally a separate file with the mapping of first class config objects to source code origin is created.
+   *
+   * Use the following maven profile to add an additional export step to your build:
+   * ```
+   *     <profile>
+   *         <id>export-config</id>
+   *         <build>
+   *             <plugins>
+   *                 <!-- parse and export configuration -->
+   *                 <plugin>
+   *                     <groupId>org.codehaus.mojo</groupId>
+   *                     <artifactId>exec-maven-plugin</artifactId>
+   *                     <version>3.1.0</version>
+   *                     <executions>
+   *                         <execution>
+   *                             <id>parse-export-config</id>
+   *                             <phase>package</phase>
+   *                             <goals>
+   *                                 <!-- use exec instead of java, so sdlb runs in a separate jvm from mvn -->
+   *                                 <goal>exec</goal>
+   *                             </goals>
+   *                             <configuration>
+   *                                 <executable>java</executable>
+   *                                 <longClasspath>true</longClasspath>
+   *                                 <arguments>
+   *                                     <argument>-Dlog4j.configurationFile=log4j2.yml</argument>
+   *                                     <argument>-classpath</argument>
+   *                                     <classpath/>
+   *                                     <argument>
+   *                                         io.smartdatalake.meta.configexporter.ConfigJsonExporter
+   *                                     </argument>
+   *                                     <argument>--config</argument>
+   *                                     <argument>./config,./envConfig/yarn.conf</argument>
+   *                                     <argument>--filename</argument>
+   *                                     <argument>./viz/exportedConfig.json</argument>
+   *                                     <argument>--descriptionPath</argument>
+   *                                     <argument>./description</argument>
+   *                                 </arguments>
+   *                                 <classpathScope>runtime</classpathScope>
+   *                             </configuration>
+   *                         </execution>
+   *                     </executions>
+   *                 </plugin>
+   *             </plugins>
+   *         </build>
+   *     </profile>
+   * ```
+   * It can be executed by the following maven command line: `mvn exec:exec@parse-export-config -Dorg.slf4j.simpleLogger.log.org.apache=ERROR -Pexport-config`
    */
   def main(args: Array[String]): Unit = {
     // Parse all command line arguments
