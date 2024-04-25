@@ -24,12 +24,23 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.{Action, CustomDataFrameAction, DataFrameOneToOneActionImpl}
 import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, DataObject}
+import org.apache.commons.io.FileUtils
 import scopt.OptionParser
 
+import java.io.File
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
-
-case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirectory: String = null, packageName: String = "io.smartdatalake.generated", dataObjectCatalogClassName: String = "DataObjectCatalog", actionCatalogClassName: String = "ActionCatalog")
+/**
+ * Configuration for the LabCatalogGenerator
+ *
+ * @param configPaths SDLB configuration paths/files
+ * @param srcDirectory directory where generated sources will be written
+ * @param packageName package name for generated classes, default is io.smartdatalake.generated
+ * @param dataObjectCatalogClassName class name for DataObject catalog
+ * @param actionCatalogClassName class name for Action catalog
+ * @param additionalSrcPath optional path of additional sources to be copied into srcDirectory for 2nd compilation step
+ */
+case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirectory: String = null, packageName: String = "io.smartdatalake.generated", dataObjectCatalogClassName: String = "DataObjectCatalog", actionCatalogClassName: String = "ActionCatalog", additionalSrcPath: Option[String] = None)
 
 /**
  * Command line interface to generate a scala files that serve as catalog for SmartDataLakeBuilderLab.
@@ -76,7 +87,7 @@ case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirecto
  *                                                <goals><goal>compile</goal></goals>
  *                                                <configuration>
  *                                                        <sourceDir>./src/main/scala-generated</sourceDir>
- *                                                        <!--additionalClasspathElements>
+ *                                                                <!--additionalClasspathElements>
  *                                                                <additionalClasspathElement>target/classes</additionalClasspathElement>
  *                                                        </additionalClasspathElements-->
  *                                                </configuration>
@@ -111,6 +122,10 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
       .optional()
       .action((value, c) => c.copy(actionCatalogClassName = value))
       .text("Class name of scala class to create. Default: ActionCatalog")
+    opt[String]('c', "additionalSrcPath")
+      .optional()
+      .action((value, c) => c.copy(additionalSrcPath = Some(value)))
+      .text("Optional path of additional sources to be copied into srcDirectory for 2nd compilation step")
     help("help").text("Display the help text.")
   }
 
@@ -138,6 +153,11 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     createCatalogScalaFile(config.srcDirectory, config.packageName, config.dataObjectCatalogClassName, dataObjectCatalogClassDef)
     val actionCatalogClassDef = generateActionCatalogClass(config.packageName, config.actionCatalogClassName, registry)
     createCatalogScalaFile(config.srcDirectory, config.packageName, config.actionCatalogClassName, actionCatalogClassDef)
+
+    // copy additional sources
+    config.additionalSrcPath.foreach{ path =>
+      FileUtils.copyDirectory(new File(path), new File(config.srcDirectory))
+    }
   }
 
   def createCatalogScalaFile(srcDir: String, packageName:String, className: String, classDef: String): Unit = {
