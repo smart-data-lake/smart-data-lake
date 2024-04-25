@@ -161,29 +161,46 @@ trait CustomTransformMethodDef {
   private[smartdatalake] def customTransformMethod: Option[universe.MethodSymbol]
 }
 
+/**
+ * A wrapper around a custom transform method to analyse parameters and dynamically call the method
+ */
 class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
 
-  private[smartdatalake] final def getParameterInfo: Seq[MethodParameterInfo] = {
-    CustomCodeUtil.analyzeMethodParameters(this, method)
+  /**
+   * Extract parameter info from method.
+   * @param instance to extract default parameter values, an object instance implementing this.method has to be provided.
+   */
+  private[smartdatalake] final def getParameterInfo(instance: Option[AnyRef] = None): Seq[MethodParameterInfo] = {
+    CustomCodeUtil.analyzeMethodParameters(instance, method)
   }
 
+  /**
+   * Returns true if method has a single DataFrame/Dataset return type
+   */
   private[smartdatalake] def returnsSingleDataset: Boolean = {
     method.returnType.exists(rt => rt =:= typeOf[DataFrame] || rt <:< typeOf[Dataset[_]])
   }
 
+  /**
+   * Returns true if method has a Map[String,DataFrame/Dataset] return type
+   */
   private[smartdatalake] def returnsMultipleDatasets: Boolean = {
     method.returnType.exists(rt => rt =:= typeOf[Map[String, DataFrame]] || rt <:< typeOf[Map[String, Dataset[_]]])
   }
 
   private[smartdatalake] def getInputDataObjectNames[T : TypeTag]: Map[String, MethodParameterInfo] = {
-    getParameterInfo.collect {
+    getParameterInfo().collect {
       case dfParam if dfParam.tpe <:< typeOf[DataFrame] => (prepareTolerantKey(dfParam.name.stripPrefix("df")), dfParam)
       case dsParam if dsParam.tpe <:< typeOf[Dataset[T]] => (prepareTolerantKey(dsParam.name.stripPrefix("ds")), dsParam)
     }.toMap
   }
 
-  private[smartdatalake] def call(instance: AnyRef, dfs: Map[String,DataFrame], options: Map[String,String])(implicit session: SparkSession) = {
-    val transformParameters = getParameterInfo
+  /**
+   * Dynamically call transform method
+   * @param instance object instance implementing method
+   */
+  private[smartdatalake] def call(instance: AnyRef, dfs: Map[String,DataFrame], options: Map[String,String])(implicit session: SparkSession): Map[String, DataFrame] = {
+    val transformParameters = getParameterInfo(Some(instance))
     val returnType = method.returnType
     val mappedParameters = transformParameters.map {
       case dfParam if dfParam.tpe <:< typeOf[DataFrame] =>
