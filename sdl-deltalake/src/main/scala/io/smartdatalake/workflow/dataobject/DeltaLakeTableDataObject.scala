@@ -37,6 +37,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, Spar
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.delta.DeltaLog
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -114,7 +115,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -211,17 +212,65 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
+  private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
+  }
+
+  private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
+    val details = DeltaTable.forName(session, table.fullName).detail()
+    val properties = details.select("properties").head.getMap[String, String](0)
+
+    properties.contains(name)
+  }
+
+  private def propertyExistsWithValue(name: String, value: String) (implicit session: SparkSession): Boolean = {
+    val details = DeltaTable.forName(session, table.fullName).detail()
+    val properties = details.select("properties").head.getMap[String, String](0)
+
+    properties.exists(_ == name -> value)
+  }
+
+  @transient private val enableCdcFeedProperty = "delta.enableChangeDataFeed"
+
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val df = context.sparkSession.table(table.fullName)
+
+    implicit val session: SparkSession = context.sparkSession
+
+    val cdcActivated = propertyExistsWithValue(enableCdcFeedProperty, "true")
+
+    val df = if(cdcActivated && incrementalOutputExpr.isDefined) {
+
+      require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+
+      val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_commit_timestamp").desc)
+
+      context.sparkSession.read.format("delta")
+        .option("readChangeFeed", "true")
+        .option("startingVersion", incrementalOutputExpr.get)
+        .table(table.fullName)
+        .where(expr("_change_type IN ('insert','update_postimage')"))
+        .withColumn("_rank", rank().over(windowSpec))
+        .where("_rank == 1")
+        .drop("_rank", "_change_type", "_commit_version", "_commit_timestamp")
+
+    } else
+      context.sparkSession.table(table.fullName)
+
+    if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
+
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
+
+
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -530,6 +579,33 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
+
+
+  private var incrementalOutputExpr: Option[String] = None
+
+  /**
+   * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
+   * The state is just a string. It's semantics is internal to the DataObject.
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   *
+   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+
+    incrementalOutputExpr = state
+
+  }
+
+  /**
+   * Return the last table version
+   */
+  override def getState: Option[String] = {
+
+    val dfHistory = DeltaTable.forName(table.fullName).history(1)
+    val latestVersion = String.valueOf(dfHistory.select("version").head.get(0))
+
+    Option(latestVersion)
+  }
 
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession

@@ -28,7 +28,9 @@ import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
+import org.apache.spark.sql.delta.DeltaAnalysisException
 import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.scalatest.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
@@ -45,6 +47,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
+  val contextInit: ActionPipelineContext = context.copy(phase = ExecutionPhase.Init)
 
   before {
     instanceRegistry.clear()
@@ -319,5 +322,145 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.metrics.flatMap(_.get("count")).contains(3))
     assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))
   }
+
+  test("normal output mode without cdc activated") {
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+
+    // test
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+
+    // check
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
+  }
+
+  test("incremental output mode with inserts") {
+
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+
+    // test 1
+    targetDO.setState(newState1)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
+
+
+    // append test data 2
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+    val newState2 = targetDO.getState
+
+    // test 2
+    targetDO.setState(newState2)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 1
+
+    // append test data 3
+    val df3 = Seq((6, "T", 5), (7, "R", 7), (8, "T", 2)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df3)
+    val newState3 = targetDO.getState
+
+    // test 3
+    targetDO.setState(newState3)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 3
+
+    assert(newState1.get < newState2.get)
+    assert(newState2.get < newState3.get)
+
+    targetDO.setState(None) // to get the full dataframe
+    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 8
+  }
+
+  test("incremental output mode without primary keys") {
+
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc")
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
+
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+    val newState2 = targetDO.getState
+
+    // test
+    val thrown = intercept[IllegalArgumentException] {
+      targetDO.setState(newState2)
+      targetDO.getSparkDataFrame()(contextExec).count()
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+    assert(thrown.getMessage.contains("PrimaryKey for table"))
+
+  }
+
+  test("incremental output mode with updates and inserts") {
+
+    // create data object
+    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath))
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
+
+    // do updates and inserts
+    session.sql("INSERT INTO test_inc VALUES (5, 'T', 7) ")
+    val newState2 = targetDO.getState
+    session.sql("INSERT INTO test_inc VALUES (6, 'U', 3) ")
+    session.sql("UPDATE test_inc SET p = 'Z', value = 8 WHERE id = 1")
+    session.sql("UPDATE test_inc SET p = 'W', value = 1 WHERE id = 1")
+
+    // test
+    val resultDf = Seq((5, "T", 7), (6, "U", 3), (1, "W", 1)).toDF("id", "p", "value")
+
+    targetDO.setState(newState2)
+    val testDf = targetDO.getSparkDataFrame()(contextExec)
+
+    testDf.count() shouldEqual 3 // 2x new insert + 1x the latest update
+
+    testDf.collect() sameElements resultDf.collect()
+
+  }
+
+
 
 }
