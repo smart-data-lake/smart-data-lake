@@ -43,6 +43,8 @@ import org.apache.iceberg.spark.{Spark3Util, SparkSchemaUtil, SparkWriteOptions}
 import org.apache.iceberg.types.TypeUtil
 import org.apache.iceberg.{PartitionSpec, TableProperties}
 import org.apache.spark.sql.connector.catalog.{Identifier, SupportsNamespaces, TableCatalog}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, expr, rank}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -122,7 +124,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val preWriteSql: Option[String] = None,
                                   override val postWriteSql: Option[String] = None)
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -237,9 +239,40 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val df = context.sparkSession.table(table.fullName)
+
+    val df = incrementalOutputExpr match {
+      case Some(snapshotId) =>
+        require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+        val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
+          else {
+
+          // activate temporary cdc view
+          context.sparkSession.sql(
+            s"""CALL ${getIcebergCatalog.name}.system.create_changelog_view(table => '${getIdentifier.toString}'
+               |, options => map('start-snapshot-id', '${snapshotId}')
+               |, compute_updates => true
+               |, identifier_columns => array('${table.primaryKey.get.mkString("','")}')
+               |)""".stripMargin)
+
+          // read cdc events
+          val temporaryViewName = table.name + "_changes"
+
+          val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_change_ordinal").desc)
+          context.sparkSession.read
+            .table(temporaryViewName)
+            .where(expr("_change_type IN ('INSERT','UPDATE_AFTER')"))
+            .withColumn("_rank", rank().over(windowSpec))
+            .where("_rank == 1")
+            .drop("_rank", "_change_type", "_change_ordinal", "_commit_snapshot_id")
+        }
+        incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
+        icebergTable
+      case _ => context.sparkSession.table(table.fullName)
+    }
+
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
+
     df
   }
 
@@ -570,10 +603,34 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = IcebergTableDataObject
 
+  private var incrementalOutputExpr: Option[String] = None
+
+  /**
+   * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
+   * The state is just a string. It's semantics is internal to the DataObject.
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   *
+   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+
+    incrementalOutputExpr = state.orElse(Some("0"))
+  }
+
+   /**
+   * Return the state of the last increment or empty if no increment was processed.
+   */
+  override def getState: Option[String] = {
+
+    incrementalOutputExpr
+
+  }
+
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     sqlOpt.foreach(stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
   }
+
 }
 
 object IcebergTableDataObject extends FromConfigFactory[DataObject] {
