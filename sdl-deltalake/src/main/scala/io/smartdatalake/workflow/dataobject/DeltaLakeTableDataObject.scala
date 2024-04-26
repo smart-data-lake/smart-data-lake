@@ -231,7 +231,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
       require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
 
-      val windowSpec = Window.partitionBy(table.primaryKey.get.mkString(",")).orderBy(col("_commit_timestamp").desc)
+      val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_commit_timestamp").desc)
 
       context.sparkSession.read.format("delta")
         .option("readChangeFeed", "true")
