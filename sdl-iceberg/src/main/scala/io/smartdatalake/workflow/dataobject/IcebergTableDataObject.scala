@@ -245,7 +245,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           // read cdc events
           val temporaryViewName = table.name + "_changes"
 
-          val windowSpec = Window.partitionBy(table.primaryKey.get.mkString(",")).orderBy(col("_change_ordinal").desc)
+          val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_change_ordinal").desc)
           context.sparkSession.read
             .table(temporaryViewName)
             .where(expr("_change_type IN ('INSERT','UPDATE_AFTER')"))
