@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.nio.file.{Files, Path => NioPath}
+import com.github.tomakehurst.wiremock.WireMockServer
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, get, stubFor, urlEqualTo}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{BasicAuthMode, SDLSaveMode}
 import io.smartdatalake.testutils.TestUtil
@@ -28,10 +29,11 @@ import io.smartdatalake.workflow.action.executionMode.FileIncrementalMoveMode
 import io.smartdatalake.workflow.connection.SFtpFileRefConnection
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
-import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.sshd.server.SshServer
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+
+import java.nio.file.Files
 
 class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
@@ -45,17 +47,26 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
   val sshUser = "test"
   val sshPwd = "test"
 
+  private var wireMockServer: WireMockServer = _
+  val port = 8080 // for some reason, only the default port seems to work
+  val httpsPort = 8443
+  val host = "127.0.0.1"
+
   override protected def beforeAll(): Unit = {
     sshd = TestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
+    wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
   }
 
   override protected def afterAll(): Unit = {
     sshd.stop()
+    wireMockServer.stop()
   }
 
   before {
     instanceRegistry.clear()
     instanceRegistry.register(SFtpFileRefConnection( "con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshUser))), ignoreHostKeyVerification = true))
+    wireMockServer.resetAll()
+    TestUtil.setupWebserviceStubs()
   }
 
   test("copy file from sftp to hadoop without partitions") {
@@ -420,7 +431,7 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     assert(r1.size == 1)
   }
 
-  test("copy partitioned webservice output to hadoop file") {
+  test("copy partitioned webservice output with fixed partition values to hadoop file") {
 
     val feed = "filetransfer"
     val tgtDir = "testTgt"
@@ -430,6 +441,63 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     // For testing we will read something from Spark UI API...
     val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
       , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq("applications","version"))), partitionLayout = Some("/%subject%?test")) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
+    val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("subject"))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
+
+    val r1 = tgtDO.getFileRefs(Seq())
+    assert(r1.map(_.fileName).toSet == Set("applications.test.json", "version.test.json"))
+  }
+
+
+  test("copy partitioned webservice output with input partition values to hadoop file") {
+
+    val feed = "filetransfer"
+    val tgtDir = "testTgt"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // setup DataObjects
+    // For testing we will read something from Spark UI API...
+    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
+      , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq())), partitionLayout = Some("/%subject%?test")) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
+    val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("subject"))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start load
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+    assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
+
+    val r1 = tgtDO.getFileRefs(Seq())
+    assert(r1.map(_.fileName).toSet == Set("applications.test.json", "version.test.json"))
+  }
+
+  test("copy webservice output with paging to hadoop files") {
+
+    val feed = "filetransfer"
+    val tgtDir = "testTgt"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // first response has a reference to the next page
+    stubFor(get(urlEqualTo("/good/getWithPaging/1"))
+      .willReturn(aResponse().withBody(s"abc123\nlink=http://$host:$port/good/getWithPaging/2 olala"))
+    )
+    stubFor(get(urlEqualTo("/good/getWithPaging/2"))
+      .willReturn(aResponse().withBody("def456"))
+    )
+
+    // setup DataObjects
+    val srcDO = WebserviceFileDataObject("src1", url = s"http://$host:$port/good/getWithPaging/1", pagingLinkRegex = Some("link=(\\S*)"))
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -441,6 +509,6 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     val r1 = tgtDO.getFileRefs(Seq())
-    assert(r1.map(_.fileName).toSet == Set("applications.test.json", "version.test.json"))
+    assert(r1.map(_.fileName).toSet == Set("result-0.json", "result-1.json"))
   }
 }

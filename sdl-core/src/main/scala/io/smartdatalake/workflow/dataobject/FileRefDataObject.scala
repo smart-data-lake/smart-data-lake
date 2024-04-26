@@ -88,7 +88,7 @@ trait FileRefDataObject extends FileDataObject {
         val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
           .getOrElse(getPath + separator + newFileName)
-        FileRefMapping(f, f.copy(fullPath = newPath))
+        FileRefMapping(f, f.copy(fullPath = newPath, fileName = newFileName))
     }
   }
 

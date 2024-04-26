@@ -22,6 +22,7 @@ package io.smartdatalake.meta.configexporter
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.ColumnStatsType
+import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.{formatSchema, getCurrentVersion}
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -39,16 +40,18 @@ import java.nio.file.{Files, Paths}
 class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
 
   val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
-  val exportPath = "./target/schema"
+  val target = "file:./target/schema"
+  val exportPath = Paths.get(target.stripPrefix("file:"))
 
   before {
-    FileUtils.deleteDirectory(new File(exportPath))
+    FileUtils.deleteDirectory(exportPath.toFile)
   }
 
   test("export simple schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", exportPath = exportPath)
-    DataObjectSchemaExporter.exportSchemas(exporterConfig)
-    val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectCsv1", "schema", Paths.get(exporterConfig.exportPath))
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", target = target)
+    DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
+    val writer = FileExportWriter(exportPath)
+    val actualOutput = writer.getLatestData("dataObjectCsv1", "schema")
 
     val expectedFieldsJson = """
       | {
@@ -74,9 +77,10 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
   }
 
   test("export complex schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", exportPath = exportPath)
-    DataObjectSchemaExporter.exportSchemas(exporterConfig)
-    val actualOutput = DataObjectSchemaExporter.getLatestData("dataObjectParquet6", "schema", Paths.get(exporterConfig.exportPath))
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", target = target)
+    DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
+    val writer = FileExportWriter(Paths.get(exporterConfig.target.stripPrefix("file:")))
+    val actualOutput = writer.getLatestData("dataObjectParquet6", "schema")
     val expectedFieldsJson =
       """ {
         | "schema": [
@@ -126,9 +130,9 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
   }
 
   test("test main with includes and excludes, dont update if same") {
-    DataObjectSchemaExporter.main(Array("-c", configPath, "-p", exportPath, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
-    assert(new File(exportPath).listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
-    assert(new File(exportPath).listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    DataObjectSchemaExporter.main(Array("-c", configPath, "-t", target, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
+    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
   }
 
   test("schema file is not updated if unchanged") {
@@ -136,17 +140,20 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
     val path = Paths.get("target/schemaUpdate")
     FileUtils.deleteDirectory(path.toFile)
     Files.createDirectories(path)
+    val writer = FileExportWriter(path)
     // first write
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", StringType))))), None, path)
-    assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length==1)
+    val schema1 = SparkSchema(StructType(Seq(StructField("a", StringType))))
+    writer.writeSchema(formatSchema(Some(schema1), None), DataObjectId("test"), getCurrentVersion)
+    assert(writer.readIndex(dataObjectId, "schema").length==1)
     Thread.sleep(1000) // timestamp in filename has seconds resolution, make sure we dont overwrite previous file.
     // second write -> no update
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", StringType))))), None, path)
-    assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 1)
+    writer.writeSchema(formatSchema(Some(schema1), None), DataObjectId("test"), getCurrentVersion)
+    assert(writer.readIndex(dataObjectId, "schema").length == 1)
     Thread.sleep(1000) // timestamp in filename has seconds resolution, make sure we dont overwrite previous file.
     // third write -> update
-    DataObjectSchemaExporter.writeSchemaIfChanged(DataObjectId("test"), Some(SparkSchema(StructType(Seq(StructField("a", IntegerType))))), None, path)
-    assert(DataObjectSchemaExporter.readIndex(dataObjectId, "schema", path).length == 2)
+    val schema2 = SparkSchema(StructType(Seq(StructField("a", IntegerType))))
+    writer.writeSchema(formatSchema(Some(schema2), None), DataObjectId("test"), getCurrentVersion)
+    assert(writer.readIndex(dataObjectId, "schema").length == 2)
   }
 
   test("export statistics") {
@@ -161,11 +168,12 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "complex")
     hiveDO.writeSparkDataFrame(df, Seq())
     // export
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectHive14", exportPath = "./target/schema")
-    DataObjectSchemaExporter.exportSchemas(exporterConfig)
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectHive14", target = target)
+    DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
     // read stats and check
     implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    val latestStats = DataObjectSchemaExporter.getLatestData(hiveDO.id, "stats", Paths.get(exporterConfig.exportPath))
+    val writer = FileExportWriter(exportPath)
+    val latestStats = writer.getLatestData(hiveDO.id, "stats")
       .map(Serialization.read[Map[String, Any]]).get
     assert(latestStats.apply("columns").asInstanceOf[Map[String,Any]]
       .apply("lastname").asInstanceOf[Map[String,Any]]

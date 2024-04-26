@@ -36,6 +36,7 @@ class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
   private val aesKey: SecretKey = generateAesKey(keyAsBytes)
 
   override def encrypt(message: String): String = {
+    if (message == null) return message
     val gcmParameterSpec = generateGcmParameterSpec()
     val cipher = Cipher.getInstance(ALGORITHM_STRING)
     cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmParameterSpec, new SecureRandom())
@@ -45,6 +46,7 @@ class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
   }
 
   override def decrypt(encryptedDataString: String): String = {
+    if (encryptedDataString == null) return encryptedDataString
     val (gcmParameterSpec, encryptedMessage) = decodeData(encryptedDataString)
 
     val cipher = Cipher.getInstance(ALGORITHM_STRING)
@@ -62,6 +64,7 @@ class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
 
   private def encodeData(gcmParameterSpec: GCMParameterSpec, encryptedMessage: Array[Byte]): String = {
     val data = gcmParameterSpec.getIV ++ encryptedMessage
+    println(Base64.getEncoder.encodeToString(gcmParameterSpec.getIV), Base64.getEncoder.encodeToString(encryptedMessage))
     Base64.getEncoder.encodeToString(data)
   }
 

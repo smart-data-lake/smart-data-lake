@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.workflow.ActionPipelineContext
+package io.smartdatalake.util.misc
 
-import java.io.InputStream
+import java.net.URI
 
-trait CanCreateInputStream {
-
-  def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream]
-
+object URIUtil {
   /**
-   * Set to true if this DataObject can create multiple InputStreams for one path, e.g. return an Iterator[InputStreams] with multiple entries.
-   * In this case SDLB will read all InputStreams from the iterator, and add an additional index-number to the output path.
+   * Append subPath to path of existing URI
    */
-
-  def createsMultiInputStreams: Boolean = false
-
+  def appendPath(uri: URI, subPath: String): URI = {
+    val existingPath = Option(uri.getPath).map(_.stripSuffix("/") + "/").getOrElse("")
+    val newPath = existingPath + subPath.stripPrefix("/")
+    new URI(uri.getScheme, uri.getUserInfo, uri.getHost, uri.getPort, newPath, uri.getQuery, uri.getFragment)
+  }
+  def appendPath(uri: String, subPath: String): String = {
+    appendPath(new URI(uri), subPath).toString
+  }
 }
