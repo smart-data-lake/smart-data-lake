@@ -219,7 +219,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     properties.exists(_ == name -> value)
   }
 
-  @transient private val EnableCdcFeedProperty = "delta.enableChangeDataFeed"
+  @transient private val enableCdcFeedProperty = "delta.enableChangeDataFeed"
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
