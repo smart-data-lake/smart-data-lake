@@ -202,7 +202,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    if(!propertyExists(EnableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(EnableCdcFeedProperty -> "true"))
+    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
   }
 
   private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
@@ -225,7 +225,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     implicit val session: SparkSession = context.sparkSession
 
-    val cdcActivated = propertyExistsWithValue(EnableCdcFeedProperty, "true")
+    val cdcActivated = propertyExistsWithValue(enableCdcFeedProperty, "true")
 
     val df = if(cdcActivated && incrementalOutputExpr.isDefined) {
 
@@ -245,7 +245,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     } else
       context.sparkSession.table(table.fullName)
 
-    if(!propertyExists(EnableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
+    if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
 
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
