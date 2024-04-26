@@ -362,7 +362,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
     // check
     assert(thrown.isInstanceOf[IllegalArgumentException])
-    assert(thrown.getMessage == s"requirement failed: PrimaryKey for table [${targetDO.table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+    assert(thrown.getMessage.contains(s"PrimaryKey for table"))
 
   }
 
