@@ -230,7 +230,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     val df = incrementalOutputExpr match {
       case Some(snapshotId) =>
-        require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+        require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
         val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
           else {
 
