@@ -238,9 +238,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         .option("startingVersion", incrementalOutputExpr.get)
         .table(table.fullName)
         .where(expr("_change_type IN ('insert','update_postimage')"))
-        .withColumn("rank", rank().over(windowSpec))
-        .where("rank == 1")
-        .drop("rank", "_change_type", "_commit_version", "_commit_timestamp")
+        .withColumn("_rank", rank().over(windowSpec))
+        .where("_rank == 1")
+        .drop("_rank", "_change_type", "_commit_version", "_commit_timestamp")
 
     } else
       context.sparkSession.table(table.fullName)

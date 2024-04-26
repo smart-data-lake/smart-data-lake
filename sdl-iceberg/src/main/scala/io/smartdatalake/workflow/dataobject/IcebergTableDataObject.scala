@@ -249,9 +249,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           context.sparkSession.read
             .table(temporaryViewName)
             .where(expr("_change_type IN ('INSERT','UPDATE_AFTER')"))
-            .withColumn("rank", rank().over(windowSpec))
-            .where("rank == 1")
-            .drop("rank", "_change_type", "_change_ordinal", "_commit_snapshot_id")
+            .withColumn("_rank", rank().over(windowSpec))
+            .where("_rank == 1")
+            .drop("_rank", "_change_type", "_change_ordinal", "_commit_snapshot_id")
         }
         incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
         icebergTable
