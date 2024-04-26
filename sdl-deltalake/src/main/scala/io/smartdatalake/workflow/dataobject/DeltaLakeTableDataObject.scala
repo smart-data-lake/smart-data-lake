@@ -229,7 +229,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     val df = if(cdcActivated && incrementalOutputExpr.isDefined) {
 
-      require(table.primaryKey.isDefined, s"PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+      require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
 
       val windowSpec = Window.partitionBy(table.primaryKey.get.mkString(",")).orderBy(col("_commit_timestamp").desc)
 
