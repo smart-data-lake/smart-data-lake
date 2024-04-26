@@ -22,7 +22,7 @@
 
     <groupId>io.smartdatalake</groupId>
     <artifactId>sdl-parent</artifactId>
-    <version>2.6.1-SNAPSHOT</version>
+    <version>2.6.1-encTest-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
