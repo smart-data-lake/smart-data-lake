@@ -79,7 +79,7 @@ import io.smartdatalake.generated._
 import io.smartdatalake.lab.SmartDataLakeBuilderLab
 val sdlb = SmartDataLakeBuilderLab[DataObjectCatalog, ActionCatalog](
   spark,
-  Seq("/Volumes/secon_dev/test/test-vol/application.conf"),
+  Seq("/Volumes/<catalog>/test/test-vol/application.conf"),
   DataObjectCatalog(_, _), ActionCatalog(_, _)
 )
 ```
