@@ -30,7 +30,7 @@ The following table gives an overview of dependency versions that are delivered 
 
 | SDL Version | Java/Scala/Hadoop Version | Hadoop Version | Spark Engine     | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
 |-------------|---------------------------|----------------|------------------|--------|---------------------------|-------------|---------|
-| 2.6.X       | Java 8+, Scala 2.12/2.13  | 3.3.6          | 3.4.2            | 2.20.0 | 2.12.0 / 1.9.0            | 2.4.0       | 1.3.1   |
+| 2.6.X       | Java 8+, Scala 2.12/2.13  | 3.3.6          | 3.4.3            | 2.20.0 | 2.12.0 / 1.9.0            | 2.4.0       | 1.3.1   |
 | 2.5.X       | Java 8+, Scala 2.12       | 3.3.2          | 3.3.2            | 2.17.2 | 2.11.0 / 1.6.2            | 2.2.0       | 1.1.0   |
 | 2.4.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.2            | 1.2.17 | 2.10.0 / 1.2.0            | 2.0.0       | -       |
 | 2.3.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.2            | 1.2.17 | 2.10.0 / 1.2.0            | 2.0.0       | -       |

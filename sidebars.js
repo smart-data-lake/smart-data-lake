@@ -79,6 +79,7 @@ const sidebars = {
         'reference/deploy-microsoft-azure',
       ]},
       'reference/testing',
+      'reference/notebookCatalog',
       'reference/troubleshooting',
       //'reference/glossary'
   ]},
