@@ -308,7 +308,7 @@
         <scala.version>${scala.minor.version}.15</scala.version>
 
         <spark.version>3.4.3</spark.version>
-        <spark-extensions.version>3.4.3</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark-extensions.version>3.4.5</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.4</spark.minor.version> <!-- this is used in sdl-snowflake -->
 
         <spark.version331>3.3.1</spark.version331> <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->
