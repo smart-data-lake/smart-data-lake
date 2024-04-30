@@ -39,7 +39,7 @@ import scala.reflect.runtime.universe.TypeTag
  * Interface to define a custom Spark-DataFrame transformation (n:m)
  * Same trait as [[CustomDfTransformer]], but multiple input and outputs supported.
  */
-trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable with SmartDataLakeLogger {
+trait CustomDfsTransformer extends CustomTransformMethodDef with TransformInfo with TransformDfsMethod with Serializable with SmartDataLakeLogger {
 
   /**
    * Function to define the transformation between several input and output DataFrames (n:m).
@@ -52,11 +52,10 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
    * @param dfs DataFrames to be transformed
    * @return Map of transformed DataFrames
    */
-  def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] = {
     require(customTransformMethod.isDefined, s"${this.getClass.getSimpleName} transform method is not overridden and no custom transform method is defined")
-    val methodWrapper = new CustomTransformMethodWrapper(customTransformMethod.get)
-    require(methodWrapper.returnsSingleDataset || methodWrapper.returnsMultipleDatasets, s"The return type of the transform method is ${customTransformMethod.get.returnType} but should be one of DataFrame, Dataset[_], Map[String,DataFrame] or Map[String,Dataset[_]]")
-    methodWrapper.call(this, dfs, options)(session)
+    require(customTransformMethodWrapper.get.returnsSingleDataset || customTransformMethodWrapper.get.returnsMultipleDatasets, s"The return type of the transform method is ${customTransformMethod.get.returnType} but should be one of DataFrame, Dataset[_], Map[String,DataFrame] or Map[String,Dataset[_]]")
+    customTransformMethodWrapper.get.call(this, dfs, options)(session)
   }
 
   /**
@@ -88,6 +87,11 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
     val defaultTransformMethod = typeOf[CustomDfsTransformer].member(TermName("transform"))
     transformMethods.find(_.typeSignature != defaultTransformMethod.typeSignature)
   }
+
+  @transient private lazy val customTransformMethodWrapper = customTransformMethod.map(new CustomTransformMethodWrapper(_))
+  override def getInputDataObjectsNameAndType: Option[Seq[(String, universe.Type)]] = customTransformMethodWrapper.map(_.getInputDataObjectNames.mapValues(_.tpe).toSeq)
+  override def isSingleInput: Boolean = customTransformMethodWrapper.map(_.getInputDataObjectNames.keys.size==1).getOrElse(false)
+  override def isSingleOutput: Boolean = customTransformMethodWrapper.map(_.returnsSingleDataset).getOrElse(false)
 }
 
 /**
@@ -267,5 +271,33 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
     }
   }
  }
+
+/**
+ * A trait to provide detailed information about a transformation
+ */
+trait TransformInfo {
+  /**
+   * Get names of input DataObjects. The Names can be DataObjectIds or names of intermediate DataFrames.
+   * @return None if input DataObjects are unknown, otherwise a list of input DataObjects in CamelCase notation.
+   */
+  def getInputDataObjectsNameAndType: Option[Seq[(String,universe.Type)]]
+
+  /**
+   * If the transformer has only one output DataObject
+   */
+  def isSingleOutput: Boolean
+
+  /**
+   * If the transformer has only one input DataObject
+   */
+  def isSingleInput: Boolean
+}
+
+/**
+ * A trait to define the method to transform m:n DataFrames
+ */
+trait TransformDfsMethod {
+  def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame]
+}
 
 case class NotFoundError(msg: String) extends Exception(msg)
