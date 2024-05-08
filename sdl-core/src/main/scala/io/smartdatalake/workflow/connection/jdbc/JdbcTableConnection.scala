@@ -73,8 +73,12 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None,
                                directTableOverwrite: Boolean = false,
+                               connectionPoolTestOnBorrow: Boolean = true,
+                               connectionPoolTestOnCreate: Boolean = true,
+                               connectionPoolTestOnReturn: Boolean = false,
+                               connectionPoolTestWhileIdle: Boolean = false,
                                override val metadata: Option[ConnectionMetadata] = None,
-                               ) extends Connection with SmartDataLakeLogger {
+                              ) extends Connection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode])
@@ -185,7 +189,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
       schema.fields.foreach { field =>
         // Change is here - dont quote if not case-sensitive and normal characters used:
         val name = if(caseSensitive || SQLUtil.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
-          else field.name
+        else field.name
         val typ = userSpecifiedColTypesMap
           .getOrElse(field.name, getJdbcType(field.dataType, dialect).databaseTypeDefinition)
         val nullable = if (field.nullable) "" else "NOT NULL"
@@ -216,6 +220,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
   pool.setMaxTotal(maxParallelConnections)
   pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close jdbc connection if not in use
   pool.setMaxWait(Duration.ofSeconds(connectionPoolMaxWaitTimeSec))
+  pool.setTestOnBorrow(connectionPoolTestOnBorrow)
+  pool.setTestOnCreate(connectionPoolTestOnCreate)
+  pool.setTestOnReturn(connectionPoolTestOnReturn)
+  pool.setTestWhileIdle(connectionPoolTestWhileIdle)
 
   private class JdbcClientPoolFactory extends BasePooledObjectFactory[SqlConnection] {
     override def create(): SqlConnection = {
