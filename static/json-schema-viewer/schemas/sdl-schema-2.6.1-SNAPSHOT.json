@@ -754,7 +754,7 @@
           },
           "url" : {
             "type" : "string",
-            "description" : "snowflake connection url"
+            "description" : "Snowflake connection url"
           },
           "warehouse" : {
             "type" : "string",
@@ -787,6 +787,23 @@
               "$ref" : "#/definitions/AuthMode/TokenAuthMode"
             } ],
             "description" : "optional authentication information: for now BasicAuthMode is supported."
+          },
+          "proxy" : {
+            "type" : "object",
+            "properties" : {
+              "host" : {
+                "type" : "string",
+                "description" : "proxy host"
+              },
+              "port" : {
+                "type" : "integer",
+                "description" : "proxy port"
+              }
+            },
+            "title" : "HttpProxyConfig",
+            "required" : [ "host", "port" ],
+            "additionalProperties" : false,
+            "description" : "Proxy configuration used to make HTTP-connection."
           },
           "sparkOptions" : {
             "type" : "object",
@@ -3940,6 +3957,17 @@
               "type" : "string"
             },
             "description" : "Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.\nThese options override connection.options."
+          },
+          "virtualPartitions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own."
+          },
+          "expectedPartitionsCondition" : {
+            "type" : "string",
+            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
           },
           "comment" : {
             "type" : "string",
