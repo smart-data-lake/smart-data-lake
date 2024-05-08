@@ -70,7 +70,7 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
 
     if (partitions.nonEmpty) {
       // mimick partition overwrite
-      val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) PartitionValues.fromDataFrame(df.select(partitions.map(col):_*))
+      val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) PartitionValues.fromDataFrame(SparkDataFrame(df.select(partitions.map(col):_*)))
       else partitionValues
       val newDataFrames = inferredPartitionValues.map(pv => (pv, df.where(getPartitionValueFilter(pv)))).toMap
       partitionedDataFrameMock = Some(

@@ -23,10 +23,14 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{JdbcExecution, JdbcUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcCatalog}
+import io.smartdatalake.workflow.dataobject.HttpProxyConfig
 import net.snowflake.spark.snowflake.Utils
+import org.apache.commons.pool2.impl.GenericObjectPool
+import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
-import java.sql.ResultSet
+import java.sql.{ResultSet, Connection => SqlConnection}
 
 /**
  * Connection information for Snowflake databases.
@@ -34,11 +38,12 @@ import java.sql.ResultSet
  * If multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session
  *
  * @param id        unique id of this connection
- * @param url       snowflake connection url
+ * @param url       Snowflake connection url
  * @param warehouse Snowflake namespace
  * @param database  Snowflake database
  * @param role      Snowflake role
  * @param authMode  optional authentication information: for now BasicAuthMode is supported.
+ * @param proxy     optional HTTP Proxy for Snowflake connection (Jdbc & Snowpark)
  * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
  * @param metadata  Connection metadata
  */
@@ -48,20 +53,28 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                database: String,
                                role: String,
                                authMode: AuthMode,
+                               proxy: Option[HttpProxyConfig] = None,
                                sparkOptions: Map[String, String] = Map(),
                                override val metadata: Option[ConnectionMetadata] = None
-                              ) extends Connection with SmartDataLakeLogger {
+                              ) extends Connection with JdbcExecution with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode])
   private var _snowparkSession: Option[Session] = None
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
-  def execSnowflakeStatement(sql: String, logging: Boolean = true): ResultSet = {
-    if (logging) logger.info(s"($id) execSnowflakeStatement: $sql")
-    Utils.runQuery(getSnowflakeAuthOptions(""), sql)
+  // prepare JDBC catalog implementation
+  val catalog: JdbcCatalog = new DefaultJdbcCatalog(this)
+  // setup JDBC connection pool for metadata and ddl queries
+  override val pool: GenericObjectPool[SqlConnection] = JdbcUtil.createConnectionPool(maxParallelConnections = 3, connectionPoolMaxIdleTimeSec = 3, connectionPoolMaxWaitTimeSec = 600, () => Utils.getJDBCConnection(getJdbcAuthOptions("")), initSql = None, autoCommit = false)
+  // set autoCommit=false as recommended
+  override val autoCommit: Boolean = false
+  override val jdbcDialect: JdbcDialect = JdbcDialects.get("snowflake")
+
+  def getProxyOptions: Map[String,String] = {
+    proxy.map(p => Map("useProxy" -> "true", "proxyHost" -> p.host, "proxyPort" -> p.port.toString)).getOrElse(Map())
   }
 
-  def getSnowflakeAuthOptions(schema: String): Map[String, String] = {
+  def getJdbcAuthOptions(schema: String): Map[String, String] = {
     authMode match {
       case m: BasicAuthMode =>
         Map(
@@ -72,7 +85,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
           "sfRole" -> role,
           "sfSchema" -> schema,
           "sfWarehouse" -> warehouse
-        )
+        ) ++ getProxyOptions
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
     }
   }
@@ -97,7 +110,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
           "WAREHOUSE" -> warehouse,
           "DB" -> database,
           "SCHEMA" -> schema
-        ))
+        ) ++ getProxyOptions)
         builder.create
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
     }

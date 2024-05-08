@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.util.hdfs
 
-import io.smartdatalake.workflow.dataframe.GenericColumn
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
-import org.apache.spark.sql.DataFrame
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 
 import scala.util.matching.Regex
 
@@ -156,10 +155,10 @@ object PartitionValues {
    * Read DataFrame and convert to PartitionValues
    * @param df DataFrame with partition columns only selected. All columns will be handled as string.
    */
-  def fromDataFrame(df: DataFrame): Seq[PartitionValues] = {
-    val cols = df.columns
-    df.distinct().collect().map {
-      row => PartitionValues(cols.map(c => (c,row.getAs[Any](c).toString)).toMap)
+  def fromDataFrame(df: GenericDataFrame): Seq[PartitionValues] = {
+    val cols = df.schema.columns
+    df.distinct.collect.map {
+      row => PartitionValues(cols.zipWithIndex.map{ case (c,idx) => (c,row.getAs[Any](idx).toString)}.toMap)
     }
   }
 
