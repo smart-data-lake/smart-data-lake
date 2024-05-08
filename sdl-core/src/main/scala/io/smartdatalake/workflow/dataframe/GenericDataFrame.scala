@@ -61,6 +61,8 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def collect: Seq[GenericRow]
 
+  def distinct: GenericDataFrame
+
   def withColumn(colName: String, expression: GenericColumn): GenericDataFrame
 
   def drop(colName: String): GenericDataFrame

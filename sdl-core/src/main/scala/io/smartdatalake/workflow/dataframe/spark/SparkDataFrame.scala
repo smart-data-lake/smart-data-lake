@@ -80,6 +80,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     }
   }
   override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
+  override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): SparkSubFeed = {
     SparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
   }

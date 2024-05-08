@@ -33,7 +33,7 @@ import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.delta.DeltaLog
@@ -490,7 +490,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val (pvs,d) = PerformanceUtils.measureDuration(
-      if(isTableExisting) PartitionValues.fromDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct())
+      if(isTableExisting) PartitionValues.fromDataFrame(SparkDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct()))
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
