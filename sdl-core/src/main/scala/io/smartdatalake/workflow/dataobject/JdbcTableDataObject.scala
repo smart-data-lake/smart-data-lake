@@ -378,6 +378,13 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     try {
       // write data to temp table
       val metrics = writeToTempTable(df, df.schema)
+
+      val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
+      updateExistingStatement.foreach{stmt =>
+        logger.info(s"($id) executing update existing statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
+        connection.execJdbcDmlStatement(stmt)
+      }
+
       // prepare SQL merge statement
       val mergeStmt = SQLUtil.createMergeStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       // execute
