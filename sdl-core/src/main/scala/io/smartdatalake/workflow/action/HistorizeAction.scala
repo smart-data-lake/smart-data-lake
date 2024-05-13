@@ -265,12 +265,17 @@ case class HistorizeAction(
 
     val newFeedDf = newDf.dropDuplicates(pks)
 
+    // if context is init check if column needs to be added -> save in needsHashColumn
+    if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
+      case Some(df) => Some(df.columns.contains(Historization.historizeHashColName))
+      case _ => Some(false)
+    }
+
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
       if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
-      // if context is init check if column needs to be added -> save in needsHashColumn
-      if (!context.isExecPhase) existingDfNeedsHashColumn = Some(existingDf.get.columns.contains(Historization.historizeHashColName))
+
       val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
       // note that schema evolution is done by output DataObject
       Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
