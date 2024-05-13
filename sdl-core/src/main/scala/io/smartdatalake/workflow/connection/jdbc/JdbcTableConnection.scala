@@ -58,6 +58,10 @@ import java.sql.{DriverManager, Connection => SqlConnection}
  *                         Default is directTableWrite=false, this will write data first into a temporary table, and then use
  *                         a "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
  *                         Also note that SDLSaveMode.Merge always creates a temporary table.
+ * @param connectionPoolTestOnBorrow flag to set the {@link GenericObjectPool}'s `testOnBorrow` property to {@code true} or {@code false}
+ * @param connectionPoolTestOnCreate flag to set the {@link GenericObjectPool}'s `testOnCreate` property to {@code true} or {@code false}
+ * @param connectionPoolTestOnReturn flag to set the {@link GenericObjectPool}'s `testOnReturn` property to {@code true} or {@code false}
+ * @param connectionPoolTestWhileIdle flag to set the {@link GenericObjectPool}'s `testWhileIdle` property to {@code true} or {@code false}
  */
 case class JdbcTableConnection(override val id: ConnectionId,
                                url: String,
@@ -70,6 +74,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") override val autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None,
                                directTableOverwrite: Boolean = false,
+                               connectionPoolTestOnBorrow: Boolean = false,
+                               connectionPoolTestOnCreate: Boolean = false,
+                               connectionPoolTestOnReturn: Boolean = false,
+                               connectionPoolTestWhileIdle: Boolean = false,
                                override val metadata: Option[ConnectionMetadata] = None,
                                ) extends Connection with JdbcExecution with SmartDataLakeLogger {
 
