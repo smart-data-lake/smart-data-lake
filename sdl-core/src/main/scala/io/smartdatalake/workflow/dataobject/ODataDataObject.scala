@@ -99,7 +99,7 @@ abstract class ODataResponseBuffer(setup: ODataResponseBufferSetup, context: Act
    * Creates and returns a DataFrame referencing the stored responses. Each response is one record.
    * @return : The Dataframe referencing the stored responses
    */
-  def getDataFrame(): DataFrame
+  def getDataFrame: DataFrame
 
   /**
    * Deletes all buffered responses and leaves the buffer empty.
@@ -319,6 +319,15 @@ class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSe
     filesystem.mkdirs(temporaryTargetDirectoryPath)
   }
 
+  /**
+   * Deletes all buffered responses and leaves the buffer empty.
+   */
+  override def cleanUp(): Unit =
+  {
+    super.cleanUp()
+    this.clearTemporaryDirectory()
+  }
+
   private def clearTemporaryDirectory() : Unit = {
     if (filesystem.exists(temporaryTargetDirectoryPath))
       filesystem.delete(temporaryTargetDirectoryPath, true)
@@ -463,6 +472,7 @@ case class ODataDataObject(override val id: DataObjectId,
   private var previousState : String = ""
   private var nextState : String = ""
   private var responseBuffer : ODataResponseBuffer = null
+
 
   /**
    * Calls the OData-API for one request.
@@ -753,7 +763,7 @@ case class ODataDataObject(override val id: DataObjectId,
       // create dataframe with the correct schema and add created_at column with the current timestamp
       val schemaExtended = s"struct< `@odata.context`: string, value: $schema>"
 
-      val responsesDf = this.responseBuffer.getDataFrame()
+      val responsesDf = this.responseBuffer.getDataFrame
         .select(from_json($"responseString", DataType.fromDDL(schemaExtended)).as("response"))
         .select(explode($"response.value").as("record"))
         .select("record.*")
