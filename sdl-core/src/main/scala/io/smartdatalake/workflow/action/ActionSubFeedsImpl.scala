@@ -146,10 +146,11 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
     // This way metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
-    val (outputSubFeeds,taskFailedException) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException])) {
-      case ((outputSubFeeds, taskFailedException), output) =>
+    val (outputSubFeeds,taskFailedException,noDataWarning) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException],Option.empty[NoDataToProcessWarning])) {
+      case ((outputSubFeeds, taskFailedException, noDataWarning), output) =>
         // find SubFeed for output and write it
         val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
+        // process this subFeed if there was no failure in previous subFeeds
         if (taskFailedException.isEmpty) {
           logWritingStarted(subFeed)
           val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
@@ -158,14 +159,26 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
               writeSubFeed(subFeed, isRecursiveInput)
             }
             logWritingFinished(outputSubFeed, d)
-            (outputSubFeeds :+ outputSubFeed, None)
+            (outputSubFeeds :+ outputSubFeed, taskFailedException, noDataWarning)
           } catch {
-            case ex: TaskFailedException => (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex))
+            // remember NoDataToProcessWarning on main output for later
+            case ex: NoDataToProcessWarning if mainOutputId.isEmpty || mainOutputId.contains(output.id) =>
+              logNoData(subFeed, isMainSubFeed = true)
+              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, Some(ex))
+            // ignore NoDataToProcessWarning if not main output
+            case ex: NoDataToProcessWarning =>
+              logNoData(subFeed, isMainSubFeed = false)
+              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, noDataWarning)
+            // remember taskedFailedException for next iteration and ignore processing of further feeds.
+            case ex: TaskFailedException =>
+              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex), noDataWarning)
           }
-        } else (outputSubFeeds :+ subFeed, taskFailedException)
+        } else (outputSubFeeds :+ subFeed, taskFailedException, noDataWarning)
     }
     // if there is a TaskFailedException, enrich it will all results and throw it.
     taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
+    // if there is a NoDataToProcessWarning, enrich it will all results and throw it.
+    noDataWarning.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
     // return processed SubFeeds
     outputSubFeeds
   }
@@ -249,6 +262,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     val metricsLog = orderMetrics(metrics, SortedSet("count", "records_written", "num_tasks"))
       .map( x => x._1+"="+x._2).mkString(" ")
     logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
+  }
+  protected def logNoData(subFeed: SubFeed, isMainSubFeed: Boolean)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"($id) got NoDataToProcessWarning when writing to ${subFeed.dataObjectId.id}. ${if (isMainSubFeed) "As this is the main output, Action will be set to skipped." else "As this is not the main output, Action will not be set to skipped."}")
   }
   private def orderMetrics(metrics: Map[String,Any], orderedKeys: SortedSet[String]): Seq[(String,Any)] = {
     orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)

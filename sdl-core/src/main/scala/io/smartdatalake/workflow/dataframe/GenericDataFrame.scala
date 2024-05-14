@@ -69,6 +69,10 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def createOrReplaceTempView(viewName: String): Unit
 
+  /**
+   * isEmpty evaluates the DataFrame and checks if the result size = 0.
+   * @return
+   */
   def isEmpty: Boolean
 
   def count: Long

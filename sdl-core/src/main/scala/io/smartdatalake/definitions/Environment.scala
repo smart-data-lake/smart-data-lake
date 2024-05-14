@@ -351,6 +351,22 @@ object Environment extends SmartDataLakeLogger {
   var _enableSparkFileDataObjectNoDataCheck: Option[Boolean] = None
 
   /**
+   * If enabled, Spark DataObjects check in spark plan if there is data available at runtime / evaluation time.
+   * This is implemented using a Spark Extension which checks runtime statistics.
+   * The operation throws an SparkPlanNoDataWarning if there is no data.
+   */
+  def enableSparkPlanNoDataCheck: Boolean = {
+    if (_enableSparkPlanNoDataCheck.isEmpty) {
+      _enableSparkPlanNoDataCheck = Some(
+        EnvironmentUtil.getSdlParameter("enableSparkPlanNoDataCheck")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _enableSparkPlanNoDataCheck.get
+  }
+  var _enableSparkPlanNoDataCheck: Option[Boolean] = None
+
+  /**
    * Maximal line length for DAG graph log, before switching to list mode.
    */
   def dagGraphLogMaxLineLength: Int = {

@@ -26,7 +26,7 @@ import io.smartdatalake.metrics.{SparkStreamingMetrics, SparkStreamingQueryListe
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
-import io.smartdatalake.util.spark.DummyStreamProvider
+import io.smartdatalake.util.spark.{DummyStreamProvider, SparkPlanNoDataWarning}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode
@@ -37,7 +37,6 @@ import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
-import java.util.concurrent.Semaphore
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
@@ -361,7 +360,13 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         assert(!preparedSubFeed.isStreaming.getOrElse(false), s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode!=${SparkStreamingMode.getClass.getSimpleName}")
         assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
-        val metrics = output.writeDataFrame(preparedSubFeed.dataFrame.get, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
+        val df = preparedSubFeed.dataFrame.get
+        val metrics = try {
+          output.writeDataFrame(df, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
+        } catch {
+          // map exception from enableSparkPlanNoDataCheck
+          case e: SparkPlanNoDataWarning => throw NoDataToProcessWarning(id.id, s"($id) ${e.getMessage}")
+        }
         // return
         preparedSubFeed.withMetrics(metrics).asInstanceOf[DataFrameSubFeed]
     }
