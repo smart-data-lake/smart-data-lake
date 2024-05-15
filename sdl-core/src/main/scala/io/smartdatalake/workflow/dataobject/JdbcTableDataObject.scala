@@ -345,7 +345,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsStatement(partitionValues))
       else transaction.execJdbcStatement(deleteAllDataStatement)
       // append into final table in one step, then commit
-      transaction.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable")
+      transaction.execJdbcStatement(s"insert into ${table.fullName} select * from ${tmpTable.fullName}")
       transaction.commit()
     } catch {
       case e: SQLException =>
