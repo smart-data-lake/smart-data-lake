@@ -64,7 +64,6 @@ class EncryptDecryptGCM(keyBytes: Array[Byte]) extends EncryptDecrypt {
 
   private def encodeData(gcmParameterSpec: GCMParameterSpec, encryptedMessage: Array[Byte]): String = {
     val data = gcmParameterSpec.getIV ++ encryptedMessage
-    println(Base64.getEncoder.encodeToString(gcmParameterSpec.getIV), Base64.getEncoder.encodeToString(encryptedMessage))
     Base64.getEncoder.encodeToString(data)
   }
 
