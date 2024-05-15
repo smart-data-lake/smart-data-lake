@@ -57,17 +57,20 @@ object SchemaEvolution extends SmartDataLakeLogger {
     * @param cols
     * @return
     */
-  def sortColumns(df: DataFrame, cols: Seq[String]): DataFrame = {
-    val dfCols = df.columns
-    val colsToSelect = cols.filter( c => dfCols.contains(c)).map(col)
+  def sortColumns(df: DataFrame, cols: Seq[String], caseSensitive: Boolean = false): DataFrame = {
+    val dfCols = if (caseSensitive) df.columns else df.columns.map(_.toLowerCase)
+    val colsToSelect = if (caseSensitive) cols.filter( c => dfCols.contains(c)).map(col)  else cols.filter(c => dfCols.contains(c.toLowerCase)).map(col)
     df.select(colsToSelect: _*)
   }
 
-  def getFieldTuples(dataFrame: DataFrame): Set[(String, String)] = {
-    getFieldTuples(dataFrame.schema)
+  def getFieldTuples(dataFrame: DataFrame, caseSensitive: Boolean = false): Set[(String, String)] = {
+    getFieldTuples(dataFrame.schema, caseSensitive)
   }
-  def getFieldTuples(schema: StructType): Set[(String, String)] = {
-    schema.fields.map(f => (f.name, f.dataType.simpleString)).toSet
+  def getFieldTuples(schema: StructType, caseSensitive: Boolean): Set[(String, String)] = {
+    if(caseSensitive)
+      schema.fields.map(f => (f.name, f.dataType.simpleString)).toSet
+    else
+      schema.fields.map(f => (f.name.toLowerCase, f.dataType.simpleString)).toSet
   }
 
   /**
@@ -77,11 +80,11 @@ object SchemaEvolution extends SmartDataLakeLogger {
     * @param newDf
     * @return
     */
-  def hasSameColNamesAndTypes(oldDf: DataFrame, newDf: DataFrame): Boolean = {
-    hasSameColNamesAndTypes(oldDf.schema, newDf.schema)
+  def hasSameColNamesAndTypes(oldDf: DataFrame, newDf: DataFrame, caseSensitiveComparison: Boolean = false): Boolean = {
+    hasSameColNamesAndTypes(oldDf.schema, newDf.schema, caseSensitiveComparison)
   }
-  def hasSameColNamesAndTypes(oldSchema: StructType, newSchema: StructType): Boolean = {
-    getFieldTuples(oldSchema) == getFieldTuples(newSchema)
+  def hasSameColNamesAndTypes(oldSchema: StructType, newSchema: StructType, caseSensitiveComparison: Boolean): Boolean = {
+    getFieldTuples(oldSchema, caseSensitiveComparison) == getFieldTuples(newSchema, caseSensitiveComparison)
   }
 
   /**
@@ -142,9 +145,10 @@ object SchemaEvolution extends SmartDataLakeLogger {
    * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns in result DataFrame's. Keeping deleted
    *                                      columns in complex data types has performance impact as all new data in the future
    *                                      has to be converted by a complex function.
+   * @param caseSensitiveComparison if true, all column names are handled case sensitive
    * @return tuple of (oldExtendedDf, newExtendedDf) evolved to new schema
    */
-  def process(oldDf: DataFrame, newDf: DataFrame, colsToIgnore: Seq[String] = Seq(), ignoreOldDeletedColumns: Boolean = false, ignoreOldDeletedNestedColumns: Boolean = true): (DataFrame, DataFrame) = {
+  def process(oldDf: DataFrame, newDf: DataFrame, colsToIgnore: Seq[String] = Seq(), ignoreOldDeletedColumns: Boolean = false, ignoreOldDeletedNestedColumns: Boolean = true, caseSensitiveComparison: Boolean = false): (DataFrame, DataFrame) = {
     // internal structure and functions
     case class ColumnDetail(name: String, oldToNewColumn: Option[Column], newColumn: Option[Column], infoMsg: Option[String], errMsg: Option[String] )
     def getNullColumnOfType(d: DataType) = lit(null).cast(d)
@@ -153,18 +157,27 @@ object SchemaEvolution extends SmartDataLakeLogger {
     logger.debug(s"old schema: ${oldDf.schema.treeString}")
     logger.debug(s"new schema: ${newDf.schema.treeString}")
 
-    val oldColsWithoutTechCols = oldDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
-    val newColsWithoutTechCols = newDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
+    val oldColsWithoutTechCols = if (caseSensitiveComparison) {
+      oldDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
+    } else {
+      oldDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase)).toSeq
+    }
+
+    val newColsWithoutTechCols = if (caseSensitiveComparison) {
+      newDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
+    } else {
+      newDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase)).toSeq
+    }
 
     // check if schema is identical
-    if (hasSameColNamesAndTypes(oldDf.select(oldColsWithoutTechCols.map(col): _*), newDf.select(newColsWithoutTechCols.map(col): _*))) {
+    if (hasSameColNamesAndTypes(oldDf.select(oldColsWithoutTechCols.map(col): _*), newDf.select(newColsWithoutTechCols.map(col): _*), caseSensitiveComparison)) {
       // check column order
       if (oldColsWithoutTechCols == newColsWithoutTechCols) {
         logger.info("Schemas are identical: no evolution needed")
         (oldDf, newDf)
       } else {
         logger.info("Schemas are identical but column order differs: columns of newDf are sorted according to oldDf")
-        val newSchemaOnlyCols = newDf.columns.diff(oldColsWithoutTechCols)
+        val newSchemaOnlyCols = if (caseSensitiveComparison) newDf.columns.diff(oldColsWithoutTechCols) else newDf.columns.diff(oldColsWithoutTechCols)
         (oldDf, newDf.select((oldColsWithoutTechCols ++ newSchemaOnlyCols).map(col): _*))
       }
     } else {
@@ -173,17 +186,19 @@ object SchemaEvolution extends SmartDataLakeLogger {
       // this defines the ordering of the resulting DataFrame's
       val tgtCols = if (Environment.schemaEvolutionNewColumnsLast) {
         // new columns last
-        oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ colsToIgnore
+        if (caseSensitiveComparison) oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ colsToIgnore
+        else oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ colsToIgnore.map(_.toLowerCase)
       } else {
         // deleted columns last
-        newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ colsToIgnore
+        if (caseSensitiveComparison) newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ colsToIgnore
+        else newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ colsToIgnore.map(_.toLowerCase)
       }
 
       // create mapping
       val tgtColumns = tgtCols.map {
         c =>
-          val oldType = oldDf.schema.fields.find(_.name == c).map(_.dataType)
-          val newType = newDf.schema.fields.find(_.name == c).map(_.dataType)
+          val oldType = if (caseSensitiveComparison) oldDf.schema.fields.find(_.name == c).map(_.dataType) else oldDf.schema.fields.find(_.name.toLowerCase == c.toLowerCase).map(_.dataType)
+          val newType = if (caseSensitiveComparison) newDf.schema.fields.find(_.name == c).map(_.dataType) else newDf.schema.fields.find(_.name.toLowerCase == c.toLowerCase).map(_.dataType)
           val thisColumn = Some(col(c))
           // define conversion
           val (oldToNewColumn, newColumn, infoMsg, errMsg) = (oldType,newType) match {
@@ -194,13 +209,13 @@ object SchemaEvolution extends SmartDataLakeLogger {
               (nullColumn, thisColumn, info, None)
             // column is old -> fill in new data with null
             case (Some(o),None) =>
-              val (oldToNewColumn,newColumn,info) = if (colsToIgnore.contains(c)) (thisColumn, None, Some(s"column $c is ignored because it is in the list of columns to ignore"))
+              val (oldToNewColumn,newColumn,info) = if (colsToIgnore.contains(if(caseSensitiveComparison) c else c.toLowerCase)) (thisColumn, None, Some(s"column $c is ignored because it is in the list of columns to ignore"))
               else if (ignoreOldDeletedColumns) (None, None, Some(s"column $c is old and will be removed because ignoreOldDeletedColumns=true"))
               else (thisColumn, Some(getNullColumnOfType(o).as(c)), Some(s"column $c is old and will be set to null for new records"))
               (oldToNewColumn, newColumn, info, None)
             // datatypes are *not* equal -> conversion of old to new datatype required
             case (Some(o),Some(n)) if o.simpleString != n.simpleString =>
-              val convertedColumns = convertDataType(col(c), o, n, ignoreOldDeletedNestedColumns)
+              val convertedColumns = convertDataType(col(if(caseSensitiveComparison) c else c.toLowerCase), o, n, ignoreOldDeletedNestedColumns)
               val info = if (convertedColumns.isDefined) Some(s"column $c is converted from ${o.simpleString}/${n.simpleString} to ${convertedColumns.get._3.simpleString}") else None
               val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.simpleString} to ${n.simpleString}") else None
               (convertedColumns.map(_._1.as(c)), convertedColumns.map(_._2.as(c)), info, err)

@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.evolution
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
@@ -38,19 +39,19 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
   test("Schema with same column names and types need to be identical") {
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
-    assert(SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew))
+    assert(SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
   test("Schema with different columns") {
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("c", IntegerType)))
-    assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew))
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
   test("Different Schema: same column names but different types") {
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StringType)))
-    assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew))
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
   test("Old and new schema with different sorting are identical, no matter in which order, but newDf is sorted according to oldDf") {
