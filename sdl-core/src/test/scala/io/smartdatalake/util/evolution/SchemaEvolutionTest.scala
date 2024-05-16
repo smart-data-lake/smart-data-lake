@@ -654,4 +654,47 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
+  test("CaseSensitive: DataFrame with same column names but different datatypes are recognized") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType)
+    ))
+
+    val schemaNew = StructType(List(
+      StructField("SF_NR_1", StringType),
+      StructField("SF_NR_2", StringType),
+      StructField("SF_NR_3", StringType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", StringType),
+      StructField("SF_NR_5", StringType),
+      StructField("SF_NR_6", StringType),
+      StructField("sf_str_3", StringType)
+    ))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf, Environment.caseSensitive))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
