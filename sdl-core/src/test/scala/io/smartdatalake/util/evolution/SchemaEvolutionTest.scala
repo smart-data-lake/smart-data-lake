@@ -976,4 +976,30 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
+  test("CaseSensitive: Changed data type of array type") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("B", ArrayType(FloatType))))
+    val schemaNew = StructType(List(StructField("a", StringType), StructField("B", ArrayType(DoubleType))))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+    assert(oldEvoDf.schema("B").dataType.asInstanceOf[ArrayType].elementType == DoubleType)
+
+    assert(oldEvoDf.select(explode(col("B"))).count() > 0)
+    assert(newEvoDf.select(explode(col("B"))).count() > 0)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+
+  }
+
 }
