@@ -23,6 +23,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{StructField, _}
 import org.scalatest.FunSuite
 import org.scalatestplus.scalacheck.Checkers
@@ -483,4 +484,66 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(oldEvoDf.select(explode(col("b.b3"))).count()>0)
     assert(newEvoDf.select(explode(col("b.b3"))).count()>0)
   }
+
+  test("CaseSensitive: Old and new schema with different sorting are identical, no matter in which order, but newDf is sorted according to oldDf") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_6", StringType)
+    ))
+
+    val schemaNew = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_6", StringType)
+    ))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    // old -> new
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf, Environment.caseSensitive))
+    assert(SchemaEvolution.newColumns(oldDf, newDf).isEmpty)
+    assert(SchemaEvolution.deletedColumns(oldDf, newDf).isEmpty)
+
+    // new -> old
+    assert(SchemaEvolution.hasSameColNamesAndTypes(newDf, oldDf, Environment.caseSensitive))
+    assert(SchemaEvolution.newColumns(newDf, oldDf).isEmpty)
+    assert(SchemaEvolution.deletedColumns(newDf, oldDf).isEmpty)
+
+    // schema evolution sorts newDf according to oldDf
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(oldEvoDf.columns.toSeq == newEvoDf.columns.toSeq)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
