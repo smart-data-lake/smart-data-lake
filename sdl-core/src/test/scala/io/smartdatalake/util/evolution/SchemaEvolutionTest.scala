@@ -755,4 +755,59 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
 
   }
 
+  test("CaseSensitive: Cornercase renamed column: column with old name still exists but empty, new column inserted") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    // column renamed?
+    val schemaOld = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_6", StringType)
+    ))
+
+    val schemaNew = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_6_1", StringType)
+    ))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+
+    val deletedCols = SchemaEvolution.deletedColumns(oldDf, newDf)
+    assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet ++ deletedCols)
+    assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet ++ deletedCols)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
