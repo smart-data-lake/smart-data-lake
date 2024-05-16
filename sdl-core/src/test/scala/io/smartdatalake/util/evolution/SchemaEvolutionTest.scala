@@ -897,4 +897,31 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
 
   }
 
+  test("CaseSensitive: Columns of result are ordered by default according to oldDf, then newColumns, then cols2Ignore") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(StructField("A", StringType), StructField("b", IntegerType), StructField("C", IntegerType), StructField("dl_ts_captured", TimestampType), StructField("dl_ts_delimited", TimestampType)))
+    val schemaNew = StructType(List(StructField("A", StringType), StructField("b", IntegerType), StructField("d", IntegerType)))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore, caseSensitiveComparison = Environment.caseSensitive)
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+
+    val tgtColOrder = Seq("A", "b", "C", "d")
+    assert(oldEvoDf.columns.toSeq == tgtColOrder ++ colsToIgnore)
+    assert(newEvoDf.columns.toSeq == tgtColOrder)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+
+  }
+
 }
