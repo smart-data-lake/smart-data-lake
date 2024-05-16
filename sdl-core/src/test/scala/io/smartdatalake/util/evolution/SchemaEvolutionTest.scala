@@ -609,4 +609,49 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
+  test("CaseSensitive: DataFrame columns should be sorted in a specific order") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schema = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("dl_ts_delimited", StringType),
+      StructField("dl_ts_captured", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType)
+    ))
+
+    val df = TestUtil.arbitraryDataFrame(schema)
+
+    val order = Seq(
+      "SF_NR_3",
+      "SF_NR_1",
+      "SF_NR_2",
+      "sf_str_1",
+      "sf_str_2",
+      "SF_NR_4",
+      "SF_NR_5",
+      "SF_NR_6",
+      "sf_str_3",
+      "dl_ts_captured",
+      "dl_ts_delimited"
+    )
+    val colSortedDf = SchemaEvolution.sortColumns(df, order, Environment.caseSensitive)
+
+    assert(colSortedDf.columns.map(c => c).toSeq == order)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
