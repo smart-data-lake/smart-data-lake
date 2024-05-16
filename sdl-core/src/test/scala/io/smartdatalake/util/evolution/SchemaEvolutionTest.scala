@@ -924,4 +924,31 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
 
   }
 
+  test("CaseSensitive: New column in struct type") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType))))))
+    val schemaNew = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType), StructField("B3", IntegerType))))))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+    assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("B3").dataType == IntegerType)
+
+    oldEvoDf.cache()
+    assert(oldEvoDf.count() > 0)
+    assert(oldEvoDf.where(col("b.B3").isNull).count() > 0)
+    assert(newEvoDf.count() > 0)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
