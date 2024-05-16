@@ -546,4 +546,67 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
+
+  test("CaseSensitive: New columns: new column exists in addition to existing columns") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_6", StringType)
+    ))
+
+    val schemaNew = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_6", StringType),
+      StructField("SF_NEW_STR_1", StringType),
+      StructField("sf_new_double_1", DoubleType),
+      StructField("sf_new_double_2", DoubleType),
+      StructField("sf_new_double", StringType)
+    ))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    assert(SchemaEvolution.newColumns(oldDf, newDf).toSet == Set("SF_NEW_STR_1", "sf_new_double_1", "sf_new_double_2", "sf_new_double"))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+
+    assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
+    assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
+
+    assert(oldEvoDf.count() > 0)
+    assert(newEvoDf.count() > 0)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
