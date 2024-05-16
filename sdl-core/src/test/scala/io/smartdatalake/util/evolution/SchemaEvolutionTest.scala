@@ -810,4 +810,56 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
+  test("CaseSensitive: New columns and technical cols to ignore") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("dl_ts_captured", TimestampType),
+      StructField("dl_ts_delimited", TimestampType)
+    ))
+
+    val schemaNew = StructType(List(
+      StructField("SF_NR_1", IntegerType),
+      StructField("SF_NR_2", IntegerType),
+      StructField("SF_NR_3", IntegerType),
+      StructField("sf_str_1", StringType),
+      StructField("sf_str_2", StringType),
+      StructField("SF_NR_4", IntegerType),
+      StructField("SF_NR_5", IntegerType),
+      StructField("SF_NR_6", IntegerType),
+      StructField("sf_str_3", StringType),
+      StructField("sf_str_4", StringType),
+      StructField("SF_TIME_1", TimestampType),
+      StructField("sf_str_5", StringType),
+      StructField("sf_str_6", StringType)
+    ))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore, caseSensitiveComparison = Environment.caseSensitive)
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+
+    assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet ++ colsToIgnore)
+    assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  }
+
 }
