@@ -862,4 +862,39 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
   }
 
+  test("CaseSensitive: Numerical columns can be cast to String") {
+
+    // Prepare case sensitivity
+    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    Environment._caseSensitive = Some(true)
+
+    val schemaOld = StructType(List(
+      StructField("sf_nr_1", IntegerType),
+      StructField("SF_NR_2", LongType),
+      StructField("sf_nr_3", DoubleType)
+    ))
+
+    val schemaNew = StructType(List(
+      StructField("sf_nr_1", StringType),
+      StructField("SF_NR_2", StringType),
+      StructField("sf_nr_3", StringType)
+    ))
+
+    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
+    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
+    assert(oldEvoDf.schema.map(s => s.dataType).distinct == Seq(StringType))
+
+    assert(oldEvoDf.count() > 0)
+    assert(newEvoDf.count() > 0)
+
+    // clean up case sensitivity
+    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+
+  }
+
 }
