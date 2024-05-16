@@ -177,7 +177,7 @@ object SchemaEvolution extends SmartDataLakeLogger {
         (oldDf, newDf)
       } else {
         logger.info("Schemas are identical but column order differs: columns of newDf are sorted according to oldDf")
-        val newSchemaOnlyCols = if (caseSensitiveComparison) newDf.columns.diff(oldColsWithoutTechCols) else newDf.columns.diff(oldColsWithoutTechCols)
+        val newSchemaOnlyCols = newDf.columns.diff(oldColsWithoutTechCols)
         (oldDf, newDf.select((oldColsWithoutTechCols ++ newSchemaOnlyCols).map(col): _*))
       }
     } else {
