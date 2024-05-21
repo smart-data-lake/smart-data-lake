@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
-import io.smartdatalake.util.misc.{JdbcExecution, JdbcUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{ConnectionPoolConfig, JdbcExecution, JdbcUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcCatalog}
 import io.smartdatalake.workflow.dataobject.HttpProxyConfig
 import net.snowflake.spark.snowflake.Utils
@@ -65,7 +65,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
   // prepare JDBC catalog implementation
   val catalog: JdbcCatalog = new DefaultJdbcCatalog(this)
   // setup JDBC connection pool for metadata and ddl queries
-  override val pool: GenericObjectPool[SqlConnection] = JdbcUtil.createConnectionPool(maxParallelConnections = 3, connectionPoolMaxIdleTimeSec = 3, connectionPoolMaxWaitTimeSec = 600, () => Utils.getJDBCConnection(getJdbcAuthOptions("")), initSql = None, autoCommit = false)
+  override val pool: GenericObjectPool[SqlConnection] = ConnectionPoolConfig().create(maxParallelConnections = 3, () => Utils.getJDBCConnection(getJdbcAuthOptions("")), initSql = None, autoCommit = false)
   // set autoCommit=false as recommended
   override val autoCommit: Boolean = false
   override val jdbcDialect: JdbcDialect = JdbcDialects.get("snowflake")

@@ -30,38 +30,9 @@ import java.time.Duration
 
 object JdbcUtil {
 
-  /**
-   * Create a JDBC Connection Pool
-   *
-   * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
-   * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
-   * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
-   * @param factoryFun factory method for JDBC Connections
-   * @param initSql sql statement to be executed on new connections
-   * @param autoCommit if auto-commit should be enabled
-   * @param connectionPoolTestOnBorrow if testOnBorrow should be enabled
-   * @param connectionPoolTestOnCreate if testOnCreate should be enabled
-   * @param connectionPoolTestOnReturn if testOnReturn should be enabled
-   * @param connectionPoolTestWhileIdle if testWhileIdle should be enabled
-   * @return the created {@code GenericObjectPool} object
-   */
-  def createConnectionPool(maxParallelConnections: Int, connectionPoolMaxIdleTimeSec: Int, connectionPoolMaxWaitTimeSec: Int, factoryFun: () => SqlConnection, initSql: Option[String], autoCommit: Boolean, connectionPoolTestOnBorrow: Boolean = false, connectionPoolTestOnCreate: Boolean = false, connectionPoolTestOnReturn: Boolean = false, connectionPoolTestWhileIdle: Boolean = false): GenericObjectPool[SqlConnection] = {
-    // setup connection pool
-    val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory(factoryFun, initSql, autoCommit))
-    pool.setMaxTotal(maxParallelConnections)
-    pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close jdbc connection if not in use
-    pool.setMaxWait(Duration.ofSeconds(connectionPoolMaxWaitTimeSec))
-    pool.setTestOnBorrow(connectionPoolTestOnBorrow)
-    pool.setTestOnCreate(connectionPoolTestOnCreate)
-    pool.setTestOnReturn(connectionPoolTestOnReturn)
-    pool.setTestWhileIdle(connectionPoolTestWhileIdle)
-    pool
-  }
-
   def createTransaction(pool: GenericObjectPool[SqlConnection], autoCommit: Boolean, logging: Boolean, id: ConfigObjectId): JdbcTransaction = {
     new JdbcTransaction(pool, autoCommit, logging, id)
   }
-
 
   def execWithJdbcStatement[A](conn: SqlConnection, doCommit: Boolean, autoCommit: Boolean)(func: Statement => A): A = {
     var stmt: Statement = null
@@ -124,7 +95,7 @@ private[smartdatalake] class JdbcTransaction(pool: GenericObjectPool[SqlConnecti
 }
 
 
-private[smartdatalake] class JdbcClientPoolFactory(factoryFun: () => SqlConnection, initSql: Option[String], autoCommit: Boolean) extends BasePooledObjectFactory[SqlConnection] {
+private[smartdatalake] class JdbcClientPoolFactory(factoryFun: () => SqlConnection, initSql: Option[String], validationTimeoutSec: Int, autoCommit: Boolean) extends BasePooledObjectFactory[SqlConnection] with SmartDataLakeLogger {
   override def create(): SqlConnection = {
     val connection = factoryFun()
     initConnection(connection)
@@ -142,6 +113,12 @@ private[smartdatalake] class JdbcClientPoolFactory(factoryFun: () => SqlConnecti
     })
     connection.setAutoCommit(autoCommit)
     connection
+  }
+
+  override def validateObject(p: PooledObject[SqlConnection]): Boolean = {
+    val valid = p.getObject.isValid(validationTimeoutSec)
+    if (!valid) logger.warn("SqlConnection was not valid. GenericObjectPool will try to create a new one.")
+    return valid
   }
 
   override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
@@ -212,4 +189,57 @@ trait JdbcExecution { this: Connection with SmartDataLakeLogger =>
    * from Spark are finished before beginning a transaction.
    */
   def beginTransaction(): JdbcTransaction = JdbcUtil.createTransaction(pool, autoCommit, logging = true, id)
+}
+
+
+
+/**
+ * Configuration to tune JDBC connection pool settings
+ *
+ * @param maxIdleTimeSec timeout to close unused connections in the pool
+ * @param maxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
+ * @param testOnBorrow flag to set the {@link GenericObjectPool}'s `testOnBorrow` property to {@code true} or {@code false}
+ * @param testOnCreate flag to set the {@link GenericObjectPool}'s `testOnCreate` property to {@code true} or {@code false}
+ * @param testOnReturn flag to set the {@link GenericObjectPool}'s `testOnReturn` property to {@code true} or {@code false}
+ * @param testWhileIdle flag to set the {@link GenericObjectPool}'s `testWhileIdle` property to {@code true} or {@code false}
+ * @param testTimeoutSec Timeout in seconds for connection.isValid call.
+ */
+case class ConnectionPoolConfig (
+                                  maxIdleTimeSec: Int = 3,
+                                  maxWaitTimeSec: Int = 600,
+                                  testOnBorrow: Boolean = false,
+                                  testOnCreate: Boolean = false,
+                                  testOnReturn: Boolean = false,
+                                  testWhileIdle: Boolean = false,
+                                  testTimeoutSec: Int = 3,
+                                ) {
+  /**
+   * Override with deprecated configuration values.
+   * This can be removed once deprecated properties are removed...
+   */
+  def withOverride(maxIdleTimeSec: Option[Int], maxWaitTimeSec: Option[Int]): ConnectionPoolConfig = {
+    this.copy(maxIdleTimeSec = maxIdleTimeSec.getOrElse(this.maxIdleTimeSec), maxWaitTimeSec = maxWaitTimeSec.getOrElse(this.maxWaitTimeSec))
+  }
+
+  /**
+   * Create a JDBC Connection Pool using this configuration.
+   *
+   * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
+   * @param factoryFun factory method for JDBC Connections
+   * @param initSql sql statement to be executed on new connections
+   * @param autoCommit if auto-commit should be enabled
+   * @return the created {@code GenericObjectPool} object
+   */
+  def create(maxParallelConnections: Int, factoryFun: () => SqlConnection, initSql: Option[String], autoCommit: Boolean): GenericObjectPool[SqlConnection] = {
+    // setup connection pool
+    val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory(factoryFun, initSql, testTimeoutSec, autoCommit))
+    pool.setMaxTotal(maxParallelConnections)
+    pool.setMinEvictableIdle(Duration.ofSeconds(maxIdleTimeSec)) // timeout to close jdbc connection if not in use
+    pool.setMaxWait(Duration.ofSeconds(maxWaitTimeSec))
+    pool.setTestOnBorrow(testOnBorrow)
+    pool.setTestOnCreate(testOnCreate)
+    pool.setTestOnReturn(testOnReturn)
+    pool.setTestWhileIdle(testWhileIdle)
+    pool
+  }
 }
