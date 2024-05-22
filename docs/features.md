@@ -103,3 +103,4 @@ More details on the roadmap will follow shortly.
 
 ## Housekeeping
 * Delete, or archive & compact partitions according to configurable expressions
+* Extend with custom housekeeping logic
