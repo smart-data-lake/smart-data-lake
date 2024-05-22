@@ -3,7 +3,7 @@ id: notebookCatalog
 title: Use in Notebooks
 ---
 
-SDLB can also be used in Notebooks. On one side SDLB can provide a high-quality catalog of data objects, and on the other hand it helps to easily prototype transformations in an interactive Notebook environment, and then transfer them to repository for production use.
+SDLB can also be used in Notebooks. On one side SDLB can provide a high-quality catalog of data objects, and on the other side it helps to easily prototype transformations in an interactive Notebook environment, and then transfer them to repository for production use.
 
 This page describes configuration of the project, installation in Databricks Notebooks and shows some examples.
 
@@ -69,7 +69,7 @@ The LabCatalogGenerator creates source code for class `ActionCatalog` and `DataO
 
 Once generated, the fat-jar (created with maven profile `fat-jar`) and SDLB configuration files have to be uploaded into a Databricks Volume. Then create a Databricks Cluster with the fat-jar as Library and Environment Variable `JNAME=zulu17-ca-amd64` to use Java 17.
 
-Make your SDLB data pipeline did run at least once, so that tables are existing. A simple Databricks Job configuration can look as follows:
+Make sure your SDLB data pipeline runs at least once to ensure that tables exist. A simple Databricks Job configuration can look as follows:
 
 ![Databricks SDLB Job](../images/databricks_job.png)
 
