@@ -127,7 +127,7 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
     // prepare default options
     val defaultOptions = Seq(
       Some(IS_EXEC -> context.isExecPhase.toString),
-      if (outputDataObjectIds.size == 1) Some(OptionsGenericDfsTransformer.OUTPUT_DATAOBJECT_ID -> outputDataObjectIds.head) else None
+      if (outputDataObjectIds.size == 1) Some(OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID -> outputDataObjectIds.head) else None
     ).flatten.toMap
     // transform
     transformWithOptions(actionId, partitionValues, dfs, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
@@ -141,7 +141,7 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
 }
 object OptionsGenericDfsTransformer {
   final val IS_EXEC = "isExec"
-  final val OUTPUT_DATAOBJECT_ID = "outputDataObjectId"
+  final val OPTION_OUTPUT_DATAOBJECT_ID = "outputDataObjectId"
 }
 
 /**

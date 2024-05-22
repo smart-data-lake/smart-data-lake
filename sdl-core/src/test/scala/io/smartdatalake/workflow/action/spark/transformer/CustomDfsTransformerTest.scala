@@ -142,7 +142,7 @@ class CustomDfsTransformerTest extends FunSuite {
     val transformMethodsOfSubclass = CustomCodeUtil.getClassMethodsByName(transformer.getClass, "transform")
       .filter(_.owner != typeOf[CustomDfsTransformer].typeSymbol)
     val transformMethod = transformMethodsOfSubclass.head
-    val params = CustomCodeUtil.analyzeMethodParameters(transformer, transformMethod)
+    val params = CustomCodeUtil.analyzeMethodParameters(Some(transformer), transformMethod)
     assert(params.find(_.name == "defaultBoolean").get.defaultValue.nonEmpty)
   }
 

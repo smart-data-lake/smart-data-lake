@@ -218,6 +218,8 @@ trait GenericDataFrame extends GenericTypedObject {
    */
   def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
 
+  def apply(columnName: String): GenericColumn
+
 }
 
 /**
@@ -286,8 +288,8 @@ trait GenericColumn extends GenericTypedObject {
    * Convert expression to SQL representation
    */
   def exprSql: String
-
   def desc: GenericColumn
+  def apply(extraction: Any): GenericColumn
 }
 
 /**

@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, SparkStreamingMode}
@@ -81,9 +81,18 @@ case class CustomDataFrameAction(override val id: ActionId,
 
   validateConfig()
 
+  private[smartdatalake] def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfsTransformerDef] = {
+    transformers ++ transformer.map(_.impl)
+  }
+
   override def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val partitionValues = getMainPartitionValues(inputSubFeeds)
-    applyTransformers(transformers ++ transformer.map(_.impl), partitionValues, inputSubFeeds, outputSubFeeds)
+    val outputDfsMap = applyTransformers(getTransformers, partitionValues, inputSubFeeds)
+    // create output subfeeds from transformed dataframes
+    outputSubFeeds.map { subFeed=>
+      val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDfsMap.keys.mkString(", ")}."))
+      subFeed.withDataFrame(Some(df))
+    }
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {

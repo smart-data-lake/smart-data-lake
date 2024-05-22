@@ -93,7 +93,7 @@ private[smartdatalake] object CustomCodeUtil {
    * @param method method symbol to read signature from
    * @return a Map with parameter names and their default values.
    */
-  def getMethodParameterDefaultValues(instance: Any, method: universe.MethodSymbol): Map[String, Any] = {
+  def getMethodParameterDefaultValues(instance: AnyRef, method: universe.MethodSymbol): Map[String, Any] = {
     val instanceMirror = runtimeMirror.reflect(instance)
     val classType = instanceMirror.symbol.toType
     method.paramLists.head.zipWithIndex.flatMap {
@@ -119,12 +119,12 @@ private[smartdatalake] object CustomCodeUtil {
 
   /**
    * Extract method parameters with default values through reflection.
-   * @param instance: class instance for method to inspect
+   * @param instance: class instance for method to inspect. Needed to get parameter default values.
    * @param method: method symbol to inspect
    */
-  def analyzeMethodParameters(instance: Any, method: universe.MethodSymbol): Seq[MethodParameterInfo] = {
+  def analyzeMethodParameters(instance: Option[AnyRef], method: universe.MethodSymbol): Seq[MethodParameterInfo] = {
     val parameters = method.paramLists.head
-    val defaultValues = getMethodParameterDefaultValues(instance, method)
+    val defaultValues = instance.map(i => getMethodParameterDefaultValues(i, method)).getOrElse(Map())
     parameters.map { p =>
       MethodParameterInfo(p.name.toString, p.typeSignature, defaultValues.get(p.name.toString))
     }
