@@ -186,12 +186,10 @@ object SchemaEvolution extends SmartDataLakeLogger {
       // this defines the ordering of the resulting DataFrame's
       val tgtCols = if (Environment.schemaEvolutionNewColumnsLast) {
         // new columns last
-        if (caseSensitiveComparison) oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ colsToIgnore
-        else oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ colsToIgnore.map(_.toLowerCase)
+        oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ (if (caseSensitiveComparison) colsToIgnore else colsToIgnore.map(_.toLowerCase))
       } else {
         // deleted columns last
-        if (caseSensitiveComparison) newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ colsToIgnore
-        else newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ colsToIgnore.map(_.toLowerCase)
+        newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ (if (caseSensitiveComparison) colsToIgnore else colsToIgnore.map(_.toLowerCase))
       }
 
       // create mapping
