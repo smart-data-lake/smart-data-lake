@@ -100,7 +100,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString).toMap)
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
-  def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head))
+  def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head)).distinct
 
   /**
    * lists modification date of partition folders
