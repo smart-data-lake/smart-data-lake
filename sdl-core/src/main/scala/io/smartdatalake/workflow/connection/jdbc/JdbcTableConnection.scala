@@ -36,14 +36,14 @@ import org.apache.spark.sql.types.StructType
 import java.sql.{DriverManager, Connection => SqlConnection}
 
 /**
- * Connection information for jdbc tables.
+ * Connection information for JDBC tables.
  * If authentication is needed, user and password must be provided.
  *
  * @param id unique id of this connection
  * @param url jdbc connection url
  * @param driver class name of jdbc driver
  * @param authMode optional authentication information: for now BasicAuthMode is supported.
- * @param db jdbc database
+ * @param db optional jdbc database to be used by tables having this connection assigned.
  * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
@@ -54,7 +54,7 @@ import java.sql.{DriverManager, Connection => SqlConnection}
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
  * @param directTableOverwrite flag to enable overwriting target tables directly without creating temporary table.
  *                         Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
- *                         For SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
+ *                         For SaveMode.Append this is ok, but it is problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
  *                         Default is directTableWrite=false, this will write data first into a temporary table, and then use
  *                         a "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
  *                         Also note that SDLSaveMode.Merge always creates a temporary table.
@@ -65,11 +65,15 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                authMode: Option[AuthMode] = None,
                                db: Option[String] = None,
                                maxParallelConnections: Int = 3,
-                               connectionPoolMaxIdleTimeSec: Int = 3,
-                               connectionPoolMaxWaitTimeSec: Int = 600,
-                               @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0") override val autoCommit: Boolean = false,
+                               @Deprecated @deprecated("Use connectionPool.maxIdleTimeSec instead.", "2.6.1")
+                               connectionPoolMaxIdleTimeSec: Option[Int] = None,
+                               @Deprecated @deprecated("Use connectionPool.maxWaitTimeSec instead.", "2.6.1")
+                               connectionPoolMaxWaitTimeSec: Option[Int] = None,
+                               @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0")
+                               override val autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None,
                                directTableOverwrite: Boolean = false,
+                               connectionPool: ConnectionPoolConfig = ConnectionPoolConfig(),
                                override val metadata: Option[ConnectionMetadata] = None,
                                ) extends Connection with JdbcExecution with SmartDataLakeLogger {
 
@@ -80,7 +84,9 @@ case class JdbcTableConnection(override val id: ConnectionId,
   // prepare catalog implementation
   val catalog: JdbcCatalog = JdbcCatalog.fromJdbcDriver(driver, this)
   // setup connection pool
-  override val pool: GenericObjectPool[SqlConnection] = JdbcUtil.createConnectionPool(maxParallelConnections, connectionPoolMaxIdleTimeSec, connectionPoolMaxWaitTimeSec, getConnection _, connectionInitSql, autoCommit)
+  override val pool: GenericObjectPool[SqlConnection] = connectionPool
+    .withOverride(connectionPoolMaxIdleTimeSec, connectionPoolMaxWaitTimeSec)
+    .create(maxParallelConnections, getConnection _, connectionInitSql, autoCommit)
   override val jdbcDialect: JdbcDialect = JdbcDialects.get(url)
 
   def test(): Unit = {
@@ -153,3 +159,4 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
     extract[JdbcTableConnection](config)
   }
 }
+
