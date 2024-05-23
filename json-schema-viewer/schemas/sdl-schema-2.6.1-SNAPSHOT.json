@@ -584,7 +584,7 @@
           },
           "db" : {
             "type" : "string",
-            "description" : "jdbc database"
+            "description" : "optional jdbc database to be used by tables having this connection assigned."
           },
           "maxParallelConnections" : {
             "type" : "integer",
@@ -592,11 +592,13 @@
           },
           "connectionPoolMaxIdleTimeSec" : {
             "type" : "integer",
-            "description" : "timeout to close unused connections in the pool"
+            "description" : "timeout to close unused connections in the pool",
+            "deprecated" : true
           },
           "connectionPoolMaxWaitTimeSec" : {
             "type" : "integer",
-            "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
+            "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).",
+            "deprecated" : true
           },
           "autoCommit" : {
             "type" : "boolean",
@@ -609,7 +611,43 @@
           },
           "directTableOverwrite" : {
             "type" : "boolean",
-            "description" : "flag to enable overwriting target tables directly without creating temporary table.\nBackground: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.\nFor SaveMode.Append this is ok, but it problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.\nDefault is directTableWrite=false, this will write data first into a temporary table, and then use\na \"DELETE\" + \"INSERT INTO SELECT\" statement to overwrite data in the target table within one transaction.\nAlso note that SDLSaveMode.Merge always creates a temporary table."
+            "description" : "flag to enable overwriting target tables directly without creating temporary table.\nBackground: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.\nFor SaveMode.Append this is ok, but it is problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.\nDefault is directTableWrite=false, this will write data first into a temporary table, and then use\na \"DELETE\" + \"INSERT INTO SELECT\" statement to overwrite data in the target table within one transaction.\nAlso note that SDLSaveMode.Merge always creates a temporary table."
+          },
+          "connectionPool" : {
+            "type" : "object",
+            "properties" : {
+              "maxIdleTimeSec" : {
+                "type" : "integer",
+                "description" : "timeout to close unused connections in the pool"
+              },
+              "maxWaitTimeSec" : {
+                "type" : "integer",
+                "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
+              },
+              "testOnBorrow" : {
+                "type" : "boolean",
+                "description" : "flag to set the {"
+              },
+              "testOnCreate" : {
+                "type" : "boolean",
+                "description" : "flag to set the {"
+              },
+              "testOnReturn" : {
+                "type" : "boolean",
+                "description" : "flag to set the {"
+              },
+              "testWhileIdle" : {
+                "type" : "boolean",
+                "description" : "flag to set the {"
+              },
+              "testTimeoutSec" : {
+                "type" : "integer",
+                "description" : "Timeout in seconds for connection.isValid call."
+              }
+            },
+            "title" : "ConnectionPoolConfig",
+            "additionalProperties" : false,
+            "description" : "Configuration to tune JDBC connection pool settings\n\nOTHERTAG: GenericObjectPool}'s `testOnBorrow` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}\n\nOTHERTAG: GenericObjectPool}'s `testOnCreate` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}\n\nOTHERTAG: GenericObjectPool}'s `testOnReturn` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}\n\nOTHERTAG: GenericObjectPool}'s `testWhileIdle` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
@@ -618,7 +656,7 @@
         "title" : "JdbcTableConnection",
         "required" : [ "type", "url", "driver" ],
         "additionalProperties" : false,
-        "description" : "Connection information for jdbc tables.\nIf authentication is needed, user and password must be provided."
+        "description" : "Connection information for JDBC tables.\nIf authentication is needed, user and password must be provided."
       },
       "KafkaConnection" : {
         "type" : "object",
