@@ -21,6 +21,7 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject.Table
 
@@ -51,6 +52,7 @@ object SQLUtil {
     val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
     val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
     val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(columns.diff(targetTable.primaryKey.get)).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
+
     val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
     val insertCols = columns.diff(saveModeOptions.insertColumnsToIgnore)
     val insertSpecStr = insertCols.map(quoteCaseSensitiveColumn).reduce(_+", "+_)
@@ -62,6 +64,24 @@ object SQLUtil {
     | WHEN MATCHED $updateConditionStr THEN UPDATE SET $updateSpecStr
     | WHEN NOT MATCHED $insertConditionStr THEN INSERT ($insertSpecStr) VALUES ($insertValueSpecStr)
     """.stripMargin
+  }
+
+  def createUpdateExistingStatement(targetTable: Table, columns: Seq[String], tmpTableName: String, saveModeOptions: SaveModeMergeOptions, quoteCaseSensitiveColumn: String => String): Option[String] = {
+
+    if (saveModeOptions.updateExistingCondition.isDefined) {
+      val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
+      val joinConditionStr = targetTable.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_ + " AND " + _)
+      val updateExistingConditionStr = saveModeOptions.updateExistingCondition.map(c => s" AND $c").getOrElse("")
+      val updateExistingSpecStr = columns.diff(Seq(Historization.historizeOperationColName)).map(colName => s"existing.$colName = new.$colName").reduce(_ + ", " + _)
+
+      Some(s"""
+         | MERGE INTO ${targetTable.fullName} as existing
+         | USING (SELECT * from $tmpTableName) as new
+         | ON $joinConditionStr $additionalMergePredicateStr
+         | WHEN MATCHED $updateExistingConditionStr THEN UPDATE SET $updateExistingSpecStr
+
+    """.stripMargin)
+    } else None
   }
 
   /**
