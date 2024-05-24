@@ -196,12 +196,12 @@ trait JdbcExecution { this: Connection with SmartDataLakeLogger =>
 /**
  * Configuration to tune JDBC connection pool settings
  *
- * @param maxIdleTimeSec timeout to close unused connections in the pool
+ * @param maxIdleTimeSec timeout to close unused connections in the pool. Default is 3 seconds.
  * @param maxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
- * @param testOnBorrow flag to set the {@link GenericObjectPool}'s `testOnBorrow` property to {@code true} or {@code false}
- * @param testOnCreate flag to set the {@link GenericObjectPool}'s `testOnCreate` property to {@code true} or {@code false}
- * @param testOnReturn flag to set the {@link GenericObjectPool}'s `testOnReturn` property to {@code true} or {@code false}
- * @param testWhileIdle flag to set the {@link GenericObjectPool}'s `testWhileIdle` property to {@code true} or {@code false}
+ * @param testOnBorrow flag to set the GenericObjectPool's `testOnBorrow`. If true the connection pool will validate the connection before it is lend. Default is false.
+ * @param testOnCreate flag to set the GenericObjectPool's `testOnCreate`. If true the connection pool will validate the connection when it is created. Default is false.
+ * @param testOnReturn flag to set the GenericObjectPool's `testOnReturn`. If true the connection pool will validate the connection after it is returned. Default is false.
+ * @param testWhileIdle flag to set the GenericObjectPool's `testWhileIdle`. If true the connection pool will validate the connection periodically while it is idle. Default is false.
  * @param testTimeoutSec Timeout in seconds for connection.isValid call.
  */
 case class ConnectionPoolConfig (

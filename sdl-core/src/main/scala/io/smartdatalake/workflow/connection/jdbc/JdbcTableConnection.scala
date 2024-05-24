@@ -47,8 +47,8 @@ import java.sql.{DriverManager, Connection => SqlConnection}
  * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
- * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
- * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
+ * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool. Deprecated: Use connectionPool.maxIdleTimeSec instead.
+ * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Deprecated: Use connectionPool.maxWaitTimeSec instead.
  * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
  *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
  * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
