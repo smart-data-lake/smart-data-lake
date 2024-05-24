@@ -592,12 +592,12 @@
           },
           "connectionPoolMaxIdleTimeSec" : {
             "type" : "integer",
-            "description" : "timeout to close unused connections in the pool",
+            "description" : "timeout to close unused connections in the pool. Deprecated: Use connectionPool.maxIdleTimeSec instead.",
             "deprecated" : true
           },
           "connectionPoolMaxWaitTimeSec" : {
             "type" : "integer",
-            "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).",
+            "description" : "timeout when waiting for connection in pool to become available. Deprecated: Use connectionPool.maxWaitTimeSec instead.",
             "deprecated" : true
           },
           "autoCommit" : {
@@ -618,7 +618,7 @@
             "properties" : {
               "maxIdleTimeSec" : {
                 "type" : "integer",
-                "description" : "timeout to close unused connections in the pool"
+                "description" : "timeout to close unused connections in the pool. Default is 3 seconds."
               },
               "maxWaitTimeSec" : {
                 "type" : "integer",
@@ -626,19 +626,19 @@
               },
               "testOnBorrow" : {
                 "type" : "boolean",
-                "description" : "flag to set the {"
+                "description" : "flag to set the GenericObjectPool's`testOnBorrow` . If true the connection pool will validate the connection before it is lend. Default is false."
               },
               "testOnCreate" : {
                 "type" : "boolean",
-                "description" : "flag to set the {"
+                "description" : "flag to set the GenericObjectPool's`testOnCreate` . If true the connection pool will validate the connection when it is created. Default is false."
               },
               "testOnReturn" : {
                 "type" : "boolean",
-                "description" : "flag to set the {"
+                "description" : "flag to set the GenericObjectPool's`testOnReturn` . If true the connection pool will validate the connection after it is returned. Default is false."
               },
               "testWhileIdle" : {
                 "type" : "boolean",
-                "description" : "flag to set the {"
+                "description" : "flag to set the GenericObjectPool's`testWhileIdle` . If true the connection pool will validate the connection periodically while it is idle. Default is false."
               },
               "testTimeoutSec" : {
                 "type" : "integer",
@@ -647,7 +647,7 @@
             },
             "title" : "ConnectionPoolConfig",
             "additionalProperties" : false,
-            "description" : "Configuration to tune JDBC connection pool settings\n\nOTHERTAG: GenericObjectPool}'s `testOnBorrow` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}\n\nOTHERTAG: GenericObjectPool}'s `testOnCreate` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}\n\nOTHERTAG: GenericObjectPool}'s `testOnReturn` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}\n\nOTHERTAG: GenericObjectPool}'s `testWhileIdle` property to {\n\nOTHERTAG: true} or {\n\nOTHERTAG: false}"
+            "description" : "Configuration to tune JDBC connection pool settings"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
