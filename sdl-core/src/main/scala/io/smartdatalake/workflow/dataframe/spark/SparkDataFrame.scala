@@ -28,6 +28,8 @@ import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.ExplainMode
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, expr, row_number}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -78,6 +80,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     }
   }
   override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
+  override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): SparkSubFeed = {
     SparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
   }
@@ -119,6 +122,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       (SparkDataFrame(dfObserved), observation)
     }
   }
+  override def apply(columnName: String): GenericColumn = SparkColumn(inner.apply(columnName))
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
@@ -238,6 +242,8 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = inner.expr.sql
+  override def desc: GenericColumn = SparkColumn(inner.desc)
+  override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
 }
 
 case class SparkField(inner: StructField) extends GenericField {

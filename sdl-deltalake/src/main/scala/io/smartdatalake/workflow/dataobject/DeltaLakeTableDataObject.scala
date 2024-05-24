@@ -27,16 +27,18 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
+import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.delta.DeltaLog
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -72,6 +74,14 @@ import scala.util.Try
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table DeltaLake table to be written by this output
  * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
+ *                   explicitly defined, the ones present in the configured "table" object are used.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
@@ -93,6 +103,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
                                     override val constraints: Seq[Constraint] = Seq(),
                                     override val expectations: Seq[Expectation] = Seq(),
+                                    override val preReadSql: Option[String] = None,
+                                    override val postReadSql: Option[String] = None,
+                                    override val preWriteSql: Option[String] = None,
+                                    override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
@@ -102,7 +116,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -199,17 +213,65 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
+  private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
+  }
+
+  private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
+    val details = DeltaTable.forName(session, table.fullName).detail()
+    val properties = details.select("properties").head.getMap[String, String](0)
+
+    properties.contains(name)
+  }
+
+  private def propertyExistsWithValue(name: String, value: String) (implicit session: SparkSession): Boolean = {
+    val details = DeltaTable.forName(session, table.fullName).detail()
+    val properties = details.select("properties").head.getMap[String, String](0)
+
+    properties.exists(_ == name -> value)
+  }
+
+  @transient private val enableCdcFeedProperty = "delta.enableChangeDataFeed"
+
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val df = context.sparkSession.table(table.fullName)
+
+    implicit val session: SparkSession = context.sparkSession
+
+    val cdcActivated = propertyExistsWithValue(enableCdcFeedProperty, "true")
+
+    val df = if(cdcActivated && incrementalOutputExpr.isDefined) {
+
+      require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
+
+      val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_commit_timestamp").desc)
+
+      context.sparkSession.read.format("delta")
+        .option("readChangeFeed", "true")
+        .option("startingVersion", incrementalOutputExpr.get)
+        .table(table.fullName)
+        .where(expr("_change_type IN ('insert','update_postimage')"))
+        .withColumn("_rank", rank().over(windowSpec))
+        .where("_rank == 1")
+        .drop("_rank", "_change_type", "_commit_version", "_commit_timestamp")
+
+    } else
+      context.sparkSession.table(table.fullName)
+
+    if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
+
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
+
+
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
     validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -365,6 +427,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       } else {
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
       }
+
+      mergeStmt = if(saveModeOptions.updateExistingCondition.isDefined) {
+        val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName))
+        mergeStmt.whenMatched(saveModeOptions.updateExistingConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
+      }
+        else mergeStmt
+
       // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
       mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
         // create merge statement
@@ -429,7 +498,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val (pvs,d) = PerformanceUtils.measureDuration(
-      if(isTableExisting) PartitionValues.fromDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct())
+      if(isTableExisting) PartitionValues.fromDataFrame(SparkDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct()))
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
@@ -518,6 +587,38 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = DeltaLakeTableDataObject
+
+
+  private var incrementalOutputExpr: Option[String] = None
+
+  /**
+   * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
+   * The state is just a string. It's semantics is internal to the DataObject.
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   *
+   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+
+    incrementalOutputExpr = state
+
+  }
+
+  /**
+   * Return the last table version
+   */
+  override def getState: Option[String] = {
+
+    val dfHistory = DeltaTable.forName(table.fullName).history(1)
+    val latestVersion = String.valueOf(dfHistory.select("version").head.get(0))
+
+    Option(latestVersion)
+  }
+
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {

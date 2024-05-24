@@ -19,26 +19,28 @@
 
 package io.smartdatalake.workflow.connection.jdbc
 
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
+import io.smartdatalake.workflow.connection.Connection
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.{DataType, StructType}
 
+import java.sql.{Connection => SqlConnection}
 import java.sql.ResultSet
 
 /**
  * SQL JDBC Catalog query method definition.
  * Implementations may vary depending on the concrete DB system.
  */
-private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnection) extends SmartDataLakeLogger  {
+private[smartdatalake] abstract class JdbcCatalog(connection: Connection with JdbcExecution) extends SmartDataLakeLogger  {
   // get spark jdbc dialect definitions
   JdbcDialects.registerDialect(HSQLDbDialect)
   JdbcDialects.registerDialect(MariaDbDialect)
-  protected val jdbcDialect: JdbcDialect = JdbcDialects.get(connection.url)
-  protected val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
+  protected lazy val jdbcDialect: JdbcDialect = connection.jdbcDialect
+  protected lazy val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
   // use jdbcDialect to define identifiers used for quoting
-  protected val (quoteStart,quoteEnd) = {
+  protected lazy val (quoteStart,quoteEnd) = {
     val dbUnquoted = jdbcDialect.quoteIdentifier("dummy")
     val quoteStart = dbUnquoted.replaceFirst("dummy.*", "")
     val quoteEnd = dbUnquoted.replaceFirst(".*dummy", "")
@@ -85,7 +87,7 @@ private[smartdatalake] abstract class JdbcCatalog(connection: JdbcTableConnectio
     sql.replace(quoteIdentifier(column), column)
   }
 
-  def isDbExisting(db: String)(implicit session: SparkSession): Boolean
+  def isDbExisting(db: String): Boolean
 
   def isTableExisting(tableName: String): Boolean = {
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
@@ -122,8 +124,8 @@ private[smartdatalake] object JdbcCatalog {
 /**
  * Default SQL JDBC Catalog query implementation using INFORMATION_SCHEMA
  */
-private[smartdatalake] class DefaultJdbcCatalog(connection: JdbcTableConnection) extends JdbcCatalog(connection) {
-  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
+private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with JdbcExecution) extends JdbcCatalog(connection) {
+  override def isDbExisting(db: String): Boolean = {
     val cntTableInCatalog = if(isQuotedIdentifier(db)) {
       s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='${removeQuotes(db)}'"
     }
@@ -137,8 +139,8 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: JdbcTableConnection)
 /**
  * Oracle SQL JDBC Catalog query implementation
  */
-private[smartdatalake] class OracleJdbcCatalog(connection: JdbcTableConnection) extends JdbcCatalog(connection) {
-  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
+private[smartdatalake] class OracleJdbcCatalog(connection: Connection with JdbcExecution) extends JdbcCatalog(connection) {
+  override def isDbExisting(db: String): Boolean = {
     val cntTableInCatalog = if(isQuotedIdentifier(db))  {
       s"select count(*) from ALL_USERS where USERNAME='${removeQuotes(db)}'"
     }
@@ -152,8 +154,8 @@ private[smartdatalake] class OracleJdbcCatalog(connection: JdbcTableConnection) 
 /**
  * SAP HANA JDBC Catalog query implementation
  */
-private[smartdatalake] class SapHanaJdbcCatalog(connection: JdbcTableConnection) extends JdbcCatalog(connection) {
-  override def isDbExisting(db: String)(implicit session: SparkSession): Boolean = {
+private[smartdatalake] class SapHanaJdbcCatalog(connection: Connection with JdbcExecution) extends JdbcCatalog(connection) {
+  override def isDbExisting(db: String): Boolean = {
     val cntTableInCatalog = if(isQuotedIdentifier(db))  {
       s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='${removeQuotes(db)}'"
     }

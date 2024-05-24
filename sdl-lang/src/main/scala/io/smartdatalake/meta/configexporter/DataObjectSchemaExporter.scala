@@ -1,10 +1,8 @@
 package io.smartdatalake.meta.configexporter
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
-import io.smartdatalake.util.misc.FileUtil.readFile
-import io.smartdatalake.util.misc.{ProductUtil, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, SparkFileDataObject}
@@ -15,15 +13,12 @@ import org.json4s.jackson.Serialization
 import org.json4s.{Formats, JObject, NoTypeHints}
 import scopt.OptionParser
 
-import java.io.File
-import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import java.time.LocalDateTime
-import scala.io.Source
-import scala.util.{Failure, Success, Try, Using}
 import scala.collection.compat._
+import scala.util.{Failure, Success, Try}
 
 case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
-                                          exportPath: String = "./schema",
+                                          target: String = "file:./schema",
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
                                           updateStats: Boolean = true,
@@ -43,8 +38,12 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('p', "exportPath")
       .optional()
-      .action((value, c) => c.copy(exportPath = value))
-      .text("Path to export configuration to. Default: ./schema")
+      .action((value, c) => c.copy(target = "file:"+value))
+      .text("Deprecated: Use target instead. Path to export schema and statistics to.")
+    opt[String]('t', "target")
+      .optional()
+      .action((value, c) => c.copy(target = value))
+      .text("Target URI to export configuration to. Can be a path like file:./schema, but also an API baseUrl like https://ui-demo.test.com/api/v1. Default: file:./schema")
     opt[String]('i', "includeRegex")
       .optional()
       .action((value, c) => c.copy(includeRegex = value))
@@ -61,38 +60,38 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .optional()
       .action((value, c) => c.copy(master = value))
       .text("Spark session master configuration. As schemas might be inferred by Spark, there might be a need to tune this for some DataObjects. Default: local[2]")
-    help("help").text("Export DataObject schemas as Json-files which can be used by the visualizer. A Json file with the DataObject Id as name is created in `exportPath` for every DataObject to be exported.")
+    help("help").text("Export DataObject schemas and statistics as Json documents which can be used by the visualizer. Each Json document is identified by its type (schema or stats), the DataObject Id and the timestamp of creation.")
   }
 
   /**
    * Takes as input an SDL Config and exports the schema of all DataObjects for the visualizer.
    */
   def main(args: Array[String]): Unit = {
-    val exporterConfig = DataObjectSchemaExporterConfig()
     // Parse all command line arguments
-    parser.parse(args, exporterConfig) match {
+    parser.parse(args, DataObjectSchemaExporterConfig()) match {
       case Some(exporterConfig) =>
 
-        // export data object schemas to json format
+        // export data object schemas and statistics to json format
         logger.info(s"starting with configuration ${ProductUtil.formatObj(exporterConfig)}")
-        exportSchemas(exporterConfig)
+        exportSchemaAndStats(exporterConfig)
 
       case None =>
         logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 
-  def exportSchemas(config: DataObjectSchemaExporterConfig): Unit = {
+  def exportSchemaAndStats(config: DataObjectSchemaExporterConfig): Unit = {
 
     // get DataObjects
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(config.configPaths)
     val hadoopConf = globalConfig.getHadoopConfiguration
-    val path = Paths.get(config.exportPath)
-    Files.createDirectories(path)
     implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter"), master=Some(config.master)), phase = ExecutionPhase.Init, serializableHadoopConf = new SerializableHadoopConfiguration(hadoopConf), globalConfig = globalConfig)
     val dataObjects = registry.getDataObjects
       .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
-    logger.info(s"Writing ${dataObjects.size} data object schemas to json files in path ${config.exportPath}")
+    logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.target}")
+
+    // create document writer depending on target uri scheme
+    val writer = ExportWriter.apply(config.target)
 
     // get and write Schemas
     val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>
@@ -115,7 +114,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       exportedSchema.foreach {
         case (schema, info, _) =>
           info.foreach(logger.warn)
-          writeSchemaIfChanged(dataObject.id, schema, info, path)
+          writer.writeSchema(formatSchema(schema, info), dataObject.id, getCurrentVersion)
       }
       // return true if no exception
       exportedSchema.forall(_._3)
@@ -127,7 +126,8 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       try {
         logger.info(s"get statistics for ${dataObject.id}")
         val stats = dataObject.getStats(config.updateStats)
-        writeStatsIfChanged(dataObject.id, stats, path)
+        val contentStr = Serialization.writePretty(stats)
+        writer.writeStats(contentStr, dataObject.id, getCurrentVersion)
       } catch {
         case ex: Exception =>
           logger.warn(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
@@ -135,52 +135,10 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     }
   }
 
-  def writeSchemaIfChanged(dataObjectId: DataObjectId, newSchema: Option[GenericSchema], info: Option[String], path: Path): Unit = {
-    assert(newSchema.isDefined || info.isDefined)
-    val newContentJson = JObject(Seq(info.toSeq.map("info" -> JString(_)), newSchema.toSeq.map("schema" -> _.toJson)).flatten:_*)
-    val newContentStr =  pretty(newContentJson)
-    val indexFile = getIndexPath(dataObjectId, "schema", path)
-    val (newFilename, newFile) = getDataPath(dataObjectId, "schema", path)
-    val latestSchema = getLatestData(dataObjectId, "schema", path)
-    if (!latestSchema.contains(newContentStr)) {
-      logger.info(s"Writing schema file $newFile and updating index")
-      Files.write(newFile, newContentStr.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-      Files.write(indexFile, (newFilename + System.lineSeparator).getBytes, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
-    }
+  private[configexporter] def formatSchema(schema: Option[GenericSchema], info: Option[String]): String = {
+    val contentJson = JObject(Seq(info.toSeq.map("info" -> JString(_)), schema.toSeq.map("schema" -> _.toJson)).flatten:_*)
+    pretty(contentJson)
   }
 
-  def writeStatsIfChanged(dataObjectId: DataObjectId, stats: Map[String,Any], path: Path): Unit = {
-    val statsStr = Serialization.writePretty(stats)
-    val indexFile = getIndexPath(dataObjectId, "stats", path)
-    val (newFilename, newFile) = getDataPath(dataObjectId, "stats", path)
-    val latestStats = getLatestData(dataObjectId, "stats", path).map(Serialization.read[Map[String, Any]])
-    if (!latestStats.contains(stats)) {
-      logger.info(s"Writing stats file $newFile and updating index")
-      Files.write(newFile, statsStr.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-      Files.write(indexFile, (newFilename + System.lineSeparator).getBytes, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
-    }
-  }
-
-  private[configexporter] def getLatestData(dataObjectId: DataObjectId, tpe: String, path: Path): Option[String] ={
-    val lastIndexEntry = readIndex(dataObjectId, tpe, path).lastOption
-    val latestFile = lastIndexEntry.map(path.resolve).map(_.toFile)
-    latestFile.map(readFile)
-  }
-
-  private[configexporter] def readIndex(dataObjectId: DataObjectId, tpe: String, path: Path): Seq[String] = {
-    val indexFile = getIndexPath(dataObjectId, tpe, path)
-    Using(Source.fromFile(indexFile.toFile)) {
-      _.getLines().filter(_.trim.nonEmpty).toVector
-    }.getOrElse(Seq())
-  }
-
-  private def getIndexPath(dataObjectId: DataObjectId, tpe: String, path: Path) = {
-    path.resolve(s"${dataObjectId.id}.$tpe.index")
-  }
-
-  private def getDataPath(dataObjectId: DataObjectId, tpe: String, path: Path) = {
-    val filename = s"${dataObjectId.id}.$tpe.${System.currentTimeMillis() / 1000}.json"
-    val file = path.resolve(filename)
-    (filename, file)
-  }
+  private[configexporter] def getCurrentVersion = System.currentTimeMillis() / 1000
 }

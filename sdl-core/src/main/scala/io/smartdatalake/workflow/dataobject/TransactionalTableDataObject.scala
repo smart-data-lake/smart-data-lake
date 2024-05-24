@@ -18,11 +18,41 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.ActionPipelineContext
+
 /**
  * Trait to mark DataObjects that support transactional writes.
  */
 trait TransactionalTableDataObject extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
+
+  val preReadSql: Option[String] = None
+  val postReadSql: Option[String] = None
+  val preWriteSql: Option[String] = None
+  val postWriteSql: Option[String] = None
+
+  override def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.preRead(partitionValues)
+    prepareAndExecSql(preReadSql, Some("preReadSql"), partitionValues)
+  }
+
+  override def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postRead(partitionValues)
+    prepareAndExecSql(postReadSql, Some("postReadSql"), partitionValues)
+  }
+
+  override def preWrite(implicit context: ActionPipelineContext): Unit = {
+    super.preWrite
+    prepareAndExecSql(preWriteSql, Some("preWriteSql"), Seq()) // no partition values here...
+  }
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    prepareAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
+  }
+
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit
 
 }

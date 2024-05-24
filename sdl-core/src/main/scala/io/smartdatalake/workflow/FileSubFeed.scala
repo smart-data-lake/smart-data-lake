@@ -119,5 +119,7 @@ object FileSubFeed extends SubFeedConverter[FileSubFeed] {
 
 /**
  * Src/Tgt tuple representing the mapping of a file reference
+ *
+ * @param multiTgt: If multi-target is true, the src FileRef might produce multiple output-streams, which are only known at execution time (e.g. Webservice with paging).
  */
 case class FileRefMapping(src: FileRef, tgt: FileRef)

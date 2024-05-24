@@ -32,7 +32,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions._
@@ -90,10 +90,10 @@ import scala.util.Try
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
-                               preReadSql: Option[String] = None,
-                               postReadSql: Option[String] = None,
-                               preWriteSql: Option[String] = None,
-                               postWriteSql: Option[String] = None,
+                               override val preReadSql: Option[String] = None,
+                               override val postReadSql: Option[String] = None,
+                               override val preWriteSql: Option[String] = None,
+                               override val postWriteSql: Option[String] = None,
                                override val schemaMin: Option[GenericSchema] = None,
                                override var table: Table,
                                override val constraints: Seq[Constraint] = Seq(),
@@ -345,7 +345,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsStatement(partitionValues))
       else transaction.execJdbcStatement(deleteAllDataStatement)
       // append into final table in one step, then commit
-      transaction.execJdbcStatement(s"insert into ${table.fullName} select * from $tmpTable")
+      transaction.execJdbcStatement(s"insert into ${table.fullName} select * from ${tmpTable.fullName}")
       transaction.commit()
     } catch {
       case e: SQLException =>
@@ -378,6 +378,13 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     try {
       // write data to temp table
       val metrics = writeToTempTable(df, df.schema)
+
+      val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
+      updateExistingStatement.foreach{stmt =>
+        logger.info(s"($id) executing update existing statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
+        connection.execJdbcDmlStatement(stmt)
+      }
+
       // prepare SQL merge statement
       val mergeStmt = SQLUtil.createMergeStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       // execute
@@ -402,23 +409,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     )
   }
 
-  override def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    super.preRead(partitionValues)
-    prepareAndExecSql(preReadSql, Some("preReadSql"), partitionValues)
-  }
-  override def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    super.postRead(partitionValues)
-    prepareAndExecSql(postReadSql, Some("postReadSql"), partitionValues)
-  }
-  override def preWrite(implicit context: ActionPipelineContext): Unit = {
-    super.preWrite
-    prepareAndExecSql(preWriteSql, Some("preWriteSql"), Seq()) // no partition values here...
-  }
-  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    super.postWrite(partitionValues)
-    prepareAndExecSql(postWriteSql, Some("postWriteSql"), partitionValues)
-  }
-  private def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
       val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)
@@ -480,7 +472,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      PartitionValues.fromDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct())
+      PartitionValues.fromDataFrame(SparkDataFrame(getSparkDataFrame().select(partitions.map(col):_*).distinct()))
     } else Seq()
   }
 

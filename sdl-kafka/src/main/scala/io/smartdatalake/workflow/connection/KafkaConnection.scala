@@ -68,19 +68,25 @@ case class KafkaConnection(override val id: ConnectionId,
         props.setProperty(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSSLSecurityProtocol)
         props.setProperty(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, m.keystorePath)
         props.setProperty(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, m.keystorePassSecret.resolve())
-        props.setProperty(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.keystoreType.getOrElse(SslConfigs.DEFAULT_SSL_KEYSTORE_TYPE))
+        props.setProperty(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, m.keystoreType)
         props.setProperty(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
         props.setProperty(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePassSecret.resolve())
-        props.setProperty(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
+        props.setProperty(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType)
       }
-     case Some(m: SASLSCRAMAuthMode) => {
+      case Some(m: SASLSCRAMAuthMode) => {
         props.setProperty(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, KafkaSASLSSLSecurityProtocol)
+        // set sasl auth
         props.setProperty("sasl.mechanism", m.sslMechanism)
-        props.setProperty("sasl.jaas.config", "org.apache.kafka.common.security.scram.ScramLoginModule required username=\""
-          + m.username.resolve() + "\" password=\"" + m.passwordSecret.resolve() + "\";")
-        props.setProperty(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, m.truststorePath)
-        props.setProperty(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, m.truststorePassSecret.resolve())
-        props.setProperty(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType.getOrElse(SslConfigs.DEFAULT_SSL_TRUSTSTORE_TYPE))
+        val jaasLoginModule = if (m.sslMechanism.toLowerCase == "plain") "org.apache.kafka.common.security.plain.PlainLoginModule"
+        else "org.apache.kafka.common.security.scram.ScramLoginModule"
+        props.setProperty("sasl.jaas.config", s"""$jaasLoginModule required username="${m.username.resolve()}" password="${m.passwordSecret.resolve()}";""")
+        // set truststore if defined
+        m.truststorePath.foreach { truststorePath =>
+          props.setProperty(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, truststorePath)
+          props.setProperty(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG,
+            m.truststorePassSecret.map(_.resolve()).getOrElse(throw ConfigurationException("truststorePassSecret must be set if truststorePath is set.")))
+          props.setProperty(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, m.truststoreType)
+        }
       }
       case Some(m) => throw ConfigurationException(s"${m.getClass.getSimpleName} is not supported for ${getClass.getSimpleName}")
       case None => ()

@@ -185,10 +185,12 @@ object ScalaClassSparkDsNTo1Transformer extends FromConfigFactory[GenericDfsTran
    * Comparison is made case-insensitive and without underscore and hyphen.
    */
   private[smartdatalake] def tolerantGet[T](map: Map[String, T], key: String): Option[T] = {
-    def prepareKey(k: String) = k.toLowerCase.replace("-", "").replace("_", "")
+    val tolerantMap = map.map { case (k, v) => (prepareTolerantKey(k), v) }
+    tolerantMap.get(prepareTolerantKey(key))
+  }
 
-    val tolerantMap = map.map { case (k, v) => (prepareKey(k), v) }
-    tolerantMap.get(prepareKey(key))
+  private[smartdatalake] def prepareTolerantKey(key: String) = {
+    key.toLowerCase.replace("-", "").replace("_", "")
   }
 }
 

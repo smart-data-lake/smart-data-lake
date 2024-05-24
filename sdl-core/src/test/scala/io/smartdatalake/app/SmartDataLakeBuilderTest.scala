@@ -26,7 +26,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{EnvironmentUtil, FinalStateUploader}
+import io.smartdatalake.util.misc.{EnvironmentUtil, StateUploader}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
@@ -746,12 +746,13 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
 
-  test("sdlb run with state file using FinalStateWriter and FinalMetricsWriter and Environment setting override from config") {
+  test("sdlb run with state file using FinalStateWriter, StateUploader and FinalMetricsWriter and Environment setting override from config") {
 
     val port = 8080 // for some reason, only the default port seems to work
     val httpsPort = 8443
     val host = "127.0.0.1"
-    val wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
+    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    TestUtil.setupWebserviceStubs()
 
     val feedName = "test"
     val sdlb = new DefaultSmartDataLakeBuilder()
@@ -766,7 +767,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     Environment._dagGraphLogMaxLineLength = None
 
     // load data from configuration file
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some("test"), configuration = Some(Seq(
       getClass.getResource("/configState/WithFinalStateWriter.conf").getPath)))
 
     // Run SDLB
@@ -786,12 +787,12 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("metricsLog")).getSparkDataFrame()
     assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long,String,String,Long)].collect().toSet == Set((1L,"act","tgt",1L)))
 
-    // check FinalStateUploader retry
-    val writer = new FinalStateUploader(Map(
-      "uploadUrl" -> "https://localhost/good/post/no_auth",
-      "uploadStagePath" -> uploadStagePath
+    // check StateUploader retry
+    val writer = new StateUploader(Map(
+      "baseUrl" -> "https://localhost/good/post/no_auth?tenant=1&repo=abc",
+      "stagePath" -> uploadStagePath
     ).mapValues(StringOrSecret).toMap)
-    writer.init(actionPipelineContext)
+    writer.prepare(actionPipelineContext)
     writer.stageStateStore.get.getFiles().isEmpty
 
     wireMockServer.stop()

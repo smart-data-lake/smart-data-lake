@@ -125,6 +125,10 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     writePretty(actionDAGRunState)
   }
 
+  def toJson(info: RuntimeInfo): String = {
+    writePretty(info)
+  }
+
   def toJson(entry: IndexEntry): String = {
     // index entry should be written compact in one line (not pretty)
     write(entry)

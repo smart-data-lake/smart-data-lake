@@ -28,7 +28,7 @@ import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef, SparkDfTransformerFunctionWrapper}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFrame, DataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.expressions.Window
@@ -133,7 +133,7 @@ case class DeduplicateAction(override val id: ActionId,
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
   require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not yet implemented for mergeModeEnable = false")
 
-  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toList ++ transformers
 
   override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // deduplicate transformer can be ignored as it is generic
 
@@ -144,7 +144,7 @@ case class DeduplicateAction(override val id: ActionId,
     transformerDefs.foreach(_.prepare(id))
   }
 
-  private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val timestamp = context.referenceTimestamp.getOrElse(LocalDateTime.now)
 
     val deduplicateTransformer = if (mergeModeEnable) {

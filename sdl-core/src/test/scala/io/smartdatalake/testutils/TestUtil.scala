@@ -142,8 +142,8 @@ object TestUtil extends SmartDataLakeLogger {
    * @param httpsPort port for https calls
    * @return instance of [[WireMockServer]]
    */
-  def setupWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
-    configureFor(host,port)
+  def startWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
+    configureFor(host, port)
     val keystoreFile = this.getClass.getResource("/test_keystore.pkcs12").getFile
     val wireMockServer =
       new WireMockServer(
@@ -156,7 +156,10 @@ object TestUtil extends SmartDataLakeLogger {
       )
     wireMockServer
       .start()
+    wireMockServer
+  }
 
+  def setupWebserviceStubs(): Unit = {
     stubFor(post(urlEqualTo("/good/post/no_auth"))
       .willReturn(aResponse().withBody("{{request.path.[0]}}"))
     )
@@ -183,9 +186,6 @@ object TestUtil extends SmartDataLakeLogger {
     stubFor(get(urlMatching("/bad/*/"))
       .willReturn(aResponse.withStatus(404))
     )
-
-    wireMockServer
-
   }
 
   def printFailedTestResult(testName: String, arguments: Seq[DataFrame] = Seq())(actual: DataFrame)(expected: DataFrame): Unit = {

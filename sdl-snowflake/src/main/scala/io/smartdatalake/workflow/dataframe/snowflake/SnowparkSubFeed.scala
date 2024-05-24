@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructType}
-import com.snowflake.snowpark.{Column, functions}
+import com.snowflake.snowpark.{Column, Window, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -276,5 +276,37 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def coalesce(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SnowparkColumn(functions.coalesce(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
+
+  override def row_number: GenericColumn = SnowparkColumn(functions.row_number())
+
+  override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
+
+    partitionBy.foreach(c => assert(c.isInstanceOf[SnowparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(c)))
+
+    assert(orderBy.isInstanceOf[SnowparkColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(orderBy))
+
+    aggFunction.apply() match {
+      case snowparkAggFunctionColumn: SnowparkColumn => SnowparkColumn(snowparkAggFunctionColumn
+        .inner.over(
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
+            .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
+      )
+      case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
+    }
+
+  }
+
+  override def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn = {
+    // TODO: check if this can be done by a udf?
+    throw new NotImplementedError("transform array is not implemented in Snowpark")
+  }
+  override def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn = {
+    // TODO: check if this can be done by a udf?
+    throw new NotImplementedError("transform_keys array is not implemented in Snowpark")
+  }
+  override def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn = {
+    // TODO: check if this can be done by a udf?
+    throw new NotImplementedError("transform_keys array is not implemented in Snowpark")
   }
 }

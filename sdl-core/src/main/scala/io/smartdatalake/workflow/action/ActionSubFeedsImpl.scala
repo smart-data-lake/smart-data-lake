@@ -61,20 +61,20 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   // this must be lazy because inputs / outputs is evaluated later in subclasses
   // Note: we don't yet decide for a main input as inputs might be skipped at runtime, but we can already create a prioritized list.
   protected lazy val prioritizedMainInputCandidates: Seq[DataObject] = getMainDataObjectCandidates(mainInputId, inputs, "input")
-  protected lazy val mainOutput: DataObject = getMainDataObjectCandidates(mainOutputId, outputs, "output").head
-  protected def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
+  private[smartdatalake] lazy val mainOutput: DataObject = getMainDataObjectCandidates(mainOutputId, outputs, "output").head
+  private[smartdatalake] def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
     // take first data object which has as SubFeed which is not skipped
     prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped || context.appConfig.isDryRun)
       .getOrElse(prioritizedMainInputCandidates.head) // otherwise just take first candidate
   }
-  protected def getMainPartitionValues(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
+  private[smartdatalake] def getMainPartitionValues(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val mainInput = getMainInput(inputSubFeeds)
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId==mainInput.id)
     mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
   }
 
   // helper data structures
-  private lazy val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
+  private[smartdatalake] lazy val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
   private lazy val outputMap = outputs.map(i => i.id -> i).toMap
 
   private[smartdatalake] def subFeedConverter: SubFeedConverter[S]
@@ -271,7 +271,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Updates the partition values of a SubFeed to the partition columns of the given input data object:
    * - remove not existing columns from the partition values
    */
-  private def updateInputPartitionValues(dataObject: DataObject, subFeed: S, partitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {
+  private[smartdatalake] def updateInputPartitionValues(dataObject: DataObject, subFeed: S, partitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {
     dataObject match {
       case partitionedDO: CanHandlePartitions =>
         // remove superfluous partitionValues
@@ -342,7 +342,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Transform partition values.
    * Can be implemented by subclass.
    */
-  protected def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
+  private[smartdatalake] def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
 
   /**
    * Transform subfeed content

@@ -36,10 +36,13 @@ class CustomFileDataObjectTest extends DataObjectTestSuite with Matchers {
     val customFileDataObject = CustomFileDataObject("testId", config)
 
     // run
-    val result = customFileDataObject.createInputStream("")
+    val result = customFileDataObject.createInputStreams("")
+    val resultHead = result.next()
 
     // check
-    val resultString = fromInputStream(result).mkString
+    val resultString = fromInputStream(resultHead).mkString
     assert(resultString.equals(TestCustomFileCreator.fileContents))
+    assert(!result.hasNext)
+
   }
 }
