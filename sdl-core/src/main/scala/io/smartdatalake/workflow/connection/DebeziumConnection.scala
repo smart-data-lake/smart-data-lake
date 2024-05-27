@@ -26,9 +26,8 @@ import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.postgresql.PostgresConnector
 import io.smartdatalake.workflow.connection.DebeziumDatabaseEngine.DebeziumDatabaseEngine
 
-import java.util.Properties
-
 case class DebeziumConnection(override val id: ConnectionId,
+                              uniqueConnectorName: String = java.util.UUID.randomUUID().toString,
                               dbEngine: DebeziumDatabaseEngine,
                               hostname: String,
                               port: Int,
@@ -43,12 +42,17 @@ case class DebeziumConnection(override val id: ConnectionId,
 
   private[smartdatalake] def connectionPropertiesMap: Map[String, String] = {
 
-    Map("name"-> java.util.UUID.randomUUID().toString,
-        "connector.class" -> dbEngine.toString,
-        "database.hostname" -> hostname,
-        "database.port" -> port.toString,
-        "database.user" -> authMode.asInstanceOf[BasicAuthMode].userSecret.resolve(), // TODO: Check with Zach regarding security
-        "database.password" -> authMode.asInstanceOf[BasicAuthMode].passwordSecret.resolve()) // TODO: Check with Zach regarding security
+    authMode match {
+      case m: BasicAuthMode =>
+        Map("name" -> uniqueConnectorName,
+          "connector.class" -> dbEngine.toString,
+          "database.hostname" -> hostname,
+          "database.port" -> port.toString,
+          "database.user" -> m.userSecret.resolve(), // TODO: Check with Zach regarding security
+          "database.password" -> m.passwordSecret.resolve() // TODO: Check with Zach regarding security
+        )
+      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Debezium connection.")
+    }
 
   }
 
