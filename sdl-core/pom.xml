@@ -469,6 +469,7 @@
                             <includes>
                                 <include>**/testutils/**</include>
                                 <include>log4j2.yml</include> <!-- Add logging configuration for testing. -->
+                                <include>test_keystore.pkcs12</include> <!-- Add key store for wiremock server for testing. -->
                             </includes>
                             <excludes>
                                 <exclude>dummy-entry</exclude> <!-- override excludes inherited from parent plugin management with dummy entry -->
