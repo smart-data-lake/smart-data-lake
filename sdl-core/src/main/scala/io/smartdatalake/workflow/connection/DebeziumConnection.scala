@@ -32,13 +32,13 @@ case class DebeziumConnection(override val id: ConnectionId,
                               dbEngine: DebeziumDatabaseEngine,
                               hostname: String,
                               port: Int,
-                              authMode: Option[AuthMode] = None,
+                              authMode: AuthMode,
                               override val metadata: Option[ConnectionMetadata] = None
                              ) extends Connection {
 
   // Allow only supported authentication modes
   private val supportedAuthModes = Seq(classOf[BasicAuthMode])
-  require(authMode.isEmpty || supportedAuthModes.contains(authMode.get.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuthModes.map(_.getSimpleName).mkString(", ")}.")
+  require(supportedAuthModes.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuthModes.map(_.getSimpleName).mkString(", ")}.")
 
 
   private def getDebeziumConnectionProperties: Properties = {
