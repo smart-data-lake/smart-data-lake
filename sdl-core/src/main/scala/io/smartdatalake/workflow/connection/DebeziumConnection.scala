@@ -41,17 +41,15 @@ case class DebeziumConnection(override val id: ConnectionId,
   require(supportedAuthModes.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuthModes.map(_.getSimpleName).mkString(", ")}.")
 
 
-  private[smartdatalake] def getDebeziumConnectionProperties: Properties = {
-    val properties = new Properties()
+  private[smartdatalake] def connectionPropertiesMap: Map[String, String] = {
 
-    properties.setProperty("name", java.util.UUID.randomUUID().toString)
-    properties.setProperty("connector.class", dbEngine.toString)
-    properties.setProperty("database.hostname", hostname)
-    properties.setProperty("database.port", port.toString)
-    properties.setProperty("database.user", authMode.asInstanceOf[BasicAuthMode].userSecret.resolve()) // TODO: Check with Zach regarding security
-    properties.setProperty("database.password", authMode.asInstanceOf[BasicAuthMode].passwordSecret.resolve()) // TODO: Check with Zach regarding security
+    Map("name"-> java.util.UUID.randomUUID().toString,
+        "connector.class" -> dbEngine.toString,
+        "database.hostname" -> hostname,
+        "database.port" -> port.toString,
+        "database.user" -> authMode.asInstanceOf[BasicAuthMode].userSecret.resolve(), // TODO: Check with Zach regarding security
+        "database.password" -> authMode.asInstanceOf[BasicAuthMode].passwordSecret.resolve()) // TODO: Check with Zach regarding security
 
-    properties
   }
 
   /**
