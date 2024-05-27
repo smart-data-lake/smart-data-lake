@@ -465,6 +465,7 @@
 
         <scalatest.test.version>3.0.8</scalatest.test.version>
         <sshd.test.version>2.10.0</sshd.test.version>
+        <debezium.version>2.6.1.Final</debezium.version>
 
         <!-- Sonar related -->
         <sonar.organization>smart-data-lake</sonar.organization>
