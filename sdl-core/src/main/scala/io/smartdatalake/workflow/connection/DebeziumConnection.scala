@@ -41,9 +41,10 @@ case class DebeziumConnection(override val id: ConnectionId,
   require(supportedAuthModes.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuthModes.map(_.getSimpleName).mkString(", ")}.")
 
 
-  private def getDebeziumConnectionProperties: Properties = {
+  private[smartdatalake] def getDebeziumConnectionProperties: Properties = {
     val properties = new Properties()
 
+    properties.setProperty("name", java.util.UUID.randomUUID().toString)
     properties.setProperty("connector.class", dbEngine.toString)
     properties.setProperty("database.hostname", hostname)
     properties.setProperty("database.port", port.toString)
