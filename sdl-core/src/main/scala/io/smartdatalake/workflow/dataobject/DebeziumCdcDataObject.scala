@@ -36,7 +36,7 @@ import java.util.concurrent.{ExecutorService, Executors}
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
                                  table: Table,
-                                 debeziumProperties: Option[Map[String, String]],
+                                 debeziumProperties: Option[Map[String, String]] = None,
                                  maxWaitTimeInSeconds: Int = 10,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
