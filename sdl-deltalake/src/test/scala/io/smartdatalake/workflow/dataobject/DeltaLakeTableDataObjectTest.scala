@@ -27,6 +27,7 @@ import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
 import org.apache.spark.sql.delta.DeltaAnalysisException
 import org.apache.spark.sql.{AnalysisException, SparkSession}
@@ -58,7 +59,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "customDf2Delta"
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
     instanceRegistry.register(sourceDO)
@@ -87,7 +88,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "customDf2Delta_partitioned"
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("default"), name = "custom_df_copy_partitioned", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
     instanceRegistry.register(sourceDO)
@@ -111,7 +112,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode overwrite with different schema") {
-    val targetTable = Table(db = Some("default"), name = "test_overwrite", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
     targetDO.dropTable
@@ -136,7 +137,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode append with different schema") {
-    val targetTable = Table(db = Some("default"), name = "test_append", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
     targetDO.dropTable
@@ -161,7 +162,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode overwrite and delete partition") {
-    val targetTable = Table(db = Some("default"), name = "test_overwrite", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite)
     targetDO.dropTable
@@ -194,7 +195,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode append") {
-    val targetTable = Table(db = Some("default"), name = "test_append", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append)
     targetDO.dropTable
@@ -220,7 +221,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode merge") {
-    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTable = Table(db = Some(deltaDb), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge)
     targetDO.dropTable
@@ -247,7 +248,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode merge with schema evolution") {
-    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTable = Table(db = Some(deltaDb), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
     targetDO.dropTable
@@ -279,7 +280,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   // Unfortunately this is needed by HistorizeAction with merge.
   // We test for failure to be notified once it is working...
   test("SaveMode merge with updateCols and schema evolution - fails in deltalake <= 2.3.0") {
-    val targetTable = Table(db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+    val targetTable = Table(db = Some(deltaDb), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
     targetDO.dropTable
@@ -306,7 +307,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
 
-    val targetTable = Table(db = Some("default"), name = "test_metrics", query = None)
+    val targetTable = Table(db = Some(deltaDb), name = "test_metrics", query = None)
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
     instanceRegistry.register(targetDO)
@@ -325,7 +326,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   test("normal output mode without cdc activated") {
     // create data object
-    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTable = Table(db = Some(deltaDb), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
@@ -347,7 +348,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   test("incremental output mode with inserts") {
 
     // create data object
-    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTable = Table(db = Some(deltaDb), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path=Some(targetTablePath), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
@@ -393,7 +394,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   test("incremental output mode without primary keys") {
 
     // create data object
-    val targetTable = Table(db = Some("default"), name = "test_inc")
+    val targetTable = Table(db = Some(deltaDb), name = "test_inc")
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
@@ -427,7 +428,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   test("incremental output mode with updates and inserts") {
 
     // create data object
-    val targetTable = Table(db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTable = Table(db = Some(deltaDb), name = "test_inc", primaryKey = Some(Seq("id")))
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath))
     targetDO.dropTable
@@ -443,11 +444,11 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
 
     // do updates and inserts
-    session.sql("INSERT INTO test_inc VALUES (5, 'T', 7) ")
+    session.sql(s"INSERT INTO $deltaDb.test_inc VALUES (5, 'T', 7) ")
     val newState2 = targetDO.getState
-    session.sql("INSERT INTO test_inc VALUES (6, 'U', 3) ")
-    session.sql("UPDATE test_inc SET p = 'Z', value = 8 WHERE id = 1")
-    session.sql("UPDATE test_inc SET p = 'W', value = 1 WHERE id = 1")
+    session.sql(s"INSERT INTO $deltaDb.test_inc VALUES (6, 'U', 3) ")
+    session.sql(s"UPDATE $deltaDb.test_inc SET p = 'Z', value = 8 WHERE id = 1")
+    session.sql(s"UPDATE $deltaDb.test_inc SET p = 'W', value = 1 WHERE id = 1")
 
     // test
     val resultDf = Seq((5, "T", 7), (6, "U", 3), (1, "W", 1)).toDF("id", "p", "value")
