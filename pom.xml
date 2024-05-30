@@ -443,7 +443,7 @@
 
         <!-- other dependency versions -->
         <scopt.version>4.0.1</scopt.version>
-        <databricks.spark-xml.version>0.14.0</databricks.spark-xml.version>
+        <databricks.spark-xml.version>0.18.0</databricks.spark-xml.version>
         <spark.excel.version>${spark.version331}_0.18.6-beta1</spark.excel.version>
         <hsqldb.version>2.7.2</hsqldb.version>
         <jackcess.version>4.0.5</jackcess.version>
@@ -454,11 +454,11 @@
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>2.15.0</snowflake-spark.version>
-        <snowflake-snowpark.version>1.11.0</snowflake-snowpark.version>
+        <snowflake-snowpark.version>1.12.1</snowflake-snowpark.version>
         <keycloak.version>22.0.1</keycloak.version>
-        <delta.version>3.0.0</delta.version>
+        <delta.version>3.2.0</delta.version>
         <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
-        <iceberg.version>1.4.3</iceberg.version>
+        <iceberg.version>1.5.2</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
