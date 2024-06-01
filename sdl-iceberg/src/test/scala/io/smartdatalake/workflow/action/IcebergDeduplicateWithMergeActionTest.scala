@@ -96,7 +96,6 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     // prepare & start 3rd load with schema evolution
     // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
     // See also last two tests in IcebergTableDataObjectTest.
-    /*
     val refTimestamp3 = LocalDateTime.now()
     val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
     val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
@@ -115,7 +114,6 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
-    */
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
@@ -169,7 +167,6 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     // prepare & start 3rd load with schema evolution
     // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
     // See also last two tests in IcebergTableDataObjectTest.
-    /*
     val refTimestamp3 = LocalDateTime.now()
     val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
     val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true)
@@ -188,6 +185,5 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
-    */
   }
 }
