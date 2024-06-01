@@ -279,7 +279,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   // Note that this is not possible with DeltaLake <= 2.3.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
   // Unfortunately this is needed by HistorizeAction with merge.
   // We test for failure to be notified once it is working...
-  test("SaveMode merge with updateCols and schema evolution - fails in deltalake <= 2.3.0") {
+  test("SaveMode merge with updateCols and schema evolution - fails in deltalake <= 3.2.0") {
     val targetTable = Table(db = Some(deltaDb), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
@@ -299,6 +299,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // - column 'rating2' added -> existing records will get new column rating2 set to null
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating2")
+    // this doesnt work for now, see also https://github.com/delta-io/delta/issues/2300
     intercept[AnalysisException](targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
   }
 
