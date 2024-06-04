@@ -185,6 +185,12 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
       private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
+      override def onQueryIdle(event: StreamingQueryListener.QueryIdleEvent): Unit = {
+        // Behaviour changed with Spark 3.5: no more progress if no data, but onQueryIdle is fired
+        // stop streaming query
+        logger.info("stopping streaming query after idle")
+        session.streams.active.find(_.runId == event.runId).get.stop()
+      }
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")

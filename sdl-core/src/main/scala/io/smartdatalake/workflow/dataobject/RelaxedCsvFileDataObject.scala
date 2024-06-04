@@ -15,7 +15,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.expressions.ExprUtils
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
@@ -127,7 +127,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
             val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // add partition column values
             Row(values: _*)
           }
-      }(RowEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // add partition cols
+      }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // add partition cols
   }
 
   private def parseCsvContent(csvContent: String, parserOptions: CSVOptions)(implicit session: SparkSession): Iterator[Row] = {

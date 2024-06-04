@@ -20,12 +20,13 @@
 package io.smartdatalake.workflow
 
 import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.catalyst.ExtendedAnalysisException
 
 /**
  * AnalysisException with reduced logical plan output
  * Output of logical plan is reduced to max 5 lines
  */
-class SimplifiedAnalysisException (analysisException: AnalysisException)
+class SimplifiedAnalysisException (analysisException: ExtendedAnalysisException)
   extends Exception(analysisException.message, analysisException.cause.orNull) with Serializable {
   setStackTrace(analysisException.getStackTrace)
   private val logicalPlanMaxLines = 5

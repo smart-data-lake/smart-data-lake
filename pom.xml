@@ -22,7 +22,7 @@
 
     <groupId>io.smartdatalake</groupId>
     <artifactId>sdl-parent</artifactId>
-    <version>2.6.2-SNAPSHOT</version>
+    <version>2.7.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -180,7 +180,7 @@
             </activation>
             <properties>
                 <scala.minor.version>2.12</scala.minor.version>
-                <scala.version>${scala.minor.version}.15</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+                <scala.version>${scala.minor.version}.18</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
             </properties>
         </profile>
         <profile>
@@ -307,14 +307,15 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
-        <spark.version>3.4.3</spark.version>
-        <spark-extensions.version>3.4.5</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
-        <spark.minor.version>3.4</spark.minor.version> <!-- this is used in sdl-snowflake -->
-
+        <spark.version>3.5.1</spark.version>
+        <spark-extensions.version>3.5.0-SNAPSHOT</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark.minor.version>3.5</spark.minor.version>
+        <spark.snowflake.minor.version>3.4</spark.snowflake.minor.version> <!-- this is used in sdl-snowflake -->
         <spark.version331>3.3.1</spark.version331> <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
         <!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
+        <asm.version>9.5</asm.version>
         <slf4j.version>2.0.7</slf4j.version>
         <log4j.version>2.20.0</log4j.version>
         <!-- make sure to update IsolatedClientLoader whenever this version is changed -->
@@ -323,7 +324,7 @@
         <protobuf.hadoopDependency.version>3.23.0</protobuf.hadoopDependency.version>
         <!-- Actual Protobuf version in Spark modules like Spark Connect, protobuf connector, etc. -->
         <!-- SPARK-41247: When updating `protobuf.version`, also need to update `protoVersion` in `SparkBuild.scala` -->
-        <protobuf.version>3.21.12</protobuf.version>
+        <protobuf.version>3.23.4</protobuf.version>
         <protoc-jar-maven-plugin.version>3.11.4</protoc-jar-maven-plugin.version>
         <yarn.version>${hadoop.version}</yarn.version>
         <zookeeper.version>3.6.3</zookeeper.version>
@@ -336,13 +337,13 @@
         <!-- Version used for internal directory structure -->
         <hive.version.short>2.3</hive.version.short>
         <!-- note that this should be compatible with Kafka brokers version 0.10 and up -->
-        <kafka.version>3.3.2</kafka.version>
+        <kafka.version>3.4.1</kafka.version>
         <!-- After 10.15.1.3, the minimum required version is JDK9 -->
         <derby.version>10.14.2.0</derby.version>
-        <parquet.version>1.12.3</parquet.version>
-        <orc.version>1.8.3</orc.version>
+        <parquet.version>1.13.1</parquet.version>
+        <orc.version>1.9.1</orc.version>
         <orc.classifier>shaded-protobuf</orc.classifier>
-        <jetty.version>9.4.51.v20230217</jetty.version>
+        <jetty.version>9.4.52.v20230823</jetty.version>
         <jakartaservlet.version>4.0.3</jakartaservlet.version>
         <chill.version>0.10.0</chill.version>
         <ivy.version>2.5.1</ivy.version>
@@ -351,15 +352,15 @@
         If you changes codahale.metrics.version, you also need to change
         the link to metrics.dropwizard.io in docs/monitoring.md.
         -->
-        <codahale.metrics.version>4.2.15</codahale.metrics.version>
+        <codahale.metrics.version>4.2.19</codahale.metrics.version>
         <!-- Should be consistent with SparkBuild.scala and docs -->
-        <avro.version>1.11.1</avro.version>
+        <avro.version>1.11.2</avro.version>
         <aws.kinesis.client.version>1.12.0</aws.kinesis.client.version>
         <!-- Should be consistent with Kinesis client dependency -->
         <aws.java.sdk.version>1.11.655</aws.java.sdk.version>
         <!-- the producer is used in tests -->
         <aws.kinesis.producer.version>0.12.8</aws.kinesis.producer.version>
-        <gcs-connector.version>hadoop3-2.2.11</gcs-connector.version>
+        <gcs-connector.version>hadoop3-2.2.14</gcs-connector.version>
         <!--  org.apache.httpcomponents/httpclient-->
         <commons.httpclient.version>4.5.14</commons.httpclient.version>
         <commons.httpcore.version>4.4.16</commons.httpcore.version>
@@ -375,13 +376,13 @@
         <scalafmt.validateOnly>true</scalafmt.validateOnly>
         <scalafmt.changedOnly>true</scalafmt.changedOnly>
         <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
-        <fasterxml.jackson.version>2.14.2</fasterxml.jackson.version>
-        <fasterxml.jackson.databind.version>2.14.2</fasterxml.jackson.databind.version>
+        <fasterxml.jackson.version>2.15.2</fasterxml.jackson.version>
+        <fasterxml.jackson.databind.version>2.15.2</fasterxml.jackson.databind.version>
         <snappy.version>1.1.9.1</snappy.version>
         <netlib.ludovic.dev.version>3.0.3</netlib.ludovic.dev.version>
-        <commons-codec.version>1.15</commons-codec.version>
-        <commons-compress.version>1.22</commons-compress.version>
-        <commons-io.version>2.11.0</commons-io.version>
+        <commons-codec.version>1.16.0</commons-codec.version>
+        <commons-compress.version>1.23.0</commons-compress.version>
+        <commons-io.version>2.13.0</commons-io.version>
         <!-- org.apache.commons/commons-lang/-->
         <commons-lang2.version>2.6</commons-lang2.version>
         <!-- org.apache.commons/commons-lang3/-->
@@ -391,31 +392,31 @@
         <datanucleus-core.version>4.1.17</datanucleus-core.version>
         <guava.version>30.0-jre</guava.version>
         <janino.version>3.1.9</janino.version>
-        <jersey.version>2.36</jersey.version>
-        <joda.version>2.12.2</joda.version>
+        <jersey.version>2.40</jersey.version>
+        <joda.version>2.12.5</joda.version>
         <jodd.version>3.5.2</jodd.version>
         <jsr305.version>3.0.0</jsr305.version>
         <libthrift.version>0.12.0</libthrift.version>
         <!-- Please don't upgrade the version to 4.10+, it depends on JDK 11 -->
         <antlr4.version>4.9.3</antlr4.version>
         <jpam.version>1.1</jpam.version>
-        <selenium.version>4.7.2</selenium.version>
-        <htmlunit-driver.version>4.7.2</htmlunit-driver.version>
-        <htmlunit.version>2.67.0</htmlunit.version>
-        <maven-antrun.version>1.8</maven-antrun.version>
+        <selenium.version>4.9.1</selenium.version>
+        <htmlunit-driver.version>4.9.1</htmlunit-driver.version>
+        <htmlunit.version>2.70.0</htmlunit.version>
+        <maven-antrun.version>3.1.0</maven-antrun.version>
         <commons-crypto.version>1.1.0</commons-crypto.version>
         <commons-cli.version>1.5.0</commons-cli.version>
-        <bouncycastle.version>1.60</bouncycastle.version>
-        <tink.version>1.7.0</tink.version>
-        <netty.version>4.1.89.Final</netty.version>
+        <bouncycastle.version>1.70</bouncycastle.version>
+        <tink.version>1.9.0</tink.version>
+        <netty.version>4.1.96.Final</netty.version>
         <!--
         If you are changing Arrow version specification, please check
         ./python/pyspark/sql/pandas/utils.py, and ./python/setup.py too.
         -->
-        <arrow.version>11.0.0</arrow.version>
+        <arrow.version>12.0.1</arrow.version>
         <!-- org.fusesource.leveldbjni will be used except on arm64 platform. -->
         <leveldbjni.group>org.fusesource.leveldbjni</leveldbjni.group>
-        <kubernetes-client.version>6.4.1</kubernetes-client.version>
+        <kubernetes-client.version>6.7.2</kubernetes-client.version>
         <!--
           These default to Hadoop 3.x shaded client/minicluster jars, but since the shaded jars are
           only available in 3.x, we have to switch to non-shaded Hadoop client jars when the active
@@ -442,7 +443,7 @@
 
         <!-- other dependency versions -->
         <scopt.version>4.0.1</scopt.version>
-        <databricks.spark-xml.version>0.14.0</databricks.spark-xml.version>
+        <databricks.spark-xml.version>0.18.0</databricks.spark-xml.version>
         <spark.excel.version>${spark.version331}_0.18.6-beta1</spark.excel.version>
         <hsqldb.version>2.7.2</hsqldb.version>
         <jackcess.version>4.0.5</jackcess.version>
@@ -453,11 +454,11 @@
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>2.15.0</snowflake-spark.version>
-        <snowflake-snowpark.version>1.11.0</snowflake-snowpark.version>
+        <snowflake-snowpark.version>1.12.1</snowflake-snowpark.version>
         <keycloak.version>22.0.1</keycloak.version>
-        <delta.version>2.4.0</delta.version>
+        <delta.version>3.2.0</delta.version>
         <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
-        <iceberg.version>1.3.1</iceberg.version>
+        <iceberg.version>1.5.2</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
@@ -469,8 +470,8 @@
         <!-- Sonar related -->
         <sonar.organization>smart-data-lake</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <scoverage.plugin.version>1.4.11</scoverage.plugin.version>
-        <scoverage.scalacPluginVersion>1.4.11</scoverage.scalacPluginVersion>
+        <scoverage.plugin.version>2.0.2</scoverage.plugin.version>
+        <scoverage.scalacPluginVersion>2.0.11</scoverage.scalacPluginVersion>
 
     </properties>
 
@@ -2973,7 +2974,7 @@
             </dependency>
             <dependency>
                 <groupId>io.delta</groupId>
-                <artifactId>delta-core_${scala.minor.version}</artifactId>
+                <artifactId>delta-spark_${scala.minor.version}</artifactId>
                 <version>${delta.version}</version>
             </dependency>
 
@@ -3034,6 +3035,16 @@
                 <groupId>com.h2database</groupId>
                 <artifactId>h2</artifactId>
                 <version>2.2.220</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm</artifactId>
+                <version>${asm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-commons</artifactId>
+                <version>${asm.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

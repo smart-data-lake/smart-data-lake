@@ -106,6 +106,8 @@ import java.time.LocalDateTime
      }
 
      // prepare & start 3rd load with schema evolution
+     // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
+     // See also last two tests in IcebergTableDataObjectTest.
      val refTimestamp3 = LocalDateTime.now()
      val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
      val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
@@ -191,6 +193,8 @@ import java.time.LocalDateTime
      }
 
      // prepare & start 3rd load with schema evolution
+     // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
+     // See also last two tests in IcebergTableDataObjectTest.
      val refTimestamp3 = LocalDateTime.now()
      val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
      val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
@@ -286,12 +290,10 @@ import java.time.LocalDateTime
      tgtDO.dropTable(context)
      instanceRegistry.register(tgtDO)
 
-     // prepare & start 1st load with merge mode
+     // prepare & start 1st load
      val refTimestamp1 = LocalDateTime.now()
      val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
-     val action1 = HistorizeAction("ha",
-       inputId = srcDO.id,
-       outputId = tgtDO.id)
+     val action1 = HistorizeAction("ha", inputId = srcDO.id, outputId = tgtDO.id)
 
      val l1 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
      srcDO.writeSparkDataFrame(l1)(context1)
@@ -300,14 +302,10 @@ import java.time.LocalDateTime
      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
      action1.exec(Seq(srcSubFeed))(context1)
 
-     // prepare & start 2st load
+     // prepare & start 2st load with merge mode
      val refTimestamp2 = LocalDateTime.now()
      val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-     val action2 = HistorizeAction("ha",
-       inputId = srcDO.id,
-       outputId = tgtDO.id,
-       mergeModeEnable = true
-     )
+     val action2 = HistorizeAction("ha", inputId = srcDO.id, outputId = tgtDO.id, mergeModeEnable = true)
 
      val l2 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
      srcDO.writeSparkDataFrame(l2)(context2)
@@ -318,7 +316,5 @@ import java.time.LocalDateTime
 
      // expectation dl_hash should not have null values
      assert(tgtDO.getSparkDataFrame()(context2).where($"dl_hash".isNull).count() == 0)
-
-
    }
  }
