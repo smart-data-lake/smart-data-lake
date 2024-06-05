@@ -3,18 +3,21 @@ id: commandLine
 title: Command Line
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Launch Java application using Spark-Submit
 SmartDataLakeBuilder is a java application. 
 To run on a cluster with spark-submit, use **DefaultSmartDataLakeBuilder** application.
 It can be started with the following command line options (for details, see [YARN](deployYarn.md)).
 
 ```bash
-spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.11-1.0.3-jar-with-dependencies.jar [arguments]
+spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.12-2.5.1-jar-with-dependencies.jar [arguments]
 ```
 and takes the following arguments:
 ```
 Usage: DefaultSmartDataLakeBuilder [options]
-  -f, --feed-sel &ltoperation?&gt&ltprefix:?&gt&ltregex&gt[,&ltoperation?&gt&ltprefix:?&gt&ltregex&gt...]
+  -f, --feed-sel <operation?><;prefix:?><regex>[,<operation?><prefix:?><regex>...]
     Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
     Operations:
     - pipe symbol (|): the two sets are combined by union operation (default)
@@ -31,21 +34,29 @@ Usage: DefaultSmartDataLakeBuilder [options]
     - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
     All matching is done case-insensitive.
     Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"
-  -n, --name &ltvalue&gt       Optional name of the application. If not specified feed-sel is used.
-  -c, --config &ltfile1&gt[,&ltfile2&gt...]
-    One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
-  --partition-values &ltpartitionColName&gt=&ltpartitionValue&gt[,&ltpartitionValue&gt,...]
+  -n, --name <value>
+    Optional name of the application. If not specified feed-sel is used.
+  -c, --config <file1>[,<file2>...]
+    One or multiple configuration files or directories containing configuration files, separated by comma.
+    Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
+  --partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
     Partition values to process for one single partition column.
-  --multi-partition-values &ltpartitionColName1&gt=&ltpartitionValue&gt,&ltpartitionColName2&gt=&ltpartitionValue&gt[;(&ltpartitionColName1&gt=&ltpartitionValue&gt,&ltpartitionColName2&gt=&ltpartitionValue&gt;...]
-    Partition values to process for multiple partitoin columns.
-  -s, --streaming          Enable streaming mode for continuous processing.
-  --parallelism &ltint&gt      Parallelism for DAG run.
-  --state-path &ltpath&gt      Path to save run state files. Must be set to enable recovery in case of failures.
-  --override-jars &ltjar1&gt[,&ltjar2&gt...]
+  --multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
+    Partition values to process for multiple partition columns.
+  -s, --streaming
+    Enable streaming mode for continuous processing.
+  --parallelism <int>
+    Parallelism for DAG run.
+  --state-path <path>
+    Path to save run state files. Must be set to enable recovery in case of failures.
+  --override-jars <jar1>[,<jar2>...]
     Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.
-  --test &ltconfig|dry-run&gt  Run in test mode: config -&gt validate configuration, dry-run -&gt execute prepare- and init-phase only to check environment and spark lineage
-  --help                   Display the help text.
-  --version                Display version information.
+  --test <config|dry-run>
+    Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
+  --help
+    Display the help text.
+  --version
+    Display version information.
 ```
 
 

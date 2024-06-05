@@ -15,32 +15,32 @@ in the given timeframe along with their readable destination airport names, as w
 Like in the previous step, we need one more action and one DataObject for our output.
 
 ## Define output object
-
-      btl-connected-airports {
-        type = CsvFileDataObject
-        path = "~{id}"
-      }
-
+```
+  btl-connected-airports {
+    type = CsvFileDataObject
+    path = "~{id}"
+  }
+```
 ## Define join_departures_airports action
-
-      join-departures-airports {
-        type = CustomDataFrameAction
-        inputIds = [stg-departures, int-airports]
-        outputIds = [btl-connected-airports]
-        transformers = [{
-          type = SQLDfsTransformer
-          code = {
-            btl-connected-airports = """select stg_departures.estdepartureairport, stg_departures.estarrivalairport,
-            airports.*
-             from stg_departures join int_airports airports on stg_departures.estArrivalAirport = airports.ident"""
-          }
-        }
-        ]
-        metadata {
-          feed = compute
-        }
+```
+  join-departures-airports {
+    type = CustomDataFrameAction
+    inputIds = [stg-departures, int-airports]
+    outputIds = [btl-connected-airports]
+    transformers = [{
+      type = SQLDfsTransformer
+      code = {
+        btl-connected-airports = """select stg_departures.estdepartureairport, stg_departures.estarrivalairport,
+        airports.*
+          from stg_departures join int_airports airports on stg_departures.estArrivalAirport = airports.ident"""
       }
-
+    }
+    ]
+    metadata {
+      feed = compute
+    }
+  }
+```
 Now it gets interesting, a couple of things to note here:
 - This time, we changed the Action Type from CopyAction to CustomDataFrameAction.
 Use CustomDataFrameAction when you need to do complex operations. For instance, CustomDataFrameAction allows multiple inputs,

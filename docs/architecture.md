@@ -30,6 +30,7 @@ The following table gives an overview of dependency versions that are delivered 
 
 | SDL Version | Java/Scala/Hadoop Version | Hadoop Version | Spark Engine     | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
 |-------------|---------------------------|----------------|------------------|--------|---------------------------|-------------|---------|
+| 2.6.X       | Java 8+, Scala 2.12/2.13  | 3.3.6          | 3.4.3            | 2.20.0 | 2.12.0 / 1.9.0            | 2.4.0       | 1.3.1   |
 | 2.5.X       | Java 8+, Scala 2.12       | 3.3.2          | 3.3.2            | 2.17.2 | 2.11.0 / 1.6.2            | 2.2.0       | 1.1.0   |
 | 2.4.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.2            | 1.2.17 | 2.10.0 / 1.2.0            | 2.0.0       | -       |
 | 2.3.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.2            | 1.2.17 | 2.10.0 / 1.2.0            | 2.0.0       | -       |
@@ -41,11 +42,23 @@ It's possible to customize dependencies and make Smart Data Lake Builder work wi
 
 In general, Java library versions are held as close as possible to the ones used in the corresponding Spark version.
 
-## Release Notes
+### Release Notes
 
 See SDBL Release Notes including breaking changes on [Github](https://github.com/smart-data-lake/smart-data-lake/releases)
 
-## Logging
+## Context
+
+<img src={require('./structurizr/diagramExports/container-001.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
+Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structurizr/diagramExports/container-001-legend.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
+
+## Components of an SDLB Job
+
+<img src={require('./structurizr/diagramExports/component-001.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
+Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structurizr/diagramExports/component-001-legend.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
+
+## Cross cutting concerns
+
+### Logging
 By default, SDLB uses the logging libraries included in the corresponding Spark version. This is Log4j 1.2.x for Spark 2.4.x up to Spark 3.2.x.
 Starting from Spark 3.3.x it will use Log4j 2.x, see [SPARK-6305](https://issues.apache.org/jira/browse/SPARK-6305).
 

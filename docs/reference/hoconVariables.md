@@ -3,13 +3,16 @@ id: hoconVariables
 title: Hocon Variables
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Variables
 Variables can be used to serve various goals. On the one hand, we want to prevent repeating specifications, keep specifications flexible, but also want to be able to change settings at call time. 
 
 Here are some examples listed. 
 
 ## Local Substitution
-Local substitution allows to reuse the id of a configuration object inside its attribute definitions by the special token "~{id}". See the following example:
+Local substitution allows to reuse the id of a configuration object inside its attribute definitions by the special token "~\{id}". See the following example:
 ```
 dataObjects {
   dataXY {

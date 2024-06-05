@@ -14,7 +14,7 @@ This Remote Agent then executes the action in its environment and returns the sc
 Only metadata is sent over the connection between Remote Agent and Main Instance.
 The Main Instance then fetches the result if needed using its own connection to the Data.
 
-An possible workflow using Azure Relay Service (which will be used in the example below) is illustrated in the following figure:
+A possible workflow using Azure Relay Service (which will be used in the example below) is illustrated in the following figure:
 <!-- Source located under ../puml/agents-example.puml -->
 ![Image](../images/agents-example.png)
 
@@ -32,8 +32,6 @@ An possible workflow using Azure Relay Service (which will be used in the exampl
 
 To use this feature, you must define a section called agents in your HOCON config.
 This config section allows to describe how to reach your remote agents as well as the connections that the remote agents have.
-
-TODO update schema viewer.
 
 Example: Agents section defining a JettyAgent along with a private Connection that only the Agent can access.
 ```
@@ -69,7 +67,7 @@ When the Agent is deployed, it gets the necessary authentication information for
 ## Agents Types
 
 - Simple, unsecured Jetty Websocket for development use
-- Azure Relay service (require sdl-azure and an Azure subscription with an Relay that has a Hybrid Connection)
+- Azure Relay service (requires sdl-azure and an Azure subscription with an Relay that has a Hybrid Connection)
 
 ## Limitations
 Only DataObjects that return SparkSubfeeds are currently supported.

@@ -31,17 +31,15 @@ When you start the `docker run` command again, you will see two errors:
 
 1. The name of the DataObject "NOPEext-departures" does not match with the inputId of the action download-departures.
 This is a very common error and the stacktrace should help you to quickly find and correct it
-
-
+```
     Exception in thread "main" io.smartdatalake.config.ConfigurationException: (Action~download-departures) [] key not found: DataObject~ext-departures
-
+```
 As noted before, SDL will often use Action-IDs and DataObject-IDs to communicate where to look in your configuration files.
 
 2. An unknown DataObject type was used. In this example, stg-airports was assigned the type UnicornFileDataObject, which does not exist.
-
-
+```
     Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: io.smartdatalake.workflow.dataobject.UnicornFileDataObject
-
+```
 Internally, the types you choose are represented by Scala Classes.
 These classes define all characteristics of a DataObject and all it's parameters, i.e. the url we defined in our WebserviceFileDataObject.
 This also explains why you get a *ClassNotFoundException* in this case.

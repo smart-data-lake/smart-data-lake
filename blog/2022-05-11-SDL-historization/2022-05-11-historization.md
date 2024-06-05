@@ -64,7 +64,7 @@ It should be noted that there are a duplicates in the dataset. In the first case
 * download the test case data from [Kaggle](https://www.kaggle.com/datasets/datasnaek/chess/download) and unzip into `SDL_sql/data` directory
 * copy polynote notebook [sql_data_monitor.ipynb](sql_data_monitor.ipynb) for later inspection into the `polynote/notebooks` directory
 
-:::warning
+:::danger
   The notebook will only be editable if the permissions are changed to be writable by other users `chmod -R 777 polynote/notebooks`
 :::
 

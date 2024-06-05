@@ -39,7 +39,7 @@ Install VC++ Redistributable Package from Microsoft:
 http://www.microsoft.com/en-us/download/details.aspx?id=5555 (x86)  
 http://www.microsoft.com/en-us/download/details.aspx?id=14632 (x64)
 
-## Java IllegalAccessError (Java 17)
+## Java IllegalAccessError / InaccessibleObjectException (Java 17)
 Symptom:
 Starting an SDLB pipeline fails with the following exception:
 ```
@@ -49,7 +49,34 @@ java.lang.IllegalAccessError: class org.apache.spark.storage.StorageUtils$ (in u
 ```
 
 Solution:
-Java 17 is more restrictive regarding usage of module exports. Unfortunately Spark uses classes from unexported packages. Packages can be exported manually. To fix above exception add `--add-exports java.base/sun.nio.ch=ALL-UNNAMED` to the java command line, see also [Stackoverflow](https://stackoverflow.com/questions/72230174/java-17-solution-for-spark-java-lang-noclassdeffounderror-could-not-initializ).
+Java 17 is more restrictive regarding usage of module exports. Unfortunately Spark uses classes from unexported packages. Packages can be exported manually. To fix the above exception add `--add-exports java.base/sun.nio.ch=ALL-UNNAMED` to the java command line / IntelliJ VM Options, see also [Stackoverflow](https://stackoverflow.com/questions/72230174/java-17-solution-for-spark-java-lang-noclassdeffounderror-could-not-initializ).
+
+There might be additional InaccessibleObjectException erros depending on the function of Spark used:
+```
+java.lang.reflect.InaccessibleObjectException: Unable to make field private final sun.nio.cs.StreamDecoder java.io.InputStreamReader.sd accessible: module java.base does not "opens java.io" to unnamed module @62e7f11d
+```
+
+To fix them add additional `--add-opens` parameters to the command line / IntelliJ VM Options according to the list in https://github.com/apache/spark/blob/aa1ff3789e492545b07d84ac095fc4c39f7446c6/pom.xml#L312.
+
+## Java InvalidObjectException: ReflectiveOperationException during deserialization (Java 17)
+Symptom:
+Starting an SDLB pipeline fails with the following exception:
+```
+java.io.InvalidObjectException: ReflectiveOperationException during deserialization
+	at java.base/java.lang.invoke.SerializedLambda.readResolve(SerializedLambda.java:280)
+	...
+Caused by: java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	...
+Caused by: java.lang.IllegalArgumentException: too many arguments
+	at java.base/java.lang.invoke.LambdaMetafactory.altMetafactory(LambdaMetafactory.java:511)
+    ...
+```
+
+Solution:
+This is a bug in Scala 2.12 together with Java 17. It is solved in Scala 2.12.17+, see also https://github.com/scala/bug/issues/12419.
+
+To fix update Scala 2.12 version in pom.xml to latest release (e.g. `<scala.version>2.12.18</scala.version>`)
 
 ## Resources not copied
 Symptom:   
