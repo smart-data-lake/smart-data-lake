@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.util.hdfs
 
-import io.smartdatalake.workflow.dataframe.GenericColumn
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
-import org.apache.spark.sql.DataFrame
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 
 import scala.util.matching.Regex
 
@@ -52,9 +51,9 @@ case class PartitionValues(elements: Map[String, Any]) {
   def nonEmpty: Boolean = elements.nonEmpty
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
-  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains))
+  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains).toMap)
   def addKey(key: String, value: Any): PartitionValues = if(!elements.contains(key)) this.copy(elements = elements + (key -> value)) else this
-  def getMapString: Map[String,String] = elements.mapValues(_.toString)
+  def getMapString: Map[String,String] = elements.mapValues(_.toString).toMap
 
   /**
    * Returns true if all given partitions are defined in this partition values instance
@@ -62,9 +61,14 @@ case class PartitionValues(elements: Map[String, Any]) {
   def isComplete(partitions: Seq[String]) = this.keys == partitions.toSet
 
   /**
-   * Returns true if partition values defined by this instance are a valid "init" of given partitions
+   * Returns true if partition defined by this instance are a valid "init" of given partitions
    */
-  def isInitOf(partitions: Seq[String]) = partitions.inits.map(_.toSet).contains(this.keys)
+  def isInitOf(partitions: Seq[String]): Boolean = partitions.inits.map(_.toSet).contains(this.keys)
+
+  /**
+   * Returns true if partition values defined by this instance are included in given partition values.
+   */
+  def isIncludedIn(pv: PartitionValues): Boolean = filterKeys(pv.keys.toSeq) == pv
 }
 
 object PartitionValues {
@@ -80,7 +84,8 @@ object PartitionValues {
    */
   def getOrdering(partitions: Seq[String]): Ordering[PartitionValues] = new Ordering[PartitionValues] {
     def compare(pv1: PartitionValues, pv2: PartitionValues): Int = {
-      partitions.map{
+      val keys = pv1.keys.intersect(pv2.keys)
+      partitions.filter(keys.contains).map{
         p => (pv1(p), pv2(p)) match {
           case (v1: String, v2: String) => v1.compare(v2)
           case (v1: Byte, v2: Byte) => v1.compare(v2)
@@ -150,10 +155,10 @@ object PartitionValues {
    * Read DataFrame and convert to PartitionValues
    * @param df DataFrame with partition columns only selected. All columns will be handled as string.
    */
-  def fromDataFrame(df: DataFrame): Seq[PartitionValues] = {
-    val cols = df.columns
+  def fromDataFrame(df: GenericDataFrame): Seq[PartitionValues] = {
+    val cols = df.schema.columns
     df.distinct.collect.map {
-      row => PartitionValues(cols.map(c => (c,row.getAs[Any](c).toString)).toMap)
+      row => PartitionValues(cols.zipWithIndex.map{ case (c,idx) => (c,row.getAs[Any](idx).toString)}.toMap)
     }
   }
 
@@ -170,6 +175,14 @@ object PartitionValues {
   def sort(partitionCols: Seq[String], partitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
     val ordering = getOrdering(partitionCols)
     partitionValues.sorted(ordering)
+  }
+
+  def fromString(str: String): PartitionValues = {
+    val elements = str.split('/').map { e =>
+      val Array(k,v) = e.split('=')
+      (k,v)
+    }.toMap
+    PartitionValues(elements)
   }
 }
 

@@ -46,7 +46,7 @@ case class AtlasEntitiesUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogg
   /**
    * Generates and pushes entities to atlas.
    */
-  def export(implicit instanceRegistry: InstanceRegistry): Unit = {
+  def `export`(implicit instanceRegistry: InstanceRegistry): Unit = {
     val definedEntities = typeUtil.atlasDefinedEntities
       .filter(_.name.startsWith(typeDefPrefix))
 

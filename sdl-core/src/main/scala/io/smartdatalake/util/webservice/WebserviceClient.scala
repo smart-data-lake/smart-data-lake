@@ -28,11 +28,11 @@ private[smartdatalake] trait WebserviceClient {
     * @return Success(with response as Array[Byte])
     *         or Failure([[WebserviceException]] with reason of failure)
     */
-  def get(): Try[Array[Byte]]
+  def get(params: Map[String,String] = Map()): Try[Array[Byte]]
 
+  def post(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]]
 
-  def post(body: Array[Byte], mimeType: String): Try[Array[Byte]]
+  def put(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]]
 
-
-  def put(body: Array[Byte], mimeType: String): Try[Array[Byte]]
+  def patch(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]]
 }

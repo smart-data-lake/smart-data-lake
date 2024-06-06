@@ -22,6 +22,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil.optionalizeMap
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 
 /**
@@ -38,7 +39,8 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
                          override val dataObjectId: DataObjectId,
                          override val partitionValues: Seq[PartitionValues],
                          override val isDAGStart: Boolean = false,
-                         override val isSkipped: Boolean = false
+                         override val isSkipped: Boolean = false,
+                         override val metrics: Option[MetricsMap] = None
                         )
   extends SubFeed {
   override def breakLineage(implicit context: ActionPipelineContext): ScriptSubFeed = this
@@ -72,6 +74,10 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): ScriptSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, parameters = None)
   }
+
+  def withMetrics(metrics: MetricsMap): ScriptSubFeed = this.copy(metrics = Some(metrics))
+  def appendMetrics(metrics: MetricsMap): ScriptSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+
 }
 object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {
   /**

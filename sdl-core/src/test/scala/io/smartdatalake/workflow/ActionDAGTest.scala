@@ -24,11 +24,11 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
-import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
@@ -52,10 +52,12 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit var contextInit: ActionPipelineContext = _
+  var contextPrep: ActionPipelineContext = _
   var contextExec: ActionPipelineContext = _
 
   before {
     contextInit = TestUtil.getDefaultActionPipelineContext
+    contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
     contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
     instanceRegistry.clear()
   }
@@ -87,8 +89,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(actions, stateStore = Some(stateStore))
 
     // exec dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     assert(contextInit.dataFrameReuseStatistics((tgt1DO.id,Seq())).size == 1)
     dag.exec(contextExec)
     assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
@@ -101,7 +103,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r1.head == 5)
 
     // check metrics for HiveTableDataObject
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written")==1)
     assert(action2MainMetrics.isDefinedAt("bytes_written"))
     assert(action2MainMetrics("num_tasks")==1)
@@ -109,7 +111,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // check state: two actions succeeded
     val latestState = stateStore.getLatestStateId().get
     val previousRunState = stateStore.recoverRunState(latestState)
-    val previousActionState = previousRunState.actionsState.mapValues(_.state)
+    val previousActionState = previousRunState.actionsState.mapValues(_.state).toMap
     val resultActionState = actions.map( a => (a.id, RuntimeEventState.SUCCEEDED)).toMap
     assert(previousActionState == resultActionState)
   }
@@ -144,8 +146,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(actions)
 
     // exec dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of breakDataframeLineage
     dag.exec(contextExec)
     assert(!contextExec.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
@@ -158,7 +160,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r1.head == 5)
 
     // check metrics for HiveTableDataObject
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written")==1)
     assert(action2MainMetrics.isDefinedAt("bytes_written"))
     assert(action2MainMetrics("num_tasks")==1)
@@ -189,8 +191,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // exec dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of different schema
     dag.exec(contextExec)
     assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
@@ -204,7 +206,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r1 == Seq("5"))
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
   }
 
@@ -265,17 +267,17 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val r1 = tgtBDO.getSparkDataFrame()
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r1.toSet == Set(6))
 
     val r2 = tgtCDO.getSparkDataFrame()
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r2.toSet == Set(3))
 
     val r3 = tgtDDO.getSparkDataFrame()
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r3.toSet == Set(3,5))
   }
 
@@ -312,14 +314,14 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(Seq(action1), partitionValues = partitionValuesFilter)
 
     // exec dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // as filters are ignored, we expect both records from src3, but only one record from src2
     val r1 = tgtDO.getSparkDataFrame(Seq())
       .select($"lastname", $"firstname", $"origin")
-      .as[(String,String,Int)].collect.toSet
+      .as[(String,String,Int)].collect().toSet
     assert(r1 == Set(("doe","john",1),("doe","john",2),("doe","john",3),("xyz","john",3)))
   }
 
@@ -367,8 +369,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(actions)
 
     // exec dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     assert(contextInit.dataFrameReuseStatistics((tgtADO.id, Seq())).size == 2)
     assert(contextInit.dataFrameReuseStatistics((tgtBDO.id, Seq())).size == 1)
     assert(contextInit.dataFrameReuseStatistics((tgtCDO.id, Seq())).size == 1)
@@ -377,19 +379,19 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     val r1 = session.table(s"${tgtBTable.fullName}")
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 5)
 
     val r2 = session.table(s"${tgtCTable.fullName}")
       .select($"rating")
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     assert(r2.size == 1)
     assert(r2.head == 5)
 
     val r3 = session.table(s"${tgtDTable.fullName}")
       .select($"rating".cast("int"))
-      .as[Int].collect.toSeq
+      .as[Int].collect().toSeq
     r3.foreach(println)
     assert(r3.size == 1)
     assert(r3.head == 10)
@@ -426,14 +428,14 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(actions)
 
     // exec dag 1st run
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     {
       val r = tgtCDO.getSparkDataFrame()
         .select($"rating")
-        .as[Int].collect.toSeq
+        .as[Int].collect().toSeq
       assert(r == Seq(5, 3))
     }
 
@@ -442,14 +444,14 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcD1.writeSparkDataFrame(l1_2)
     val l2_2 = Seq(("peter", "pan", 4)).toDF("lastname", "firstname", "rating")
     srcD2.writeSparkDataFrame(l2_2)
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     {
       val r = tgtCDO.getSparkDataFrame()
         .select($"rating")
-        .as[Int].collect.toSeq
+        .as[Int].collect().toSeq
       assert(r == Seq(5, 4)) // doe is not updated...
     }
   }
@@ -489,8 +491,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(actions, partitionValues = Seq(PartitionValues(Map("dt"->"20180101"))))
 
     // exec dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     val r1 = session.table(s"${tgt2Table.fullName}")
@@ -539,16 +541,16 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(Seq(action1, action2))
 
     // run dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // read src/tgt and count
     val dfSrc = srcDO.getSparkDataFrame()
-    val srcCount = dfSrc.count
+    val srcCount = dfSrc.count()
     val dfTgt1 = tgt1DO.getSparkDataFrame()
     val dfTgt2 = tgt2DO.getSparkDataFrame()
-    val tgtCount = dfTgt2.count
+    val tgtCount = dfTgt2.count()
     assert(srcCount == tgtCount)
   }
 
@@ -587,25 +589,25 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(Seq(action1, action2, action3))
 
     // run dag
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // read src/tgt and count
     val dfSrc = srcDO.getSparkDataFrame()
-    val srcCount = dfSrc.count
+    val srcCount = dfSrc.count()
     val dfTgt3 = tgt3DO.getSparkDataFrame()
-    val tgtCount = dfTgt3.count
+    val tgtCount = dfTgt3.count()
     assert(srcCount == tgtCount)
 
     // check metrics for CsvFileDataObject
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written")==40)
     assert(action2MainMetrics.isDefinedAt("bytes_written"))
     assert(action2MainMetrics("num_tasks")==1)
 
     // check metrics for FileTransferAction
-    val action3MainMetrics = action3.runtimeData.getFinalMetrics(action3.outputId).get.getMainInfos
+    val action3MainMetrics = TestUtil.getMetrics(action3.getRuntimeInfo().get, action3.outputId)
     assert(action3MainMetrics("files_written")==1)
   }
 
@@ -633,15 +635,15 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
       selectExpression = Some("slice(selectedOutputPartitionValues,-1,1)"), // only one partition: last partition first
       failCondition = Some("size(selectedOutputPartitionValues) = 0 and size(outputPartitionValues) = 0")
     )
-    val actions: Seq[DataFrameOneToOneActionImpl] = Seq(
-      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode))
-      , CopyAction("b", tgt1DO.id, tgt2DO.id)
+    val actions = Seq(
+      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode)),
+      CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
     val dag = ActionDAGRun(actions)
 
     // first dag run: partition lastname=einstein
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -652,8 +654,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"einstein"))))
 
     // second dag run: partition lastname=doe
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -664,8 +666,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(tgt2DO.listPartitions ==  Seq(PartitionValues(Map("lastname"->"doe")), PartitionValues(Map("lastname"->"einstein"))))
 
     // third dag run - skip action execution because there are no new partitions to process
-    dag.prepare
-    val subFeeds = dag.init
+    dag.prepare(contextPrep)
+    val subFeeds = dag.init(contextInit)
     subFeeds.forall(_.isSkipped)
   }
 
@@ -692,13 +694,13 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // fail for not existing expected partition abc
     val dag1 = ActionDAGRun(actions, partitionValues = Seq(PartitionValues(Map("lastname" -> "abc"))))
-    dag1.prepare
-    val e = intercept[TaskFailedException](dag1.exec)
+    dag1.prepare(contextPrep)
+    val e = intercept[TaskFailedException](dag1.exec(contextExec))
     assert(e.cause.isInstanceOf[AssertionError])
 
     // doesnt fail for not existing unexpected partition xyz
     val dag2 = ActionDAGRun(actions, partitionValues = Seq(PartitionValues(Map("lastname" -> "xyz"))))
-    dag2.prepare
+    dag2.prepare(contextPrep)
     dag2.exec(contextExec)
   }
 
@@ -731,12 +733,12 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(actions)
 
     // first dag run
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
-    assert(tgt1DO.getSparkDataFrame().count == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
+    assert(tgt1DO.getSparkDataFrame().count() == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
     assert(tgt1DO.listPartitions.isEmpty)
     val r2 = tgt2DO.getSparkDataFrame()
       .select($"rating")
@@ -745,8 +747,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(tgt2DO.listPartitions == expectedPartitions)
 
     // second dag run - skip action execution because there are no new partitions to process
-    dag.prepare
-    val subFeeds = dag.init
+    dag.prepare(contextPrep)
+    val subFeeds = dag.init(contextInit)
     subFeeds.forall(_.isSkipped)
   }
 
@@ -771,8 +773,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -784,8 +786,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // second dag run - no data to process
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
 
     // check
     val r2 = tgt2DO.getSparkDataFrame()
@@ -798,9 +800,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john 2",10)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(df2, Seq())
     dag.reset
-    dag.prepare
-    dag.init
-    dag.exec(contextExec)
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    val outputSubFeeds = dag.exec(contextExec)
 
     // check
     val r3 = tgt2DO.getSparkDataFrame()
@@ -809,8 +811,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r3.size == 2)
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written")==1)
+    assert(outputSubFeeds.find(_.dataObjectId == action2.outputId).get.metrics.get("records_written")==1)
   }
 
   test("action dag with 2 actions in sequence, first is executionMode=SparkStreamingOnceMode, second is normal") {
@@ -834,8 +837,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -846,8 +849,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // second dag run - no data to process
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -860,8 +863,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john 2",10)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(df2, Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -871,7 +874,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r3.size == 2)
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
 
@@ -900,8 +903,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -910,8 +913,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // second dag run - no data to process
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -922,8 +925,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val data2 = Seq(("doe","john 2",10))
     src2DO.writeSparkDataFrame(data2.toDF("lastname", "firstname", "rating"), Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -931,7 +934,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r3 == (data1src1 ++ data1src2 ++ data2).toSet)
 
     // check metrics
-    val action1MainMetrics = action1.runtimeData.getFinalMetrics(action1.outputIds.head).get.getMainInfos
+    val action1MainMetrics = TestUtil.getMetrics(action1.getRuntimeInfo().get, action1.outputIds.head)
     assert(action1MainMetrics("records_written")==1)
   }
 
@@ -956,8 +959,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -968,8 +971,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // second dag run - no data to process
     dag.reset
-    dag.prepare
-    val subFeeds = dag.init
+    dag.prepare(contextPrep)
+    val subFeeds = dag.init(contextInit)
     subFeeds.forall(_.isSkipped)
 
     // check
@@ -982,8 +985,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df2 = Seq(("doe","john 2",10, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeSparkDataFrame(df2, Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -993,7 +996,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r3.size == 2)
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputId).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written")==2) // without execution mode always the whole table is processed
   }
 
@@ -1027,8 +1030,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -1042,8 +1045,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df3 = Seq(("doe","john","honolulu")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df3, Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -1053,7 +1056,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r2 == Set((5,"honolulu")))
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputIds.head).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
     assert(action2MainMetrics("records_written")==1)
   }
 
@@ -1086,8 +1089,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -1097,20 +1100,20 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r1 == Set((5,"waikiki beach")))
 
     // second dag run - no data to process in action a
-    // there should be no exception and action b should run with updated data of src2 and no data of tgt1, means the inner join results in 0 records written to tgt2
+    // there should be no exception and action b should run with updated data of src2 and all data of tgt1 (as skipped SubFeed is reset)
     val df3 = Seq(("doe","john","honolulu")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df3, Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
-    assert(tgt2DO.getSparkDataFrame().isEmpty)
+    assert(tgt2DO.getSparkDataFrame().count() == 1)
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputIds.head).get.getMainInfos
-    assert(action2MainMetrics("records_written")==0 && action2MainMetrics("no_data")==true)
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
+    assert(action2MainMetrics("records_written")==1)
   }
 
   test("action dag with 2 actions in sequence, first is executionMode=DataFrameIncrementalMode, second with executionCondition=true and ProcessAll mode") {
@@ -1142,8 +1145,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -1157,8 +1160,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val df3 = Seq(("doe","john","honolulu")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df3, Seq())
     dag.reset
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // check
@@ -1168,7 +1171,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r2 == Set((5,"honolulu")))
 
     // check metrics
-    val action2MainMetrics = action2.runtimeData.getFinalMetrics(action2.outputIds.head).get.getMainInfos
+    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
     assert(action2MainMetrics("records_written")==1)
   }
 
@@ -1190,9 +1193,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1))
 
     // first dag run, first file processed
-    dag.prepare
-    dag.init
-    val ex = intercept[TaskFailedException](dag.exec)
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    val ex = intercept[TaskFailedException](dag.exec(contextExec))
     assert(ex.cause.isInstanceOf[MetricsCheckFailed])
   }
 
@@ -1215,8 +1218,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // dag1 run fails in init-phase because action1 fails and there is no other action to execute
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode=Some(PartitionDiffMode(failConditions = Seq(Condition(expression = "year(runStartTime) > 2000", Some("testing"))))))
     val dag1: ActionDAGRun = ActionDAGRun(Seq(action1))
-    dag1.prepare
-    dag1.init
+    dag1.prepare(contextPrep)
+    dag1.init(contextInit)
     val ex1 = intercept[TaskFailedException](dag1.exec(contextExec))
     assert(ex1.cause.isInstanceOf[ExecutionModeFailedException])
     assert(ex1.cause.getMessage.contains("testing"))
@@ -1225,9 +1228,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val action2 = CopyAction("b", srcDO.id, tgt2DO.id)
     val dag2: ActionDAGRun = ActionDAGRun(Seq(action1,action2))
     dag2.reset
-    dag2.prepare
-    dag2.init
-    val ex2 = intercept[TaskFailedException](dag2.exec)
+    dag2.prepare(contextPrep)
+    dag2.init(contextInit)
+    val ex2 = intercept[TaskFailedException](dag2.exec(contextExec))
     assert(ex2.cause.isInstanceOf[ExecutionModeFailedException])
     assert(ex2.cause.getMessage.contains("testing"))
 
@@ -1259,8 +1262,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(actions)
 
     // first dag run
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
   }
 
@@ -1289,13 +1292,13 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag: ActionDAGRun = ActionDAGRun(actions)
 
     // first dag run
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
     // second dag run - skip action execution because there are no new partitions to process
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     val results = dag.exec(contextExec)
     assert(results.head.isSkipped)
   }
@@ -1334,11 +1337,11 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val dag = ActionDAGRun(actions)
 
     // first dag run
-    dag.prepare
-    dag.init
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
     dag.exec(contextExec)
 
-    assert(recDO.getSparkDataFrame().count > 0)
+    assert(recDO.getSparkDataFrame().count() > 0)
 
     // and cleanup special config again
     Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())

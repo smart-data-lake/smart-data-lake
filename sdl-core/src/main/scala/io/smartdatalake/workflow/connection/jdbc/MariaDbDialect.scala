@@ -90,7 +90,7 @@ private case object MariaDbDialect extends JdbcDialect {
       case _: Exception =>
         logWarning("Cannot show schemas.")
     }
-    schemaBuilder.result
+    schemaBuilder.result()
   }
 
   override def getTableExistsQuery(table: String): String = {

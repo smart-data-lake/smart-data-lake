@@ -33,7 +33,7 @@ import net.schmizz.sshj.sftp.{SFTPClient, SFTPException}
 import java.io.{InputStream, OutputStream}
 import java.nio.file.FileAlreadyExistsException
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -162,12 +162,12 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
-  override def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream = {
+  override def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     Try {
       implicit val sftp = connection.pool.borrowObject
       SshUtil.getInputStream(path, () => Try(connection.pool.returnObject(sftp)))
     } match {
-      case Success(r) => r
+      case Success(r) => Iterator(r)
       case Failure(e) => throw new RuntimeException(s"Can't create InputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
   }

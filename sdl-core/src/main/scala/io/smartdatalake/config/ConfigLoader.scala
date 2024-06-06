@@ -88,7 +88,6 @@ object ConfigLoader extends SmartDataLakeLogger {
   def loadConfigFromFilesystem(configLocations: Seq[String], hadoopConf: Configuration): Config = try {
     val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
     logger.info(s"Loading configuration from filesystem locations: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
-    val hadoopConf: Configuration = new Configuration() // note that we could not yet load additional hadoop/spark configurations set in the configuration files
 
     // Search locations for config files
     val configFiles = hadoopPaths.flatMap( location =>
@@ -97,7 +96,7 @@ object ConfigLoader extends SmartDataLakeLogger {
         }
         else
           try {
-            val files = getFilesInBfsOrder(location)(location.getFileSystem(hadoopConf))
+            val files = getFilesInBfsOrder(location)(Environment.fileSystemFactory.getFileSystem(location, hadoopConf))
             if (files.isEmpty){
               throw ConfigurationException(s"The provided directory path ${location.toUri.getPath} does not contain any valid config files")
             }

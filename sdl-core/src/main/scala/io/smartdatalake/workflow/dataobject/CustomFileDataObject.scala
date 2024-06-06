@@ -35,8 +35,8 @@ case class CustomFileDataObject(override val id: DataObjectId,
                                )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with FileRefDataObject with CanCreateInputStream {
 
-  override def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream = {
-    creator.exec
+  override def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
+    Iterator(creator.exec)
   }
 
   override def partitionLayout(): Option[String] = None

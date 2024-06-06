@@ -21,6 +21,7 @@ package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import org.apache.spark.annotation.DeveloperApi
 
 /**
@@ -32,12 +33,14 @@ import org.apache.spark.annotation.DeveloperApi
 case class SecretProviderConfig(className: String, options: Option[Map[String,String]] = None) {
   // instantiate SecretProvider
   private[smartdatalake] val provider: SecretProvider = try {
-    val clazz = Environment.classLoader.loadClass(className)
+    val clazz = Environment.classLoader().loadClass(className)
     val constructor = clazz.getConstructor(classOf[Map[String,String]])
     constructor.newInstance(options.getOrElse(Map())).asInstanceOf[SecretProvider]
   } catch {
     case e: NoSuchMethodException => throw ConfigurationException(s"""SecretProvider class $className needs constructor with parameter "options: Map[String,String]": ${e.getMessage}""", Some("globalConfig.secretProviders"), e)
-    case e: Exception => throw ConfigurationException(s"Cannot instantiate SecretProvider class $className: ${e.getClass.getSimpleName} ${e.getMessage}", Some("globalConfig.secretProviders"), e)
+    case e: Exception =>
+      val cause = getRootCause(e)
+      throw ConfigurationException(s"Cannot instantiate SecretProvider class $className: ${cause.getClass.getSimpleName} ${cause.getMessage}", Some("globalConfig.secretProviders"), e)
   }
 }
 

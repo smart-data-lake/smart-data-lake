@@ -87,7 +87,7 @@ private[smartdatalake] class SynchronousJmsReceiver[T](override val consumerFact
         val endTime = System.currentTimeMillis()
         val elapsedTime = endTime - startTime
         if (elapsedTime >= maxBatchAge.toMillis || buffer.size >= batchSize) {
-          storeBuffer
+          storeBuffer()
           running = false
         } else {
           if (lastCommitted + txBatchSize == buffer.size) {

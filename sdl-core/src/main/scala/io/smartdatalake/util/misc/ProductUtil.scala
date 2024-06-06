@@ -20,7 +20,7 @@ package io.smartdatalake.util.misc
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import org.apache.spark.sql.catalyst.ScalaReflection
+import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, ScalaReflection, SerializerBuildHelper}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{DataFrame, Dataset}
 
@@ -83,7 +83,7 @@ private[smartdatalake] object ProductUtil {
    * Case classes and Maps are formatted as key=value list.
    */
   private[smartdatalake] def formatObj(obj: Any, truncateListLimit: Int = 10): String = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     // recursive function to add an object to the message
     def addObjToBuilder(msg: StringBuilder, inputObj: Any, spacing: Boolean = true): Unit = {
@@ -169,8 +169,8 @@ private[smartdatalake] object ProductUtil {
     val mirror = ScalaReflection.mirror
     val cls = mirror.runtimeClass(tpe)
     val encoder = ScalaReflection.encoderFor(tpe)
-    val serializer = ScalaReflection.serializerFor(encoder)
-    val deserializer = ScalaReflection.deserializerFor(encoder)
+    val serializer = SerializerBuildHelper.createSerializer(encoder)
+    val deserializer = DeserializerBuildHelper.createDeserializer(encoder)
     new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
   }
 

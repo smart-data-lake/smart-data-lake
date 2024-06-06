@@ -29,14 +29,17 @@ import scala.util.{Failure, Success, Try}
 
 private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) extends WebserviceClient {
   private val contentTypeHeader = "content-type"
-  override def get(): Try[Array[Byte]] = {
-    exec(request)
+  override def get(params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.params(params))
   }
-  override def post(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).postData(body))
+  override def post(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.header(contentTypeHeader, mimeType).params(params).postData(body))
   }
-  override def put(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).put(body))
+  override def put(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.header(contentTypeHeader, mimeType).params(params).put(body))
+  }
+  override def patch(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.header(contentTypeHeader, mimeType).params(params).postData(body).method("PATCH"))
   }
   private def exec(request: HttpRequest): Try[Array[Byte]] = {
     Try(request.asBytes) match {

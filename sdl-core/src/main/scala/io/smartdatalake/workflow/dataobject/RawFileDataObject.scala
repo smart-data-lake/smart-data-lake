@@ -32,17 +32,13 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 /**
  * DataObject of type raw for files with unknown content.
  * Provides details to an Action to access raw files.
- * By specifying format you can custom Spark data formats
  *
- * @param customFormat Custom Spark data source format, e.g. binaryFile or text. Only needed if you want to read/write this DataObject with Spark.
- * @param options Options for custom Spark data source format. Only of use if you want to read/write this DataObject with Spark.
- * @param fileName Definition of fileName. This is concatenated with path and partition layout to search for files. Default is an asterix to match everything.
- * @param saveMode Overwrite or Append new data.
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
+ * By specifying customFormat, binary or text files can read with Spark.
+ *
+ * @param customFormat Custom Spark data source format, e.g. binaryFile or text.
+ *                     Only needed if you want to read/write this DataObject with Spark.
+ * @param options Options for custom Spark data source format.
+ *                Only of use if you want to read/write this DataObject with Spark.
  */
 case class RawFileDataObject( override val id: DataObjectId,
                               override val path: String,

@@ -18,6 +18,9 @@ spark-warehouse
 .idea/**/shelf
 .idea/misc.xml
 .idea/scala_compiler.xml
+.vscode
+.metals
+.bloop
 
 # Generated files
 .idea/**/contentModel.xml

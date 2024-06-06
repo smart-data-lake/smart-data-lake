@@ -50,7 +50,7 @@ object DagExporter extends SmartDataLakeLogger {
 
   def exportConfigDagToJSON(config: DagExporterConfig): String = {
     val (registry, _) = ConfigToolbox.loadAndParseConfig(config.sdlConfigPaths.split(','))
-    val simplifiedActions: Map[String, SimplifiedAction] = registry.getActions.groupBy(action => action.id.id).mapValues(action => toSimplifiedAction(action.head))
+    val simplifiedActions: Map[String, SimplifiedAction] = registry.getActions.groupBy(action => action.id.id).mapValues(action => toSimplifiedAction(action.head)).toMap
     writePretty(simplifiedActions)(Serialization.formats(NoTypeHints))
   }
 }

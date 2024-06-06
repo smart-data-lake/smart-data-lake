@@ -73,7 +73,7 @@ class SubFeedTest extends FunSuite {
     val sf2 = SparkSubFeed(Some(SparkDataFrame(df2)), "test1", Seq(PartitionValues(Map("dt"->"20200101"))))
     val sfUnion = sf1.union(sf2).asInstanceOf[SparkSubFeed]
     assert(sfUnion.partitionValues.toSet == Set(PartitionValues(Map("dt"->"20190101")), PartitionValues(Map("dt"->"20200101"))))
-    assert(sfUnion.dataFrame.get.inner.as[Int].collect.toSeq.sorted == Seq(1,2,3,4,5,6))
+    assert(sfUnion.dataFrame.get.inner.as[Int].collect().toSeq.sorted == Seq(1,2,3,4,5,6))
   }
 
   test("FileSubFeed union with FileRefs, with partitionValues") {

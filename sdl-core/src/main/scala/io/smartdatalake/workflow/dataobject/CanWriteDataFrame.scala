@@ -22,6 +22,7 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
@@ -37,18 +38,13 @@ trait CanWriteDataFrame {
    * Called during init phase for checks and initialization.
    * If possible dont change the system until execution phase.
    */
-  def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = Unit
+  def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Write a DataFrame to the DataObject
+   * @return collected metrics
    */
-  def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
-
-  /**
-   * Write a GenericDataFrameSubFeed to the DataObject.
-   * See writeSubFeedSupportedTypes for supported languages of the GenericDataFrameSubFeed.
-   */
-  private[smartdatalake] def writeSubFeed(subFeed: DataFrameSubFeed, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit
+  def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): MetricsMap
 
   /**
    * Declare supported Language for writing DataFrame.

@@ -22,14 +22,12 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 /**
  * This is the root trait for every DataObject.
@@ -49,6 +47,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
 
   /**
    * Configure a housekeeping mode to e.g cleanup, archive and compact partitions.
+   *
    * Default is None.
    */
   def housekeepingMode: Option[HousekeepingMode] = None
@@ -67,7 +66,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schema'", "schema", e)
       }
-      case _ => Unit
+      case _ => ()
     }
     // check lazy parsed schemaMin (note that it can match schema and schemaMin, and we therefore need two match statements)
     this match {
@@ -76,25 +75,25 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schemaMin'", "schemaMin", e)
       }
-      case _ => Unit
+      case _ => ()
     }
   }
 
   /**
    * Runs operations before reading from [[DataObject]]
    */
-  private[smartdatalake] def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations after reading from [[DataObject]]
    */
-  private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations before writing to [[DataObject]]
    * Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
    */
-  private[smartdatalake] def preWrite(implicit context: ActionPipelineContext): Unit = Unit
+  private[smartdatalake] def preWrite(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations after writing to [[DataObject]]
@@ -126,6 +125,22 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
     implicit val registryImpl: InstanceRegistry = registry
     getConnection[T](connectionId)
   }
+
+  /**
+   * Returns statistics about this DataObject from the catalog. Depending on it's type this can be (see also [[io.smartdatalake.definitions.TableStatsType]])
+   * - sizeInBytes
+   * - numFiles
+   * - numRows
+   * - numPartitions, minPartition, maxPartition
+   * - createdAt
+   * - lastModifiedAt
+   * - lastCommitMsg
+   * - location
+   * - columns -> column statistics
+   * @param update if true, more costly operations such as "analyze table" are executed before returning results.
+   * @return a map with statistics about this DataObject
+   */
+  def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String,Any] = Map()
 
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"

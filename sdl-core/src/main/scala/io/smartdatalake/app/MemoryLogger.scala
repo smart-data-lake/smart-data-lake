@@ -26,7 +26,7 @@ import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
 import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, PluginContext, SparkPlugin}
 import org.apache.spark.{SparkConf, SparkContext, SparkEnv}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Configuration for periodic memory usage logging

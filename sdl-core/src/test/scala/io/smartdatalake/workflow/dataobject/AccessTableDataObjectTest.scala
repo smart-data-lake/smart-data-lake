@@ -18,15 +18,14 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io.File
-import java.nio.file.Paths
-import java.sql.Timestamp
-
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
 import org.apache.commons.io.FileUtils
-import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{DataFrame, Row}
+
+import java.io.File
+import java.nio.file.Paths
+import java.sql.Timestamp
 
 
 class AccessTableDataObjectTest extends DataObjectTestSuite {
@@ -87,30 +86,6 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     firstRow.getAs[Int]("field3") shouldEqual 9999
     firstRow.getAs[Boolean]("field4") shouldEqual true
     firstRow.getAs[Timestamp]("field5").toString shouldEqual "2018-05-24 00:00:00.0"
-  }
-
-  test("Reading an access 2016 database using the Ucanaccess driver directly throws an exception") {
-    // prepare
-    val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
-    val executorLogLevel = Logger.getLogger("org.apache.spark.executor.Executor").getLevel
-    val taskSetManagerLogLevel = Logger.getLogger("org.apache.spark.scheduler.TaskSetManager").getLevel
-
-    try {
-      Logger.getLogger("org.apache.spark.executor.Executor").setLevel(Level.OFF)
-      Logger.getLogger("org.apache.spark.scheduler.TaskSetManager").setLevel(Level.OFF)
-
-        // run
-        val thrown = intercept[Exception] {
-          val df = dataObj.getDataFrameByFramework()
-          df.collect()
-        }
-
-        // check
-        thrown.getCause.getMessage shouldEqual "UCAExc:::5.0.1 incompatible data type in conversion: from SQL type CHARACTER to java.lang.Integer, value: ID"
-    } finally {
-        Logger.getLogger("org.apache.spark.executor.Executor").setLevel(executorLogLevel)
-        Logger.getLogger("org.apache.spark.scheduler.TaskSetManager").setLevel(taskSetManagerLogLevel)
-    }
   }
 
   test("It is not possible to read from an non-existing database file.") {

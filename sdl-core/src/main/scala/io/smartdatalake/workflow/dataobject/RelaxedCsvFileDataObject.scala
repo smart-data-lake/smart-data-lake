@@ -15,7 +15,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.expressions.ExprUtils
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
@@ -46,22 +46,12 @@ import scala.reflect.runtime.universe.typeOf
  * If mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.
  * RelaxCsvFileDataObject also supports getting an error msg by adding "<options.columnNameOfCorruptRecord>_msg" as field to the schema.
  *
- * @param schema The data object schema.
- *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
- *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
- *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType Specifies the string format used for writing date typed data.
  * @param treatMissingColumnsAsCorrupt If set to true records from files with missing columns in its header are treated as corrupt (default=false).
  *                                   Corrupt records are handled according to options.mode (default=permissive).
  * @param treatSuperfluousColumnsAsCorrupt If set to true records from files with superfluous columns in its header are treated as corrupt (default=false).
  *                                   Corrupt records are handled according to options.mode (default=permissive).
- * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
  **/
 case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val path: String,
@@ -137,7 +127,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
             val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // add partition column values
             Row(values: _*)
           }
-      }(RowEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // add partition cols
+      }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // add partition cols
   }
 
   private def parseCsvContent(csvContent: String, parserOptions: CSVOptions)(implicit session: SparkSession): Iterator[Row] = {
@@ -215,12 +205,12 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
    */
   def parse(input: String): Option[Row] = try {
     val parsedInternalRow = rawParser.parse(input)
-    if (missingFieldNames.nonEmpty && treatMissingColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow, new SparkException(s"Missing field(s) ${missingFieldNames.mkString(", ")} in header"))
-    if (superfluousFieldNames.nonEmpty && treatSuperfluousColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow, new SparkException(s"Superfluous field(s) ${superfluousFieldNames.mkString(", ")} in header") )
+    if (missingFieldNames.nonEmpty && treatMissingColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow.toArray, new SparkException(s"Missing field(s) ${missingFieldNames.mkString(", ")} in header"))
+    if (superfluousFieldNames.nonEmpty && treatSuperfluousColumnsAsError) throw BadRecordException( () => UTF8String.fromString(input), () => parsedInternalRow.toArray, new SparkException(s"Superfluous field(s) ${superfluousFieldNames.mkString(", ")} in header") )
     parsedInternalRow.map(row => createResultRow(Some(fnRowConverter(row)), None, None))
   } catch {
     case e: BadRecordException => parserOptions.parseMode match {
-      case PermissiveMode => Some(createResultRow(e.partialResult().map(fnRowConverter), Option(e.record()).map(_.toString), Option(e.cause).map(_.getMessage)))
+      case PermissiveMode => Some(createResultRow(e.partialResults().map(fnRowConverter).headOption, Option(e.record()).map(_.toString), Option(e.cause).map(_.getMessage)))
       case DropMalformedMode => None
       case FailFastMode => throw new SparkException(s"Malformed records are detected in record parsing, failing because of FailFastMode. inputRecord=${input.take(100)}", e)
     }

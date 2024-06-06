@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions}
+import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -70,13 +70,19 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val resultat = expected.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("CustomDf2DeltaTable",Seq())(actual)(expected)
     assert(resultat)
+
+    // check statistics
+    assert(targetDO.getStats().apply(TableStatsType.NumRows.toString) == 2)
+    val colStats = targetDO.getColumnStats()
+    assert(colStats.apply("num").get(ColumnStatsType.Max.toString).contains(1))
+    assert(colStats.apply("text").get(ColumnStatsType.Max.toString).contains("Foo!"))
   }
 
   test("Write data partitioned") {
 
     // setup DataObjects
     val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("iceberg1.default"), name = "custom_df_copy_partitioned", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = IcebergTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
     targetDO.dropTable
@@ -233,10 +239,11 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(result2)
   }
 
-  test("SaveMode merge with schema evolution") {
+
+  test("SaveMode merge with updateCols") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge)
     targetDO.dropTable
 
     // first load
@@ -248,33 +255,63 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(result)
 
-    // 2nd load: merge data by primary key with different schema
-    // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
-    // - column 'rating2' added -> existing records will get new column rating2 set to null
+    // 2nd load: merge data by primary key
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
-      .toDF("type", "lastname", "firstname", "rating2")
-    targetDO.initSparkDataFrame(df2, Seq())
-    targetDO.writeSparkDataFrame(df2)
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("rating"))))
     val actual2 = targetDO.getSparkDataFrame()
-    val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
-      .toDF("type", "lastname", "firstname", "rating", "rating2")
+    val expected2 = Seq(("ext","doe","john",10),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
     val result2 = expected2.isEqual(actual2)
     if (!result2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(result2)
   }
 
-  // Note that this is not possible with DeltaLake 1.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
-  // Unfortunately this is needed by HistorizeAction with merge.
+  // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt is not properly supported.
   // We test for failure to be notified once it is working...
-  test("SaveMode merge with updateCols and schema evolution - fails in deltalake 1.0") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
+  // Once this works again, also enable 3rd load in IcebergHistorizeWithMergeActionTest and IcebergDeduplicateWithMergeActionTest test cases again
+  test("SaveMode merge with schema evolution") {
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("tpe","lastname","firstname")))
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, options = Map("mergeSchema" -> "true"), allowSchemaEvolution = true)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
     val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3))
-      .toDF("type", "lastname", "firstname", "rating")
+      .toDF("tpe", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
+
+    // 2nd load: merge data by primary key with different schema
+    // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
+    // - column 'rating2' added -> existing records will get new column rating2 set to null
+    val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
+      .toDF("tpe", "lastname", "firstname", "rating2")
+    targetDO.initSparkDataFrame(df2, Seq())
+    targetDO.writeSparkDataFrame(df2)
+    val actual2 = targetDO.getSparkDataFrame()
+    val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
+      .toDF("tpe", "lastname", "firstname", "rating", "rating2")
+    val result2 = expected2.isEqual(actual2)
+    if (!result2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    assert(result2)
+  }
+
+  // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
+  // We test for failure to be notified once it is working...
+  // Once this works again, also enable 3rd load in IcebergHistorizeWithMergeActionTest and IcebergDeduplicateWithMergeActionTest test cases again
+  test("SaveMode merge with updateCols and schema evolution - fails in deltalake 1.x") {
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("tpe","lastname","firstname")))
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Merge, allowSchemaEvolution = true)
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3))
+      .toDF("tpe", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val resultat = df1.isEqual(actual)
@@ -285,8 +322,116 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
     // - column 'rating2' added -> existing records will get new column rating2 set to null
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
-      .toDF("type", "lastname", "firstname", "rating2")
+      .toDF("tpe", "lastname", "firstname", "rating2")
     intercept[AnalysisException](targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
+  }
+
+  test("incremental output mode with inserts") {
+
+    // create data object
+    val targetTable = Table(catalog =  Some("iceberg1"), db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+
+    // test 1
+    targetDO.setState(newState1)
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 4)
+
+
+    // append test data 2
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df2)
+    val newState2 = targetDO.getState
+
+    // test 2
+    targetDO.setState(newState2)
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 1)
+
+    // append test data 3
+    val df3 = Seq((6, "T", 5), (7, "R", 7), (8, "T", 2)).toDF("id", "p", "value")
+    targetDO.writeSparkDataFrame(df3)
+    val newState3 = targetDO.getState
+
+    // test 3
+    targetDO.setState(newState3)
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 3)
+
+    targetDO.setState(None) // to get the full dataframe
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 8)
+  }
+
+  test("incremental output mode without primary keys") {
+
+    // create data object
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc")
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+
+    // test
+    val thrown = intercept[IllegalArgumentException] {
+      targetDO.setState(newState1)
+      targetDO.getSparkDataFrame()(contextExec).count()
+    }
+
+    // check
+    assert(thrown.isInstanceOf[IllegalArgumentException])
+    assert(thrown.getMessage.contains(s"PrimaryKey for table"))
+
+  }
+
+  test("incremental output mode with updates and inserts") {
+
+    // create data object
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath))
+    targetDO.dropTable
+    targetDO.setState(None) // initialize incremental output with empty state
+
+    // write test data 1
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
+    targetDO.prepare
+    targetDO.initSparkDataFrame(df1, Seq())
+    targetDO.writeSparkDataFrame(df1)
+    val newState1 = targetDO.getState
+    targetDO.setState(newState1)
+    assert(targetDO.getSparkDataFrame()(contextExec).count() == 4)
+
+    // do updates and inserts
+    session.sql(s"INSERT INTO ${targetTable.fullName} VALUES (5, 'T', 7) ")
+    val newState2 = targetDO.getState
+    session.sql(s"INSERT INTO ${targetTable.fullName} VALUES (6, 'U', 3) ")
+    session.sql(s"UPDATE ${targetTable.fullName} SET p = 'Z', value = 8 WHERE id = 1")
+    session.sql(s"UPDATE ${targetTable.fullName} SET p = 'W', value = 1 WHERE id = 1")
+
+    // test
+    val resultDf = Seq((5, "T", 7), (6, "U", 3), (1, "W", 1)).toDF("id", "p", "value")
+
+    targetDO.setState(newState2)
+    val testDf = targetDO.getSparkDataFrame()(contextExec)
+
+    assert(testDf.count() == 3) // 2x new insert + 1x the latest update
+
+    testDf.collect() sameElements resultDf.collect()
+
   }
 
 }

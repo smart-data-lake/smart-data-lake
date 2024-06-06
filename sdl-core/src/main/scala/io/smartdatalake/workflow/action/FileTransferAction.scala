@@ -26,10 +26,12 @@ import io.smartdatalake.util.filetransfer.{FileTransfer, StreamFileTransfer}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed, SubFeed}
 
 /**
- * [[Action]] to transfer files between SFtp, Hadoop and local Fs.
+ * [[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.
+ * As data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.
+ * If you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back.
  *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
@@ -75,18 +77,22 @@ case class FileTransferAction(override val id: ActionId,
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
     logger.info(s"($id) got ${inputFileRefs.size} files to copy")
-    outputSubFeed.copy(fileRefMapping = Some(fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))))
+    val fileRefMapping = fileTransfer.getFileRefMapping(inputFileRefs, filenameExtractorRegex.map(_.r))
+    val partitionValues = if (outputSubFeed.partitionValues.nonEmpty || output.partitions.isEmpty) outputSubFeed.partitionValues
+    else fileRefMapping.map(_.tgt.partitionValues).distinct
+    outputSubFeed.copy(fileRefs = Some(fileRefMapping.map(_.tgt)), fileRefMapping = Some(fileRefMapping), partitionValues = partitionValues)
   }
 
-  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): WriteSubFeedResult[FileSubFeed] = {
-    val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
+  override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {
+    var fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
-    if (fileRefMapping.nonEmpty) fileTransfer.exec(fileRefMapping)
-    output.endWritingOutputStreams(subFeed.partitionValues)
+    if (fileRefMapping.nonEmpty) fileRefMapping = fileTransfer.exec(fileRefMapping)
+    val outputSubFeed = subFeed.copy(fileRefMapping = Some(fileRefMapping))
+    output.endWritingOutputStreams(outputSubFeed.partitionValues)
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->filesWritten) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    WriteSubFeedResult(subFeed, Some(fileRefMapping.isEmpty), Some(metrics))
+    subFeed.withMetrics(metrics)
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {

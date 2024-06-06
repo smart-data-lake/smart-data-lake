@@ -25,7 +25,9 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataobject._
+import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -50,7 +52,7 @@ case class TestDataObject( id: DataObjectId,
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = null
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {}
+                             (implicit context: ActionPipelineContext): MetricsMap = Map()
 
   override var table: Table = Table(db=Some("testdb"), name="testtable")
 
@@ -60,10 +62,11 @@ case class TestDataObject( id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
 
-  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   override def factory: FromConfigFactory[DataObject] = TestDataObject
 
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 }
 
 object TestDataObject extends FromConfigFactory[DataObject] {

@@ -23,7 +23,7 @@ import org.apache.hadoop.fs.permission.{AclEntry, FsPermission}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Example ACL configuration

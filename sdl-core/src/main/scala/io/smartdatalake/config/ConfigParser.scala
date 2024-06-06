@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe._
 import scala.util.Try
 import scala.util.matching.Regex
@@ -139,7 +139,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     val configuredType = config.get[String]("type")
       .mapError(error => throw ConfigurationException(s"Required configuration setting 'type' is missing.", None, error.configException))
       .value
-    val clazz = Environment.classLoader.loadClass(className(configuredType))
+    val clazz = Environment.classLoader().loadClass(className(configuredType))
     val mirror = runtimeMirror(clazz.getClassLoader)
     val classSymbol = mirror.classSymbol(clazz)
     require(classSymbol.companion.isModule, s"Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. It does not have a companion object.")

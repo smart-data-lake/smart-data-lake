@@ -62,9 +62,9 @@ case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransfo
     assert(dfs.values.forall(_.isInstanceOf[SnowparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
     val action = context.instanceRegistry.get[Action](actionId)
     val snowparkSession = action.inputs.head.asInstanceOf[SnowflakeTableDataObject].snowparkSession
-    val snowparkDfs = dfs.mapValues(_.asInstanceOf[SnowparkDataFrame].inner)
+    val snowparkDfs = dfs.mapValues(_.asInstanceOf[SnowparkDataFrame].inner).toMap
     customTransformer.transform(snowparkSession, options, snowparkDfs)
-      .mapValues(SnowparkDataFrame)
+      .mapValues(SnowparkDataFrame).toMap
   }
 
   override def getSubFeedSupportedType: Type = typeOf[SnowparkSubFeed]

@@ -27,7 +27,7 @@ import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 import java.text.Normalizer
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * Provides utility functions for [[DataFrame]]s.
@@ -237,7 +237,7 @@ private[smartdatalake] object DataFrameUtil {
       // Thus we need also to compare the cardinalities and the schemata of the two data frames.
       // For the schema, the order of columns doesn't need to match.
       // Note that we ignore the nullability of the columns to compare schemata.
-      isSchemaEqualIgnoreNullabilty(df2) && symmetricDifference(df2).isEmpty && df.count == df2.count
+      isSchemaEqualIgnoreNullabilty(df2) && symmetricDifference(df2).isEmpty && df.count() == df2.count()
     }
 
     def isSchemaEqualIgnoreNullabilty(df2: DataFrame): Boolean = {
@@ -369,10 +369,16 @@ private[smartdatalake] object DataFrameUtil {
   }
 
   /**
+   * Remove all hyphen and blanks from a string with underscores
+   */
+  def replaceNonSqlWithUnderscores(x: String): String = {
+    x.replaceAll("[^a-zA-Z0-9_]+", "_")
+  }
+  /**
    * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
    */
   def removeNonStandardSQLNameChars(x: String): String = {
-    x.toLowerCase.replaceAll("[^a-z0-9_]", "")
+    x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")
   }
 
   def getEmptyDataFrame(schema: StructType)(implicit session: SparkSession): DataFrame = {

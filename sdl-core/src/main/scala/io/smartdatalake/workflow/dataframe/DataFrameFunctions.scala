@@ -46,6 +46,7 @@ trait DataFrameFunctions {
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
+  def coalesce(columns: GenericColumn*): GenericColumn
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn
   def stringType: GenericDataType
   def arrayType(dataType: GenericDataType): GenericDataType
@@ -58,4 +59,12 @@ trait DataFrameFunctions {
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
    */
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+
+  def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn
+
+  def row_number: GenericColumn
+
+  def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn
+  def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
+  def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
 }

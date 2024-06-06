@@ -34,40 +34,33 @@ class InstanceRegistry {
   private[config] val instances: mutable.Map[ConfigObjectId, SdlConfigObject] = mutable.Map.empty
 
   /**
-   * Add all instances from `instancesToAdd` to this instance registry.
+   * Add all instances from `instancesToAdd` to this instance registry, overwriting existing entries with the same id.
    *
    * @param instancesToAdd the instances to add.
    */
   def register[A <: ConfigObjectId, B <: SdlConfigObject](instancesToAdd: Map[A, B]): Unit = instances ++= instancesToAdd
 
   /**
-   * Add all instances from `instancesToAdd` to this instance registry.
+   * Add all instances from `instancesToAdd` to this instance registry, overwriting existing entries the same ids.
    *
    * @param instancesToAdd the instances to add.
    */
   def register(instancesToAdd: Seq[SdlConfigObject]): Unit = instancesToAdd.foreach(register)
 
   /**
-   * Register a new instance if an instance with the same id has not been registered before.
+   * Register a new instance, overwriting an existing entry with the same id.
    *
    * @param instance the instance to register
-   * @return  true if the instance was registered, false when an instance with the same id is already registered.
    */
-  def register(instance: SdlConfigObject): Boolean = {
-    instances.get(instance.id) match {
-      case Some(_) => false
-      case None =>
-        instances.put(instance.id, instance)
-        true
-    }
+  def register(instance: SdlConfigObject): Unit = {
+    instances(instance.id) = instance
   }
 
   /**
    * Retrieve a registered instance.
    *
    * @param objectId the id of the instance.
-   * @return  an option value with the instance registered with this id
-   *          or `None` if no instance is registered with this id.
+   * @return the instance registered with this id
    */
   def get[A <: SdlConfigObject](objectId: ConfigObjectId): A = instances(objectId).asInstanceOf[A]
 

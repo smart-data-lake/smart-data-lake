@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
+import com.snowflake.snowpark.custom.SnowparkUtils
 import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -28,6 +29,8 @@ import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.json4s.JString
+import org.json4s.JsonAST.JValue
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -73,7 +76,8 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
-  override def collect: Seq[GenericRow] = inner.collect.map(SnowparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
+  override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
     SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
   }
@@ -89,20 +93,22 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.count() == 0
   override def count: Long = inner.count()
-  override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult)
+  override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult())
   // not implemented in Snowpark
   override def uncache: GenericDataFrame = this
-  override def log(msg: String, loggerFunc: String => Unit): Unit = {
-    // for Snowpark we cannot print the DataFrame show output to a string. It is just printed to stdout after logging, which is not optimal as order in stdout is not guaranteed like that.
-    loggerFunc(msg)
-    inner.show()
+  override def showString(options: Map[String,String] = Map()): String = {
+    val showNumRows = options.get("showNumRows").map(_.toInt).getOrElse(10)
+    val showWidth = options.get("showWidth").map(_.toInt).getOrElse(200)
+    SnowparkUtils.showString(inner, showNumRows, showWidth)
   }
+  def explainString(options: Map[String,String] = Map()): String = SnowparkUtils.explainString(inner)
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     // Snowpark has no method to observe metrics. They need to be calculated.
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this.cache, observation)
   }
+  override def apply(columnName: String): GenericColumn = SnowparkColumn(inner.apply(columnName))
 }
 
 case class SnowparkGroupedDataFrame(inner: RelationalGroupedDataFrame) extends GenericGroupedDataFrame {
@@ -152,6 +158,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
   override def makeNullable: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.makeNullable.inner)))
   override def toLowerCase: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.toLowerCase.inner)))
   override def removeMetadata: SnowparkSchema = this // metadata not existing in Snowpark
+  override def treeString(level: Int = Int.MaxValue): String = SnowparkUtils.schemaTreeString(inner, level)
 }
 
 case class SnowparkColumn(inner: Column) extends GenericColumn {
@@ -223,6 +230,11 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = throw new NotImplementedError(s"Converting column back to sql expression is not supported by Snowpark")
+  override def desc: GenericColumn = SnowparkColumn(inner.desc)
+  override def apply(extraction: Any): GenericColumn = extraction match {
+    case str: String => SnowparkColumn(inner.apply(str))
+    case idx: Int => SnowparkColumn(inner.apply(idx))
+  }
 }
 
 case class SnowparkField(inner: StructField) extends GenericField {
@@ -230,6 +242,7 @@ case class SnowparkField(inner: StructField) extends GenericField {
   override def name: String = inner.name
   override def dataType: SnowparkDataType = SnowparkDataType(inner.dataType)
   override def nullable: Boolean = inner.nullable
+  override def comment: Option[String] = None
   override def makeNullable: SnowparkField = SnowparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SnowparkField = SnowparkField(inner.copy(dataType = dataType.toLowerCase.inner, columnIdentifier = ColumnIdentifier(inner.name.toLowerCase)))
   override def removeMetadata: SnowparkField = this // metadata is not existing in Snowpark
@@ -244,11 +257,13 @@ trait SnowparkDataType extends GenericDataType {
   override def makeNullable: SnowparkDataType
   override def toLowerCase: SnowparkDataType
   override def removeMetadata: SnowparkDataType = this // metadata is not existing in Snowpark
+  override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
 }
 case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
   override def makeNullable: SnowparkDataType = this
   override def toLowerCase: SnowparkDataType = this
   override def isSimpleType: Boolean = true
+  def toJson: JValue = JString(inner.typeName)
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)

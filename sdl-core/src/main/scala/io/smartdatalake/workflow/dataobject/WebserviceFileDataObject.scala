@@ -34,26 +34,54 @@ import org.apache.tika.Tika
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
 
+/**
+ * List of partitions possible values for this partition
+ * @param name partition name
+ * @param values possible values for this partition
+ */
 case class WebservicePartitionDefinition(name: String, values: Seq[String])
 
+/**
+ * Proxy configuration used to make HTTP-connection.
+ * @param host proxy host
+ * @param port proxy port
+ */
 case class HttpProxyConfig(host: String, port: Int)
 
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
 /**
- * [[DataObject]] to call webservice and return response as InputStream
- * This is implemented as FileRefDataObject because the response is treated as some file content.
- * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
- * All possible query parameter values must be given in configuration.
+ * [[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.
  *
- * @param partitionDefs   list of partitions with list of possible values for every entry
+ * The corresponding Action to process the response or upload data should be a FileTransferAction.
+ * This is implemented as FileRefDataObject because the response / upload data is treated as some file content.
+ *
+ * FileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.
+ *
+ * Query parameter (partitions) and possible values can be configured through `partitionDefs` attribute.
+ * If no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG.
+ *
+ * @param url URL of the webservice
+ * @param additionalHeaders Additional headers to pass with the http request
+ * @param timeouts optional configuration of HTTP timeouts
+ * @param authMode Optional configuration of webservice authentication. Supported `AuthMode`s are BasicAuthMode and CustomHttpAuthMode.
+ *                 CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
+ * @param mimeType Optionally specify mime-type of Webservice response. If not specified `tika`-library is used to guess the type.
+ * @param writeMethod HTTP method used when uploading data to a webservice.
+ *                    Default method is POST.
+ * @param proxy optional Proxy configuration used to make HTTP-connection.
+ * @param followRedirects if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param partitionDefs Optional list of partitions and possible partition values.
+ *                      Partitions and their values are mapped as query parameter in webservice requests.
+ *                      Multiple values are translated into multiple requests. Each request handles one combination of partition values.
  * @param partitionLayout definition of partitions in query string. Use %<partitionColName>% as placeholder for partition column value in layout.
+ * @param pagingLinkRegex if Webservice implements paging, configure a regular expression to extract a link for the next page.
+ *                        Example: "\slink=(\S*)"
  */
 case class WebserviceFileDataObject(override val id: DataObjectId,
                                     url: String,
                                     additionalHeaders: Map[String, String] = Map(),
                                     timeouts: Option[HttpTimeoutConfig] = None,
-                                    readTimeoutMs: Option[Int] = None,
                                     authMode: Option[AuthMode] = None,
                                     mimeType: Option[String] = None,
                                     writeMethod: WebserviceMethod = WebserviceMethod.Post,
@@ -61,6 +89,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     followRedirects: Boolean = false,
                                     partitionDefs: Seq[WebservicePartitionDefinition] = Seq(),
                                     override val partitionLayout: Option[String] = None,
+                                    pagingLinkRegex: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
@@ -73,7 +102,12 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
 
   override def partitions: Seq[String] = partitionDefs.map(_.name)
 
-  override def expectedPartitionsCondition: Option[String] = None // all partitions are expected to exist
+  override def expectedPartitionsCondition: Option[String] = {
+    if (partitionDefs.exists(_.values.isEmpty)) Some("false") // if some partitionDef values is not defined, we cannot now what partitions exist...
+    else None // all partitions are expected to exist
+  }
+
+  override def createsMultiInputStreams: Boolean = pagingLinkRegex.isDefined
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     // prepare auth mode if defined
@@ -86,8 +120,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @param query optional URL with replaced placeholders to call
    * @return Response as Array[Byte]
    */
-  def getResponse(query: Option[String] = None): Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, query.map(url + _))
+  def getResponse(url: String): Array[Byte] = {
+    val webserviceClient = ScalaJWebserviceClient(this, Some(url))
 
     webserviceClient.get() match {
       case Success(c) => c
@@ -132,15 +166,34 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Same as getResponse, but returns response as InputStream
+   * getResponse, implement paging, return as InputStreams
    *
    * @param query it should be possible to define the partition to read as query string, but this is not yet implemented
    */
-  override def createInputStream(query: String)(implicit context: ActionPipelineContext): InputStream = {
-    new ByteArrayInputStream(getResponse(Some(query)))
+  override def createInputStreams(query: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
+    val targetUrl = url + query
+    val responses: Iterator[Array[Byte]] = new Iterator[Array[Byte]]() {
+      var nextLink: Option[String] = Some(targetUrl)
+      override def hasNext: Boolean = nextLink.isDefined
+      override def next(): Array[Byte] = {
+        assert(nextLink.nonEmpty)
+        val response = getResponse(nextLink.get)
+        nextLink = pagingLinkRegex.flatMap{ patternStr =>
+          val pattern = patternStr.r.unanchored
+          new String(response) match {
+            case pattern(link) =>
+              logger.debug(s"next pagingLink found: $link")
+              Some(link)
+            case _ => None
+          }
+        }
+        response
+      }
+    }
+    responses.map(e => new ByteArrayInputStream(e))
   }
 
-  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * @param path      is ignored for webservices
@@ -154,13 +207,13 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
         val bytes = this.toByteArray
         postResponse(bytes, None)
       } match {
-        case Success(_) => Unit
+        case Success(_) => ()
         case Failure(e) => throw new RuntimeException(s"($id) Could not post to webservice: ${e.getMessage}", e)
       }
     }
   }
 
-  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = Unit
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
@@ -175,7 +228,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
       // as partitionValues don't need to define a value for every partition, we need to create all partition values and filter them
       val allPartitionValues = createAllPartitionValues
       if (partitionValues.isEmpty || partitionValues.contains(PartitionValues(Map()))) allPartitionValues
-      else allPartitionValues.filter(allPv => partitionValues.exists(_.elements.forall(filterPvElement => allPv.get(filterPvElement._1).contains(filterPvElement._2))))
+      else if (allPartitionValues.nonEmpty) allPartitionValues.filter(allPv => partitionValues.exists(_.elements.forall(filterPvElement => allPv.get(filterPvElement._1).contains(filterPvElement._2))))
+      else partitionValues
     } else Seq(PartitionValues(Map())) // create empty default PartitionValue
     // create one FileRef for every PartitionValue
     partitionValuesToProcess.map(createFileRef)

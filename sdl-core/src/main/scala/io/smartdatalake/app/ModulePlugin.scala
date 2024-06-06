@@ -19,8 +19,10 @@
 
 package io.smartdatalake.app
 
+import io.smartdatalake.util.misc.ReflectionUtil
 import org.reflections.Reflections
-import scala.collection.JavaConverters._
+
+import scala.jdk.CollectionConverters._
 
 /**
  * Hooks for modules to interact with sdl-core
@@ -35,8 +37,8 @@ trait ModulePlugin {
 
 object ModulePlugin {
   lazy val modules: Seq[ModulePlugin] = {
-    new Reflections("io.smartdatalake")
+    ReflectionUtil.getReflections("io.smartdatalake")
       .getSubTypesOf(classOf[ModulePlugin]).asScala.toSeq
-      .map(_.newInstance())
+      .map(_.getDeclaredConstructor().newInstance())
   }
 }

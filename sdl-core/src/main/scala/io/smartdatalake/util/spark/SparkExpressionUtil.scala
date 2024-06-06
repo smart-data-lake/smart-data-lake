@@ -176,7 +176,7 @@ object DefaultExpressionData {
   def from(context: ActionPipelineContext, partitionValues: Seq[PartitionValues]): DefaultExpressionData = {
     DefaultExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.phase.toString
       , context.referenceTimestamp.map(Timestamp.valueOf), Timestamp.valueOf(context.runStartTime)
-      , Timestamp.valueOf(context.attemptStartTime), partitionValues.map(_.elements.mapValues(_.toString)))
+      , Timestamp.valueOf(context.attemptStartTime), partitionValues.map(_.elements.mapValues(_.toString).toMap))
   }
 }
 

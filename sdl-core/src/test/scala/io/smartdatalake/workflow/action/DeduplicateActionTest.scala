@@ -85,7 +85,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame().cache
+      val actual = tgtDO.getSparkDataFrame().cache()
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -102,7 +102,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
       val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame().cache
+      val actual = tgtDO.getSparkDataFrame().cache()
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)

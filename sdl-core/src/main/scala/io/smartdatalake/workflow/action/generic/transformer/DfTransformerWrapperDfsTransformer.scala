@@ -31,15 +31,20 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
  * This works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.
  * All other SubFeeds will be passed through without transformation.
  * @param transformer Configuration for a GenericDfTransformerDef to be applied
- * @param subFeedsToApply Names of SubFeeds the transformation should be applied to.
+ * @param subFeedsToApply Names of SubFeeds the transformation should be applied to. Default is an empty list,
+ *                        which will apply the transformation to all subfeeds.
  */
-case class DfTransformerWrapperDfsTransformer(transformer: GenericDfTransformer, subFeedsToApply: Seq[String]) extends GenericDfsTransformer {
+case class DfTransformerWrapperDfsTransformer(transformer: GenericDfTransformer, subFeedsToApply: Seq[String] = Seq()) extends GenericDfsTransformer {
   override def name: String = transformer.name
   override def description: Option[String] = transformer.description
-  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val missingSubFeeds = subFeedsToApply.toSet.diff(dfs.keySet)
     assert(missingSubFeeds.isEmpty, s"($actionId) [transformation.$name] subFeedsToApply ${missingSubFeeds.mkString(", ")} not found in input dfs. Available subFeeds are ${dfs.keys.mkString(", ")}.")
-    dfs.map { case (subFeedName,df) => if (subFeedsToApply.contains(subFeedName)) (subFeedName, transformer.transform(actionId, partitionValues, df, DataObjectId(subFeedName), Some(subFeedName), executionModeResultOptions)) else (subFeedName, df)}
+    dfs.map {
+      case (subFeedName,df) =>
+        if (subFeedsToApply.contains(subFeedName) || subFeedsToApply.isEmpty) (subFeedName, transformer.transform(actionId, partitionValues, df, DataObjectId(subFeedName), Some(subFeedName), executionModeResultOptions))
+        else (subFeedName, df)
+    }
   }
   override def transformPartitionValues(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     transformer.transformPartitionValues(actionId, partitionValues, executionModeResultOptions)

@@ -30,12 +30,12 @@ import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.tolerantGet
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-import sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl
 
-import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.{InvocationTargetException, ParameterizedType}
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
@@ -84,10 +84,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
   private[smartdatalake] def transformWithParamMapping(actionId: ActionId, session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame], inputDOs: Seq[DataObject], partitionValues: Seq[PartitionValues]): DataFrame = {
 
     // lookup transform method
-    val methodName = "transform"
-    val mirror = scala.reflect.runtime.currentMirror
-    val typeTagSubclass = mirror.classSymbol(customTransformer.getClass).toType
-    val transformMethodsOfSubclass = typeTagSubclass.members.filter(_.isMethod).filter(_.name.toString == methodName)
+    val transformMethodsOfSubclass = CustomCodeUtil.getClassMethodsByName(customTransformer.getClass, "transform")
     assert(transformMethodsOfSubclass.size == 1, s"($actionId) [transformers.$name] $expectedTransformMessage")
     val transformMethod = transformMethodsOfSubclass.head
 
@@ -115,10 +112,8 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     val allMappedParams: Seq[Object] = (mappedNonDatasetParams ++ mappedDatasetParams).sortBy(_._1).map(_._2)
 
     // call method dynamically
-    val transformMethodInstance = customTransformer.getClass.getMethods.find(_.getName == methodName).get
-    val res =
-      try {
-        transformMethodInstance.invoke(customTransformer, allMappedParams: _*)
+    val resDs = try {
+        CustomCodeUtil.callMethod[Dataset[_]](customTransformer, transformMethod, allMappedParams)
       } catch {
         case e: InvocationTargetException =>
           // Simplify nested exception to hide reflection complexity in exceptions from custom transformer code.
@@ -127,11 +122,11 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
           throw targetException
       }
 
-    val outputClassType = transformMethodInstance.getAnnotatedReturnType.getType.asInstanceOf[ParameterizedTypeImpl].getActualTypeArguments.head.getTypeName
-    val columsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
+    val outputClassType = transformMethod.returnType.typeArgs.head
+    val columnsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
-    val resAsDF = res.asInstanceOf[Dataset[_]].toDF
-    val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columsFromCaseClass.map(col): _*) else resAsDF
+    val resAsDF = resDs.toDF()
+    val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columnsFromCaseClass.map(col): _*) else resAsDF
 
     if (addPartitionValuesToOutput) {
       assert(partitionValues.size == 1, s"When using addPartitionValuesToOutput you can only process one partition-value at a time, but ${partitionValues.size} where given: {${partitionValues.mkString(";")}}")
@@ -176,23 +171,26 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     }
   }
 
-  /**
-   * Tolerant lookup of entry in map.
-   * Comparison is made case-insensitive and without underscore and hyphen.
-   */
-  private def tolerantGet[T](map: Map[String, T], key: String): Option[T] = {
-    def prepareKey(k: String) = k.toLowerCase.replace("-", "").replace("_", "")
-
-    val tolerantMap = map.map { case (k, v) => (prepareKey(k), v) }
-    tolerantMap.get(prepareKey(key))
-  }
-
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDsNTo1Transformer
 }
 
 object ScalaClassSparkDsNTo1Transformer extends FromConfigFactory[GenericDfsTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaClassSparkDsNTo1Transformer = {
     extract[ScalaClassSparkDsNTo1Transformer](config)
+  }
+
+
+  /**
+   * Tolerant lookup of entry in map.
+   * Comparison is made case-insensitive and without underscore and hyphen.
+   */
+  private[smartdatalake] def tolerantGet[T](map: Map[String, T], key: String): Option[T] = {
+    val tolerantMap = map.map { case (k, v) => (prepareTolerantKey(k), v) }
+    tolerantMap.get(prepareTolerantKey(key))
+  }
+
+  private[smartdatalake] def prepareTolerantKey(key: String) = {
+    key.toLowerCase.replace("-", "").replace("_", "")
   }
 }
 

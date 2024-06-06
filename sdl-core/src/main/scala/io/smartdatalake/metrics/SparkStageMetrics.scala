@@ -19,6 +19,8 @@
 
 package io.smartdatalake.metrics
 
+import io.smartdatalake.config.SdlConfigObject
+
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, Instant, ZoneId}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
@@ -73,7 +75,7 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   /**
    * @return A printable string reporting all metrics.
    */
-  def getAsText: String = {
+  override def getAsText: String = {
     val valueSeparator: String = "="
     val durationStringWithSeparator = durationString(valueSeparator)(_, _)
     val keyValueStringWithSeparator = keyValueString(valueSeparator)(_, _)
@@ -116,8 +118,13 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
   def getId: String = jobInfo.toString
   def getOrder: Long = stageId
   def getMainInfos: Map[String, Any] = {
-    Map("stage_duration" -> stageRuntime, "records_written" -> recordsWritten, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks.toLong, "stage" -> stageName.split(' ').head ) ++
-      (if (recordsWritten == 0) Map("no_data" -> true) else Map())
+    Map("stage_duration" -> stageRuntime, "records_written" -> recordsWritten, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks.toLong, "stage" -> stageName.split(' ').head )
   }
 }
-private[smartdatalake] case class JobInfo(id: Int, group: String, description: String, executionId: Option[SDLExecutionId])
+private[smartdatalake] case class JobInfo(id: Int, group: String, description: String, executionId: Option[SDLExecutionId]) {
+  val dataObjectIdRegex = (s"DataObject~(${SdlConfigObject.idRegexStr})").r.unanchored
+  val dataObjectId = description match {
+    case dataObjectIdRegex(id) => Some(DataObjectId(id))
+    case _ => None // there are some stages which are created by Spark DataFrame operations which dont manipulate Actions target DataObject's, e.g. pivot operator
+  }
+}

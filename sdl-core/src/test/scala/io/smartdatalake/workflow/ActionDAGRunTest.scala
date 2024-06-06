@@ -24,13 +24,15 @@ import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.workflow.action.{ResultRuntimeInfo, RuntimeEventState, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 
 import java.nio.file.Files
 import java.time.{Duration, LocalDateTime}
+import scala.jdk.CollectionConverters._
 
 class ActionDAGRunTest extends FunSuite {
 
@@ -43,22 +45,36 @@ class ActionDAGRunTest extends FunSuite {
     val duration = Duration.ofMinutes(5)
     val endTime = startTime.plus(duration)
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
-      results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1)))),Map("test"->1, "test2"->"abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
+      results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))), metrics = Some(Map("test"->1, "test2"->"abc")))),
+      dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
     val appVersion = AppUtil.getManifestVersion
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
       .mapValues(actionState => actionState
-        .copy(results = actionState.results.map( result => result
-          .copy(subFeed = result.subFeed match {
-            case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
-            case subFeed => subFeed
-          })))))
+        .copy(results = actionState.results.map {
+          case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
+          case subFeed => subFeed
+        })).toMap)
     // check
     val deserializedState = ActionDAGRunState.fromJson(json)
     assert(deserializedState == expectedState)
+  }
+
+  test("read old state version") {
+    val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
+    val migratedState = ActionDAGRunState.fromJson(stateContent)
+    assert(migratedState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion)
+    val stateLoadTest = migratedState.actionsState("load-test")
+    assert(stateLoadTest.results.head.getClass.getSimpleName == "SparkSubFeed")
+    assert(stateLoadTest.inputIds.nonEmpty)
+    assert(stateLoadTest.outputIds.nonEmpty)
+    assert(stateLoadTest.results.head.partitionValues == Seq(PartitionValues(Map("test" -> 1))))
+    val stateFilerefTest = migratedState.actionsState("fileref-test")
+    assert(stateFilerefTest.results.head.getClass.getSimpleName == "FileSubFeed")
+    assert(stateFilerefTest.results.head.asInstanceOf[FileSubFeed].fileRefMapping.get.head.src.partitionValues == PartitionValues(Map("test" -> "123")))
   }
 
   test("append to state index file") {
@@ -71,7 +87,8 @@ class ActionDAGRunTest extends FunSuite {
     val duration = Duration.ofMinutes(5)
     val endTime = startTime.plus(duration)
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
-      results = Seq(ResultRuntimeInfo(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test" -> 1)))), Map("test" -> 1, "test2" -> "abc"))), dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
+      results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test" -> 1))), metrics = Some(Map("test" -> 1, "test2" -> "abc")))),
+      dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
     val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
     val appVersion = AppUtil.getManifestVersion
     val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = true, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion)
@@ -84,14 +101,14 @@ class ActionDAGRunTest extends FunSuite {
     {
       stateStore.saveState(state)
       val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
-      assert(index.split(HadoopFileActionDAGRunStateStore.indexEntryDelimiter).length == 1)
+      assert(index.linesIterator.count(_.trim.nonEmpty) == 1)
     }
 
     // write second state
     {
       stateStore.saveState(state)
       val index = HdfsUtil.readHadoopFile(tempDir.resolve("index.json").toString)(session.sparkContext.hadoopConfiguration)
-      assert(index.split(HadoopFileActionDAGRunStateStore.indexEntryDelimiter).length == 2)
+      assert(index.linesIterator.count(_.trim.nonEmpty) == 2)
     }
   }
 }

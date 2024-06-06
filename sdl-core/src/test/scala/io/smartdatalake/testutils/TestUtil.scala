@@ -23,10 +23,12 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.SDLExecutionId
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -48,13 +50,23 @@ import java.math.BigDecimal
 import java.nio.file.Files
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDateTime}
-import scala.collection.JavaConverters._
-import scala.util.Try
+import scala.jdk.CollectionConverters._
 
 /**
  * Utility methods for testing.
  */
 object TestUtil extends SmartDataLakeLogger {
+
+  // extract keystore file from resource jar for wiremock server
+  private lazy val wiremockKeyStoreFile = {
+    val resource = "test_keystore.pkcs12"
+    val keyStorePath = Files.createTempDirectory("test").resolve(resource)
+    val inputStream = Option(getClass.getResourceAsStream("/"+resource))
+      .getOrElse(throw new RuntimeException(s"Could not find resource $resource in classpath"))
+    Files.copy(inputStream, keyStorePath)
+    inputStream.close()
+    keyStorePath.toString
+  }
 
   def sparkSessionBuilder(additionalSparkProperties: Map[String,StringOrSecret] = Map()) : SparkSession.Builder = {
     // create builder
@@ -75,7 +87,7 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   // create SparkSession if needed
-  lazy val session : SparkSession = sparkSessionBuilder().getOrCreate
+  lazy val session : SparkSession = sparkSessionBuilder().getOrCreate()
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     getDefaultActionPipelineContext(session) // initialize with Spark session incl. Hive support
@@ -141,21 +153,23 @@ object TestUtil extends SmartDataLakeLogger {
    * @param httpsPort port for https calls
    * @return instance of [[WireMockServer]]
    */
-  def setupWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
-    configureFor(host,port)
-    val keystoreFile = this.getClass.getResource("/test_keystore.pkcs12").getFile
+  def startWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
+    configureFor(host, port)
     val wireMockServer =
       new WireMockServer(
         wireMockConfig()
           .port(port)
           .httpsPort(httpsPort)
           .bindAddress(host)
-          .keystorePath(keystoreFile)
+          .keystorePath(wiremockKeyStoreFile)
           .keystorePassword("mytruststorepassword")
       )
     wireMockServer
       .start()
+    wireMockServer
+  }
 
+  def setupWebserviceStubs(): Unit = {
     stubFor(post(urlEqualTo("/good/post/no_auth"))
       .willReturn(aResponse().withBody("{{request.path.[0]}}"))
     )
@@ -182,9 +196,6 @@ object TestUtil extends SmartDataLakeLogger {
     stubFor(get(urlMatching("/bad/*/"))
       .willReturn(aResponse.withStatus(404))
     )
-
-    wireMockServer
-
   }
 
   def printFailedTestResult(testName: String, arguments: Seq[DataFrame] = Seq())(actual: DataFrame)(expected: DataFrame): Unit = {
@@ -375,7 +386,7 @@ object TestUtil extends SmartDataLakeLogger {
 
   def arbitraryDataFrame(schema: StructType, nbRecords: Int = 100)(implicit session: SparkSession): DataFrame = {
     val nbOfArrayRecords = 3
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     def arbitraryValue(dataType: DataType): Any = {
       dataType match {
         case IntegerType => Arbitrary.arbInt.arbitrary.sample.get
@@ -394,6 +405,10 @@ object TestUtil extends SmartDataLakeLogger {
     }
     val rows = (1 to nbRecords).map( x => arbitraryRow(schema.fields)).asJava
     session.createDataFrame(rows, schema)
+  }
+
+  def getMetrics(runtimeInfo: RuntimeInfo, dataObjectId: DataObjectId): MetricsMap = {
+    runtimeInfo.results.find(_.dataObjectId == dataObjectId).get.metrics.getOrElse(Map())
   }
 }
 

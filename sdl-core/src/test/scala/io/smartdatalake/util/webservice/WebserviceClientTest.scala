@@ -25,10 +25,10 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
-import org.scalatest.{BeforeAndAfterEach, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, BeforeAndAfterEach, FunSuite}
 import scalaj.http.{Http, HttpResponse}
 
-class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
+class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll  {
 
   val port = 8080 // for some reason, only the default port seems to work
   val httpsPort = 8443
@@ -39,12 +39,17 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfterEach  {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  override protected def beforeEach(): Unit = {
-    wireMockServer = TestUtil.setupWebservice(host, port, httpsPort)
+  override protected def beforeAll(): Unit = {
+    wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
   }
 
-  override protected def afterEach(): Unit = {
+  override protected def afterAll(): Unit = {
     wireMockServer.stop()
+  }
+
+  before {
+    wireMockServer.resetAll()
+    TestUtil.setupWebserviceStubs()
   }
 
   test("Call webservice with wrong Url") {
@@ -112,5 +117,5 @@ private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
     // add options as headers
     additionalHeaders = options
   }
-  override private[smartdatalake] def getHeaders = additionalHeaders.mapValues(_.resolve())
+  override def getHeaders = additionalHeaders.mapValues(_.resolve()).toMap
 }

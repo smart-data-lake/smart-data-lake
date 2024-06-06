@@ -26,9 +26,14 @@ import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.apache.spark.sql._
+import org.apache.spark.sql.execution.ExplainMode
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{col, expr, row_number}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql._
+import org.json4s.JString
+import org.json4s.JsonAST.JValue
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
@@ -74,7 +79,8 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
-  override def collect: Seq[GenericRow] = inner.collect.map(SparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
+  override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): SparkSubFeed = {
     SparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
   }
@@ -90,10 +96,17 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
   override def isEmpty: Boolean = inner.isEmpty
   override def count: Long = inner.count()
-  override def cache: GenericDataFrame = SparkDataFrame(inner.cache)
-  override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist)
-  override def log(msg: String, loggerFunc: String => Unit): Unit = {
-    loggerFunc(msg + System.lineSeparator() + DatasetHelper.showString(inner, truncate = 0))
+  override def cache: GenericDataFrame = SparkDataFrame(inner.cache())
+  override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist())
+  override def showString(options: Map[String,String] = Map()): String = {
+    val numRows = options.get("numRows").map(_.toInt).getOrElse(10)
+    val truncate = options.get("truncate").map(_.toInt).getOrElse(20)
+    val vertical = options.get("vertical").exists(_.toBoolean)
+    DatasetHelper.showString(inner, numRows, truncate, vertical)
+  }
+  def explainString(options: Map[String,String] = Map()): String = {
+    val mode = options.getOrElse("mode", "simple")
+    inner.queryExecution.explainString(ExplainMode.fromString(mode.toLowerCase))
   }
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
@@ -109,6 +122,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       (SparkDataFrame(dfObserved), observation)
     }
   }
+  override def apply(columnName: String): GenericColumn = SparkColumn(inner.apply(columnName))
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {
@@ -159,6 +173,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   override def makeNullable: SparkSchema = SparkSchema(StructType(fields.map(_.makeNullable.inner)))
   override def toLowerCase: SparkSchema = SparkSchema(StructType(fields.map(_.toLowerCase.inner)))
   override def removeMetadata: SparkSchema = SparkSchema(StructType(fields.map(_.removeMetadata.inner)))
+  override def treeString(level: Int = Int.MaxValue): String = inner.treeString(level)
 }
 
 case class SparkColumn(inner: Column) extends GenericColumn {
@@ -227,6 +242,8 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
   override def exprSql: String = inner.expr.sql
+  override def desc: GenericColumn = SparkColumn(inner.desc)
+  override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
 }
 
 case class SparkField(inner: StructField) extends GenericField {
@@ -234,6 +251,7 @@ case class SparkField(inner: StructField) extends GenericField {
   override def name: String = inner.name
   override def dataType: SparkDataType = SparkDataType(inner.dataType)
   override def nullable: Boolean = inner.nullable
+  override def comment: Option[String] = inner.getComment()
   override def makeNullable: SparkField = SparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SparkField = SparkField(inner.copy(dataType = dataType.toLowerCase.inner, name = inner.name.toLowerCase))
   override def removeMetadata: SparkField = SparkField(inner.copy(dataType = dataType.removeMetadata.inner, metadata = Metadata.empty))
@@ -250,12 +268,14 @@ trait SparkDataType extends GenericDataType {
   override def toLowerCase: SparkDataType
   override def removeMetadata: SparkDataType
   override def isSimpleType: Boolean = false
+  override def isNumeric: Boolean = inner.isInstanceOf[NumericType]
 }
 case class SparkSimpleDataType(inner: DataType) extends SparkDataType {
   override def makeNullable: SparkDataType = this
   override def toLowerCase: SparkDataType = this
   override def removeMetadata: SparkDataType = this
   override def isSimpleType: Boolean = true
+  def toJson: JValue = JString(inner.typeName)
 }
 case class SparkStructDataType(override val inner: StructType) extends SparkDataType with GenericStructDataType {
   override def makeNullable: SparkDataType = SparkStructDataType(SparkSchema(inner).makeNullable.inner)

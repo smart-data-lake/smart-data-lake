@@ -88,7 +88,7 @@ trait FileRefDataObject extends FileDataObject {
         val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
           .getOrElse(getPath + separator + newFileName)
-        FileRefMapping(f, f.copy(fullPath = newPath))
+        FileRefMapping(f, f.copy(fullPath = newPath, fileName = newFileName))
     }
   }
 
@@ -169,7 +169,7 @@ trait FileRefDataObject extends FileDataObject {
    * Create directories if not existing.
    * If no implementation is given, it is assumed that directories will be created on-the-fly when writing a file.
    */
-  def mkDirs(path: String)(implicit context: ActionPipelineContext): Unit = Unit
+  def mkDirs(path: String)(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Overwrite or Append new data.

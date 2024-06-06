@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -268,9 +268,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     applyAcls
   }
 
-  override def createInputStream(path: String)(implicit context: ActionPipelineContext): InputStream = {
+  override def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     Try(filesystem.open(new Path(path))) match {
-      case Success(r) => r
+      case Success(r) => Iterator(r)
       case Failure(e) => throw new RuntimeException(s"Can't create InputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
     }
   }
@@ -320,5 +320,13 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   def extractPartitionValuesFromDirPath(dirPath: String)(implicit context: ActionPipelineContext): PartitionValues = {
     PartitionLayout.extractPartitionValues(partitionLayout().get, relativizePath(dirPath) + separator)
+  }
+
+  override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    try {
+      HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ getPartitionStats
+    } catch {
+      case e:Exception => Map(TableStatsType.Info.toString -> e.getMessage)
+    }
   }
 }

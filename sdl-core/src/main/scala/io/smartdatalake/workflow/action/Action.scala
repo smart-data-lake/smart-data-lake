@@ -145,7 +145,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     val duplicateNames = context.instanceRegistry.getDataObjects.map {
       dataObj => ActionHelper.replaceSpecialCharactersWithUnderscore(dataObj.id.id)
     }.groupBy(identity).collect { case (x, List(_,_,_*)) => x }.toList
-    require(duplicateNames.isEmpty, s"The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
+    require(duplicateNames.isEmpty, s"($id) The names of your DataObjects are not unique when replacing special characters with underscore. Duplicates: ${duplicateNames.mkString(",")}")
 
     // validate executionCondition
     executionCondition.foreach(_.syntaxCheck[SubFeedsExpressionData](id, Some("executionCondition")))
@@ -232,7 +232,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     if (isAsynchronousProcessStarted) return
     // evaluate metrics fail condition if defined
-    metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c))
+    metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c, outputSubFeeds))
     // process postRead/Write hooks
     inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
@@ -241,7 +241,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Executes operations needed to cleanup after executing an action failed.
    */
-  def postExecFailed(implicit context: ActionPipelineContext): Unit = Unit
+  def postExecFailed(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
@@ -259,13 +259,11 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String)(implicit context: ActionPipelineContext): Unit = {
+  private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
-    val metrics = {
-      getRuntimeMetrics().flatMap{
-        case (dataObjectId, Some(metrics)) => metrics.getMainInfos.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-        case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
-      }.toSeq
+    val metrics = subFeeds.map(subFeed => (subFeed.dataObjectId, subFeed.metrics)).flatMap {
+      case (dataObjectId, Some(metrics)) => metrics.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
+      case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
     }
     metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
       .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched expression "$condition""""))
@@ -301,7 +299,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     val dataObject = try {
       registry.get[T](dataObjectId)
     } catch {
-      case _: NoSuchElementException => throw new NoSuchElementException(s"key not found in instance registry for $role: $dataObjectId")
+      case _: NoSuchElementException => throw new NoSuchElementException(s"($id) key not found in instance registry for $role: $dataObjectId")
     }
     try {
       // force class cast on generic type (otherwise the ClassCastException is thrown later)
@@ -341,25 +339,16 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Adds a runtime metric for this Action
    */
-  def addRuntimeMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
+  def addAsyncMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
     if (dataObjectId.isDefined) {
       if (outputs.exists(_.id == dataObjectId.get)) try {
         runtimeData.addMetric(executionId, dataObjectId.get, metric)
       } catch {
-        case e: LateArrivingMetricException => logger.error(s"($id) ${e.msg}")
         case e: AssertionError => logger.error(s"($id) ${e.getMessage}")
       }
       else logger.warn(s"($id) Metrics received for ${dataObjectId.get} which doesn't belong to outputs ($metric")
     } else logger.debug(s"($id) Metrics received for unspecified DataObject (${metric.getId})")
     if (logger.isDebugEnabled) logger.debug(s"($id) Metrics received:\n" + metric.getAsText)
-  }
-
-  /**
-   * Get the latest metrics for all DataObjects and a given SDLExecutionId.
-   * @param executionId ExecutionId to get metrics for. If empty metrics for last ExecutionId are returned.
-   */
-  def getRuntimeMetrics(executionId: Option[ExecutionId] = None): Map[DataObjectId, Option[ActionMetrics]] = {
-    outputs.map(dataObject => (dataObject.id, runtimeData.getMetrics(dataObject.id, executionId))).toMap
   }
 
   /**

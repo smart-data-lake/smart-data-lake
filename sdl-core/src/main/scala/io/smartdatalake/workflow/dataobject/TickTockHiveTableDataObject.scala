@@ -25,11 +25,13 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, Environment, SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, EnvironmentUtil}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -47,6 +49,10 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
                                        override var table: Table,
                                        override val constraints: Seq[Constraint] = Seq(),
                                        override val expectations: Seq[Expectation] = Seq(),
+                                       override val preReadSql: Option[String] = None,
+                                       override val postReadSql: Option[String] = None,
+                                       override val preWriteSql: Option[String] = None,
+                                       override val postWriteSql: Option[String] = None,
                                        numInitialHdfsPartitions: Int = 16,
                                        saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                        acl: Option[AclDef] = None,
@@ -79,17 +85,17 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) HiveUtil.removeTickTockFromLocation(new Path(HiveUtil.existingTableLocation(table)))
-        else HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
+        else getAbsolutePath
       }
 
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
       if(thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
         val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
-        val definedPathNormalized = HiveUtil.normalizePath(path.get)
+        val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"Table ${table.fullName} exists already with different path $path. The table will be written with new path definition $hadoopPathHolder!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
       }
     }
     hadoopPathHolder
@@ -102,6 +108,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       filesystemHolder = HdfsUtil.getHadoopFsFromSpark(hadoopPath)
     }
     filesystemHolder
+  }
+
+  private def getAbsolutePath(implicit context: ActionPipelineContext) = {
+    val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.flatMap(_.pathPrefix))
+    HdfsUtil.makeAbsolutePath(prefixedPath)(HdfsUtil.getHadoopFsWithConf(prefixedPath)(context.serializableHadoopConf.conf)) // dont use "filesystem" to avoid loop
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
@@ -143,13 +154,14 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): Unit = {
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
-    writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput, saveModeOptions)
-
+    val metrics = writeDataFrameInternal(df, createTableOnly=false, partitionValues, isRecursiveInput, saveModeOptions)
     // make sure empty partitions are created as well
     createMissingPartitions(partitionValues)
+    // return
+    metrics
   }
 
   /**
@@ -158,7 +170,7 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
    * or only a few HDFS files that are too large.
    */
   def writeDataFrameInternal(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
-                            (implicit context: ActionPipelineContext): Unit = {
+                            (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     val dfPrepared = if (createTableOnly) {
       // create empty df with existing df's schema
@@ -178,15 +190,25 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
       } else df.repartition(numInitialHdfsPartitions)
     }
 
-    // write table and fix acls
-    val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-    HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), forceTickTock = isRecursiveInput)
+    // write table and collect Spark metrics
+    val metrics = SparkStageMetricsListener.execWithMetrics(this.id, {
+      val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+      HiveUtil.writeDfToHiveWithTickTock(dfPrepared, hadoopPath, table, partitions, SparkSaveMode.from(finalSaveMode), forceTickTock = isRecursiveInput)
+    })
+
+    // apply acls
     val aclToApply = acl.orElse(connection.flatMap(_.acl))
     if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
+
+    // analyse
     if (analyzeTableAfterWrite && !createTableOnly) {
       logger.info(s"($id) Analyze table ${table.fullName}.")
-      HiveUtil.analyze(table, partitions, partitionValues)
+      val simpleColumns = SparkSchema(dfPrepared.schema).filter(_.dataType.isSimpleType).columns
+      HiveUtil.analyze(table, simpleColumns, partitions, partitionValues)
     }
+
+    // return
+    metrics
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
@@ -223,6 +245,11 @@ case class TickTockHiveTableDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = TickTockHiveTableDataObject
+
+  def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    implicit val session: SparkSession = context.sparkSession
+    sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
 }
 
 

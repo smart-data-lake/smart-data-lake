@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.definitions
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.util.webservice.KeycloakUtil
@@ -42,13 +43,13 @@ sealed trait AuthMode {
    * This method is called in prepare phase through the data object.
    * It allows the check configuration and setup variables.
    */
-  private[smartdatalake] def prepare(): Unit = Unit
+  private[smartdatalake] def prepare(): Unit = ()
 
   /**
    * This method is called after exec phase throught the postExec method of the data object.
    * It allows to release any resources that were reserved.
    */
-  private[smartdatalake] def close(): Unit = Unit
+  private[smartdatalake] def close(): Unit = ()
 }
 
 /**
@@ -74,7 +75,7 @@ case class TokenAuthMode(@Deprecated @deprecated("Use `token` instead", "2.5.0")
   private val _token =  token.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(tokenVariable.get))
 
   private[smartdatalake] val tokenSecret: StringOrSecret = _token
-  private[smartdatalake] override def getHeaders: Map[String, String] = {
+  override def getHeaders: Map[String, String] = {
     Map("Authorization" -> s"Bearer ${tokenSecret.resolve()}")
   }
 }
@@ -90,7 +91,7 @@ case class AuthHeaderMode(
                          ) extends AuthMode with HttpHeaderAuth {
   private val _secret = secret.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(secretVariable.get))
   private[smartdatalake] val stringOrSecret: StringOrSecret = _secret
-  private[smartdatalake] override def getHeaders: Map[String,String] = Map(headerName -> stringOrSecret.resolve())
+  override def getHeaders: Map[String,String] = Map(headerName -> stringOrSecret.resolve())
 }
 
 /**
@@ -125,7 +126,7 @@ case class KeycloakClientSecretAuthMode(
     // check connection
     keycloakClient.tokenManager().getAccessToken.getToken
   }
-  private[smartdatalake] override def getHeaders: Map[String,String] = {
+  override def getHeaders: Map[String,String] = {
     assert(keycloakClient!=null, "keycloak client not initialized")
     val token = keycloakClient.tokenManager.getAccessToken.getToken
     Map("Authorization" -> s"Bearer $token")
@@ -140,17 +141,18 @@ case class KeycloakClientSecretAuthMode(
 }
 
 /**
- * Connect with custom HTTP authentication
+ * Connect with custom HTTP-header based authentication
+ *
  * @param className class name implementing trait [[CustomHttpAuthModeLogic]]
  * @param options Options to pass to the custom auth mode logic in prepare function.
  */
 case class CustomHttpAuthMode(className: String, options: Map[String,StringOrSecret]) extends AuthMode with HttpHeaderAuth {
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomHttpAuthModeLogic](className)
   private[smartdatalake] override def prepare(): Unit = impl.prepare(options)
-  private[smartdatalake] override def getHeaders: Map[String, String] = impl.getHeaders
+  override def getHeaders: Map[String, String] = impl.getHeaders
 }
 trait CustomHttpAuthModeLogic extends HttpHeaderAuth {
-  def prepare(options: Map[String,StringOrSecret]): Unit = Unit
+  def prepare(options: Map[String,StringOrSecret]): Unit = ()
 }
 
 /**
@@ -169,11 +171,11 @@ case class PublicKeyAuthMode(@Deprecated @deprecated("Use `user` instead", "2.5.
  */
 case class SSLCertsAuthMode (
                             keystorePath: String,
-                            keystoreType: Option[String],
+                            keystoreType: String = "JKS",
                             @Deprecated @deprecated("Use `keystorePass` instead", "2.5.0") private val keystorePassVariable: Option[String] = None,
                             private val keystorePass: Option[StringOrSecret],
                             truststorePath: String,
-                            truststoreType: Option[String],
+                            truststoreType: String = "JKS",
                             @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
                             private val truststorePass: Option[StringOrSecret]
                            ) extends AuthMode {
@@ -192,25 +194,23 @@ case class SASLSCRAMAuthMode (
                                  @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None,
                                  private val password: Option[StringOrSecret],
                                  sslMechanism: String,
-                                 truststorePath: String,
-                                 truststoreType: Option[String],
+                                 truststorePath: Option[String],
+                                 truststoreType: String = "JKS",
                                  @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
                                  private val truststorePass: Option[StringOrSecret],
                                ) extends AuthMode {
-  private val _password: StringOrSecret = password.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(passwordVariable.get))
-  private val _truststorePass = truststorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(truststorePassVariable.get))
-
-  private[smartdatalake] val passwordSecret: StringOrSecret = _password
-  private[smartdatalake] val truststorePassSecret: StringOrSecret  = _truststorePass
+  private[smartdatalake] val passwordSecret: StringOrSecret = password.orElse(passwordVariable.map(SecretsUtil.convertSecretVariableToStringOrSecret))
+    .getOrElse(throw ConfigurationException(s"password or passwordVariable must be defined."))
+  private[smartdatalake] val truststorePassSecret: Option[StringOrSecret]  = truststorePass.orElse(truststorePassVariable.map(SecretsUtil.convertSecretVariableToStringOrSecret))
 }
 
 
 /**
  * Interface to generalize authentication for HTTP requests
  */
-private[smartdatalake] trait HttpHeaderAuth {
+trait HttpHeaderAuth {
   /**
    * Return additional headers to add/overwrite in http request.
    */
-  private[smartdatalake] def getHeaders: Map[String,String] = Map()
+  def getHeaders: Map[String,String] = Map()
 }

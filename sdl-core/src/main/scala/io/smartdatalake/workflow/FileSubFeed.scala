@@ -21,6 +21,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataobject.FileRef
 
@@ -39,8 +40,9 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val partitionValues: Seq[PartitionValues],
                        override val isDAGStart: Boolean = false,
                        override val isSkipped: Boolean = false,
-                       fileRefMapping: Option[Seq[FileRefMapping]] = None
-                      )
+                       fileRefMapping: Option[Seq[FileRefMapping]] = None,
+                       override val metrics: Option[MetricsMap] = None
+)
   extends SubFeed {
 
   override def breakLineage(implicit context: ActionPipelineContext): FileSubFeed = {
@@ -95,6 +97,13 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): FileSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = None, fileRefMapping = None)
   }
+
+  override def withMetrics(metrics: MetricsMap): FileSubFeed = {
+    this.copy(metrics = Some(metrics))
+  }
+
+  def appendMetrics(metrics: MetricsMap): FileSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+
 }
 object FileSubFeed extends SubFeedConverter[FileSubFeed] {
   /**
@@ -110,5 +119,7 @@ object FileSubFeed extends SubFeedConverter[FileSubFeed] {
 
 /**
  * Src/Tgt tuple representing the mapping of a file reference
+ *
+ * @param multiTgt: If multi-target is true, the src FileRef might produce multiple output-streams, which are only known at execution time (e.g. Webservice with paging).
  */
 case class FileRefMapping(src: FileRef, tgt: FileRef)

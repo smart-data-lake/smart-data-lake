@@ -28,6 +28,7 @@ import io.smartdatalake.util.json.DefaultFlatteningParser
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
@@ -48,31 +49,22 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * Note that writing XML-file partitioned is not supported by spark-xml.
  *
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param schema An optional data object schema. If defined, any automatic schema inference is avoided.
- *               As this corresponds to the schema on write, it must not include the optional filenameColumn on read.
- *               Define the schema by using one of the schema providers DDL, jsonSchemaFile, xsdFile or caseClassName.
- *               The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
- *               A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param sparkRepartition Optional definition of repartition operation before writing DataFrame with Spark to Hadoop.
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
- *
+ * @param rowTag Define rowTag in xmlOptions instead
+ * @param flatten Use action/transformers instead
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
  */
 case class XmlFileDataObject(override val id: DataObjectId,
                              override val path: String,
-                             rowTag: Option[String] = None, // this is for backward compatibility, it can also be given in xmlOptions
+                             @Deprecated @deprecated("Define rowTag in xmlOptions instead", "2.6.0")
+                             rowTag: Option[String] = None,
                              xmlOptions: Option[Map[String,String]] = None,
                              override val partitions: Seq[String] = Seq(),
                              override val schema: Option[GenericSchema] = None,
                              override val schemaMin: Option[GenericSchema] = None,
                              override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
-                             flatten: Boolean = false,
+                             @Deprecated @deprecated("Use action/transformers instead", "2.6.0") flatten: Boolean = false,
                              override val acl: Option[AclDef] = None,
                              override val connectionId: Option[ConnectionId] = None,
                              override val filenameColumn: Option[String] = None,
@@ -97,12 +89,14 @@ case class XmlFileDataObject(override val id: DataObjectId,
     } else dfSuper
   }
 
-  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
-    super.writeSparkDataFrameToPath(df, path, finalSaveMode)
+    val metrics = super.writeSparkDataFrameToPath(df, path, finalSaveMode)
     // add file extension to files, as spark-xml does not out-of-the-box
     filesystem.globStatus(new Path(path, "part-*"), (path: Path) => !path.getName.contains("."))
       .foreach(f => filesystem.rename(f.getPath, f.getPath.suffix(fileName.replace("*", ""))))
+    // return
+    metrics
   }
 
   override def factory: FromConfigFactory[DataObject] = XmlFileDataObject

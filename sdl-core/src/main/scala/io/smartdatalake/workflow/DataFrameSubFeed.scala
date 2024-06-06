@@ -21,9 +21,10 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.ScalaUtil
+import io.smartdatalake.util.misc.{ReflectionUtil, ScalaUtil}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
+import org.reflections.Reflections
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.Type
@@ -31,7 +32,7 @@ import scala.reflect.runtime.universe.Type
 /**
  * A SubFeed that holds a DataFrame
  */
-trait DataFrameSubFeed extends SubFeed  {
+trait DataFrameSubFeed extends SubFeed {
   @transient
   def tpe: Type // concrete type of this DataFrameSubFeed
   implicit lazy val companion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(tpe)
@@ -128,5 +129,11 @@ object DataFrameSubFeed {
   private[smartdatalake] def assertCorrectSubFeedType(expectedTpe: Type, elements: Seq[GenericTypedObject]): Unit = {
     val parentMethod = Thread.currentThread().getStackTrace.drop(2).find(_.getClassName.startsWith("io.smartdatalake")).map(_.getMethodName).getOrElse("<unknown>")
     assert(elements.forall(_.subFeedType =:= expectedTpe), s"Unsupported subFeedType(s) ${elements.filter(c => !(c.subFeedType =:= expectedTpe)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method $parentMethod")
+  }
+
+  private[smartdatalake] lazy val getKnownSubFeedTypes: Seq[Type] = {
+    implicit val reflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake")
+    ReflectionUtil.getTraitImplClasses[DataFrameSubFeed]
+      .map(ReflectionUtil.classToType)
   }
 }

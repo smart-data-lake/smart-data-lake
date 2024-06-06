@@ -44,7 +44,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", brokers = "localhost:6001", schemaRegistry = Some("http://localhost:6002"))
 
-  KafkaTestUtil.start
+  KafkaTestUtil.start()
 
   test("Can read and write from Kafka") {
     createCustomTopic("topic", Map(), 1, 1)
@@ -84,7 +84,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     logger.info(s"streaming query finished, rows processed = ${query.lastProgress.numInputRows}")
 
     // check
-    val df2 = dataObject2.getSparkDataFrame().cache
+    val df2 = dataObject2.getSparkDataFrame().cache()
     assert(df2.symmetricDifference(df1).isEmpty)
   }
 
@@ -112,9 +112,9 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     assert(partitions.size >= 3) // as we have written messages over a timestamp of 3secs
 
     // check query first partitions data
-    val dfP1 = dataObject1.getSparkDataFrame(Seq(partitions.minBy( p => p("sec").toString.toLong))).cache
+    val dfP1 = dataObject1.getSparkDataFrame(Seq(partitions.minBy( p => p("sec").toString.toLong))).cache()
     assert(dfP1.columns.contains("sec"))
-    val dataP1 = dfP1.select($"key",$"value").as[(String,String)].collect.toSeq
+    val dataP1 = dfP1.select($"key",$"value").as[(String,String)].collect().toSeq
     assert(dataP1 == Seq(("A","1")))
   }
 
@@ -182,7 +182,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJsonRead", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(userSchema)))
     val df = dataObject.getSparkDataFrame()
       .select($"value.*")
-    val (actFirstName, actLastName, actUserId) = df.as[(String,String,Long)].head
+    val (actFirstName, actLastName, actUserId) = df.as[(String,String,Long)].head()
     assert(actFirstName == expected.getFirstName && actLastName == expected.getLastName && actUserId == expected.getUserId)
   }
 
@@ -202,7 +202,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     val dfAct = dataObject.getSparkDataFrame()
       .select($"value.*")
 
-    val actual = dfAct.as[(String,Long)].collect
+    val actual = dfAct.as[(String,Long)].collect()
     assert(actual.toSeq == expected)
   }
 
@@ -222,7 +222,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     val dfAct = dataObject.getSparkDataFrame()
       .select($"value.*")
 
-    val actual = dfAct.as[(String,Long)].collect
+    val actual = dfAct.as[(String,Long)].collect()
     assert(actual.toSeq == expected)
   }
 
@@ -239,7 +239,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     // test 1
     targetDO.setState(None) // initialize incremental output with empty state
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
     val newState1 = targetDO.getState
 
     // append test data 2
@@ -249,17 +249,17 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     // test 2
     targetDO.setState(newState1)
     val df2result = targetDO.getSparkDataFrame()(contextExec)
-    df2result.count shouldEqual 1
+    df2result.count() shouldEqual 1
     val newState2 = targetDO.getState
 
     // test 3
     targetDO.setState(newState2)
     val df3result = targetDO.getSparkDataFrame()(contextExec)
-    df3result.count shouldEqual 0
+    df3result.count() shouldEqual 0
     val newState3 = targetDO.getState
     assert(newState3 == newState2)
 
-    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 5
+    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 5
   }
 
   test("kafka incremental mode") {
@@ -271,12 +271,12 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     // test 0a - read empty topic with delayedMaxTimestamp=now
     targetDO.enableKafkaStateIncrementalMode(Some(Timestamp.from(Instant.now())))
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 0
     targetDO.commitIncrementalOutputState
 
     // test 0b - read empty topic
     targetDO.enableKafkaStateIncrementalMode()
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 0
     targetDO.commitIncrementalOutputState
 
     // write test data 1
@@ -284,7 +284,7 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     targetDO.writeSparkDataFrame(df1)
 
     // test 1 - read first batch
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 4
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 4
     targetDO.commitIncrementalOutputState
 
     // append test data 2
@@ -292,11 +292,11 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
     targetDO.writeSparkDataFrame(df2)
 
     // test 2 - get new data
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 1
     targetDO.commitIncrementalOutputState
 
     // test 3 - no data
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 0
     targetDO.commitIncrementalOutputState
 
     // save current time to test delayedMaxTimestamp feature
@@ -308,20 +308,20 @@ class KafkaTopicDataObjectTest extends FunSuite with BeforeAndAfterAll with Befo
 
     // test 4 - no new data with delayedMaxTimestamp=tstmpBeforeData3
     targetDO.enableKafkaStateIncrementalMode(Some(tstmpBeforeData3))
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 0
     targetDO.commitIncrementalOutputState
 
     // test 5 - new data with delayedMaxTimestamp=now
     targetDO.enableKafkaStateIncrementalMode(Some(Timestamp.from(Instant.now())))
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 1
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 1
     targetDO.commitIncrementalOutputState
 
     // test 4 - no new data without delayedMaxTimestamp
     targetDO.enableKafkaStateIncrementalMode()
-    targetDO.getSparkDataFrame()(contextExec).count shouldEqual 0
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 0
 
     // all data without incremental mode
-    targetDO.getSparkDataFrame()(contextInit).count shouldEqual 6
+    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 6
   }
 
   test("json schema evolution") {

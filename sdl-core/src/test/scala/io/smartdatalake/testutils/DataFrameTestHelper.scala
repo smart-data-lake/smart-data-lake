@@ -144,7 +144,7 @@ object DataFrameTestHelper {
   def createDfFromJson(json: String)(implicit session: SparkSession): DataFrame = {
     import session.implicits._
 
-    session.read.json(Seq(json).toDS)
+    session.read.json(Seq(json).toDS())
   }
 
   def createJsonFromYaml(yamlString: String): String = {
@@ -204,7 +204,7 @@ object DataFrameTestHelper {
     val expectedPrimeCount = expectedPrime.groupBy(expectedPrime.columns.map(col): _*).agg(count("*").as("rowcount"))
     val actualPrimeCount = actualPrime.groupBy(actualPrime.columns.map(col): _*).agg(count("*").as("rowcount"))
     val (expectedMinusActual, actualMinusExpected) = symmetricDifference(expectedPrimeCount, actualPrimeCount)
-    val sameData = expectedMinusActual.count == 0 && actualMinusExpected.count == 0
+    val sameData = expectedMinusActual.count() == 0 && actualMinusExpected.count() == 0
 
     if (!sameData) {
       val messageRows = s"non-equal rows\nrows which appear in expected but not in actual:\n " +
@@ -270,4 +270,5 @@ object DataFrameTestHelper {
 
   case class TypedValue(value: Any, dataType: DataType)
 
+  case class ComplexTypeTest(a: String, b: Int)
 }

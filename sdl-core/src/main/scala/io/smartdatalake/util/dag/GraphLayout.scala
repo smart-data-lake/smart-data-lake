@@ -19,12 +19,12 @@
 
 package io.smartdatalake.util.dag
 
-import com.github.mdr.ascii.graph.Graph
-import com.github.mdr.ascii.layout.coordAssign.{Layouter, ToStringVertexRenderingStrategy, VertexRenderingStrategy}
-import com.github.mdr.ascii.layout.cycles.CycleRemover
-import com.github.mdr.ascii.layout.drawing.{EdgeElevator, KinkRemover, RedundantRowRemover, Renderer}
-import com.github.mdr.ascii.layout.layering.{LayerOrderingCalculator, LayeringCalculator}
-import com.github.mdr.ascii.layout.prefs.{LayoutPrefs, LayoutPrefsImpl}
+import org.scalameta.ascii.graph.Graph
+import org.scalameta.ascii.layout.coordAssign.{Layouter, ToStringVertexRenderingStrategy, VertexRenderingStrategy}
+import org.scalameta.ascii.layout.cycles.CycleRemover
+import org.scalameta.ascii.layout.drawing.{EdgeElevator, KinkRemover, RedundantRowRemover, Renderer}
+import org.scalameta.ascii.layout.layering.{LayerOrderingCalculator, LayeringCalculator}
+import org.scalameta.ascii.layout.prefs.{LayoutPrefs, LayoutPrefsImpl}
 
 /**
  * Code copied from com.github.mdr.ascii.layout.GraphLayout to fix but not using vertexRenderingStrategy.

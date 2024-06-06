@@ -37,7 +37,7 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
@@ -54,7 +54,7 @@ private[smartdatalake] trait ActionMetrics {
 
   def getMainInfos: Map[String, Any]
 
-  def getAsText: String
+  def getAsText: String = getMainInfos.map { case (k, v) => s"$k=$v" }.mkString(" ")
 }
 
 private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainInfos: Map[String, Any]) extends ActionMetrics {
@@ -63,13 +63,11 @@ private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainIn
   def getOrder: Long = order
 
   def getMainInfos: Map[String, Any] = mainInfos
-
-  def getAsText: String = {
-    mainInfos.map { case (k, v) => s"$k=$v" }.mkString(" ")
-  }
 }
 
 private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SDLExecutionId, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], initialDataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], actionsSkipped: Map[ActionId, RuntimeInfo]) extends SmartDataLakeLogger {
+  private val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
+  private val appVersion = AppUtil.getManifestVersion
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-${executionId.runId}", parallelism)
 
@@ -84,7 +82,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
     // wait for result
     val result = Await.result(futureResult, Duration.Inf)
-    scheduler.shutdown
+    scheduler.shutdown()
 
     // collect all root exceptions
     val dagExceptions = result.filter(_.isFailure).map(_.failed.get).flatMap {
@@ -112,34 +110,38 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     result.filter(_.isSuccess).map(_.get)
   }
 
-  def prepare(implicit context: ActionPipelineContext): Unit = {
-    context.phase = ExecutionPhase.Prepare
+  def prepare(context: ActionPipelineContext): Unit = {
+    implicit val phaseContext: ActionPipelineContext = context.copy(phase = ExecutionPhase.Prepare)
+    // prepare state listeners
+    stateListeners.foreach(_.prepare(phaseContext))
     // run prepare for every node
-    run[DummyDAGResult](context.phase) {
+    run[DummyDAGResult](phaseContext.phase) {
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => DummyDAGResult(dataObjectId))
       case (node: Action, _) =>
-        node.prepare
+        val actionContext = phaseContext.copy(currentAction = Some(node))
+        node.prepare(actionContext)
         node.outputs.map(outputDO => DummyDAGResult(outputDO.id.id))
       case x => throw new IllegalStateException(s"Unmatched case $x")
     }
   }
 
-  def init(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    context.phase = ExecutionPhase.Init
+  def init(context: ActionPipelineContext): Seq[SubFeed] = {
+    implicit val phaseContext: ActionPipelineContext = context.copy(phase = ExecutionPhase.Init)
     // initialize state listeners
-    stateListeners.foreach(_.init(context))
+    stateListeners.foreach(_.init(phaseContext))
     // run init for every node
-    val t = run[SubFeed](context.phase) {
+    val t = run[SubFeed](phaseContext.phase) {
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
       case (node: Action, subFeeds) =>
         val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
         val previousThreadName = setThreadName(getActionThreadName(node.id))
         val resultSubFeeds = try {
+          val actionContext = phaseContext.copy(currentAction = Some(node))
           val inputIds = node.inputs.map(_.id)
-          node.preInit(deduplicatedSubFeeds, initialDataObjectsState.filter(state => inputIds.contains(state.dataObjectId)))
-          node.init(deduplicatedSubFeeds)
+          node.preInit(deduplicatedSubFeeds, initialDataObjectsState.filter(state => inputIds.contains(state.dataObjectId)))(actionContext)
+          node.init(deduplicatedSubFeeds)(actionContext)
         } finally {
           setThreadName(previousThreadName)
         }
@@ -161,20 +163,21 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     }.values.toSeq
   }
 
-  def exec(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+  def exec(context: ActionPipelineContext): Seq[SubFeed] = {
     // run exec for every node
     val result = {
-      context.phase = ExecutionPhase.Exec
-      run[SubFeed](context.phase, parallelism) {
+      implicit val phaseContext: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
+      run[SubFeed](phaseContext.phase, parallelism) {
         case (node: InitDAGNode, _) =>
           node.edges.map(dataObjectId => getInitialSubFeed(dataObjectId))
         case (node: Action, subFeeds) =>
           val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
           val previousThreadName = setThreadName(getActionThreadName(node.id))
           val resultSubFeeds = try {
-            node.preExec(deduplicatedSubFeeds)
-            val resultSubFeeds = node.exec(deduplicatedSubFeeds)
-            node.postExec(deduplicatedSubFeeds, resultSubFeeds)
+            val actionContext = phaseContext.copy(currentAction = Some(node))
+            node.preExec(deduplicatedSubFeeds)(actionContext)
+            val resultSubFeeds = node.exec(deduplicatedSubFeeds)(actionContext)
+            node.postExec(deduplicatedSubFeeds, resultSubFeeds)(actionContext)
             resultSubFeeds
           } catch {
             case ex: Exception =>
@@ -234,8 +237,6 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    */
   def saveState(phase: ExecutionPhase, changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
-    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
-    val appVersion = AppUtil.getManifestVersion
     val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo, appVersion)
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))
@@ -262,10 +263,10 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       saveState(phase, Some(node.id))
     }
 
-    override def onNodeFailure(exception: Throwable)(node: Action): Unit = {
+    override def onNodeFailure(exception: Throwable, partialResults: Seq[DAGResult])(node: Action): Unit = {
       // only first line of message included as logical plan of AnalysisException might have several 100 lines...
-      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next).getOrElse("null")}"
-      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg))
+      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next()).getOrElse("null")}"
+      node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg), results = partialResults.collect { case x: SubFeed => x })
       logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
       saveState(phase, Some(node.id))
     }
@@ -285,7 +286,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    * Get Action count per RuntimeEventState
    */
   def getStatistics: Map[RuntimeEventState, Int] = {
-    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size)
+    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size).toMap
   }
 
   /**

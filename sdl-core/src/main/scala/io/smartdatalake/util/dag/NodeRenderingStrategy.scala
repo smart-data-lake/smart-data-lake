@@ -19,9 +19,9 @@
 
 package io.smartdatalake.util.dag
 
-import com.github.mdr.ascii.common.Dimension
-import com.github.mdr.ascii.layout.coordAssign.VertexRenderingStrategy
 import io.smartdatalake.util.misc.LogUtil
+import org.scalameta.ascii.common.Dimension
+import org.scalameta.ascii.layout.coordAssign.VertexRenderingStrategy
 
 /**
  * Render a node by centering it horizontally and vertically within the given region.
@@ -37,7 +37,7 @@ class NodeRenderingStrategy(nodeToString: DAGNode => String) extends VertexRende
   }
 
   def getText(v: DAGNode, allocatedSize: Dimension): List[String] = {
-    val unpaddedLines = LogUtil.splitLines(nodeToString(v)).take(allocatedSize.height).map { line ⇒ centerLine(allocatedSize, line) }
+    val unpaddedLines = LogUtil.splitLines(nodeToString(v)).take(allocatedSize.height).map { line => centerLine(allocatedSize, line) }
     val verticalDiscrepancy = Math.max(0, allocatedSize.height - unpaddedLines.size)
     val verticalPadding = List.fill(verticalDiscrepancy / 2)("")
     verticalPadding ++ unpaddedLines ++ verticalPadding

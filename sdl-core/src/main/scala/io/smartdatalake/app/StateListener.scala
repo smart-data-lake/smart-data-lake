@@ -24,6 +24,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
@@ -35,12 +36,14 @@ import io.smartdatalake.util.secrets.StringOrSecret
 case class StateListenerConfig(className: String, options: Option[Map[String,StringOrSecret]] = None) {
   // instantiate listener
   private[smartdatalake] val listener: StateListener = try {
-    val clazz = Environment.classLoader.loadClass(className)
+    val clazz = Environment.classLoader().loadClass(className)
     val constructor = clazz.getConstructor(classOf[Map[String,String]])
     constructor.newInstance(options.getOrElse(Map())).asInstanceOf[StateListener]
   } catch {
     case e: NoSuchMethodException => throw ConfigurationException(s"State listener class $className needs constructor with parameter Map[String,String]: ${e.getMessage}", Some("globalConfig.stateListeners"), e)
-    case e: Exception => throw ConfigurationException(s"Cannot instantiate state listener class $className: ${e.getMessage}", Some("globalConfig.stateListeners"), e)
+    case e: Exception =>
+      val cause = getRootCause(e)
+      throw ConfigurationException(s"Cannot instantiate state listener class $className: ${cause.getClass.getSimpleName} ${cause.getMessage}", Some("globalConfig.stateListeners"), e)
   }
 }
 
@@ -50,9 +53,14 @@ case class StateListenerConfig(className: String, options: Option[Map[String,Str
 trait StateListener {
 
   /**
-   * Called on initialization to check environment
+   * Called in prepare phase to check configuration
    */
-  def init(context: ActionPipelineContext): Unit = Unit
+  def prepare(context: ActionPipelineContext): Unit = ()
+
+  /**
+   * Called in init phase to check environment
+   */
+  def init(context: ActionPipelineContext): Unit = ()
 
   /**
    * notifyState is called whenever an action is finished (succeeded or failed) and at the end of the DAG execution (success or failure).

@@ -20,9 +20,8 @@ package io.smartdatalake.config
 
 import com.typesafe.config.{ConfigException, ConfigFactory}
 import io.smartdatalake.config.ConfigParser.localSubstitution
-import io.smartdatalake.config.{ConfigParser, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
+import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject, TestHousekeepingMode}
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
@@ -289,7 +288,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     testDataObject shouldEqual TestDataObject(id = "tdo", arg1 = "first", args = List("one", "two"))
   }
 
-  "TestAction" should "be parsable" in {
+  "TestAction with ExecutionMode" should "be parsable" in {
     val dataObjectsConfig = ConfigFactory.parseString(
       """
         |dataObjects = {
@@ -322,6 +321,42 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
     val testAction = TestAction.fromConfig(config.getConfig("a"))
     val expected = TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", executionMode = Some(PartitionDiffMode(partitionColNb = Some(2))))
+    testAction shouldEqual expected
+  }
+
+  "TestAction with HousekeepingMode" should "be parsable" in {
+    val dataObjectsConfig = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        | tdo1 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = foo
+        |   args = [bar, "!"]
+        | }
+        | tdo2 = {
+        |   type = io.smartdatalake.config.objects.TestDataObject
+        |   arg1 = goo
+        |   args = [bar]
+        | }
+        |}
+      """.stripMargin).resolve
+    val config = ConfigFactory.parseString(
+      """
+        |a = {
+        | id = a
+        | inputId = tdo1
+        | output-id = tdo2
+        | housekeepingMode= {
+        |   type = io.smartdatalake.config.objects.TestHousekeepingMode
+        |   arg1 = foo
+        | }
+        |}
+        |
+        |""".stripMargin).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(dataObjectsConfig)
+    val testAction = TestAction.fromConfig(config.getConfig("a"))
+    val expected = TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", housekeepingMode = Some(TestHousekeepingMode(arg1 = Some("foo"))))
     testAction shouldEqual expected
   }
 

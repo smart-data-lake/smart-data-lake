@@ -53,7 +53,7 @@ class SecretsUtilTest extends FunSuite {
 }
 
 class TestSecretProvider(option1: String) extends SecretProvider {
-  def this(options: Map[String, String]) {
+  def this(options: Map[String, String]) = {
     this(
       options.getOrElse("option1", throw new ConfigurationException(s"Cannot create TestSecretProvider, option 'option1' missing."))
     )

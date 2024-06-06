@@ -24,7 +24,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.apache.spark.sql.SparkSession
@@ -40,7 +40,8 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.session
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   private var tempDir: NioPath = _
   private var tempPath: String = _
@@ -76,7 +77,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test"->"true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, 1)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     // check if file is present
@@ -87,12 +88,12 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     // read src with util and count
     val dfSrc = srcDO.getSparkDataFrame()
     assert(dfSrc.columns.length > 2)
-    val srcCount = dfSrc.count
+    val srcCount = dfSrc.count()
 
     // read tgt with util and count
     val dfTgt = tgtDO.getSparkDataFrame()
     assert(dfTgt.columns.length == 2)
-    val tgtCount = dfTgt.count
+    val tgtCount = dfTgt.count()
     assert(srcCount == tgtCount)
   }
 
@@ -118,7 +119,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test"->"true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, 1, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", srcPartitionValues) // InitSubFeed needed to test initExecutionMode!
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
     assert(tgtSubFeed.partitionValues.toSet == srcPartitionValues.toSet)
     assert(tgtDO.listPartitions.toSet == srcPartitionValues.toSet)
@@ -130,7 +131,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     // check counts
     val dfSrc = srcDO.getSparkDataFrame()
     val dfTgt = tgtDO.getSparkDataFrame()
-    assert(dfSrc.count == dfTgt.count)
+    assert(dfSrc.count() == dfTgt.count())
   }
 
 }
