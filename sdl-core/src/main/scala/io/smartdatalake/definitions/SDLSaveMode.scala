@@ -125,6 +125,7 @@ case class SaveModeGenericOptions(override val saveMode: SDLSaveMode) extends Sa
 case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
                                 updateCondition: Option[String] = None,
                                 updateColumns: Seq[String] = Seq(),
+                                updateExistingCondition: Option[String] = None,
                                 insertCondition: Option[String] = None,
                                 insertColumnsToIgnore: Seq[String] = Seq(),
                                 insertValuesOverride: Map[String, String] = Map(),
@@ -133,6 +134,7 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
   override private[smartdatalake] val saveMode = SDLSaveMode.Merge
   private[smartdatalake] val deleteConditionExpr = deleteCondition.map(expr)
   private[smartdatalake] val updateConditionExpr = updateCondition.map(expr)
+  private[smartdatalake] val updateExistingConditionExpr = updateExistingCondition.map(expr)
   private[smartdatalake] val insertConditionExpr = insertCondition.map(expr)
   private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
   private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)

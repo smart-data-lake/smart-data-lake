@@ -192,21 +192,21 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       require(table.db.contains("default"), s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
     }
     if (!isTableExisting) {
-      require(path.isDefined, s"($id) If DeltaLake table does not exist yet, path must be set.")
+      require(path.isDefined, s"($id) If Iceberg table does not exist yet, path must be set.")
       if (filesystem.exists(hadoopPath)) {
         if (filesystem.exists(getMetadataPath)) {
           // define an iceberg table, metadata can be read from files.
           getIcebergCatalog.registerTable(getTableIdentifier, getMetadataPath.toString)
           logger.info(s"($id) Creating Iceberg table ${table.fullName} for existing path $hadoopPath")
         } else {
-          // if path has existing parquet files, convert to delta table
+          // if path has existing parquet files, convert to iceberg table
           require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset Iceberg table.")
           convertPathToIceberg
         }
       }
     } else if (filesystem.exists(hadoopPath)) {
       if (!filesystem.exists(getMetadataPath)) {
-        // if path has existing parquet files but not in delta format, convert to delta format
+        // if path has existing parquet files but not in iceberg format, convert to iceberg format
         require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset Iceberg table.")
         convertTableToIceberg
         logger.info(s"($id) Converted existing table ${table.fullName} to Iceberg table")
@@ -283,8 +283,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     if (isTableExisting) {
       val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
-      if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
-      else validateSchema(SparkSchema(saveModeTargetDf.schema), existingSchema, "write")
+      if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), existingSchema, "write")
     }
   }
 
@@ -326,13 +325,19 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val sparkMetrics = if (isTableExisting) {
       // check scheme
       if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
-      // update table property "spark.accept-any-schema" to allow schema evolution. This disables Spark schema checks as they dont allow missing columns. Iceberg schema checks still apply.
-      updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, allowSchemaEvolution.toString, TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
       // apply
       if (finalSaveMode == SDLSaveMode.Merge) {
+        // handle schema evolution on merge because this is not yet supported in Spark <=3.5
+        val existingSchema = SparkSchema(getSparkDataFrame().schema)
+        if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
+        // make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=false with SQL merge, because this is not supported in Spark 3.5. See also https://github.com/apache/iceberg/issues/9827.
+        // TODO: This might be solved with Spark 4.0, as there will be a Spark API for merge.
+        updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, "false", TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
+        // Make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=true for schema evolution
+        updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, allowSchemaEvolution.toString, TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
         // V2 writer can be used if table is existing, it supports overwriting given partitions
         val dfWriterV2 = saveModeTargetDf
           .writeTo(table.fullName)
@@ -369,7 +374,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         case (k,v) => (k,v)
       }
 
-    // vacuum delta lake table
+    // vacuum iceberg table
     vacuum
 
     // fix acls
@@ -406,6 +411,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
         writeToTempTable(df)
       )
+
+      // update existing does not work with SQL merge stmt
+      val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, SQLUtil.sparkQuoteCaseSensitiveColumn(_))
+      updateExistingStatement.foreach{stmt =>
+        logger.info(s"($id) executing update existing statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
+        context.sparkSession.sql(stmt)
+      }
+
       // override missing columns with null value, as Iceberg needs all target columns be included in insert statement
       val targetCols = session.table(table.fullName).schema.fieldNames
       val missingCols = targetCols.diff(df.columns)
@@ -438,7 +451,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Iceberg as a write option 'mergeSchema' (see also SparkWriteOptions.MERGE_SCHEMA),
+   * Iceberg has a write option 'mergeSchema' (see also SparkWriteOptions.MERGE_SCHEMA),
    * but it doesnt work as there is another validation before that checks the schema (e.g. QueryCompilationErrors$.cannotWriteTooManyColumnsToTableError in the stack trace)
    * This code is therefore copied from SparkWriteBuilder.validateOrMergeWriteSchema:246ff
    */

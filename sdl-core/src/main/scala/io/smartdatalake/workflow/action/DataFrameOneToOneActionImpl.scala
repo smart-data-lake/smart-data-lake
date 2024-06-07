@@ -55,6 +55,11 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   }
 
   /**
+   * Prepares list of transformers
+   */
+  private[smartdatalake] def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef]
+
+  /**
    * Transform a [[SparkSubFeed]].
    * To be implemented by subclasses.
    *
@@ -64,7 +69,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    */
   def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed
 
-  override final def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
+  override protected final def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
     assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     val transformedSubFeed = transform(inputSubFeeds.head, outputSubFeeds.head)
@@ -88,7 +93,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   /**
    * apply transformer to SubFeed
    */
-  protected def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  private[smartdatalake] def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size>1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
     val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed,Option.empty[String])){

@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
@@ -29,9 +29,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerCon
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{Type, typeOf}
-import scala.util.{Failure, Success, Try}
+import scala.reflect.runtime.universe.Type
 
 /**
  * This [[Action]] copies data between an input and output DataObject using DataFrames.
@@ -73,23 +71,27 @@ case class CopyAction(override val id: ActionId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
 
-  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toList ++ transformers
 
   override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType)
 
   validateConfig()
 
+  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+    transformerDefs
+  }
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
-    transformerDefs.foreach(_.prepare(id))
+    getTransformers.foreach(_.prepare(id))
   }
 
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    applyTransformers(transformerDefs, inputSubFeed, outputSubFeed)
+    applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
   override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    applyTransformers(transformerDefs, partitionValues)
+    applyTransformers(getTransformers, partitionValues)
   }
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {

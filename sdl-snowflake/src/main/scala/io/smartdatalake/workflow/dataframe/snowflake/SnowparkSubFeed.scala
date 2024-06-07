@@ -296,4 +296,17 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
     }
 
   }
+
+  override def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn = {
+    // TODO: check if this can be done by a udf?
+    throw new NotImplementedError("transform array is not implemented in Snowpark")
+  }
+  override def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn = {
+    // TODO: check if this can be done by a udf?
+    throw new NotImplementedError("transform_keys array is not implemented in Snowpark")
+  }
+  override def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn = {
+    // TODO: check if this can be done by a udf?
+    throw new NotImplementedError("transform_keys array is not implemented in Snowpark")
+  }
 }

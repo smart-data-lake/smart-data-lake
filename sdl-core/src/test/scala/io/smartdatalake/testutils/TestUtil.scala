@@ -57,6 +57,17 @@ import scala.jdk.CollectionConverters._
  */
 object TestUtil extends SmartDataLakeLogger {
 
+  // extract keystore file from resource jar for wiremock server
+  private lazy val wiremockKeyStoreFile = {
+    val resource = "test_keystore.pkcs12"
+    val keyStorePath = Files.createTempDirectory("test").resolve(resource)
+    val inputStream = Option(getClass.getResourceAsStream("/"+resource))
+      .getOrElse(throw new RuntimeException(s"Could not find resource $resource in classpath"))
+    Files.copy(inputStream, keyStorePath)
+    inputStream.close()
+    keyStorePath.toString
+  }
+
   def sparkSessionBuilder(additionalSparkProperties: Map[String,StringOrSecret] = Map()) : SparkSession.Builder = {
     // create builder
     val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
@@ -144,14 +155,13 @@ object TestUtil extends SmartDataLakeLogger {
    */
   def startWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
     configureFor(host, port)
-    val keystoreFile = this.getClass.getResource("/test_keystore.pkcs12").getFile
     val wireMockServer =
       new WireMockServer(
         wireMockConfig()
           .port(port)
           .httpsPort(httpsPort)
           .bindAddress(host)
-          .keystorePath(keystoreFile)
+          .keystorePath(wiremockKeyStoreFile)
           .keystorePassword("mytruststorepassword")
       )
     wireMockServer

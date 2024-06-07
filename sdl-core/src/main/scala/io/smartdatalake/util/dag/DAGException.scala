@@ -24,6 +24,7 @@ import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.LogUtil
 import io.smartdatalake.workflow.{SimplifiedAnalysisException, SubFeed}
 import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.catalyst.ExtendedAnalysisException
 
 private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
   def severity: ExceptionSeverity.ExceptionSeverity
@@ -43,7 +44,7 @@ private[smartdatalake] object TaskFailedException {
     // create exception
     val ex = cause match {
       case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity, results)
-      case ex: AnalysisException if Environment.simplifyFinalExceptionLog =>
+      case ex: ExtendedAnalysisException if Environment.simplifyFinalExceptionLog =>
         // reduce logical plan output to 5 lines
         TaskFailedException(id, msg, new SimplifiedAnalysisException(ex), ExceptionSeverity.FAILED, results)
       case _ => TaskFailedException(id, msg, cause, ExceptionSeverity.FAILED, results)
