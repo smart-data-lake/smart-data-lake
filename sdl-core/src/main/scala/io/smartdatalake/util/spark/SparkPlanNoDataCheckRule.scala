@@ -37,7 +37,7 @@ private[smartdatalake] case class SparkPlanNoDataCheckRule(spark: SparkSession) 
       plan match {
         case x: V1WriteCommand => evaluateNoData(plan)
         case x: V2WriteCommand => evaluateNoData(plan)
-        case _ => Unit
+        case _ => ()
       }
     }
     plan
