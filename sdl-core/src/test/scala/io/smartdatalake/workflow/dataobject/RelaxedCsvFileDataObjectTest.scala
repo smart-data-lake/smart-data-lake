@@ -1,5 +1,6 @@
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -131,13 +132,15 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
     assert(dfResult.where($"_filename".isNull).isEmpty)
   }
 
-  test("Read CSV file with with header only") {
+  test("Read CSV file with header only") {
     val tempDir = Files.createTempDirectory("csv")
 
     // File with header only
     val data1 = Seq[(String,String,String)]()
     val df1 = data1.toDF("h1", "h2", "h3")
+    Environment._enableSparkPlanNoDataCheck = Some(false)
     df1.write.mode(SaveMode.Append).option("header", true).csv(tempDir.toFile.getPath)
+    Environment._enableSparkPlanNoDataCheck = Some(true)
 
     val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)))
 
@@ -153,7 +156,9 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
     // File with header only
     val data1 = Seq[(String,String,String)]()
     val df1 = data1.toDF("h1", "h2", "h3")
+    Environment._enableSparkPlanNoDataCheck = Some(false)
     df1.write.mode(SaveMode.Append).option("header", false).csv(tempDir.toFile.getPath)
+    Environment._enableSparkPlanNoDataCheck = Some(true)
 
     val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)))
 
