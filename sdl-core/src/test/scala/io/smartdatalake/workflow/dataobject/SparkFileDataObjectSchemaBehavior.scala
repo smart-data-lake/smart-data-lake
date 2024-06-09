@@ -56,7 +56,9 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       val path = tempFilePath(fileExtension)
       val session = context.sparkSession
       import session.implicits._
+      Environment._enableSparkPlanNoDataCheck = Some(false)
       createFile(path, Seq.empty[String].toDF())
+      Environment._enableSparkPlanNoDataCheck = Some(true)
       try {
         val dataObj = createDataObject(path, Some(StructType(schema)))
         val df = dataObj.getSparkDataFrame()
