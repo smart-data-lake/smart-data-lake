@@ -21,13 +21,15 @@ package io.smartdatalake.util.spark
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.HdfsUtil.addHadoopDefaultSchemaAuthority
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.Table
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.FunSuite
+
+import java.io.File
 
 class SDLSparkExtensionTest extends FunSuite {
 
@@ -83,7 +85,7 @@ class SDLSparkExtensionTest extends FunSuite {
   }
 
   def writeTable(df: DataFrame, name: String) = {
-    val path = new Path(s"./target/$name")
+    val path = new Path(new File(s"target/$name").getAbsolutePath)
     val table = Table(Some("default"),name)
     HiveUtil.dropTable(table, path)
     df.write.option("path", path.toString).saveAsTable(table.fullName)
