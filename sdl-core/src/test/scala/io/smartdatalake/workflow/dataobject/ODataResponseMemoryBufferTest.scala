@@ -21,12 +21,13 @@ package io.smartdatalake.workflow.dataobject
 
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-
 import org.mockito.{Mockito => m}
 import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.workflow.action.RuntimeEventState
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.{DataFrameReader, SparkSession}
 
 import java.io.File
@@ -590,6 +591,45 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$top=9999")
   }
+
+  test("getSparkDataFrame in init phase") {
+    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val context = this.contextInit
+    //val context_mock = m.mock(classOf[ActionPipelineContext])
+    //m.doReturn(ExecutionPhase.Init, Seq.empty: _*).when(context_mock).phase
+
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+    )
+
+    val result = sut.getSparkDataFrame(Seq.empty)(context)
+
+    val resultSchema = result.schema
+
+    val columnAIdx = resultSchema.fieldIndex("ColumnA")
+    val columnBIdx = resultSchema.fieldIndex("ColumnB")
+    val columnCreatedIdx = resultSchema.fieldIndex("sdlb_created_on")
+
+    val columnAType = resultSchema.fields(columnAIdx)
+    val columnBType = resultSchema.fields(columnBIdx)
+    val columnCreatedType = resultSchema.fields(columnCreatedIdx)
+
+    assert(columnAType.name == "ColumnA")
+    assert(columnAType.dataType.typeName == "string")
+
+    assert(columnBType.name == "ColumnB")
+    assert(columnBType.dataType.typeName == "integer")
+
+    assert(columnCreatedType.name == "sdlb_created_on")
+    assert(columnCreatedType.dataType.typeName == "timestamp")
+  }
 }
 
 class ODataDataObjectComponentTest extends DataObjectTestSuite {
@@ -699,7 +739,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     assert(resultData.length == 2)
 
     val record1 = resultData(0)
-    //val colidx_odataid = record1.fieldIndex("@odata.id")
     assert(record1.getString(0) == "FOOBAR_1A")
     assert(record1.getInt(1) == 1)
 
@@ -904,5 +943,107 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     temp_dir_base.delete()
     server.stop()
+  }
+
+  test("With connection problems and retry success") {
+    val port = 8080
+    val httpsPort = 8443
+    val host = "127.0.0.1"
+    val server = TestUtil.startWebservice(host, port, httpsPort)
+    val auth_response = """{"access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
+
+    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
+      .inScenario("FailTheFirstTime")
+      .willReturn(w.aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER))
+      .willSetStateTo("Step2")
+    )
+
+    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
+      .inScenario("FailTheFirstTime")
+      .whenScenarioStateIs("Step2")
+      .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
+      .willReturn(w.aResponse().withBody(auth_response))
+    )
+
+    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2}]}"""
+    w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
+      .withHeader("Accept", w.equalTo("application/json"))
+      .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
+      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
+      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB"))
+      .willReturn(w.aResponse().withBody(response1))
+    )
+
+    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+    )
+
+    val context_mock = m.mock(classOf[ActionPipelineContext])
+    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(context_mock)
+    val resultData = resultDf.collect()
+
+    assert(resultData.length == 2)
+
+    val record1 = resultData(0)
+    assert(record1.getString(0) == "FOOBAR_1A")
+    assert(record1.getInt(1) == 1)
+
+    val record2 = resultData(1)
+    assert(record2.getString(0) == "FOOBAR_2A")
+    assert(record2.getInt(1) == 2)
+
+    server.stop()
+  }
+
+  test("With connection problems and no retry success") {
+    val port = 8080
+    val httpsPort = 8443
+    val host = "127.0.0.1"
+    val server = TestUtil.startWebservice(host, port, httpsPort)
+
+    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
+      .willReturn(w.aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER))
+    )
+
+    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+    )
+
+    val context_mock = m.mock(classOf[ActionPipelineContext])
+    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+    var exceptionCaught = false
+
+    try {
+      sut.getSparkDataFrame(Seq.empty)(context_mock)
+    }
+    catch
+    {
+      case x: Exception => exceptionCaught = true
+    }
+    finally {
+      server.stop()
+    }
+
+    assert(exceptionCaught)
   }
 }

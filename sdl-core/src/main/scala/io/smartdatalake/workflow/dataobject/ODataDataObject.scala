@@ -18,7 +18,6 @@ import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
 import java.net.URLEncoder
-//import com.databricks.sdk.scala.dbutils.DBUtils
 import java.nio.file.{Paths, Files}
 import java.io.{File, BufferedWriter, FileWriter}
 import java.time.{Instant, ZoneId}
