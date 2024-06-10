@@ -27,6 +27,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
 
+
 trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
   protected implicit lazy val session: SparkSession = TestUtil.session

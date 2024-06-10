@@ -27,6 +27,100 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 import org.apache.hadoop.fs.{Path => HadoopPath}
 
+class ODataIOC {
+
+  def newFile(path:String) : java.io.File = {
+    new File(path)
+  }
+
+  def newPath(path:String) : java.nio.file.Path = {
+    Paths.get(path)
+  }
+
+  def newBufferedWriter(writer: java.io.Writer): BufferedWriter = {
+    new BufferedWriter(writer)
+  }
+
+  def newFileWriter(file: java.io.File) : FileWriter= {
+    new FileWriter(file)
+  }
+
+  def newODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseMemoryBuffer = {
+    new ODataResponseMemoryBuffer(setup, context, this)
+  }
+
+  def newODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseLocalFileBuffer =
+  {
+    new ODataResponseLocalFileBuffer(tmpDirName, setup, context, this)
+  }
+
+  def newODataResponseDBFSFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseDBFSFileBuffer =
+  {
+    new ODataResponseDBFSFileBuffer(tmpDirName, setup, context, this)
+  }
+
+  def newODataResponseFileBufferByType(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseBuffer = {
+    var result : ODataResponseBuffer = null
+
+    if (setup != null) {
+      setup.tempFileBufferType.getOrElse("").toLowerCase match {
+        case "local" => result = newODataResponseLocalFileBuffer(tmpDirName, setup, context)
+        case "dbfs"  => result = newODataResponseDBFSFileBuffer(tmpDirName, setup, context)
+        case _ => throw ConfigurationException(s"(Unknown FileBufferType '$setup.tempFileBufferType'")
+      }
+    }
+    else {
+      throw ConfigurationException("No configuration available to the create FileResponseBuffer")
+    }
+    result
+  }
+
+  def newODataBearerToken(token: String, expiresAt:java.time.Instant) : ODataBearerToken = {
+    ODataBearerToken(token, expiresAt)
+  }
+
+  def newHadoopFsWithConf(path: org.apache.hadoop.fs.Path, context:ActionPipelineContext) : org.apache.hadoop.fs.FileSystem = {
+    HdfsUtil.getHadoopFsWithConf(path)(context.hadoopConf)
+  }
+
+  def newHadoopPath(path: String) : HadoopPath = {
+    new HadoopPath(path)
+  }
+
+  def newHadoopPath(parent: String, child: String) : HadoopPath = {
+    new HadoopPath(parent, child)
+  }
+
+  def newHadoopPath(parent: HadoopPath, child: String) : HadoopPath = {
+    new HadoopPath(parent, child)
+  }
+
+  def newScalaJWebServiceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[io.smartdatalake.definitions.AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : ScalaJWebserviceClient = {
+    ScalaJWebserviceClient(url, headers, timeouts, authMode, proxy, followRedirects)
+  }
+
+  def fileExists(path:java.nio.file.Path): Boolean = {
+    Files.exists(path)
+  }
+
+  def fileCreateDirectories(path:java.nio.file.Path) : java.nio.file.Path = {
+    Files.createDirectories(path)
+  }
+
+  def getInstantNow : Instant = {
+    Instant.now()
+  }
+
+  def writeHadoopFile(path: HadoopPath, content: String, filesystem: FileSystem) : Unit = {
+    HdfsUtil.writeHadoopFile(path, content)(filesystem)
+  }
+
+  def sparkDataTypeFromDDL(ddl: String) : DataType = {
+    DataType.fromDDL(ddl)
+  }
+}
+
+
 /**
  * [[ODataAuthorization]] contains the coordinates and credentials to gain access to the DataSource
  * @param oauthUrl: URL to the OAuth2 authorization instance like "https://login.microsoftonline.com/{tenant-guid}/oauth2/v2.0/token"
@@ -50,7 +144,15 @@ case class ODataResponseBufferSetup(
                                      tempFileBufferType: Option[String] = None
                                      , tempFileDirectoryPath: Option[String] = None
                                      , memoryToFileSwitchThresholdNumOfChars: Option[Long] = None
-                                   )
+                                   ) {
+
+  /* Late-Arriving property
+   */
+  private var tableName: String = ""
+  def getTableName: String = this.tableName
+  def setTableName(tableName: String): Unit = this.tableName = tableName
+
+}
 
 /**
  * [[ODataBearerToken]] contains the current bearer token and a method to check whether the token is still valid.
@@ -90,6 +192,10 @@ abstract class ODataResponseBuffer(setup: ODataResponseBufferSetup, context: Act
     responses.foreach(r => addResponse(r))
   }
 
+  def getResponseCount : Int = {
+    this.responseCount
+  }
+
   /**
    * @return the number of characters stored in this buffer
    */
@@ -120,7 +226,7 @@ abstract class ODataResponseBuffer(setup: ODataResponseBufferSetup, context: Act
  * ResponseBuffer implementation which uses memory to store all responses.
  * @param setup: The setup object which contains the configuration for this response buffer
  */
-class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext) extends ODataResponseBuffer(setup, context) {
+class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
 
   /**
    * The buffered responses. Every response corresponds to one element in this array.
@@ -145,7 +251,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
    * Creates a DataFrame based on the buffered responses
    *  @return : The Dataframe referencing the stored responses
    */
-  override def getDataFrame(): DataFrame = {
+  override def getDataFrame: DataFrame = {
     val session = context.sparkSession
     import session.implicits._
     val dataFrame = responses.toDF("responseString")
@@ -161,7 +267,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
    * Returns the array containing the buffered responses
    * @return the array containing the buffered responses
    */
-  private def getResponseBuffer : ArrayBuffer[String] = {
+  def getResponseBuffer : ArrayBuffer[String] = {
     responses
   }
 
@@ -178,7 +284,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
       val threshold = setup.memoryToFileSwitchThresholdNumOfChars.getOrElse(-1L)
 
       if (dirPath != "" && threshold > 0L && this.getStoredCharacterCount > threshold) {
-        result = ODataResponseBufferFactory.createTempFileResponseBuffer()
+        result = ioc.newODataResponseFileBufferByType(setup.getTableName, setup, context)
         result.addResponses(this.getResponseBuffer)
       }
     }
@@ -191,7 +297,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
  * @param tmpDirName : Name of sub directory which will be created to only contain files of this instance
  * @param setup: The setup object which contains the configuration for this response buffer
  */
-class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) extends ODataResponseBuffer(setup, context) {
+class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
 
   private var dirInitialized : Boolean = false
   private var dirPath: Option[String] = None
@@ -200,7 +306,7 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
   /**
    * Initializes the temporary directory by making sure, that the path exists and the target directory is empty.
    */
-  private def initTempDir(): Unit = {
+  def initTempDir(): Unit = {
     if (!dirInitialized) {
       makeTempDirIfNotExists()
       clearTempDir()
@@ -211,11 +317,11 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
   /**
    * @return the path to the temporary directory
    */
-  private def getDirectoryPath: String = {
+  def getDirectoryPath: String = {
     if (this.dirPath.nonEmpty)
       dirPath.get
     else if (setup != null && setup.tempFileDirectoryPath.isDefined) {
-      dirPath = Option(Paths.get(setup.tempFileDirectoryPath.get).resolve(tmpDirName + s"_${Instant.now.getEpochSecond}").toString)
+      dirPath = Option(ioc.newPath(setup.tempFileDirectoryPath.get).resolve(tmpDirName + s"_${ioc.getInstantNow.getEpochSecond}").toString)
       dirPath.get
     } else
       throw new ConfigurationException("TempFileDirectoryPath not configured")
@@ -224,8 +330,8 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
   /**
    * Deletes all files in the temporary directory
    */
-  private def clearTempDir(): Unit = {
-    val file = new File(this.getDirectoryPath)
+  def clearTempDir(): Unit = {
+    val file = ioc.newFile(this.getDirectoryPath)
     val files = file.listFiles()
     files.foreach( f => if (!f.isDirectory) f.delete())
   }
@@ -233,10 +339,10 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
   /**
    * Creates the path and the temporary directories if either does not exists.
    */
-  private def makeTempDirIfNotExists(): Unit = {
-    val dirPath = Paths.get(this.getDirectoryPath)
-    if (!Files.exists(dirPath)) {
-      Files.createDirectories(dirPath)
+  def makeTempDirIfNotExists(): Unit = {
+    val dirPath = ioc.newPath(this.getDirectoryPath)
+    if (!ioc.fileExists(dirPath)) {
+      ioc.fileCreateDirectories(dirPath)
     }
   }
 
@@ -245,11 +351,11 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
    * @param fileName: Name of the file
    * @param data: Content of the file
    */
-  private def writeToFile(fileName: String, data: String): Unit = {
-    val dirPath : java.nio.file.Path = Paths.get(this.getDirectoryPath)
+  def writeToFile(fileName: String, data: String): Unit = {
+    val dirPath : java.nio.file.Path = ioc.newPath(this.getDirectoryPath)
     val filepath = dirPath.resolve(fileName)
-    val file = new File(filepath.toString)
-    val writer = new BufferedWriter(new FileWriter(file))
+    val file = ioc.newFile(filepath.toString)
+    val writer = ioc.newBufferedWriter(ioc.newFileWriter(file))
     writer.write(data)
     writer.close()
   }
@@ -258,8 +364,8 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
   /**
    * @return name the current temporary file
    */
-  private def getFileName : String = {
-    val curTime = DateTimeFormatter.ofPattern("yyyyMMdd'_'HHmmss").withZone(ZoneId.of("UTC")).format(Instant.now())
+  def getFileName : String = {
+    val curTime = DateTimeFormatter.ofPattern("yyyyMMdd'_'HHmmss").withZone(ZoneId.of("UTC")).format(ioc.getInstantNow)
     s"${curTime}_${this.fileCount}.json"
   }
 
@@ -278,7 +384,7 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
    * Creates a dataframe which reads all stored temporary files
    *  @return : The Dataframe referencing the stored responses
    */
-  override def getDataFrame(): DataFrame = {
+  override def getDataFrame: DataFrame = {
     val session = context.sparkSession
     val dataFrame = session.read.option("wholetext", value = true).text(this.getDirectoryPath).withColumnRenamed("value", "responseString")
     dataFrame
@@ -301,13 +407,13 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
   }
 }
 
-class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext) extends ODataResponseBuffer(setup, context) {
+class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
 
   private var dirInitialized : Boolean = false
-  private implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(new HadoopPath("dbfs://"))(context.hadoopConf)
-  private val temporaryTargetDirectoryPath = new HadoopPath(setup.tempFileDirectoryPath.get, tableName + s"_${Instant.now.getEpochSecond}")
+  private implicit val filesystem: FileSystem = ioc.newHadoopFsWithConf(ioc.newHadoopPath("dbfs://"), context)
+  private val temporaryTargetDirectoryPath = ioc.newHadoopPath(setup.tempFileDirectoryPath.get, tableName + s"_${Instant.now.getEpochSecond}")
 
-  private def initTemporaryDirectory(): Unit = {
+  def initTemporaryDirectory(): Unit = {
     if (!dirInitialized) {
       clearTemporaryDirectory()
       makeTempDirIfNotExists()
@@ -315,7 +421,11 @@ class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSe
     }
   }
 
-  private def makeTempDirIfNotExists() : Unit = {
+  def getFileSystem : FileSystem = {
+    filesystem
+  }
+
+  def makeTempDirIfNotExists() : Unit = {
     filesystem.mkdirs(temporaryTargetDirectoryPath)
   }
 
@@ -328,18 +438,18 @@ class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSe
     this.clearTemporaryDirectory()
   }
 
-  private def clearTemporaryDirectory() : Unit = {
+  def clearTemporaryDirectory() : Unit = {
     if (filesystem.exists(temporaryTargetDirectoryPath))
       filesystem.delete(temporaryTargetDirectoryPath, true)
   }
 
-  private def writeToFile(fileName: String, content: String) : Unit = {
+  def writeToFile(fileName: String, content: String) : Unit = {
     initTemporaryDirectory()
-    HdfsUtil.writeHadoopFile(new HadoopPath(temporaryTargetDirectoryPath, fileName), content)
+    ioc.writeHadoopFile(ioc.newHadoopPath(temporaryTargetDirectoryPath, fileName), content, filesystem)
   }
 
-  private def generateFileName() : String = {
-    s"${this.responseCount}.json"
+  def generateFileName() : String = {
+    s"${this.getResponseCount}.json"
   }
 
   /**
@@ -359,7 +469,7 @@ class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSe
    *
    * @return : The Dataframe referencing the stored responses
    */
-  override def getDataFrame(): DataFrame = {
+  override def getDataFrame: DataFrame = {
     val session = context.sparkSession
     val dataFrame = session.read.option("wholetext", value = true).text(this.temporaryTargetDirectoryPath.toString).withColumnRenamed("value", "responseString")
     dataFrame
@@ -377,65 +487,7 @@ class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSe
 /**
  * Factory object to create and evolve the response buffers
  */
-object ODataResponseBufferFactory {
 
-  /**
-   * Name of the target table
-   */
-  private var tableName : String = ""
-
-  /**
-   * Pipeline context necessary to interact with the file system
-   */
-  private var context: Option[ActionPipelineContext] = None
-
-  /**
-   * Setup for the response buffer
-   */
-  private var setup: Option[ODataResponseBufferSetup] = None
-
-  /**
-   * Initializes the factory with the two parameters
-   * @param tableName Name of the table
-   * @param context Current instance of the ActionPipelineContext
-   */
-  def init(tableName: String, setup: Option[ODataResponseBufferSetup], context:ActionPipelineContext) : Unit = {
-    this.tableName = tableName
-    this.context = Option(context)
-    this.setup = setup
-  }
-
-  /**
-   * Creates a memory response buffer instance
-   * @return : an instance of a new [[ODataResponseMemoryBuffer]]
-   */
-  def createMemoryResponseBuffer(): ODataResponseBuffer = {
-    new ODataResponseMemoryBuffer(this.setup.get, this.context.get)
-  }
-
-  /**
-   * Creates a new instance of a file response buffer (either local of for dbfs)
-   * @return : New instance of [[ODataResponseLocalFileBuffer]]
-   */
-  def createTempFileResponseBuffer() : ODataResponseBuffer = {
-    var result : ODataResponseBuffer = null
-
-    if (setup.isDefined) {
-      val fileBufferType = setup.get.tempFileBufferType
-
-      fileBufferType.getOrElse("").toLowerCase match {
-        case "local" => result = new ODataResponseLocalFileBuffer(tableName, setup.get, context.get)
-        case "dbfs"  => result = new ODataResponseDBFSFileBuffer(tableName, setup.get, context.get)
-        case _ => throw ConfigurationException(s"(Unknown FileBufferType '$fileBufferType'")
-      }
-    }
-    else {
-      throw ConfigurationException("No configuration available to the create FileResponseBuffer")
-    }
-
-    result
-  }
-}
 
 /**
  * [[DataObject]] of type OData.
@@ -469,9 +521,14 @@ case class ODataDataObject(override val id: DataObjectId,
                           (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
 
+  private var ioc: ODataIOC = new ODataIOC()
   private var previousState : String = ""
   private var nextState : String = ""
   private var responseBuffer : ODataResponseBuffer = null
+
+  def injectIOC(ioc: ODataIOC) : Unit = {
+    this.ioc = ioc
+  }
 
 
   /**
@@ -493,7 +550,7 @@ case class ODataDataObject(override val id: DataObjectId,
                       , mimeType: String = "application/json"
                       , retry: Int = nRetry
                      ) : Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(url, headers, timeouts, authMode = None, proxy = None, followRedirects = true)
+    val webserviceClient = ioc.newScalaJWebServiceClient(url, headers, timeouts, authMode = None, proxy = None, followRedirects = true)
     val webserviceResult = method match {
       case WebserviceMethod.Get =>
         webserviceClient.get()
@@ -533,7 +590,7 @@ case class ODataDataObject(override val id: DataObjectId,
    * @param authorization : authorization parameters
    * @return new [[ODataBearerToken]] instance
    */
-  private def getBearerToken(authorization: ODataAuthorization) : ODataBearerToken = {
+  def getBearerToken(authorization: ODataAuthorization) : ODataBearerToken = {
     implicit val formats: Formats = DefaultFormats
 
     val payload : Map[String, String] = Map(
@@ -553,7 +610,7 @@ case class ODataDataObject(override val id: DataObjectId,
     val expiresInSecs = responseMap.apply("expires_in").asInstanceOf[BigInt].longValue()
 
     val expiresDateTime = Instant.now.plusSeconds(expiresInSecs)
-    ODataBearerToken(token, expiresDateTime)
+    ioc.newODataBearerToken(token, expiresDateTime)
   }
 
   /**
@@ -619,7 +676,7 @@ case class ODataDataObject(override val id: DataObjectId,
    * @param extractStart: Start of the program to exclude records that were modified after this start.
    * @return OData request URL
    */
-  private def getODataURL(columnNames: Seq[String], extractStart: Instant) : String = {
+  def getODataURL(columnNames: Seq[String], extractStart: Instant) : String = {
 
     //Start with the base url and the table name
     var requestUrl = s"$baseUrl$tableName"
@@ -699,18 +756,18 @@ case class ODataDataObject(override val id: DataObjectId,
     import session.implicits._
 
     //Marking the current time to exclude records which are modified after this instant
-    val startTimeStamp = Instant.now
+    val startTimeStamp = this.ioc.getInstantNow
 
     if(context.phase == ExecutionPhase.Init){
       // In Init phase, return an empty DataFrame
       Seq[String]().toDF("responseString")
-        .select(from_json($"responseString", DataType.fromDDL(schema)).as("response"))
+        .select(from_json($"responseString", ioc.sparkDataTypeFromDDL(schema)).as("response"))
         .select(explode($"response").as("record"))
         .select("record.*")
-        .withColumn("created_at", current_timestamp())
+        .withColumn("sdlb_created_on", current_timestamp())
     } else {
       //Convert the schema string into StructType
-      val schemaType  = DataType.fromDDL(schema)
+      val schemaType  = ioc.sparkDataTypeFromDDL(schema)
 
       //Extract the schema of one record
       val schemaTypeRecords = schemaType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]
@@ -724,11 +781,10 @@ case class ODataDataObject(override val id: DataObjectId,
       //Request the bearer token
       var bearerToken = getBearerToken(authorization.get)
 
-      //Initialize the ResponseBufferFactory
-      ODataResponseBufferFactory.init(this.tableName, responseBufferSetup, context)
+      responseBufferSetup.get.setTableName(this.tableName)
 
       //Initialize the MemoryBuffer
-      this.responseBuffer = ODataResponseBufferFactory.createMemoryResponseBuffer()
+      this.responseBuffer = ioc.newODataResponseMemoryBuffer(responseBufferSetup.get, context)
       var loopCount = 0
 
       //Commence the looping for each request
