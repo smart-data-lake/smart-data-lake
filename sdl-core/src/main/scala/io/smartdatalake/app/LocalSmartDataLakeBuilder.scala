@@ -19,6 +19,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.EnvironmentUtil
 import scopt.OParser
 
@@ -30,11 +31,11 @@ import java.io.File
  * Sets master to local[*] and deployMode to client by default.
  */
 object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
-  val localParser: OParser[_, SmartDataLakeBuilderConfig] = {
-    val builder = OParser.builder[SmartDataLakeBuilderConfig]
+  val localParser: OParser[_, LocalSmartDataLakeBuilderConfig] = {
+    val builder = OParser.builder[LocalSmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
-      parser,
+      parserGeneric(),
       // optional master and deploy-mode settings to override defaults local[*] / client. Note that using something different than master=local is experimental.
       opt[String]('m', "master")
         .action((arg, config) => config.copy(master = Some(arg)))
@@ -65,7 +66,7 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
     logger.info(s"Starting Program $appType $appVersion")
 
     // Set defaults from environment variables
-    val config = SmartDataLakeBuilderConfig().copy(
+    val config = LocalSmartDataLakeBuilderConfig().copy(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
       username = sys.env.get("SDL_KERBEROS_USER"),
@@ -94,11 +95,65 @@ object LocalSmartDataLakeBuilder extends SmartDataLakeBuilder {
         }
 
         // start
-        val stats = run(config)
+        val sdlConfig = SmartDataLakeBuilderConfig(config.feedSel, applicationName = config.applicationName, configuration = config.configuration,
+          partitionValues = config.partitionValues, multiPartitionValues = config.multiPartitionValues,
+          parallelism = config.parallelism, statePath = config.statePath, overrideJars = config.overrideJars
+          , test = config.test, streaming = config.streaming)
+        val stats = run(sdlConfig)
           .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
         logger.info(s"$appType finished successfully: $stats")
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
+}
+
+/**
+ * @param master          The Spark master URL passed to SparkContext when in local mode.
+ * @param deployMode      The Spark deploy mode passed to SparkContext when in local mode.
+ * @param username        Kerberos user name (`username`@`kerberosDomain`) for local mode.
+ * @param kerberosDomain  Kerberos domain (`username`@`kerberosDomain`) for local mode.
+ * @param keytabPath      Path to Kerberos keytab file for local mode.
+ */
+case class LocalSmartDataLakeBuilderConfig(feedSel: String = null,
+                                           applicationName: Option[String] = None,
+                                           configuration: Option[Seq[String]] = None,
+                                           master: Option[String] = None,
+                                           deployMode: Option[String] = None,
+                                           username: Option[String] = None,
+                                           kerberosDomain: Option[String] = None,
+                                           keytabPath: Option[File] = None,
+                                           partitionValues: Option[Seq[PartitionValues]] = None,
+                                           multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                           parallelism: Int = 1,
+                                           statePath: Option[String] = None,
+                                           overrideJars: Option[Seq[String]] = None,
+                                           test: Option[TestMode.Value] = None,
+                                           streaming: Boolean = false,
+                                          )
+  extends CanBuildSmartDataLakeBuilderConfig[LocalSmartDataLakeBuilderConfig] {
+  override def withfeedSel(value: String): LocalSmartDataLakeBuilderConfig = copy(feedSel = value)
+
+  override def withapplicationName(value: Option[String]): LocalSmartDataLakeBuilderConfig = copy(applicationName = value)
+
+  override def withconfiguration(value: Option[Seq[String]]): LocalSmartDataLakeBuilderConfig = copy(configuration = value)
+
+  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalSmartDataLakeBuilderConfig = copy(partitionValues = value)
+
+  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
+
+  override def withparallelism(value: Int): LocalSmartDataLakeBuilderConfig = copy(parallelism = value)
+
+  override def withstatePath(value: Option[String]): LocalSmartDataLakeBuilderConfig = copy(statePath = value)
+
+  override def withoverrideJars(value: Option[Seq[String]]): LocalSmartDataLakeBuilderConfig = copy(overrideJars = value)
+
+  override def withtest(value: Option[TestMode.Value]): LocalSmartDataLakeBuilderConfig = copy(test = value)
+
+  override def withstreaming(value: Boolean): LocalSmartDataLakeBuilderConfig = copy(streaming = value)
+
+  override def withmaster(value: Option[String]): LocalSmartDataLakeBuilderConfig = copy(master = value)
+
+  override def withdeployMode(value: Option[String]): LocalSmartDataLakeBuilderConfig = copy(deployMode = value)
+
 }

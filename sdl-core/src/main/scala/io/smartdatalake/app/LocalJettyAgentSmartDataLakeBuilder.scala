@@ -69,26 +69,22 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     }
   }
 }
-case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
-                                                     override val applicationName: Option[String] = None,
-                                                     override val configuration: Option[Seq[String]] = None,
-                                                     override val master: Option[String] = None,
-                                                     override val deployMode: Option[String] = None,
-                                                     override val username: Option[String] = None,
-                                                     override val kerberosDomain: Option[String] = None,
-                                                     override val keytabPath: Option[File] = None,
-                                                     override val partitionValues: Option[Seq[PartitionValues]] = None,
-                                                     override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                                     override val parallelism: Int = 1,
-                                                     override val statePath: Option[String] = None,
-                                                     override val overrideJars: Option[Seq[String]] = None,
-                                                     override val test: Option[TestMode.Value] = None,
-                                                     override val streaming: Boolean = false,
+case class LocalJettyAgentSmartDataLakeBuilderConfig(feedSel: String = null,
+                                                     applicationName: Option[String] = None,
+                                                     configuration: Option[Seq[String]] = None,
+                                                     master: Option[String] = None,
+                                                     deployMode: Option[String] = None, partitionValues: Option[Seq[PartitionValues]] = None,
+                                                     multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                                     parallelism: Int = 1,
+                                                     statePath: Option[String] = None,
+                                                     overrideJars: Option[Seq[String]] = None,
+                                                     test: Option[TestMode.Value] = None,
+                                                     streaming: Boolean = false,
                                                      port: Int = DefaultPort,
                                                      maxPortRetries: Int = MaxPortRetries
                                                     )
 
-  extends SmartDataLakeBuilderConfigTrait[LocalJettyAgentSmartDataLakeBuilderConfig] {
+  extends CanBuildSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig] {
   override def withfeedSel(value: String): LocalJettyAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
 
   override def withapplicationName(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
@@ -98,12 +94,6 @@ case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: Strin
   override def withmaster(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(master = value)
 
   override def withdeployMode(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
 
   override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
 

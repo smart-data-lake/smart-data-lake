@@ -20,7 +20,7 @@
 package io.smartdatalake.communication.agent
 
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
-import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilderConfig
+import io.smartdatalake.app.{LocalAzureRelayAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.communication.message.SDLMessage
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.json4s.Formats
@@ -32,8 +32,8 @@ import java.nio.ByteBuffer
 object AzureRelayAgentServer extends SmartDataLakeLogger {
   implicit val format: Formats = AgentClient.messageFormat
 
-  def start(config: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
-    val connectionParams = new RelayConnectionStringBuilder(config.azureRelayURL.get + System.getenv("SharedAccessKey"))
+  def start(localAzureRelayAgentConfig: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
+    val connectionParams = new RelayConnectionStringBuilder(localAzureRelayAgentConfig.azureRelayURL.get + System.getenv("SharedAccessKey"))
 
     val tokenProvider = TokenProvider.createSharedAccessSignatureTokenProvider(connectionParams.getSharedAccessKeyName, connectionParams.getSharedAccessKey)
     val listener = new HybridConnectionListener(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
@@ -54,7 +54,11 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
             val message = new String(bytesReceived.array, bytesReceived.arrayOffset, bytesReceived.remaining)
             logger.info("Received " + message)
             val sdlMessage = read[SDLMessage](message)
-            val responseMessageOpt = agentController.handle(sdlMessage, config)
+            val sdlConfig = SmartDataLakeBuilderConfig(localAzureRelayAgentConfig.feedSel, applicationName = localAzureRelayAgentConfig.applicationName, configuration = localAzureRelayAgentConfig.configuration,
+              partitionValues = localAzureRelayAgentConfig.partitionValues, multiPartitionValues = localAzureRelayAgentConfig.multiPartitionValues,
+              parallelism = localAzureRelayAgentConfig.parallelism, statePath = localAzureRelayAgentConfig.statePath, overrideJars = localAzureRelayAgentConfig.overrideJars
+              , test = localAzureRelayAgentConfig.test, streaming = localAzureRelayAgentConfig.streaming)
+            val responseMessageOpt = agentController.handle(sdlMessage, sdlConfig)
             if (responseMessageOpt.isDefined) {
               sendSDLMessage(responseMessageOpt.get, connection)
               if(responseMessageOpt.get.agentResult.get.exception.isDefined){
