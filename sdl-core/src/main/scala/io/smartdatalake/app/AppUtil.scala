@@ -19,13 +19,15 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.misc.{EnvironmentUtil, GraphUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark.SparkEnv
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.util.ChildFirstURLClassLoader
 import org.slf4j.MDC
 
@@ -54,6 +56,9 @@ object AppUtil extends SmartDataLakeLogger {
                         ): SparkSession = {
     logger.info(s"Creating spark session: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive")
 
+    // prepare extensions
+    val noDataExtension = if (Environment.enableSparkPlanNoDataCheck) Some(new SDLSparkExtension) else None
+
     // create configObject
     val sessionBuilder = SparkSession.builder()
       .optionalMaster(masterOpt)
@@ -65,6 +70,7 @@ object AppUtil extends SmartDataLakeLogger {
       .optionalConfig( "spark.kryo.classesToRegister", kryoClassNamesOpt.map(_.mkString(",")))
       .optionalConfigs( sparkOptionsOpt )
       .optionalEnableHive(enableHive)
+      .optionalExtension(noDataExtension)
 
     // create session
     val session = sessionBuilder.getOrCreate()
@@ -140,6 +146,9 @@ object AppUtil extends SmartDataLakeLogger {
     def optionalEnableHive(enable: Boolean ): SparkSession.Builder = {
       if (enable) builder.enableHiveSupport()
       else builder
+    }
+    def optionalExtension(extension: Option[(SparkSessionExtensions => Unit)]): SparkSession.Builder = {
+      extension.map(e => builder.withExtensions(e)).getOrElse(builder)
     }
   }
 

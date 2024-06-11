@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeGenericOptions}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
@@ -27,7 +27,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
-import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, SparkRepartitionTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
@@ -548,6 +548,33 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextInit).head
     val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
+  }
+
+
+  test("copy load detect no-data rowCount=0 from SparkPlan") {
+
+    // setup DataObjects
+    val feed = "copy"
+    val srcDO = ParquetFileDataObject( "src1", tempPath+s"/src1")
+    srcDO.deleteAll
+    instanceRegistry.register(srcDO)
+    val tgtDO = ParquetFileDataObject( "tgt1", tempPath+s"/tgt1")
+    instanceRegistry.register(tgtDO)
+
+    // prepare empty Parquet file & start load
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(SparkRepartitionTransformer(numberOfTasksPerPartition = 10)))
+    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+      .where(lit(false)) // write empty DataFrame
+    Environment._enableSparkPlanNoDataCheck = Some(false)
+    srcDO.writeSparkDataFrame(l1, Seq())
+    Environment._enableSparkPlanNoDataCheck = Some(true)
+    assert(srcDO.getFileRefs(Seq()).nonEmpty)
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    action1.init(Seq(srcSubFeed))(contextInit)
+    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec))
+
+    // check that no files have been written to tgt1
+    assert(tgtDO.getFileRefs(Seq()).isEmpty)
   }
 }
 

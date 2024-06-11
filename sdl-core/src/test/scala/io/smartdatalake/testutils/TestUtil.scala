@@ -26,11 +26,12 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, replaceNonSqlWithUnderscores}
+import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, ParquetFileDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
@@ -50,6 +51,7 @@ import java.math.BigDecimal
 import java.nio.file.Files
 import java.sql.{Date, Timestamp}
 import java.time.{Instant, LocalDateTime}
+import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 /**
@@ -78,6 +80,8 @@ object TestUtil extends SmartDataLakeLogger {
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
       .config("spark.sql.shuffle.partitions", "2")
     //.config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
+      // add nodata spark extension
+      .withExtensions(new SDLSparkExtension)
     // Configure hive metastore location
     // Note that "builder.enableHiveSupport()" is not needed to work with hive metastore. In fact enableHiveSupport doesn't work with JDK11+.
     val tmpDirOnFS = Files.createTempDirectory("derby-").toFile
@@ -409,6 +413,34 @@ object TestUtil extends SmartDataLakeLogger {
 
   def getMetrics(runtimeInfo: RuntimeInfo, dataObjectId: DataObjectId): MetricsMap = {
     runtimeInfo.results.find(_.dataObjectId == dataObjectId).get.metrics.getOrElse(Map())
+  }
+
+  private lazy val pathToDeleteOnExit: mutable.Buffer[String] = {
+    val buffer = mutable.Buffer[String]()
+    // register hook to delete directories and files registered in buffer
+    Runtime.getRuntime.addShutdownHook(new Thread(() => buffer.foreach(p => FileUtils.deleteQuietly(new File(p)))))
+    buffer
+  }
+  def deleteOnExit(path: String): Unit = {
+    pathToDeleteOnExit.append(path)
+  }
+
+  def createHiveTableDataObject(id: String)(implicit instanceRegistry: InstanceRegistry): HiveTableDataObject = {
+    val tempDir = Files.createTempDirectory("sdlb-test")
+    val tempPath = tempDir.toAbsolutePath.toString
+    TestUtil.deleteOnExit(tempPath)
+    val dataObject = HiveTableDataObject(id, path = Some(tempPath), table = Table(Some("default"), replaceNonSqlWithUnderscores(id)))
+    instanceRegistry.register(dataObject)
+    dataObject
+  }
+
+  def createParquetDataObject(id: String)(implicit instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
+    val tempDir = Files.createTempDirectory("sdlb-test")
+    val tempPath = tempDir.toAbsolutePath.toString
+    TestUtil.deleteOnExit(tempPath)
+    val dataObject = ParquetFileDataObject(id, path = tempPath)
+    instanceRegistry.register(dataObject)
+    dataObject
   }
 }
 

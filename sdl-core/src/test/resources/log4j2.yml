@@ -66,3 +66,14 @@ Configuration:
         level: ERROR
       - name: io.smartdatalake.app.BuildVersionInfo
         level: ERROR
+
+      # Filter specific message
+      - name: org.apache.spark.sql.execution.datasources.FileFormatWriter
+        level: WARN
+        additivity: false
+        filters:
+          # Ignore log events with 'AssertNotEmptyFailure' exception
+          - RegexFilter:
+              regex: ".*io.smartdatalake.util.spark.AssertNotEmptyFailure.*"
+              onMatch: DENY
+              onMismatch: NEUTRAL
