@@ -26,6 +26,7 @@ import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUt
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.DataObject
