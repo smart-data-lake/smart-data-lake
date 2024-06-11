@@ -43,68 +43,20 @@ import java.time.{Duration, LocalDateTime}
 import scala.annotation.tailrec
 import scala.util.Try
 
-trait SmartDataLakeBuilderConfigTrait[R] {
-  //All builder functions for all fields
+trait CanBuildSmartDataLakeBuilderConfig[R] {
+  //All builder functions for all fields of the common SmartDataLakeBuilderConfig
   def withfeedSel(value: String): R
-
   def withapplicationName(value: Option[String]): R
-
   def withconfiguration(value: Option[Seq[String]]): R
-
-  def withmaster(value: Option[String]): R
-
-  def withdeployMode(value: Option[String]): R
-
-  def withusername(value: Option[String]): R
-
-  def withkerberosDomain(value: Option[String]): R
-
-  def withkeytabPath(value: Option[File]): R
-
   def withpartitionValues(value: Option[Seq[PartitionValues]]): R
-
   def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): R
-
   def withparallelism(value: Int): R
-
   def withstatePath(value: Option[String]): R
-
   def withoverrideJars(value: Option[Seq[String]]): R
-
   def withtest(value: Option[TestMode.Value]): R
-
   def withstreaming(value: Boolean): R
-
-  //All fieldnames of the corresponding case class
-  def feedSel: String = null
-
-  def applicationName: Option[String] = None
-
-  def configuration: Option[Seq[String]] = None
-
-  def master: Option[String] = None
-
-  def deployMode: Option[String] = None
-
-  def username: Option[String] = None
-
-  def kerberosDomain: Option[String] = None
-
-  def keytabPath: Option[File] = None
-
-  def partitionValues: Option[Seq[PartitionValues]] = None
-
-  def multiPartitionValues: Option[Seq[PartitionValues]] = None
-
-  def parallelism: Int = 1
-
-  def statePath: Option[String] = None
-
-  def overrideJars: Option[Seq[String]] = None
-
-  def test: Option[TestMode.Value] = None
-
-  def streaming: Boolean = false
+  def withmaster(value: Option[String]): R
+  def withdeployMode(value: Option[String]): R
 }
 
 /**
@@ -115,31 +67,23 @@ trait SmartDataLakeBuilderConfigTrait[R] {
  * @param feedSel         Expressions to select the actions to execute. See [[AppUtil.filterActionList()]] or commandline help for syntax description.
  * @param applicationName Application name.
  * @param configuration   One or multiple configuration files or directories containing configuration files, separated by comma.
- * @param master          The Spark master URL passed to SparkContext when in local mode.
- * @param deployMode      The Spark deploy mode passed to SparkContext when in local mode.
- * @param username        Kerberos user name (`username`@`kerberosDomain`) for local mode.
- * @param kerberosDomain  Kerberos domain (`username`@`kerberosDomain`) for local mode.
- * @param keytabPath      Path to Kerberos keytab file for local mode.
  * @param test            Run in test mode:
  *                        - "config": validate configuration
  *                        - "dry-run": execute "prepare" and "init" phase to check environment
  */
-case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
-                                      override val applicationName: Option[String] = None,
-                                      override val configuration: Option[Seq[String]] = None,
-                                      override val master: Option[String] = None,
-                                      override val deployMode: Option[String] = None,
-                                      override val username: Option[String] = None,
-                                      override val kerberosDomain: Option[String] = None,
-                                      override val keytabPath: Option[File] = None,
-                                      override val partitionValues: Option[Seq[PartitionValues]] = None,
-                                      override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                      override val parallelism: Int = 1,
-                                      override val statePath: Option[String] = None,
-                                      override val overrideJars: Option[Seq[String]] = None,
-                                      override val test: Option[TestMode.Value] = None,
-                                      override val streaming: Boolean = false
-                                     ) extends SmartDataLakeBuilderConfigTrait[SmartDataLakeBuilderConfig] {
+case class SmartDataLakeBuilderConfig(feedSel: String = null,
+                                      applicationName: Option[String] = None,
+                                      configuration: Option[Seq[String]] = None,
+                                      master: Option[String] = None,
+                                      deployMode: Option[String] = None,
+                                      partitionValues: Option[Seq[PartitionValues]] = None,
+                                      multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                      parallelism: Int = 1,
+                                      statePath: Option[String] = None,
+                                      overrideJars: Option[Seq[String]] = None,
+                                      test: Option[TestMode.Value] = None,
+                                      streaming: Boolean = false
+                                     ) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig] {
 
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains({
@@ -165,12 +109,6 @@ case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
   override def withmaster(value: Option[String]): SmartDataLakeBuilderConfig = copy(master = value)
 
   override def withdeployMode(value: Option[String]): SmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): SmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): SmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): SmartDataLakeBuilderConfig = copy(keytabPath = value)
 
   override def withpartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(partitionValues = value)
 
@@ -223,7 +161,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
 
-  protected def parserGeneric[R <: SmartDataLakeBuilderConfigTrait[R]](feedSelRequired: Boolean = true): OParser[_, R] = {
+  protected def parserGeneric[R <: CanBuildSmartDataLakeBuilderConfig[R]](feedSelRequired: Boolean = true): OParser[_, R] = {
     val builder: OParserBuilder[R] = OParser.builder[R]
     import builder._
 

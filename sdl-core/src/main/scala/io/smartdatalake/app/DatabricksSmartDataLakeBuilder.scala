@@ -26,6 +26,7 @@ import scopt.OParser
  *
  * As there is an old version of config-*.jar deployed on Databricks, this special App uses a ChildFirstClassLoader to override it in the classpath.
  */
+@deprecated("Use Init Scripts in your Databricks Environment instead")
 object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   /**
