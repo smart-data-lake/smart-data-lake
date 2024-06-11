@@ -153,12 +153,13 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   /**
-   * Provide a sample data file name to be created to file-based Action. If none is returned, no file is created.
+   * Provide a sample data file name to be created by file-based Action. If none is returned, no file is created.
    */
   override def createSampleFile(implicit context: ActionPipelineContext): Option[String] = {
-    // only create new sample file there is no schema file and if it doesnt exist yet, or an update is forced by the environment configuration
-    if (!filesystem.exists(schemaFile) && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) Some(sampleFile.toString)
-    else None
+    // only create new sample file if there is no schema defined, and no schema file exists or an update is forced by the environment configuration
+    if (schema.isEmpty && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) {
+      Some(sampleFile.toString)
+    } else None
   }
   private def sampleFile(implicit context: ActionPipelineContext) = new Path( new Path(hadoopPath, ".sample"), s"sampleData.${fileName.split('.').last.filter(_ != '*')}")
 
