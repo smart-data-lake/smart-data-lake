@@ -27,6 +27,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, UnaryNode}
 import org.apache.spark.sql.execution.{SparkPlan, UnaryExecNode}
 
 
+/**
+ * A strategy to translate below AssertNotEmpty operator in Spark logical plan to its representation in the physical plan.
+ */
 object AssertNotEmptyStrategy extends Strategy {
   def apply(plan: LogicalPlan): Seq[AssertNotEmptyExec] = plan match {
     case AssertNotEmpty(child) =>
@@ -35,11 +38,20 @@ object AssertNotEmptyStrategy extends Strategy {
   }
 }
 
+/**
+ * Operator to assert that a Dataset is not empty at the exact point in the plan where this operator is inserted.
+ * Use SDLSparkExtension.assertNotEmpty to use it.
+ *
+ * Performance note: this is executing an additional rdd.isEmpty job while executing the query!
+ */
 private[smartdatalake] case class AssertNotEmpty(child: LogicalPlan) extends UnaryNode {
   override def output: Seq[Attribute] = child.output
   override protected def withNewChildInternal(newChild: LogicalPlan): LogicalPlan = copy(child = newChild)
 }
 
+/**
+ * Implementation of AssertNotEmpty operator
+ */
 case class AssertNotEmptyExec(child: SparkPlan) extends UnaryExecNode {
 
   // Output has the same attributes as input
