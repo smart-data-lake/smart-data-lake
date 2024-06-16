@@ -144,7 +144,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
 
   test("SaveMode overwrite with different schema on managed table") {
     val targetTable = Table(db = Some(deltaDb), name = "test_overwrite_managed", query = None)
-    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true, isManaged = true)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
@@ -193,7 +193,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
 
   test("SaveMode append with different schema on managed table") {
     val targetTable = Table(db = Some(deltaDb), name = "test_append_managed", query = None)
-    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true, isManaged = true)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
     targetDO.dropTable
 
     // first load
@@ -250,7 +250,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
 
   test("SaveMode overwrite and delete partition on managed table") {
     val targetTable = Table(db = Some(deltaDb), name = "test_overwrite_managed", query = None)
-    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static"), isManaged = true)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static"))
     targetDO.dropTable
 
     // first load
@@ -308,7 +308,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
 
   test("SaveMode append on managed table") {
     val targetTable = Table(db = Some(deltaDb), name = "test_append_managed", query = None)
-    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Append, isManaged = true)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Append)
     targetDO.dropTable
 
     // first load

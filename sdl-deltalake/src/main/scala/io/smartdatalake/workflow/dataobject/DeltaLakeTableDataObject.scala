@@ -67,7 +67,8 @@ import scala.util.Try
  * - Overwriting partitions is implemented by replaceWhere option in one transaction.
  *
  * @param id unique name of this data object
- * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
+ * @param path Optional hadoop directory for this table. If path is not defined, table is handled as a managed table.
+ *             If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  * @param partitions partition columns for this data object
  * @param options Options for Delta Lake tables see: [[https://docs.delta.io/latest/delta-batch.html]] and [[org.apache.spark.sql.delta.DeltaOptions]]
@@ -86,8 +87,6 @@ import scala.util.Try
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
- * @param isManaged If set to true table location is managed by catalog, otherwise it is an external table and path must be defined.
- *                  Default is createing external tables, e.g. isManaged=false.
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
  * @param acl override connection permissions for files created tables hadoop directory with this connection
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
@@ -112,7 +111,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
-                                    isManaged: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
@@ -135,9 +133,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = context.sparkSession
     val thisIsTableExisting = isTableExisting
-    require(thisIsTableExisting || path.isDefined || isManaged, s"($id) DeltaTable ${table.fullName} does not exist, so path must be set or table should be managed (isManaged=true)")
+    require(thisIsTableExisting || path.isDefined, s"($id) DeltaTable ${table.fullName} does not exist, so path must be set or table should be managed (isManaged=true)")
 
-    if (hadoopPathHolder == null && !isManaged) {
+    if (hadoopPathHolder == null) {
       hadoopPathHolder = {
         if (thisIsTableExisting) new Path(getDetails.head().getAs[String]("location"))
         else getAbsolutePath
@@ -167,7 +165,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite and Append supported for now.")
-  assert(!isManaged || path.isEmpty, s"($id) For managed tables (isManaged=true) no path must be configured.")
 
   def deltaTable(implicit session: SparkSession) = DeltaTable.forName(session, table.fullName)
 
@@ -180,9 +177,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
     require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
     // initialize external table if needed
-    if (!isManaged) {
+    if (path.isDefined) { // if path is not defined, it is handled as managed table.
       if (!isTableExisting) {
-        require(path.isDefined, s"($id) If DeltaLake table does not exist yet, path must be set.")
         if (filesystem.exists(hadoopPath)) {
           if (DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
             // define a delta table, metadata can be read from files.
@@ -230,14 +226,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
     val details = deltaTable.detail()
-    val properties = details.select("properties").head.getMap[String, String](0)
+    val properties = details.select("properties").head().getMap[String, String](0)
 
     properties.contains(name)
   }
 
   private def propertyExistsWithValue(name: String, value: String) (implicit session: SparkSession): Boolean = {
     val details = deltaTable.detail()
-    val properties = details.select("properties").head.getMap[String, String](0)
+    val properties = details.select("properties").head().getMap[String, String](0)
 
     properties.exists(_ == name -> value)
   }
@@ -319,7 +315,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val dfWriter = saveModeTargetDf.write
       .format("delta")
       .options(options)
-      .conditionalOption("path", !isManaged, () => hadoopPath.toString) // evaluate hadoopPath only for external tables
+      .conditionalOption("path", path.isDefined, () => hadoopPath.toString) // evaluate hadoopPath only for external tables
       .option("userMetadata", userMetadata)
       .option("mergeSchema", allowSchemaEvolution) // allow schema evolution for SaveMode.Append
 
@@ -525,7 +521,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    HiveUtil.dropTableOptionalPath(table, if (!isManaged) Some(hadoopPath) else None, doPurge = false)
+    HiveUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
   }
 
   def getDetails(implicit session: SparkSession): DataFrame = {
@@ -609,7 +605,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def getState: Option[String] = {
 
     val dfHistory = DeltaTable.forName(table.fullName).history(1)
-    val latestVersion = String.valueOf(dfHistory.select("version").head.get(0))
+    val latestVersion = String.valueOf(dfHistory.select("version").head().get(0))
 
     Option(latestVersion)
   }
