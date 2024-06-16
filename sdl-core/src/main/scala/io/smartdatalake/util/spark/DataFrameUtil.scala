@@ -409,5 +409,9 @@ private[smartdatalake] object DataFrameUtil {
     def optionalOption(key: String, value: Option[String]): DataFrameWriter[T] = {
       if (value.isDefined) writer.option(key, value.get) else writer
     }
+
+    def conditionalOption(key: String, activated: Boolean, value: () => String): DataFrameWriter[T] = {
+      if (activated) writer.option(key, value()) else writer
+    }
   }
 }
