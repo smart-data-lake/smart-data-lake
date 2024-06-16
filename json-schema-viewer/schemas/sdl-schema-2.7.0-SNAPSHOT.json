@@ -1421,7 +1421,7 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.\nIf pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied."
+            "description" : "Optional hadoop directory for this table. If path is not defined, table is handled as a managed table.\nIf it doesn't contain scheme and authority, the connections pathPrefix is applied.\nIf pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied."
           },
           "partitions" : {
             "type" : "array",
