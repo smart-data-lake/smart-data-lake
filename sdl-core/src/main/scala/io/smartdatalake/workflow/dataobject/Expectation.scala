@@ -56,7 +56,7 @@ trait Expectation extends ParsableFromConfig[Expectation] with ConfigHolder with
   /**
    * The aggregation scope used to evaluate the aggregate expression.
    * Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
-   * Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
+   * Other options are 'All' and 'JobPartition', which are implemented by reading the output data again.
    */
   def scope: ExpectationScope = Job
 
@@ -213,7 +213,7 @@ object SQLExpectation extends FromConfigFactory[Expectation] {
  *                    If no expectation is defined, the result value is just recorded in metrics.
  * @param scope The aggregation scope used to evaluate the aggregate expression.
  *              Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
- *              Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
+ *              Other options are 'All' and 'JobPartition', which are implemented by reading the output data again.
  */
 case class SQLFractionExpectation(override val name: String, override val description: Option[String] = None, countConditionExpression: String, globalConditionExpression: Option[String] = None, expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
   extends Expectation {
@@ -355,7 +355,7 @@ object SQLQueryExpectation extends FromConfigFactory[Expectation] {
  *                    If no expectation is defined, the result value is is just recorded in metrics.
  * @param scope The aggregation scope used to evaluate the aggregate expression.
  *              Default is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.
- *              Other options are 'All' and 'JobPartitions', which are implemented by reading the output data again.
+ *              Other options are 'All' and 'JobPartition', which are implemented by reading the output data again.
  */
 case class CountExpectation(override val name: String = "count", override val description: Option[String] = None, expectation: Option[String] = None, override val scope: ExpectationScope = Job, override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
   extends Expectation {
