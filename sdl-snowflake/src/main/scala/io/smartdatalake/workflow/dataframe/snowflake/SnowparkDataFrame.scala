@@ -109,7 +109,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     (this.cache, observation)
   }
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
-    logger.warn("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")
+    throw new NotImplementedError("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")
     this
   }
   override def apply(columnName: String): GenericColumn = SnowparkColumn(inner.apply(columnName))

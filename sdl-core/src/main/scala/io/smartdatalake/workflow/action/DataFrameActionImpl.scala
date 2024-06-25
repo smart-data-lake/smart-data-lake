@@ -31,8 +31,8 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkObservation, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
@@ -251,14 +251,20 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive)
     // add count observation. Observation name must include action id because DataFrames might be passed on from previous actions and might read the same DataObject.
     if (Environment.enableInputDataObjectCount) {
-      val aggExpressions = ExpectationValidation.defaultExpectations.flatMap(_.getAggExpressionColumns(subFeed.dataObjectId))
-      preparedSubFeed = preparedSubFeed.withDataFrame(preparedSubFeed.dataFrame.map(_.observe(s"${id.id}#${subFeed.dataObjectId.id}!tolerant", aggExpressions, context.isExecPhase))) // "!tolerant" suffix marks the observation to allow filter push down over CollectMetrics operation, see also SDLSparkExtension.
+      input match {
+        case evDataObject: ExpectationValidation => preparedSubFeed.dataFrame.foreach { df =>
+          val isGlobalInputOnly = context.instanceRegistry.isInputOnlyDataObject(subFeed.dataObjectId)
+          val (dfExpectations, observation) = evDataObject.setupConstraintsAndJobExpectations(df, defaultExpectationsOnly = !isGlobalInputOnly, predicateTolerant = true)
+          preparedSubFeed = preparedSubFeed.withDataFrame(Some(dfExpectations)).withObservation(Some(observation))
+        }
+        case _ => ()
+      }
     }
     // return
     preparedSubFeed
   }
 
-  override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed, inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     assert(subFeed.dataFrame.isDefined)
     val output = outputs.find(_.id == subFeed.dataObjectId).get
     // initialize outputs
@@ -268,10 +274,27 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // apply expectation validation
     output match {
       case evDataObject: DataObject with ExpectationValidation =>
-        val (dfExpectations, observation) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get)
+        val (dfExpectations, outputObservation) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get)
+        // combine input observations with output observation into one combined observation
+        // enrich collecting other SparkObservations together with this output SparkObservation
+        outputObservation match {
+          case outputSparkObservation: SparkObservation =>
+            inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
+            val inputSparkObservationNames = inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
+            outputSparkObservation.setOtherObservationNames(inputSparkObservationNames)
+        }
+        val inputObservationsToCombine = inputSubFeeds.flatMap { subFeed =>
+          subFeed.observation match {
+            case Some(_: SparkObservation) => None // ignore as this is handled by output observation
+            case Some(otherObservation) => Some(PrefixedObservation(otherObservation, subFeed.dataObjectId.id+"#")) // add input DataObjectId prefix to metrics
+            case None => None
+          }
+        }
+        val combinedObservation = CombinedObservation(inputObservationsToCombine :+ outputObservation)
+        // add updated dataframe and observation to SubFeed
         subFeed
           .withDataFrame(Some(dfExpectations))
-          .withObservation(Some(observation))
+          .withObservation(Some(combinedObservation))
       case _ => subFeed
     }
   }
@@ -286,7 +309,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // get expectations metrics and check violations
     outputSubFeed = output match {
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
-        var scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor(otherMetricsPrefix = Some(id.id+"#"))).getOrElse(Map())
+        var scopeJobExpectationMetrics = subFeed.observation.map { observation =>
+          observation match {
+            case sparkObservation: SparkObservation =>
+              sparkObservation.setOtherMetricsPrefix(id.id+"#")
+            case _ => ()
+          }
+          observation.waitFor()
+        }.getOrElse(Map())
         scopeJobExpectationMetrics = enrichJobExpectationMetrics(scopeJobExpectationMetrics, output.id)
         val (metrics,exceptions) = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
         outputSubFeed = outputSubFeed.appendMetrics(metrics).asInstanceOf[DataFrameSubFeed]
@@ -309,11 +339,12 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   def enrichJobExpectationMetrics(metrics: Map[String, _], outputId: DataObjectId): Map[String, _] = {
     val mainInputCountKey = s"count#${prioritizedMainInputCandidates.head.id.id}"
     var enrichedMetrics = metrics
-    // copy count#mainInput metric on mainOutput from corresponding input metric
+    // if this is the main SubFeed, copy count#mainInput from corresponding input metric
     if (outputId == mainOutput.id && metrics.isDefinedAt(mainInputCountKey)) {
       enrichedMetrics = enrichedMetrics + ("count#mainInput" -> metrics(mainInputCountKey))
     }
     // calculate pctTransfer on mainOutput, if count on output and mainInput is available.
+    // TODO: define as expectation on the action
     if (outputId == mainOutput.id && metrics.isDefinedAt("count") && metrics.isDefinedAt(mainInputCountKey)) {
       // transferPct is rounded off to 4 digits to show better if something is missing.
       enrichedMetrics = enrichedMetrics + ("pctTransfer" -> Math.floor(metrics("count").asInstanceOf[Long].toDouble / metrics(mainInputCountKey).asInstanceOf[Long] * 10000) / 10000)

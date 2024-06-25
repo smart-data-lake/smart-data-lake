@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
 import io.smartdatalake.workflow.dataframe.DataFrameObservation
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.QueryExecution
@@ -42,6 +43,8 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
 
   @volatile private var metrics: Option[Map[String, Row]] = None
 
+  def getName: String = name
+
   def on[T](ds: Dataset[T], registerListener: Boolean, exprs: Column*): Dataset[T] = {
     // check this is no streaming Dataset. It would need registering a StreamingQueryListener instead of a QueryExecutionListener.
     if (ds.isStreaming) throw new IllegalArgumentException("SparkObservation does not yet support streaming Datasets")
@@ -54,11 +57,10 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
    * Get the observed metrics. This waits for the observed dataset to finish and deliver metrics with the name of this SparkObservation.
    *
    * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
-   * @param otherMetricsPrefix metric name prefix of others metrics to extract if possible. This is used to extract spark observations setup independently, using ActionId as prefix.
    * @return the observed metrics as a `Map[String, Any]`
    */
   @throws[InterruptedException]
-  def waitFor(timeoutSec: Int = 10, otherMetricsPrefix: Option[String] = None): Map[String, _] = {
+  def waitFor(timeoutSec: Int = 10): Map[String, _] = {
     synchronized {
       // we need to loop as wait might return without us calling notify
       // https://en.wikipedia.org/w/index.php?title=Spurious_wakeup&oldid=992601610
@@ -69,13 +71,31 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
         if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"SparkObservation $name did not receive metrics within timeout of $timeoutSec seconds.")
       }
     }
-    extractMetrics(otherMetricsPrefix)
+    extractMetrics()
   }
 
-  def extractMetrics(otherMetricsPrefix: Option[String] = None): Map[String, _] = {
+  /**
+   * Set a metric name prefix of others metrics to extract if possible.
+   * This is used to extract spark observations setup independently, using ActionId as prefix.
+   */
+  def setOtherMetricsPrefix(prefix: String): Unit = {
+    otherMetricsPrefix = Some(prefix)
+  }
+  private var otherMetricsPrefix: Option[String] = None
+
+  /**
+   * Set a metric name prefix of others metrics to extract if possible.
+   * This is used to extract spark observations setup independently, using ActionId as prefix.
+   */
+  def setOtherObservationNames(names: Seq[String]): Unit = {
+    otherObservationNames = names
+  }
+  private var otherObservationNames: Seq[String] = Seq()
+
+  private[spark] def extractMetrics(): Map[String, _] = {
     // if metric with observation name found, also get other metrics whose name starts with otherMetricsPrefix, e.g. observations for input records count, or custom observations in user Spark code.
     metrics.getOrElse(Map())
-      .filterKeys(k => k == name || otherMetricsPrefix.exists(k.startsWith)).toMap
+      .filterKeys(k => k == name || otherMetricsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
       .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherMetricsPrefix.map(name.stripPrefix).getOrElse(name), e))}
   }
 
@@ -93,7 +113,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
 
   private def createMetric(observationName: String, observation: (String,Any)) = {
     val (k,v) = observation
-    val metricName = if (observationName==name) k else s"$k#${observationName.stripSuffix("!tolerant")}"
+    val metricName = if (observationName==name) k else s"$k#${observationName.takeWhile(_!='#')}"
     (metricName, Option(v).getOrElse(None)) // if value is null convert to None
   }
 }

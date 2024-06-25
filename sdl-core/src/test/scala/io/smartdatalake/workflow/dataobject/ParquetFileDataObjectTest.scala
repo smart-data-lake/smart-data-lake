@@ -23,7 +23,7 @@ import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.HadoopFileConnection
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
 
@@ -114,7 +114,8 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
 
     assert(df.count == 0) // no results expected
 
-    val metrics = observation.waitFor(otherMetricsPrefix = Some("test#"))
+    observation.asInstanceOf[SparkObservation].setOtherMetricsPrefix("test#")
+    val metrics = observation.waitFor()
     assert(metrics("count") == 0) // this is the final count
     assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)
   }

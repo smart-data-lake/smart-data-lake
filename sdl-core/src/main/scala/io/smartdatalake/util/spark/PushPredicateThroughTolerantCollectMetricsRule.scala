@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.spark
 
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.{CollectMetrics, Filter, LogicalPlan, UnaryNode}
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -33,9 +34,13 @@ private[smartdatalake] case class PushPredicateThroughTolerantCollectMetricsRule
   val applyLocally: PartialFunction[LogicalPlan, LogicalPlan] = {
     case filter @ Filter(_, u: UnaryNode) =>
       u match {
-        case m: CollectMetrics if m.name.endsWith("!tolerant") =>
+        case m: CollectMetrics if m.name.endsWith(tolerantMetricsMarker) =>
           u.withNewChildren(Seq(Filter(filter.condition, u.child)))
         case _ => filter
       }
   }
+}
+
+object PushPredicateThroughTolerantCollectMetricsRuleObject {
+  val tolerantMetricsMarker = "!tolerant"
 }

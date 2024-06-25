@@ -106,7 +106,7 @@ trait GenericDataFrame extends GenericTypedObject {
 
   /**
    * Observe metrics on this DataFrame.
-   * Note that this doesn't create a listener. These metrics will only be collected together with using setupObservation.
+   * Note that this doesn't create a listener. These metrics will only be collected together using setupObservation.
    * @param name name of the observation
    * @param aggregateColumns aggregate columns to observe on the DataFrame
    * @return the modified DataFrame

@@ -27,14 +27,12 @@ trait DataFrameObservation {
 
   /**
    * Get the observed metrics.
-   *
    * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
    *                   timeoutSec can be ignored if the Observation implementation is calculating results.
-   * @param otherMetricsPrefix metric name prefix of others metrics to extract if possible. This is used to extract spark observations setup independently, using ActionId as prefix.
    * @return the observed metrics as a `Map[String, Any]`
    */
   @throws[InterruptedException]
-  def waitFor(timeoutSec: Int = 10, otherMetricsPrefix: Option[String] = None): Map[String, _]
+  def waitFor(timeoutSec: Int = 10): Map[String, _]
 
 }
 
@@ -44,7 +42,7 @@ trait DataFrameObservation {
  * For Snowpark this is the only method to observe metrics.
  */
 private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFrame, aggregateColumns: GenericColumn*) extends DataFrameObservation {
-  override def waitFor(timeoutSec: Int, otherMetricsPrefix: Option[String] = None): Map[String, _] = {
+  override def waitFor(timeoutSec: Int): Map[String, _] = {
     // calculate aggregate expressions on DataFrame
     val dfObservations = df.agg(aggregateColumns)
     val metricsRow = dfObservations.collect.headOption
@@ -54,4 +52,23 @@ private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFr
     } else Map()
   }
 }
+
+/**
+ * Observation that wraps another observation and adds a prefix to all metrics.
+ */
+private[smartdatalake] case class PrefixedObservation(observation: DataFrameObservation, metricsPrefix: String) extends DataFrameObservation {
+  override def waitFor(timeoutSec: Int): Map[String, _] = observation.waitFor(timeoutSec).map{
+    case (k,v) => metricsPrefix+k -> v
+  }
+}
+
+/**
+ * Observation to combine multiple observation into one.
+ */
+private[smartdatalake] case class CombinedObservation(observations: Seq[DataFrameObservation]) extends DataFrameObservation {
+  override def waitFor(timeoutSec: Int): Map[String, _] = observations.foldLeft(Map[String,Any]()){
+    case (agg, observation) => agg ++ observation.waitFor(timeoutSec)
+  }
+}
+
 

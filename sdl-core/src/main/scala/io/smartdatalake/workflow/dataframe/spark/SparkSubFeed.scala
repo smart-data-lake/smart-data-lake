@@ -85,7 +85,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(isSkipped = false)
   }
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
+    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None)
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
     val (dataFrame, dummy) = other match {

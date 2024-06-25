@@ -21,11 +21,12 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataobject.ExpectationValidation.defaultExpectations
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import java.util.UUID
 
@@ -56,19 +57,19 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
    */
   def expectations: Seq[Expectation]
 
-  def setupConstraintsAndJobExpectations(df: GenericDataFrame)(implicit context: ActionPipelineContext): (GenericDataFrame, DataFrameObservation) = {
+  def setupConstraintsAndJobExpectations(df: GenericDataFrame, defaultExpectationsOnly: Boolean = false, predicateTolerant: Boolean = false)(implicit context: ActionPipelineContext): (GenericDataFrame, DataFrameObservation) = {
     // add constraint validation column
-    val dfConstraints = setupConstraintsValidation(df)
+    val dfConstraints = if (defaultExpectationsOnly) df else setupConstraintsValidation(df)
     // setup job expectations as DataFrame observation
     val jobExpectations = expectations.filter(_.scope == ExpectationScope.Job)
     val (dfJobExpectations, observation) = {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
-      val expectationColumns = (defaultExpectations ++ jobExpectations).flatMap(_.getAggExpressionColumns(this.id))
-      setupObservation(dfConstraints, expectationColumns, context.isExecPhase)
+      val expectationColumns = (defaultExpectations ++ (if (defaultExpectationsOnly) Seq() else jobExpectations)).flatMap(_.getAggExpressionColumns(this.id))
+      setupObservation(dfConstraints, expectationColumns, context.isExecPhase, predicateTolerant)
     }
-    // setup add caching if there are expectations with scope != job
-    if (expectations.exists(_.scope != ExpectationScope.Job)) (dfJobExpectations.cache, observation)
-    else (dfJobExpectations, observation)
+    // add caching if there are expectations with scope != job
+    if (expectations.exists(_.scope != ExpectationScope.Job)) dfJobExpectations.cache
+    (dfJobExpectations, observation)
   }
 
   /**
@@ -176,9 +177,10 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     } else df
   }
 
-  protected def forceGenericObservation = false
-  private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, DataFrameObservation) = {
-    val (dfObserved, observation) = df.setupObservation(this.id + "#" + UUID.randomUUID(), expectationColumns, isExecPhase, forceGenericObservation)
+  protected def forceGenericObservation = false // can be overridden by subclass
+  private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean, predicateTolerant: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
+    val observationName = this.id.id + "#" + UUID.randomUUID() + (if (predicateTolerant) tolerantMetricsMarker else "")
+    val (dfObserved, observation) = df.setupObservation(observationName, expectationColumns, isExecPhase, forceGenericObservation)
     (dfObserved, observation)
   }
 }

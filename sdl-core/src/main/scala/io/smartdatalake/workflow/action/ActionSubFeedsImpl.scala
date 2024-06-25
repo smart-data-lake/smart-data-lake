@@ -131,7 +131,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   // TODO: this should be a property of the SubFeed. Like that it is passed to the Action and its Input/Output DataObjects.
   protected var executionModeResultOptions: Map[String,String] = Map()
 
-  def postprocessOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
+  def postprocessOutputSubFeeds(subFeeds: Seq[S], inputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // assert all outputs have a subFeed
     outputs.foreach{ output =>
         subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
@@ -139,7 +139,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // validate & update subfeeds
     subFeeds.map { subFeed =>
       outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"($id) No output found for result ${subFeed.dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-      postprocessOutputSubFeedCustomized(subFeed)
+      postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
     }
   }
 
@@ -204,7 +204,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // transform
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
     // update partition values to output's partition columns and update dataObjectId
-    outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
+    outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
     // return
     outputSubFeeds
   } catch {
@@ -224,7 +224,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       // transform
       outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
       // check and adapt output SubFeeds
-      outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
+      outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
       // write output
       outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
       // return
@@ -352,7 +352,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Implement additional processing logic for SubFeeds after transformation.
    * Can be implemented by subclass.
    */
-  protected def postprocessOutputSubFeedCustomized(subFeed: S)(implicit context: ActionPipelineContext): S = subFeed
+  protected def postprocessOutputSubFeedCustomized(subFeed: S, inputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): S = subFeed
 
   /**
    * Transform partition values.
