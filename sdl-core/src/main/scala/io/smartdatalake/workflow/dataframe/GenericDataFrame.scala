@@ -253,6 +253,9 @@ trait GenericSchema extends GenericTypedObject {
   def sql: String
   def add(colName: String, dataType: GenericDataType): GenericSchema
   def add(field: GenericField): GenericSchema
+  def addIfNotExists(colName: String, dataType: GenericDataType): GenericSchema = {
+    if (!columnExists(colName)) add(colName, dataType) else this
+  }
   def remove(colName: String): GenericSchema
   def filter(func: GenericField => Boolean): GenericSchema
   def getEmptyDataFrame(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame

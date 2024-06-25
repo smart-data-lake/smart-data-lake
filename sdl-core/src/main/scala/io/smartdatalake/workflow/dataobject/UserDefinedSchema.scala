@@ -38,6 +38,7 @@ trait UserDefinedSchema {
    * If defined, any automatic schema inference is avoided.
    *
    * The schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.
+   * If partition columns are missing, they will be added with type String.
    *
    * Define the schema by using one of the schema providers below, default is DDL.
    * The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
