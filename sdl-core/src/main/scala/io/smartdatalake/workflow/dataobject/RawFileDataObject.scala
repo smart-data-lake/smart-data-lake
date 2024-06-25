@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -37,6 +37,15 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
  *
  * @param customFormat Custom Spark data source format, e.g. binaryFile or text.
  *                     Only needed if you want to read/write this DataObject with Spark.
+ * @param customPartitionLayout Define a different partition layout than the default Hadoop directory partitioning.
+ *                                Note that this works with file based Actions like FileTransferAction, but not Spark (getSparkDataFrame method). Spark does not support reading data with a different partition layout.
+ *                                Partition layout defines how partition values can be extracted from the path.
+ *                                Use "%<colname>%" as token to extract the value for a partition column.
+ *                                As partition layout extracts partition from the path of individual files, it can also be used to extract partitions from the file name.
+ *                                With "%<colname:regex>%" a regex can be given to limit search. This is especially useful
+ *                                if there is no char to delimit the last token from the rest of the path or also between two tokens.
+ *                                Be careful that for directory based partition values extraction, the final path separator must be part
+ *                                of the partition layout to extract the last token correctly, e.g. "%year%/" for partitioning with yearly directories.
  * @param options Options for custom Spark data source format.
  *                Only of use if you want to read/write this DataObject with Spark.
  */
@@ -46,6 +55,7 @@ case class RawFileDataObject( override val id: DataObjectId,
                               override val options: Map[String, String] = Map(),
                               override val fileName: String = "*",
                               override val partitions: Seq[String] = Seq(),
+                              customPartitionLayout: Option[String] = None,
                               override val schema: Option[GenericSchema] = None,
                               override val schemaMin: Option[GenericSchema] = None,
                               override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
@@ -59,6 +69,8 @@ case class RawFileDataObject( override val id: DataObjectId,
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
 
+  assert(customPartitionLayout.isEmpty || partitions.nonEmpty, s"($id) partitionLayoutOverride can only be set if there are partition columns")
+
   /** override schema for text and binaryfile format, as these are fixed */
   override def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
     val isFormatWithFixedSchema = Seq("text", "binaryfile").contains(readFormat.toLowerCase)
@@ -67,7 +79,15 @@ case class RawFileDataObject( override val id: DataObjectId,
     else super.getSchema
   }
 
-  override def format: String = customFormat.getOrElse(throw ConfigurationException(s"($id) set attribute customFormat if you want to read/write this a RawFileDataObject with Spark"))
+  override def format: String = {
+    // this is called from getSparkDataFrame, so we can validate here that no custom partition layout is set. Spark does not support reading data with another partition layout than the standard hadoop partitioning.
+    if (customPartitionLayout.nonEmpty) throw ConfigurationException(s"($id) Spark does not support reading data with a customPartitionLayout")
+    customFormat.getOrElse(throw ConfigurationException(s"($id) set attribute customFormat if you want to read/write this a RawFileDataObject with Spark"))
+  }
+
+  override def partitionLayout(): Option[String] = {
+    customPartitionLayout.orElse(super.partitionLayout())
+  }
 
   override def factory: FromConfigFactory[DataObject] = RawFileDataObject
 
