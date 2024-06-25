@@ -32,7 +32,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Provides utility functions for [[DataFrame]]s.
  */
-private[smartdatalake] object DataFrameUtil {
+object DataFrameUtil {
 
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger {
 
