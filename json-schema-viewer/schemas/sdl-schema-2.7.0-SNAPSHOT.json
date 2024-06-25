@@ -4721,8 +4721,6 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
               }, {
-                "$ref" : "#/definitions/GenericDfTransformer/LabSparkDfTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SQLDfTransformer"
@@ -4892,8 +4890,6 @@
             "items" : {
               "oneOf" : [ {
                 "$ref" : "#/definitions/GenericDfsTransformer/DfTransformerWrapperDfsTransformer"
-              }, {
-                "$ref" : "#/definitions/GenericDfsTransformer/LabSparkDfsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfsTransformer/PythonCodeDfsTransformer"
               }, {
@@ -5196,8 +5192,6 @@
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
               }, {
-                "$ref" : "#/definitions/GenericDfTransformer/LabSparkDfTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/SQLDfTransformer"
@@ -5432,8 +5426,6 @@
                 "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
-              }, {
-                "$ref" : "#/definitions/GenericDfTransformer/LabSparkDfTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
               }, {
@@ -6245,36 +6237,6 @@
         "additionalProperties" : false,
         "description" : "Apply a filter condition to a DataFrame."
       },
-      "LabSparkDfTransformer" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "LabSparkDfTransformer"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "customTransformer" : {
-            "type" : "string",
-            "existingJavaType" : "io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer"
-          },
-          "options" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          },
-          "runtimeOptions" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          }
-        },
-        "title" : "LabSparkDfTransformer",
-        "required" : [ "type", "customTransformer" ],
-        "additionalProperties" : false
-      },
       "PythonCodeDfTransformer" : {
         "type" : "object",
         "properties" : {
@@ -7012,8 +6974,6 @@
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
             }, {
-              "$ref" : "#/definitions/GenericDfTransformer/LabSparkDfTransformer"
-            }, {
               "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/SQLDfTransformer"
@@ -7054,36 +7014,6 @@
         "required" : [ "type", "transformer" ],
         "additionalProperties" : false,
         "description" : "A Transformer to use single DataFrame Transformers as multiple DataFrame Transformers.\nThis works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.\nAll other SubFeeds will be passed through without transformation."
-      },
-      "LabSparkDfsTransformer" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "LabSparkDfsTransformer"
-          },
-          "name" : {
-            "type" : "string"
-          },
-          "customTransformer" : {
-            "type" : "string",
-            "existingJavaType" : "io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer"
-          },
-          "options" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          },
-          "runtimeOptions" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          }
-        },
-        "title" : "LabSparkDfsTransformer",
-        "required" : [ "type", "customTransformer" ],
-        "additionalProperties" : false
       },
       "PythonCodeDfsTransformer" : {
         "type" : "object",
