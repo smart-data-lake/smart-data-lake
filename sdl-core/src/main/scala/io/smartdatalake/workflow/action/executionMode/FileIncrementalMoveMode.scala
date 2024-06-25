@@ -41,12 +41,20 @@ import org.apache.spark.sql.Row
  * A better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also [[CollectSetDeterministic]]
  * - Partition values preserved.
  *
- * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout.
+ * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout. See also `àrchiveInsidePartition` option.
  *                    If this is a relative path, e.g. "_archive", it is appended after the path of the DataObject.
  *                    If this is an absolute path it replaces the path of the DataObject.
+ * @param archiveInsidePartition By default archiveDir moves files for partitioned DataObjects as according to the following directory layout:
+ *                               {{{<dataObject-root>/<archivePath>/<partitionDirs>/<filename>}}}
+ *                               This is good because the partition does no longer exist afterwards.
+ *                               By setting archiveInsidePartition=true files are moved inside the partition directory as follows:
+ *                               {{{<dataObject-root>/<partitionDirs>/<archivePath>/<filename>}}}
+ *                               This is good to keep the file in the original directory structure.
+ *                               Note that archivePath needs to be relative if setting archiveInsidePartition=true.
  */
-case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends ExecutionMode {
-  assert(archivePath.forall(_.nonEmpty)) // empty string not allowed
+case class FileIncrementalMoveMode(archivePath: Option[String] = None, archiveInsidePartition: Boolean = false) extends ExecutionMode {
+    assert(archivePath.forall(_.nonEmpty)) // empty string not allowed
+  assert(!archiveInsidePartition || archivePath.exists(isRelativePath), s"archivePath needs to be relative if setting archiveInsidePartition=true (archivePath=$archivePath)")
 
   private var sparkFilesObserver: Option[SparkFilenameObservation[Row]] = None
 
@@ -89,7 +97,8 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
               val newBasePath = if (fileRefInput.isAbsolutePath(archivePath.get)) archivePath.get
               else fileRefInput.concatPath(fileRefInput.getPath, archivePath.get)
               inputFiles.foreach { file =>
-                val archiveFile = fileRefInput.concatPath(newBasePath, fileRefInput.relativizePath(file))
+                val archiveFile = if (archiveInsidePartition) insertBeforeFilename(file, archivePath.get)
+                else fileRefInput.concatPath(newBasePath, fileRefInput.relativizePath(file))
                 fileRefInput.renameFileHandleAlreadyExisting(file, archiveFile)
               }
             } else {
@@ -112,7 +121,7 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
           val newBasePath = if (archiveHadoopPath.isAbsolute) archiveHadoopPath
           else new Path(sparkDataObject.hadoopPath, archiveHadoopPath)
           // create archive file names
-          val filePairs = files.map(file => (file, new Path(newBasePath, sparkDataObject.relativizePath(file))))
+          val filePairs = files.map(file => (file, if (archiveInsidePartition) new Path(insertBeforeFilename(file, archivePath.get)) else new Path(newBasePath, sparkDataObject.relativizePath(file))))
           // create directories if not existing (otherwise hadoop rename fails)
           filePairs.map(_._2).map(_.getParent).distinct
             .foreach(p => if (!sparkDataObject.filesystem.exists(p)) sparkDataObject.filesystem.mkdirs(p))
@@ -126,6 +135,19 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None) extends E
       case _ => throw ConfigurationException(s"($actionId) FileIncrementalMoveMode needs FileRefDataObject with FileSubFeed or SparkFileDataObject with SparkSubFeed as input")
     }
   }
+
+  private def isSeparator(c: Char): Boolean = c=='/' || c=='\\'
+  private def isRelativePath(path: String) = !path.contains(":") && !isSeparator(path.charAt(0))
+  private def splitPathAndFilename(file: String) = {
+    val splitIdx = file.lastIndexWhere(isSeparator)
+    (file.substring(0,splitIdx), file.charAt(splitIdx), file.substring(splitIdx+1))
+  }
+  private def strip(str: String, fun: Char => Boolean) = {str.dropWhile(fun).reverse.dropWhile(fun).reverse}
+  private def insertBeforeFilename(file: String, relativePath: String) = {
+    val (path, separator, filename) = splitPathAndFilename(file)
+    path + separator + strip(relativePath, isSeparator) + separator + filename
+  }
+
   override def factory: FromConfigFactory[ExecutionMode] = ProcessAllMode
 }
 

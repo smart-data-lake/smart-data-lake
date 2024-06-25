@@ -36,6 +36,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
+import java.io.FileNotFoundException
 import java.nio.file.Files
 
 class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
@@ -239,6 +240,44 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     executionMode.postExec(ActionId("test"), srcDOArchive, srcDOArchive, subFeedWithFileRefs, subFeedWithFileRefs)
     assert(srcDOArchive.getFileRefs(Seq()).isEmpty)
     assert(srcDOArchive.filesystem.listStatus(new Path(srcDOArchive.path + s"/archive")).toSeq.nonEmpty)
+  }
+
+  test("FileIncrementalMoveMode archive relative path with partitions") {
+    val srcDOArchive = ParquetFileDataObject("srcArchive", tempPath + s"/srcArchive", partitions = Seq("lastname"))
+    srcDOArchive.deleteAll
+    instanceRegistry.register(srcDOArchive)
+    val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
+    srcDOArchive.writeSparkDataFrame(l1, Seq())
+
+    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = srcDOArchive.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDOArchive, srcDOArchive, subFeed, PartitionValues.oneToOneMapping).get
+    val subFeedWithFileRefs = subFeed.copy(fileRefs = result.fileRefs, fileRefMapping = result.fileRefs.map(_.map(fileRef => FileRefMapping(fileRef, fileRef))))
+    assert(srcDOArchive.getFileRefs(Seq()).nonEmpty)
+    executionMode.postExec(ActionId("test"), srcDOArchive, srcDOArchive, subFeedWithFileRefs, subFeedWithFileRefs)
+    assert(srcDOArchive.getFileRefs(Seq()).isEmpty)
+    assert(srcDOArchive.filesystem.listStatus(new Path(srcDOArchive.path + s"/archive")).nonEmpty)
+    assert(srcDOArchive.filesystem.globStatus(new Path(srcDOArchive.path + s"/*/archive/*")).isEmpty)
+  }
+
+  test("FileIncrementalMoveMode archive relative path with partitions and archiveInsidePartition") {
+    val srcDOArchive = ParquetFileDataObject("srcArchive", tempPath + s"/srcArchive", partitions = Seq("lastname"))
+    srcDOArchive.deleteAll
+    instanceRegistry.register(srcDOArchive)
+    val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
+    srcDOArchive.writeSparkDataFrame(l1, Seq())
+
+    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"), archiveInsidePartition = true)
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = srcDOArchive.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDOArchive, srcDOArchive, subFeed, PartitionValues.oneToOneMapping).get
+    val subFeedWithFileRefs = subFeed.copy(fileRefs = result.fileRefs, fileRefMapping = result.fileRefs.map(_.map(fileRef => FileRefMapping(fileRef, fileRef))))
+    assert(srcDOArchive.getFileRefs(Seq()).nonEmpty)
+    executionMode.postExec(ActionId("test"), srcDOArchive, srcDOArchive, subFeedWithFileRefs, subFeedWithFileRefs)
+    assert(srcDOArchive.getFileRefs(Seq()).isEmpty)
+    intercept[FileNotFoundException](srcDOArchive.filesystem.listStatus(new Path(srcDOArchive.path + s"/archive")))
+    assert(srcDOArchive.filesystem.globStatus(new Path(srcDOArchive.path + s"/*/archive/*")).toSeq.nonEmpty)
   }
 
   test("FileIncrementalMoveMode archive absolute path") {
