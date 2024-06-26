@@ -42,9 +42,9 @@ case class ODataResponseBufferSetup(
 
   /* Late-Arriving property
    */
-  private var tableName: String = ""
-  def getTableName: String = this.tableName
-  def setTableName(tableName: String): Unit = this.tableName = tableName
+  private var actionName: String = ""
+  def getActionName: String = this.actionName
+  def setActionName(tableName: String): Unit = this.actionName = tableName
 
 }
 
@@ -165,7 +165,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
       val threshold = setup.memoryToFileSwitchThresholdNumOfChars.getOrElse(-1L)
 
       if (dirPath != "" && threshold > 0L && this.getStoredCharacterCount > threshold) {
-        result = ioc.newODataResponseFileBufferByType(setup.getTableName, setup, context)
+        result = ioc.newODataResponseFileBufferByType(setup.getActionName, setup, context)
         result.addResponses(this.getResponseBuffer)
       }
     }

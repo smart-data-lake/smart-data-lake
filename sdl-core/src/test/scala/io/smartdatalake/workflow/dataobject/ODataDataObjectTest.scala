@@ -50,7 +50,7 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
     val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("TEMPFILEPATH"), Some(threshold))
 
     if (tableName != null) {
-      setup.setTableName(tableName)
+      setup.setActionName(tableName)
     }
 
     new ODataResponseMemoryBuffer(setup, context, ioc)
@@ -129,7 +129,7 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
   test("ODataResponseMemoryBuffer - switchIfNecessary - new buffer") {
     val context = m.mock(classOf[ActionPipelineContext])
     val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("TEMPFILEPATH"), Some(3))
-    setup.setTableName("TABLE")
+    setup.setActionName("TABLE")
 
     val ioc = init_ioc()
     val newBuffer = m.mock(classOf[ODataResponseDBFSFileBuffer])
@@ -147,7 +147,7 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
   test("ODataResponseMemoryBuffer - switchIfNecessary - above threshold but no path") {
     val context = m.mock(classOf[ActionPipelineContext])
     val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), None, Some(3))
-    setup.setTableName("TABLE")
+    setup.setActionName("TABLE")
 
     val ioc = init_ioc()
     val sut = new ODataResponseMemoryBuffer(setup, context, ioc)

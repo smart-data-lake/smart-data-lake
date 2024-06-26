@@ -537,14 +537,7 @@ case class ODataDataObject(override val id: DataObjectId,
         .select("record.*")
         .withColumn("sdlb_created_on", current_timestamp())
     } else {
-      //DEL Convert the schema string into StructType
-      //DEL val schemaType  = ioc.sparkDataTypeFromDDL(schema)
-
-      //DEL Extract the schema of one record
-      //DEL val schemaTypeRecords = schemaType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]
-
       //Extract the names of the columns
-      //DEL val columnNames = extractColumnNames(schemaTypeRecords)
       val columnNames = recordSchema.columns
 
       //Generate the URL for the first API call
@@ -553,7 +546,7 @@ case class ODataDataObject(override val id: DataObjectId,
       //Request the bearer token
       var bearerToken = getBearerToken(authorization.get)
 
-      responseBufferSetup.get.setTableName(this.tableName)
+      responseBufferSetup.get.setActionName(this.id.id)
 
       //Initialize the MemoryBuffer
       this.responseBuffer = ioc.newODataResponseMemoryBuffer(responseBufferSetup.get, context)
@@ -588,8 +581,6 @@ case class ODataDataObject(override val id: DataObjectId,
 
       logger.info(s"Loop count $loopCount")
 
-      //DEL create dataframe with the correct schema and add created_at column with the current timestamp
-      //DEL val schemaExtended = s"struct< `@odata.context`: string, value: $schema>"
       val responseSchema = StructType(Seq(StructField("@odata.context", StringType), StructField("value", arraySchema)))
 
       val responsesDf = this.responseBuffer.getDataFrame
