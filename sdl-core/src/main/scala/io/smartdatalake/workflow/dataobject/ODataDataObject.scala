@@ -26,38 +26,90 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 import org.apache.hadoop.fs.{Path => HadoopPath}
 
+/**
+ * InversionOfControl container class
+ * This class serves as a hub or a relay for all calls to class creators and to static functions outside of this module.
+ * It allows test code to override these calls and to inject Mock- and Spy objects into the running code.
+ */
 class ODataIOC {
 
+  /**
+   * Creates a new instance of the java.io.File class
+   * @param path to the file
+   * @return java.io.File object
+   */
   def newFile(path:String) : java.io.File = {
     new File(path)
   }
 
+  /**
+   * Create a new instance of the java.nio.file.Path class
+   * @param path
+   * @return java.nio.file.Path object
+   */
   def newPath(path:String) : java.nio.file.Path = {
     Paths.get(path)
   }
 
+  /**
+   * Create a new instance of the java.io.BufferedWriter class
+   * @param writer reference to an already existing Writer object
+   * @return java.io.BufferedWriter object
+   */
   def newBufferedWriter(writer: java.io.Writer): BufferedWriter = {
     new BufferedWriter(writer)
   }
 
+  /**
+   * Create a new instance of the java.io.FileWriter class
+   * @param file path to the file to write to
+   * @return java.io.FileWriter
+   */
   def newFileWriter(file: java.io.File) : FileWriter= {
     new FileWriter(file)
   }
 
+  /**
+   * Create a new instance of the ODataResponseMemoryBuffer class
+   * @param setup buffer configuration
+   * @param context pipeline context
+   * @return ODataResponseMemoryBuffer
+   */
   def newODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseMemoryBuffer = {
     new ODataResponseMemoryBuffer(setup, context, this)
   }
 
+  /**
+   * Create a new instance of the ODataReponseLocalFileBuffer class
+   * @param tmpDirName path to the temporary direction to write to
+   * @param setup buffer configuration
+   * @param context pipeline context
+   * @return ODataReponseLocalFileBuffer
+   */
   def newODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseLocalFileBuffer =
   {
     new ODataResponseLocalFileBuffer(tmpDirName, setup, context, this)
   }
 
+  /**
+   * Create a new instance of the ODataResponseDBFSFileBuffer class
+   * @param tmpDirName path to the temporary direction to write to
+   * @param setup buffer configuration
+   * @param context pipeline context
+   * @return ODataResponseDBFSFileBuffer
+   */
   def newODataResponseDBFSFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseDBFSFileBuffer =
   {
     new ODataResponseDBFSFileBuffer(tmpDirName, setup, context, this)
   }
 
+  /**
+   * Create a new instance of a ResponseFileBuffer class, based on the provided parameters
+   * @param tmpDirName path to the temporary direction to write to
+   * @param setup buffer configuration
+   * @param context pipeline context
+   * @return either ODataResponseLocalFileBuffer or ODataResponseDBFSFileBuffer
+   */
   def newODataResponseFileBufferByType(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseBuffer = {
     var result : ODataResponseBuffer = null
 
@@ -74,46 +126,110 @@ class ODataIOC {
     result
   }
 
+  /**
+   * Create a new instance of the ODataBearerToken class
+   * @param token bearer token
+   * @param expiresAt expire datetime
+   * @return ODataBearerToken
+   */
   def newODataBearerToken(token: String, expiresAt:java.time.Instant) : ODataBearerToken = {
     ODataBearerToken(token, expiresAt)
   }
 
+  /**
+   * Creates a new instance of the org.apache.hadoop.fs.FileSystem class
+   * @param path base path for the file system
+   * @param context pipeline context
+   * @return org.apache.hadoop.fs.FileSystem
+   */
   def newHadoopFsWithConf(path: org.apache.hadoop.fs.Path, context:ActionPipelineContext) : org.apache.hadoop.fs.FileSystem = {
     HdfsUtil.getHadoopFsWithConf(path)(context.hadoopConf)
   }
 
+  /**
+   * Create a new instance of the org.apache.hadoop.fs.Path class
+   * @param path path as a string
+   * @return org.apache.hadoop.fs.Path
+   */
   def newHadoopPath(path: String) : HadoopPath = {
     new HadoopPath(path)
   }
 
+  /**
+   * Create a new instance of the org.apache.hadoop.fs.Path class
+   * @param parent parent directory
+   * @param child child directory
+   * @return org.apache.hadoop.fs.Path
+   */
   def newHadoopPath(parent: String, child: String) : HadoopPath = {
     new HadoopPath(parent, child)
   }
 
+  /**
+   * Create a new instance of the org.apache.hadoop.fs.Path class
+   * @param parent parent directory
+   * @param child child directory
+   * @return org.apache.hadoop.fs.Path
+   */
   def newHadoopPath(parent: HadoopPath, child: String) : HadoopPath = {
     new HadoopPath(parent, child)
   }
 
+  /**
+   * Create a new instance of the io.smartdatalake.util.webservice.ScalaJWebserviceClient class
+   * @param url
+   * @param headers
+   * @param timeouts
+   * @param authMode
+   * @param proxy
+   * @param followRedirects
+   * @return io.smartdatalake.util.webservice.ScalaJWebserviceClient
+   */
   def newScalaJWebServiceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[io.smartdatalake.definitions.AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : ScalaJWebserviceClient = {
     ScalaJWebserviceClient(url, headers, timeouts, authMode, proxy, followRedirects)
   }
 
+  /**
+   * Calls the static method exists of the java.nio.file.Files class
+   * @param path path to check
+   * @return true if exists
+   */
   def fileExists(path:java.nio.file.Path): Boolean = {
     Files.exists(path)
   }
 
+  /**
+   * Calls the static method createDirectories of the java.nio.file.Files class
+   * @param path path to create
+   * @return
+   */
   def fileCreateDirectories(path:java.nio.file.Path) : java.nio.file.Path = {
     Files.createDirectories(path)
   }
 
+  /**
+   * Calls the static method now of the java.time.Instance class
+   * @return now instant
+   */
   def getInstantNow : Instant = {
     Instant.now()
   }
 
+  /**
+   * Calls the static method writeHadoopFile of the io.smartdatalake.util.hdfs.HdfsUtil class
+   * @param path path to write to
+   * @param content content to write
+   * @param filesystem reference to the file system
+   */
   def writeHadoopFile(path: HadoopPath, content: String, filesystem: FileSystem) : Unit = {
     HdfsUtil.writeHadoopFile(path, content)(filesystem)
   }
 
+  /**
+   * Calls the static method fromDDL from the org.apache.spark.sql.types.DataType class
+   * @param ddl DDL string to convert
+   * @return DataType object
+   */
   def sparkDataTypeFromDDL(ddl: String) : DataType = {
     DataType.fromDDL(ddl)
   }
