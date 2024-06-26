@@ -55,7 +55,7 @@ import scala.util.Try
 trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
-  with UserDefinedSchema with SchemaValidation {
+  with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger {
 
   /**
    * The Spark-Format provider to be used
@@ -114,10 +114,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
   def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
     _schemaHolder = _schemaHolder.orElse(
         // get defined schema, add potentially missing partition columns as type string
-        schema.map { s =>
-          partitions.foldLeft(s.convert(typeOf[SparkSubFeed])) {
-              case (schema,col) => schema.addIfNotExists(col, SparkSimpleDataType(StringType))
-          }.asInstanceOf[SparkSchema]
+        schema.map(_.convert(typeOf[SparkSubFeed])).map { s =>
+          val missingPartitions = partitions.filterNot(s.columnExists)
+          if (missingPartitions.nonEmpty) {
+            logger.info(s"($id) adding missing partition columns ${missingPartitions.mkString(", ")} to schema")
+            missingPartitions.foldLeft(s){ case (s,c) => s.add(c, SparkSimpleDataType(StringType))}.asInstanceOf[SparkSchema]
+          } else s.asInstanceOf[SparkSchema]
         }
       )
       .orElse (
