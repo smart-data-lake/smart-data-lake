@@ -128,7 +128,11 @@
           },
           "archivePath" : {
             "type" : "string",
-            "description" : "if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout.\nIf this is a relative path, e.g. \"_archive\", it is appended after the path of the DataObject.\nIf this is an absolute path it replaces the path of the DataObject."
+            "description" : "if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout. See also`archiveInsidePartition` option.\nIf this is a relative path, e.g. \"_archive\", it is appended after the path of the DataObject.\nIf this is an absolute path it replaces the path of the DataObject."
+          },
+          "archiveInsidePartition" : {
+            "type" : "boolean",
+            "description" : "By default archiveDir moves files for partitioned DataObjects as according to the following directory layout:\n{{{<dataObject-root>/<archivePath>/<partitionDirs>/<filename>}}}This is good because the partition does no longer exist afterwards.\nBy setting archiveInsidePartition=true files are moved inside the partition directory as follows:\n{{{<dataObject-root>/<partitionDirs>/<archivePath>/<filename>}}}\nThis is good to keep the file in the original directory structure.\nNote that archivePath needs to be relative if setting archiveInsidePartition=true."
           }
         },
         "title" : "FileIncrementalMoveMode",
