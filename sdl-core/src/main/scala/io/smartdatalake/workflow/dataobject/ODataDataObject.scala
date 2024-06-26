@@ -10,21 +10,25 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceException, WebserviceMethod}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.{ArrayType, DataType, StructType}
+import org.apache.spark.sql.types.{ArrayType, DataType, StructType, StructField, StringType}
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
 import java.net.URLEncoder
-import java.nio.file.{Paths, Files}
-import java.io.{File, BufferedWriter, FileWriter}
+import java.nio.file.{Files, Paths}
+import java.io.{BufferedWriter, File, FileWriter}
 import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
 import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 import org.apache.hadoop.fs.{Path => HadoopPath}
+
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * InversionOfControl container class
@@ -224,15 +228,6 @@ class ODataIOC {
   def writeHadoopFile(path: HadoopPath, content: String, filesystem: FileSystem) : Unit = {
     HdfsUtil.writeHadoopFile(path, content)(filesystem)
   }
-
-  /**
-   * Calls the static method fromDDL from the org.apache.spark.sql.types.DataType class
-   * @param ddl DDL string to convert
-   * @return DataType object
-   */
-  def sparkDataTypeFromDDL(ddl: String) : DataType = {
-    DataType.fromDDL(ddl)
-  }
 }
 
 
@@ -279,7 +274,7 @@ case class ODataBearerToken(token: String, expiresAt:java.time.Instant) {
  * @param instanceRegistry
  */
 case class ODataDataObject(override val id: DataObjectId,
-                           schema: String,
+                           override val schema: Option[GenericSchema],
                            baseUrl : String,
                            tableName: String,
                            sourceFilters: Option[String] = None,
@@ -292,7 +287,7 @@ case class ODataDataObject(override val id: DataObjectId,
                            override val metadata: Option[DataObjectMetadata] = None
                           )
                           (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger with UserDefinedSchema {
 
   private var ioc: ODataIOC = new ODataIOC()
   private var previousState : String = ""
@@ -531,22 +526,26 @@ case class ODataDataObject(override val id: DataObjectId,
     //Marking the current time to exclude records which are modified after this instant
     val startTimeStamp = this.ioc.getInstantNow
 
+    val recordSchema = schema.get.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema]
+    val arraySchema = ArrayType(recordSchema.inner)
+
     if(context.phase == ExecutionPhase.Init){
       // In Init phase, return an empty DataFrame
       Seq[String]().toDF("responseString")
-        .select(from_json($"responseString", ioc.sparkDataTypeFromDDL(schema)).as("response"))
+        .select(from_json($"responseString", arraySchema).as("response"))
         .select(explode($"response").as("record"))
         .select("record.*")
         .withColumn("sdlb_created_on", current_timestamp())
     } else {
-      //Convert the schema string into StructType
-      val schemaType  = ioc.sparkDataTypeFromDDL(schema)
+      //DEL Convert the schema string into StructType
+      //DEL val schemaType  = ioc.sparkDataTypeFromDDL(schema)
 
-      //Extract the schema of one record
-      val schemaTypeRecords = schemaType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]
+      //DEL Extract the schema of one record
+      //DEL val schemaTypeRecords = schemaType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]
 
       //Extract the names of the columns
-      val columnNames = extractColumnNames(schemaTypeRecords)
+      //DEL val columnNames = extractColumnNames(schemaTypeRecords)
+      val columnNames = recordSchema.columns
 
       //Generate the URL for the first API call
       var requestUrl = getODataURL(columnNames, startTimeStamp)
@@ -589,11 +588,12 @@ case class ODataDataObject(override val id: DataObjectId,
 
       logger.info(s"Loop count $loopCount")
 
-      // create dataframe with the correct schema and add created_at column with the current timestamp
-      val schemaExtended = s"struct< `@odata.context`: string, value: $schema>"
+      //DEL create dataframe with the correct schema and add created_at column with the current timestamp
+      //DEL val schemaExtended = s"struct< `@odata.context`: string, value: $schema>"
+      val responseSchema = StructType(Seq(StructField("@odata.context", StringType), StructField("value", arraySchema)))
 
       val responsesDf = this.responseBuffer.getDataFrame
-        .select(from_json($"responseString", DataType.fromDDL(schemaExtended)).as("response"))
+        .select(from_json($"responseString", responseSchema).as("response"))
         .select(explode($"response.value").as("record"))
         .select("record.*")
         .withColumn("sdlb_created_on", current_timestamp())

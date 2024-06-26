@@ -24,11 +24,15 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import org.mockito.{Mockito => m}
 import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.util.misc.SchemaProviderType
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import io.smartdatalake.workflow.action.RuntimeEventState
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.{DataFrameReader, SparkSession}
+import org.apache.spark.sql.types.{StructType, StructField, StringType, IntegerType}
 
 import java.io.File
 import java.nio.file.Files
@@ -512,7 +516,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -532,7 +536,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -554,7 +558,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -577,7 +581,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -601,7 +605,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -661,7 +665,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     
     val sut = ODataDataObject(
         id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -719,7 +723,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -801,7 +805,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -895,7 +899,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -979,7 +983,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
@@ -1021,7 +1025,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = "array<struct<ColumnA:string, ColumnB:integer>>"
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
