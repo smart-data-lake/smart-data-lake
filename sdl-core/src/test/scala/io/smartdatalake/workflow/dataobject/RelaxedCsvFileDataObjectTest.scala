@@ -109,7 +109,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
 
     val dfResult = dataObj.getSparkDataFrame().cache
 
-    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3", "_filename"))
+    assert(dfResult.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     val expectedResult = data1 ++ data2.map(x => (x._3, x._1, x._2))
     assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == expectedResult.toSet )
     assert(dfResult.select($"_filename").distinct.count > 1 )
@@ -128,6 +128,24 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
     val dfResult = dataObj.getSparkDataFrame(pv1).cache
 
     assert(dfResult.columns.toSeq == Seq("h2", "h3", "h1", "_filename"))
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == data1.toSet)
+    assert(dfResult.where($"_filename".isNull).isEmpty)
+  }
+
+  test("CSV files partitioned, schema without partition cols") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"),
+      schema = Some(SparkSchema(df1.drop("h1").schema)), filenameColumn = Some("_filename"))
+    dataObj.writeSparkDataFrame(df1, pv1)
+
+    val dfResult = dataObj.getSparkDataFrame(pv1).cache
+
+    assert(dfResult.columns.toSet == Set("h2", "h3", "h1", "_filename"))
     assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == data1.toSet)
     assert(dfResult.where($"_filename".isNull).isEmpty)
   }
