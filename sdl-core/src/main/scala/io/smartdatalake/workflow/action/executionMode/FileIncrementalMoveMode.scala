@@ -41,7 +41,7 @@ import org.apache.spark.sql.Row
  * A better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also [[CollectSetDeterministic]]
  * - Partition values preserved.
  *
- * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout. See also `àrchiveInsidePartition` option.
+ * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout. See also `archiveInsidePartition` option.
  *                    If this is a relative path, e.g. "_archive", it is appended after the path of the DataObject.
  *                    If this is an absolute path it replaces the path of the DataObject.
  * @param archiveInsidePartition By default archiveDir moves files for partitioned DataObjects as according to the following directory layout:
