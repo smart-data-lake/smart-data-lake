@@ -375,7 +375,7 @@ case class ODataDataObject(override val id: DataObjectId,
     val responseMap : Map[String, Any] = Serialization.read[Map[String, Any]](responseString)
 
     val token = responseMap.apply("access_token").asInstanceOf[String]
-    val expiresInSecs = responseMap.apply("expires_in").asInstanceOf[BigInt].longValue()
+    val expiresInSecs = responseMap.apply("expires_in").asInstanceOf[BigInt].longValue
 
     val expiresDateTime = Instant.now.plusSeconds(expiresInSecs)
     ioc.newODataBearerToken(token, expiresDateTime)
