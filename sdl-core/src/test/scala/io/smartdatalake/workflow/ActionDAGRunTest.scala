@@ -39,6 +39,9 @@ class ActionDAGRunTest extends FunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
+  private val sdlbVersionInfo = BuildVersionInfo.sdlbVersionInfo.map(_.entries().toMap)
+  private val appVersionInfo = BuildVersionInfo.appVersionInfo.map(_.entries().toMap).orElse(AppUtil.getManifestVersion.map(v => Map("version"->v)))
+
   test("convert ActionDAGRunState to json and back") {
     val df = Seq(("a",1)).toDF("txt", "value")
     val startTime = LocalDateTime.now
@@ -47,9 +50,7 @@ class ActionDAGRunTest extends FunSuite {
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
       results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))), metrics = Some(Map("test"->1, "test2"->"abc")))),
       dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
-    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
-    val appVersion = AppUtil.getManifestVersion
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), buildVersionInfo = buildVersionInfo, appVersion = appVersion )
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo = sdlbVersionInfo, appVersionInfo = appVersionInfo )
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
@@ -67,6 +68,7 @@ class ActionDAGRunTest extends FunSuite {
     val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
     val migratedState = ActionDAGRunState.fromJson(stateContent)
     assert(migratedState.runStateFormatVersion.get == ActionDAGRunState.runStateFormatVersion)
+    assert(migratedState.sdlbVersionInfo.contains(Map("version" -> "2.5.2")))
     val stateLoadTest = migratedState.actionsState("load-test")
     assert(stateLoadTest.results.head.getClass.getSimpleName == "SparkSubFeed")
     assert(stateLoadTest.inputIds.nonEmpty)
@@ -89,9 +91,7 @@ class ActionDAGRunTest extends FunSuite {
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
       results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test" -> 1))), metrics = Some(Map("test" -> 1, "test2" -> "abc")))),
       dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
-    val buildVersionInfo = BuildVersionInfo.readBuildVersionInfo
-    val appVersion = AppUtil.getManifestVersion
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = true, Some(1), buildVersionInfo = buildVersionInfo, appVersion = appVersion)
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = true, Some(1), sdlbVersionInfo = sdlbVersionInfo, appVersionInfo = appVersionInfo)
 
     // prepare state store
     val tempDir = Files.createTempDirectory("test")
