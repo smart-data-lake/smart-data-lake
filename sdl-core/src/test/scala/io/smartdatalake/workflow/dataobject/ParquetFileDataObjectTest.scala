@@ -114,7 +114,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
 
     assert(df.count == 0) // no results expected
 
-    observation.asInstanceOf[SparkObservation].setOtherMetricsPrefix("test#")
+    observation.asInstanceOf[SparkObservation].setOtherObservationsPrefix("test#")
     val metrics = observation.waitFor()
     assert(metrics("count") == 0) // this is the final count
     assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)

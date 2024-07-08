@@ -239,6 +239,7 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
     case str: String => SnowparkColumn(inner.apply(str))
     case idx: Int => SnowparkColumn(inner.apply(idx))
   }
+  override def getName: Option[String] = inner.getName
 }
 
 case class SnowparkField(inner: StructField) extends GenericField {

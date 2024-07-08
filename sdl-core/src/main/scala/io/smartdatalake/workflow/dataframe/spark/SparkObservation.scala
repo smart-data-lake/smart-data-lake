@@ -75,17 +75,16 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
   }
 
   /**
-   * Set a metric name prefix of others metrics to extract if possible.
-   * This is used to extract spark observations setup independently, using ActionId as prefix.
+   * Set an observation name prefix of others metrics to extract if possible.
+   * This is used to extract spark observations setup independently, using e.g. ActionId as prefix.
    */
-  def setOtherMetricsPrefix(prefix: String): Unit = {
-    otherMetricsPrefix = Some(prefix)
+  def setOtherObservationsPrefix(prefix: String): Unit = {
+    otherObservationsPrefix = Some(prefix)
   }
-  private var otherMetricsPrefix: Option[String] = None
+  private var otherObservationsPrefix: Option[String] = None
 
   /**
-   * Set a metric name prefix of others metrics to extract if possible.
-   * This is used to extract spark observations setup independently, using ActionId as prefix.
+   * Set names of other observation to extract if possible.
    */
   def setOtherObservationNames(names: Seq[String]): Unit = {
     otherObservationNames = names
@@ -93,10 +92,10 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
   private var otherObservationNames: Seq[String] = Seq()
 
   private[spark] def extractMetrics(): Map[String, _] = {
-    // if metric with observation name found, also get other metrics whose name starts with otherMetricsPrefix, e.g. observations for input records count, or custom observations in user Spark code.
+    // also extract other observations according to otherObservationsPrefix and otherObservationNames.
     metrics.getOrElse(Map())
-      .filterKeys(k => k == name || otherMetricsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
-      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherMetricsPrefix.map(name.stripPrefix).getOrElse(name), e))}
+      .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
+      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherObservationsPrefix.map(name.stripPrefix).getOrElse(name), e))}
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {

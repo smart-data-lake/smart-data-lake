@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME

@@ -29,9 +29,11 @@ import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.col
+
 import scala.jdk.CollectionConverters._
 
 /**

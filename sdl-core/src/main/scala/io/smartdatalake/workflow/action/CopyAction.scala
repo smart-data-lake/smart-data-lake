@@ -27,6 +27,7 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 import scala.reflect.runtime.universe.Type
@@ -61,6 +62,7 @@ case class CopyAction(override val id: ActionId,
                       override val executionMode: Option[ExecutionMode] = None,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
+                      override val expectations: Seq[ActionExpectation] = Seq(),
                       override val saveModeOptions: Option[SaveModeOptions] = None,
                       override val metadata: Option[ActionMetadata] = None,
                       override val agentId: Option[AgentId] = None

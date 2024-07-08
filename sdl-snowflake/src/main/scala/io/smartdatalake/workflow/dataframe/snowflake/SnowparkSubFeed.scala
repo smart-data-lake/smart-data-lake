@@ -23,6 +23,7 @@ import com.snowflake.snowpark.types.{ArrayType, StringType, StructField, StructT
 import com.snowflake.snowpark.{Column, Window, functions}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
@@ -146,7 +147,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   def appendMetrics(metrics: MetricsMap): SnowparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 }
 
-object SnowparkSubFeed extends DataFrameSubFeedCompanion {
+object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogger {
   override def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     subFeed match {
       case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed
@@ -178,6 +179,19 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion {
   override def count(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.count(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def countDistinct(columns: GenericColumn*): SnowparkColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    val innerColumns = columns.map(_.asInstanceOf[SnowparkColumn].inner)
+    SnowparkColumn(functions.count_distinct(innerColumns.head, innerColumns.tail:_*))
+  }
+  override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): SnowparkColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn =>
+        if (rsd.isDefined) logger.warn("Parameter 'rsd' is ignored for approxCountDistinct within SnowflakeSubFeed")
+        SnowparkColumn(functions.approx_count_distinct(snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

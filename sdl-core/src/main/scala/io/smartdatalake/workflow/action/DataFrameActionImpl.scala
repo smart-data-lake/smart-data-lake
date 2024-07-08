@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransform
 import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkObservation, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation, ExpectationScope}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
@@ -79,6 +80,17 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    * Override and parametrize saveMode in output DataObject configurations when writing to DataObjects.
    */
   def saveModeOptions: Option[SaveModeOptions] = None
+
+  /**
+   * List of expectation definitions to evaluate when executing this Action, see [[Expectation]] for details.
+   *
+   * Note: Expectations defined DataObjects measure data quality and are evaluated against the output only.
+   * Expectations defined on Actions measure quality of the transformation process and can measure and compare metrics between inputs and main output.
+   *
+   * Expectations defined at Action level are executed together with the expectations of the main output DataObject.
+   */
+  def expectations: Seq[ActionExpectation] = Seq()
+  assert(!expectations.exists(_.scope == ExpectationScope.JobPartition), s"($id) Calculating input metrics for expectations with scope JobPartition not supported")
 
   /**
    * Common DataFrameSubFeed type needed by transformers
@@ -249,12 +261,18 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // enrich with fresh DataFrame if needed
     preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive)
-    // add count observation. Observation name must include action id because DataFrames might be passed on from previous actions and might read the same DataObject.
+    // add observations on input DataFrame
     if (Environment.enableInputDataObjectCount) {
       input match {
         case evDataObject: ExpectationValidation => preparedSubFeed.dataFrame.foreach { df =>
+          // collect additional aggregate expressions for this DataObject from Action expectations with scope Job
+          val inputJobAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.Job).flatMap(_.getInputAggExpressionColumns(id))
+          val additionalJobAggExpressionColumns = inputJobAggExpressionColumns.filter(c => c.getName.exists(n => n.endsWith(s"#${input.id.id}"))).map(c => c.as(c.getName.get.stripSuffix(s"#${input.id.id}"))) ++
+            inputJobAggExpressionColumns.filter(c => c.getName.exists(n => !n.contains("#") && input.id == prioritizedMainInputCandidates.head.id))
+          // for global input, validate constraints and expectations, otherwise just add default expectations, e.g. count
           val isGlobalInputOnly = context.instanceRegistry.isInputOnlyDataObject(subFeed.dataObjectId)
-          val (dfExpectations, observation) = evDataObject.setupConstraintsAndJobExpectations(df, defaultExpectationsOnly = !isGlobalInputOnly, predicateTolerant = true)
+          // setup observation
+          val (dfExpectations, observation) = evDataObject.setupConstraintsAndJobExpectations(df, defaultExpectationsOnly = !isGlobalInputOnly, predicateTolerant = true, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns)
           preparedSubFeed = preparedSubFeed.withDataFrame(Some(dfExpectations)).withObservation(Some(observation))
         }
         case _ => ()
@@ -274,7 +292,10 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // apply expectation validation
     output match {
       case evDataObject: DataObject with ExpectationValidation =>
-        val (dfExpectations, outputObservation) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get)
+        // collect additional aggregate expressions for from Action expectations with scope Job
+        val additionalJobAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.Job).flatMap(_.getAggExpressionColumns(evDataObject.id))
+        // setup observation
+        val (dfExpectations, outputObservation) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns)
         // combine input observations with output observation into one combined observation
         // enrich collecting other SparkObservations together with this output SparkObservation
         outputObservation match {
@@ -306,19 +327,24 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     var outputSubFeed = writeSubFeed(subFeed, output, isRecursive)
     setSparkJobMetadata(None)
     if (breakDataFrameOutputLineage) outputSubFeed = outputSubFeed.breakLineage
+    val isMainOutput = mainOutput.id == output.id
     // get expectations metrics and check violations
     outputSubFeed = output match {
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
-        var scopeJobExpectationMetrics = subFeed.observation.map { observation =>
+        // get metrics with scope Job from observations
+        val scopeJobExpectationMetrics = subFeed.observation.map { observation =>
           observation match {
-            case sparkObservation: SparkObservation =>
-              sparkObservation.setOtherMetricsPrefix(id.id+"#")
+            case sparkObservation: SparkObservation => sparkObservation.setOtherObservationsPrefix(id.id+"#")
             case _ => ()
           }
           observation.waitFor()
         }.getOrElse(Map())
-        scopeJobExpectationMetrics = enrichJobExpectationMetrics(scopeJobExpectationMetrics, output.id)
-        val (metrics,exceptions) = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics)
+        // get input metrics with scope All
+        val inputMetrics = if (isMainOutput) getInputAggMetrics(subFeed) else Map()
+        // if this is mainOutput, enrich main input metrics
+        val enrichmentFunc: Map[String,_] => Map[String,_] = if (isMainOutput) enrichMainInputMetrics else identity
+        // evaluate and validate expectations
+        val (metrics,exceptions) = evDataObject.validateExpectations(subFeed.dataFrame.get, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ inputMetrics, expectations, enrichmentFunc)
         outputSubFeed = outputSubFeed.appendMetrics(metrics).asInstanceOf[DataFrameSubFeed]
         // throw first validation exceptions if any, enriched with metrics...
         exceptions.foreach(ex => throw TaskFailedException(id.id, ex, Some(Seq(outputSubFeed))))
@@ -336,20 +362,29 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     outputSubFeed
   }
 
-  def enrichJobExpectationMetrics(metrics: Map[String, _], outputId: DataObjectId): Map[String, _] = {
-    val mainInputCountKey = s"count#${prioritizedMainInputCandidates.head.id.id}"
-    var enrichedMetrics = metrics
-    // if this is the main SubFeed, copy count#mainInput from corresponding input metric
-    if (outputId == mainOutput.id && metrics.isDefinedAt(mainInputCountKey)) {
-      enrichedMetrics = enrichedMetrics + ("count#mainInput" -> metrics(mainInputCountKey))
+  def getInputAggMetrics(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): Map[String, Any] = {
+    val exprNameRegex = "([^#]+)#([^#]+)".r.anchored
+    val allInputAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.All).flatMap(_.getInputAggExpressionColumns(id))
+      .map( expr => expr.getName match {
+        case Some(exprNameRegex(name, dataObjectId)) => (DataObjectId(dataObjectId), expr.as(name))
+        case Some(name) => (prioritizedMainInputCandidates.head.id, expr)
+        case None => throw new IllegalStateException(s"($id) name of aggregate expression unknown: $expr")
+      })
+      .groupBy(_._1).mapValues(_.map(_._2))
+    allInputAggExpressionColumns.flatMap { case (dataObjectId, aggExpressions) =>
+      val dataObject = inputMap(dataObjectId) match {
+        case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame => evDataObject
+        case _ => throw new IllegalStateException(s"($id) Cannot calculate input metric on $dataObjectId not supporting ExpectationValidation")
+      }
+      dataObject.extractMetrics(dataObject.getDataFrame(Seq(),subFeed.tpe), aggExpressions, ExpectationScope.All)
+        .map{ case (k,v) => (k+"#"+dataObjectId.id, v)}
     }
-    // calculate pctTransfer on mainOutput, if count on output and mainInput is available.
-    // TODO: define as expectation on the action
-    if (outputId == mainOutput.id && metrics.isDefinedAt("count") && metrics.isDefinedAt(mainInputCountKey)) {
-      // transferPct is rounded off to 4 digits to show better if something is missing.
-      enrichedMetrics = enrichedMetrics + ("pctTransfer" -> Math.floor(metrics("count").asInstanceOf[Long].toDouble / metrics(mainInputCountKey).asInstanceOf[Long] * 10000) / 10000)
-    }
-    enrichedMetrics
+  }
+
+  def enrichMainInputMetrics(metrics: Map[String, _]): Map[String, _] = {
+    val mainInputIdSuffix = s"#${prioritizedMainInputCandidates.head.id.id}"
+    // copy all metrics with name `<metric>#<dataObjectId>` as `<metric>#mainInput`
+    metrics ++ metrics.filterKeys(_.endsWith(mainInputIdSuffix)).map{case (k,v) => (k.stripSuffix(mainInputIdSuffix)+"#mainInput" -> v)}
   }
 
   /**

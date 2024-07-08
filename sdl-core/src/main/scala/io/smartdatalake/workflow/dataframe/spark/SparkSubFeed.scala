@@ -189,6 +189,19 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def countDistinct(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    val innerColumns = columns.map(_.asInstanceOf[SparkColumn].inner)
+    SparkColumn(functions.count_distinct(functions.struct(innerColumns:_*)))
+  }
+  override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn =>
+        if (rsd.isDefined) SparkColumn(functions.approx_count_distinct(sparkColumn.inner, rsd.get))
+        else SparkColumn(functions.approx_count_distinct(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def size(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.size(sparkColumn.inner))

@@ -29,7 +29,7 @@ import scala.reflect.runtime.universe
  * This is the generic counterpart for Spark package org.apache.spark.sql.functions
  */
 trait DataFrameFunctions {
-  protected def subFeedType: universe.Type
+  private[smartdatalake] def subFeedType: universe.Type
 
   def col(colName: String): GenericColumn
   def lit(value: Any): GenericColumn
@@ -46,6 +46,8 @@ trait DataFrameFunctions {
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
+  def countDistinct(columns: GenericColumn*): GenericColumn
+  def approxCountDistinct(columns: GenericColumn, rsd: Option[Double] = None): GenericColumn
   def coalesce(columns: GenericColumn*): GenericColumn
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn
   def stringType: GenericDataType

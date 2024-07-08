@@ -28,6 +28,7 @@ import io.smartdatalake.util.spark.{DataFrameUtil, SDLSparkExtension}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.expressions.{Alias, NamedExpression}
 import org.apache.spark.sql.execution.ExplainMode
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, expr, row_number}
@@ -38,6 +39,7 @@ import org.json4s.JsonAST.JValue
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
+import scala.util.Try
 
 case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
@@ -253,6 +255,10 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def exprSql: String = inner.expr.sql
   override def desc: GenericColumn = SparkColumn(inner.desc)
   override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
+  override def getName: Option[String] = inner.expr match {
+    case c: NamedExpression => Some(c.name)
+    case _ => None
+  }
 }
 
 case class SparkField(inner: StructField) extends GenericField {

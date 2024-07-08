@@ -303,6 +303,7 @@ trait GenericColumn extends GenericTypedObject {
   def exprSql: String
   def desc: GenericColumn
   def apply(extraction: Any): GenericColumn
+  def getName: Option[String]
 }
 
 /**
