@@ -72,7 +72,7 @@ case class UniqueKeyExpectation(
   override def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Seq[GenericColumn] = {
     val colsToCheck = (if (key.isEmpty) getPrimaryKeyCols(dataObjectId) else key).map(functions.col)
     Seq(
-      if (scope == ExpectationScope.Job && functions.subFeedType == typeOf[SparkSubFeed]) Some(functions.approxCountDistinct(functions.struct(colsToCheck:_*), Some(0.005)).as(countDistinctName))
+      if (scope == ExpectationScope.Job && functions.getSubFeedType == typeOf[SparkSubFeed]) Some(functions.approxCountDistinct(functions.struct(colsToCheck:_*), Some(0.005)).as(countDistinctName))
       else Some(functions.countDistinct(colsToCheck:_*).as(countDistinctName)),
       if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
     ).flatten
