@@ -29,7 +29,8 @@ import scala.reflect.runtime.universe
  * This is the generic counterpart for Spark package org.apache.spark.sql.functions
  */
 trait DataFrameFunctions {
-  private[smartdatalake] def subFeedType: universe.Type
+  protected def subFeedType: universe.Type
+  def getSubFeedType: universe.Type = subFeedType
 
   def col(colName: String): GenericColumn
   def lit(value: Any): GenericColumn
