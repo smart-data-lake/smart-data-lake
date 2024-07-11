@@ -371,7 +371,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         case Some(name) => (prioritizedMainInputCandidates.head.id, expr)
         case None => throw new IllegalStateException(s"($id) name of aggregate expression unknown: $expr")
       })
-      .groupBy(_._1).mapValues(_.map(_._2))
+      .groupBy(_._1).mapValues(_.map(_._2)).toMap
     allInputAggExpressionColumns.flatMap { case (dataObjectId, aggExpressions) =>
       val dataObject = inputMap(dataObjectId) match {
         case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame => evDataObject

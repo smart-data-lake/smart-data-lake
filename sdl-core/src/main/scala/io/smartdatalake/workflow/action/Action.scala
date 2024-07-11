@@ -29,13 +29,11 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
-import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.expr
 
 import java.time.LocalDateTime
-import scala.collection.Seq
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
