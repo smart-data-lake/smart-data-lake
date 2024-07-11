@@ -30,7 +30,9 @@ import scala.reflect.runtime.universe
  */
 trait DataFrameFunctions {
   protected def subFeedType: universe.Type
-  def getSubFeedType: universe.Type = subFeedType
+
+  // Attention: Don't name this method getSubFeedType, Scala will otherwise compile it as a property and StatusInfoServer will try to serialize it and get an error "Direct self-reference leading to cycle..."
+  def requestSubFeedType(): universe.Type = subFeedType
 
   def col(colName: String): GenericColumn
   def lit(value: Any): GenericColumn

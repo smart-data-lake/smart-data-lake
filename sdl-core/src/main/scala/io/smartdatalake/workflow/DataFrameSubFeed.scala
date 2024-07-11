@@ -131,7 +131,7 @@ object DataFrameSubFeed {
     assert(elements.forall(_.subFeedType =:= expectedTpe), s"Unsupported subFeedType(s) ${elements.filter(c => !(c.subFeedType =:= expectedTpe)).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method $parentMethod")
   }
 
-  private[smartdatalake] lazy val getKnownSubFeedTypes: Seq[Type] = {
+  @transient private[smartdatalake] lazy val getKnownSubFeedTypes: Seq[Type] = {
     implicit val reflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake")
     ReflectionUtil.getTraitImplClasses[DataFrameSubFeed]
       .map(ReflectionUtil.classToType)

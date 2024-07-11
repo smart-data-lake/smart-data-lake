@@ -95,7 +95,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
     metrics.getOrElse(Map())
       .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
-      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherObservationsPrefix.map(name.stripPrefix).getOrElse(name), e))}
+      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherObservationsPrefix.map(name.stripPrefix).getOrElse(name).stripSuffix(tolerantMetricsMarker), e))}
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {

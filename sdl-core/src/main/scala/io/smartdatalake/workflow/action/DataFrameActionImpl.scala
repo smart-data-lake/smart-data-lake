@@ -303,6 +303,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
             val inputSparkObservationNames = inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
             outputSparkObservation.setOtherObservationNames(inputSparkObservationNames)
+          case _ => ()
         }
         val inputObservationsToCombine = inputSubFeeds.flatMap { subFeed =>
           subFeed.observation match {

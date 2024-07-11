@@ -23,15 +23,12 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
-import io.smartdatalake.util.spark.{DataFrameUtil, SDLSparkExtension}
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.expressions.{Alias, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.execution.ExplainMode
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{col, expr, row_number}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -39,7 +36,6 @@ import org.json4s.JsonAST.JValue
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
-import scala.util.Try
 
 case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]

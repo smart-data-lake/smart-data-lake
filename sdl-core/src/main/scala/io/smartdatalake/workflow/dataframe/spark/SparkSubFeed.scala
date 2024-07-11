@@ -55,8 +55,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val metrics: Option[MetricsMap] = None
                        )
   extends DataFrameSubFeed {
-  @transient
-  override val tpe: Type = typeOf[SparkSubFeed]
+  @transient override val tpe: Type = typeOf[SparkSubFeed]
   override def breakLineage(implicit context: ActionPipelineContext): SparkSubFeed = {
     // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
@@ -150,7 +149,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
       .applyFilter
   }
   override def withMetrics(metrics: MetricsMap): SparkSubFeed = this.copy(metrics = Some(metrics))
-  def appendMetrics(metrics: MetricsMap): SparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+  override def appendMetrics(metrics: MetricsMap): SparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 
 }
 
@@ -164,7 +163,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
-  override def subFeedType: universe.Type = typeOf[SparkSubFeed]
+  @transient override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def col(colName: String): GenericColumn = {
     SparkColumn(functions.col(colName))
   }
