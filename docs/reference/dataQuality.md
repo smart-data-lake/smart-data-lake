@@ -41,7 +41,7 @@ Using the `type = SQLExpectation`, a simple aggregation SQL expression is evalua
 
 SDLB supports other expectation types, see [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html) for a list.
 
-By default, the expectation is evaluated against the currently processed dataset (scope=Job), which may consist of multiple partition values. Using the option `scope=JobPartition`, the scope can be changed to evalute against *each* partition value. The option `scope=All` would take all data in the output DataObject into account. Note that expectations with scope!=Job need reading the data from the output again after it has been written, while expectations with scope=Job can be calculated on the fly when using Spark as execution engine.
+By default, the expectation is evaluated against the currently processed dataset (scope=Job), which may consist of multiple partition values. Using `scope=Job` results in one metric for the processed dataset. Using the option `scope=JobPartition`, the scope can be changed to evalute against *each* partition value in the dataset processed by the job. This results in one metric per processed partition. The option `scope=All` would take all data in the output DataObject into account, and create one metric for it. Note that expectations with scope!=Job need reading the data from the output again after it has been written, while expectations with scope=Job can be calculated on the fly when using Spark as execution engine.
 
 
 ```
