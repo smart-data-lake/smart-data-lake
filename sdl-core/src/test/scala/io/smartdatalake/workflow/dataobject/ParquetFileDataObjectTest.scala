@@ -102,13 +102,13 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin, fileExtension = ".parquet"))
 
   def createDataObject(path: String, schemaOpt: Option[StructType]): ParquetFileDataObject = {
-    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt.map(SparkSchema))
+    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt.map(SparkSchema.apply))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   def createDataObjectWithSchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): ParquetFileDataObject = {
-    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
+    val dataObj = ParquetFileDataObject(id = "schemaTestParquetDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply))
     instanceRegistry.register(dataObj)
     dataObj
   }

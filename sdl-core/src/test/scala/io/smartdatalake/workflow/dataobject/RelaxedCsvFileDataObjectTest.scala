@@ -60,7 +60,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
     df3.write.mode(SaveMode.Append).option("header", true).csv(tempDir.toFile.getPath)
 
     val schema = Some(df1.schema.add("_filename", StringType).add("_corrupt_record", StringType).add("_corrupt_record_msg", StringType))
-    val dataObj = RelaxedCsvFileDataObject( id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema), filenameColumn = Some("_filename")
+    val dataObj = RelaxedCsvFileDataObject( id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), filenameColumn = Some("_filename")
                                           , treatMissingColumnsAsCorrupt = true, treatSuperfluousColumnsAsCorrupt = true)
 
     val dfResult = dataObj.getSparkDataFrame().cache
@@ -105,7 +105,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
     df2.write.mode(SaveMode.Append).option("header", true).csv(tempDir.toFile.getPath)
 
     val schema = Some(df1.schema.add("_filename", StringType))
-    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema), filenameColumn = Some("_filename"))
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), filenameColumn = Some("_filename"))
 
     val dfResult = dataObj.getSparkDataFrame().cache
 
@@ -196,7 +196,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
 
     val options = Map("mode" -> "permissive")
     val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string, _corrupt_record string"))
-    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema), csvOptions = options)
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
     val dfResult = dataObj.getSparkDataFrame().cache
 
     assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3", "_corrupt_record"))
@@ -215,7 +215,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
 
     val options = Map("mode" -> "failfast")
     val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string"))
-    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema), csvOptions = options)
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
     intercept[SparkException](dataObj.getSparkDataFrame().count)
   }
 
@@ -229,7 +229,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
 
     val options = Map("mode" -> "dropmalformed")
     val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string"))
-    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema), csvOptions = options)
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
     val dfResult = dataObj.getSparkDataFrame()
 
     assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))

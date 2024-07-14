@@ -65,6 +65,10 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
   val tgt2DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
   instanceRegistry.register(tgt2DO)
 
+  val tgt3Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname", "firstname")))
+  val tgt3DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+  instanceRegistry.register(tgt3DO)
+
   val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath + s"/fileTestSrc", partitions = Seq("lastname"))
   instanceRegistry.register(fileSrcDO)
 
@@ -78,6 +82,8 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     tgt1DO.dropTable
     tgt2DO.dropTable
     tgt2DO.writeSparkDataFrame(l1.where($"rating" <= 2), Seq())
+    tgt3DO.dropTable
+    tgt3DO.writeSparkDataFrame(l1.where($"rating" <= 2).withColumnRenamed("rating", "Rating"), Seq())
     fileSrcDO.writeSparkDataFrame(l1, Seq())
   }
 
@@ -191,6 +197,20 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filter.nonEmpty)
+  }
+  test("DataFrameIncrementalMode comparison column has different case than InputDataObject Column") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "Rating")
+    executionMode.prepare(ActionId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filter.nonEmpty)
+  }
+    test("DataFrameIncrementalMode comparison column has different case than OutputDataObject Column") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
+    executionMode.prepare(ActionId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.nonEmpty)
   }
 
