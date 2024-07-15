@@ -204,17 +204,11 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getDataType(colName: String): SparkDataType = {
-    var structField: StructField = null
-    try {
-      structField = inner.apply(colName)
-    } catch {
-      case e: IllegalArgumentException =>
-        if (caseSensitive) {
-          throw e
-        } else {
-            structField = toLowerCase.inner.apply(colName.toLowerCase)
-        }
-    }
+    val structField: StructField =
+      if (caseSensitive)
+        inner.apply(colName)
+      else
+        toLowerCase.inner.apply(colName.toLowerCase)
     SparkDataType(structField.dataType)
   }
 
