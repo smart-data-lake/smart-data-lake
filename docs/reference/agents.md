@@ -59,15 +59,14 @@ These instructions take the form of a string containing all the necessary hocon 
 The instructions contain the Action's config along with all Input and Output DataObjects of the action. 
 That's all that the Agent knows, it does not get any other context when it is started.
 
-Usually, some of these DataObjects will be linked to connections that are only available on the instance where the Agent lives.
+Usually, some of these DataObjects will be linked to connections that are only available on the instance where the Agent lives, for example, a private Database Connection so that the Remote Agent can fetch Data for a DataObject.
 Connections defined in the agents section **override** connections defined in the global connections section when they are executed on the Agent.
-This allows the Agent to use some connections that are only accessible in the Agent's environment and not on the Remote Instance, for example, a private Database Connection to fetch Data for a DataObject.
 When the Agent is deployed, it gets the necessary authentication information for these agent connections on startup on the Remote Instance and then just waits for instructions.
 
 ## Agents Types
 
 - Simple, unsecured Jetty Websocket for development use
-- Azure Relay service (requires sdl-azure and an Azure subscription with a Relay that has a Hybrid Connection). The Traffic between the Agent and the Remote Instance in protected by AzureRelayService. The main instance needs to know a SharedAccessKey in order to connect to the Remote Agent via the AzureRelay.
+- Azure Relay service (requires sdl-azure and an Azure subscription with a Relay that has a Hybrid Connection). The traffic between the Agent and the Remote Instance in protected by AzureRelayService. The main instance needs to know a SharedAccessKey in order to connect to the Remote Agent via the AzureRelay.
 
 ## Limitations
 Only DataObjects that return SparkSubfeeds are currently supported.
