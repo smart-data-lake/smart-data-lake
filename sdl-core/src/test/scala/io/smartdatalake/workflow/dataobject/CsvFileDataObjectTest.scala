@@ -334,13 +334,13 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   }
 
   def createDataObject(options: Map[String, String])(path: String, schemaOpt: Option[StructType]): CsvFileDataObject = {
-    val dataObj = CsvFileDataObject(id = "schemaTestCsvDO", path = path, schema = schemaOpt.map(SparkSchema), csvOptions = options)
+    val dataObj = CsvFileDataObject(id = "schemaTestCsvDO", path = path, schema = schemaOpt.map(SparkSchema.apply), csvOptions = options)
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   def createDataObjectWithSchemaMin(options: Map[String, String])(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): CsvFileDataObject = {
-    val dataObj = CsvFileDataObject(id = "schemaTestCsvDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema), csvOptions = options)
+    val dataObj = CsvFileDataObject(id = "schemaTestCsvDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply), csvOptions = options)
     instanceRegistry.register(dataObj)
     dataObj
   }

@@ -120,7 +120,7 @@ object TestUtil extends SmartDataLakeLogger {
                      )(implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): HiveTableDataObject = {
     val table = Table(db=db,name=tableName,primaryKey=primaryKeyColumns)
     val path = dirPath+s"$tableName"
-    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin.map(SparkSchema),table=table)
+    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin.map(SparkSchema.apply),table=table)
     hTabDo.dropTable
     instanceRegistry.register(hTabDo)
     prepareHiveTable(table,path,df,partitionCols)
