@@ -71,6 +71,7 @@ const sidebars = {
       'reference/executionEngines',
       'reference/executionModes',
       'reference/transformations',
+      'reference/agents',
       //'reference/schemaEvolution',
       //'reference/housekeeping',
       'reference/streaming',
