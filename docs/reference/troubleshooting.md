@@ -17,7 +17,8 @@ The `winutils.exe` executable can not be found.
 - Extract binaries for desired hadoop version into folder (e.g. hadoop-3.2.2\bin)
 - Set HADOOP_HOME evironment variable (e.g. HADOOP_HOME=...\hadoop-3.2.2).
   Note that the binary files need to be located at %HADOOP_HOME%\bin!
-- Add %HADOOP_HOME%\bin to PATH variable.
+- Add %HADOOP_HOME%\bin to PATH variable. If you don't do this you may see an error "java.lang.UnsatisfiedLinkError: 'boolean org.apache.hadoop.io.nativeio.NativeIO$Windows.access0(java.lang.String, int)"
+  
 
 ## Windows: `/tmp/hive` is not writable 
 Error:  
@@ -36,8 +37,7 @@ Other errors are also possible:
 
 Solution:  
 Install VC++ Redistributable Package from Microsoft:  
-http://www.microsoft.com/en-us/download/details.aspx?id=5555 (x86)  
-http://www.microsoft.com/en-us/download/details.aspx?id=14632 (x64)
+https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
 
 ## Java IllegalAccessError / InaccessibleObjectException (Java 17)
 Symptom:
