@@ -84,8 +84,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * List of expectation definitions to evaluate when executing this Action, see [[Expectation]] for details.
    *
-   * Note: Expectations defined DataObjects measure data quality and are evaluated against the output only.
-   * Expectations defined on Actions measure quality of the transformation process and can measure and compare metrics between inputs and main output.
+   * Note: Expectations defined on DataObjects measure data quality and are evaluated against the output only.
+   * Expectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.
    *
    * Expectations defined at Action level are executed together with the expectations of the main output DataObject.
    */
