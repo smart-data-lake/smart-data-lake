@@ -180,7 +180,17 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
   }
 
-  test("copy load with transformation from sql code and constraint and expectation") {
+  test("copy load with transformation from sql code and constraint and expectation - Spark DataFrame observations") {
+    // if approximate=false, metrics are calculated as generic calculated metrics (because Spark does not support count_distinct as observations aggregate expression)
+    testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint = false)
+  }
+
+  test("copy load with transformation from sql code and constraint and expectation - Generic DataFrame observations") {
+    // if approximateUniqueConstraint=true, metrics are calculated as Spark DataFRame observations
+    testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint = true)
+  }
+
+  def testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint: Boolean): Unit = {
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
@@ -195,7 +205,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
         CountExpectation(name = "countAll", expectation = Some(">= 1"), scope = ExpectationScope.All),
         SQLQueryExpectation(name = "countOfPartitionsWith1Record", code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)", scope = ExpectationScope.All),
         SQLExpectation("resultNull", Some("dont fail if result is null"), "null", Some("> 1")),
-        UniqueKeyExpectation("primaryKey")
+        UniqueKeyExpectation("primaryKey", approximate=approximateUniqueConstraint)
       )
     )
     tgtDO.dropTable
@@ -234,23 +244,39 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val metrics2 = tgtSubFeed2.metrics.get
     assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 2, "countAll#src1" -> 1, "countAll#mainInput" -> 1, "pctComplete" -> 2.0, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None, "primaryKey" -> 1.0, "countDistinctPrimaryKey" -> 1))
 
-    // fail constraint evaluation
+    // fail tgt constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
       constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null")),
     )
     instanceRegistry.register(tgtDOConstraintFail)
-    val actionConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
-    val ex1 = intercept[TaskFailedException](actionConstraintFail.exec(Seq(srcSubFeed))(contextExec))
+    val actionTgtConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
+    val ex1 = intercept[TaskFailedException](actionTgtConstraintFail.exec(Seq(srcSubFeed))(contextExec))
     assert(getRootCause(ex1).isInstanceOf[RuntimeException])
-     
-    // fail expectation evaluation
+
+    // fail src constraint evaluation (validate on read)
+    val srcDOConstraintFail = MockDataObject("src1constraintFail",
+      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null"))).register
+    srcDOConstraintFail.writeSparkDataFrame(l1, Seq())
+    val actionSrcConstraintFail = CopyAction("ca", srcDOConstraintFail.id, tgtDO.id)
+    val ex2 = intercept[TaskFailedException](actionSrcConstraintFail.exec(Seq(SparkSubFeed(None, srcDOConstraintFail.id, Seq())))(contextExec))
+    assert(getRootCause(ex2).isInstanceOf[RuntimeException])
+
+    // fail tgt expectation evaluation
     val tgtDOExpectationFail = HiveTableDataObject( "tgt1expectationFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
       expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
     )
     instanceRegistry.register(tgtDOExpectationFail)
     val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)
-    val ex2 = intercept[TaskFailedException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
-    assert(getRootCause(ex2).isInstanceOf[ExpectationValidationException])
+    val ex3 = intercept[TaskFailedException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
+    assert(getRootCause(ex3).isInstanceOf[ExpectationValidationException])
+
+    // fail src expectation evaluation
+    val srcDOExpectationFail = MockDataObject("src1expectationFail",
+      expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))).register
+    srcDOExpectationFail.writeSparkDataFrame(l1, Seq())
+    val actionSrcExpectationFail = CopyAction("ca", srcDOExpectationFail.id, tgtDO.id)
+    val ex4 = intercept[TaskFailedException](actionSrcExpectationFail.exec(Seq(SparkSubFeed(None, srcDOExpectationFail.id, Seq())))(contextExec))
+    assert(getRootCause(ex4).isInstanceOf[ExpectationValidationException])
   }
 
   // TODO: test UniqueKeyExpectation fail with scope=Job / All!

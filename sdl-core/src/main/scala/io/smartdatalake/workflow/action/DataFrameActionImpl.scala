@@ -31,8 +31,8 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
-import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkObservation, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation, ExpectationScope}
 import org.apache.spark.sql.SparkSession
@@ -265,16 +265,19 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     if (Environment.enableInputDataObjectCount) {
       input match {
         case evDataObject: ExpectationValidation => preparedSubFeed.dataFrame.foreach { df =>
-          // collect additional aggregate expressions for this DataObject from Action expectations with scope Job
-          val inputJobAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.Job).flatMap(_.getInputAggExpressionColumns(id))
-          val specificInputJobAggExpressionColumns = inputJobAggExpressionColumns.filter(c => c.getName.exists(n => n.endsWith(s"#${input.id.id}"))).map(c => c.as(c.getName.get.stripSuffix(s"#${input.id.id}")))
+          // collect additional aggregate expressions for Action with scope Job
+          val inputJobExpectations = expectations.filter(_.scope == ExpectationScope.Job)
+          val inputJobAggExpressionColumns = inputJobExpectations.flatMap(_.getInputAggExpressionColumns(id))
+          val forceGenericObservation = inputJobExpectations.exists(!_.calculateAsJobDataFrameObservation)
           val mainInputJobAggExpressionColumns = inputJobAggExpressionColumns.filter(c => c.getName.exists(n => !n.contains("#") && input.id == prioritizedMainInputCandidates.head.id))
-          val additionalJobAggExpressionColumns = specificInputJobAggExpressionColumns ++ mainInputJobAggExpressionColumns
+          val specificInputJobAggExpressionColumns = inputJobAggExpressionColumns.filter(c => c.getName.exists(n => n.endsWith(s"#${input.id.id}"))).map(c => c.as(c.getName.get.stripSuffix(s"#${input.id.id}")))
           // validate constraints and expectations on read if this is DataObject is not written by a DataFrame-Action, otherwise just add default expectations, e.g. count
           val validateOnRead = context.instanceRegistry.shouldValidateDataObjectOnRead(subFeed.dataObjectId)
           // setup observation
-          val (dfExpectations, observation) = evDataObject.setupConstraintsAndJobExpectations(df, defaultExpectationsOnly = !validateOnRead, predicateTolerant = true, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns)
-          preparedSubFeed = preparedSubFeed.withDataFrame(Some(dfExpectations)).withObservation(Some(observation))
+          val (dfExpectations, observations) = evDataObject.setupConstraintsAndJobExpectations(df, defaultExpectationsOnly = !validateOnRead, pushDownTolerant = true,
+            additionalJobAggExpressionColumns = specificInputJobAggExpressionColumns ++ mainInputJobAggExpressionColumns, forceGenericObservation
+          )
+          preparedSubFeed = preparedSubFeed.withDataFrame(Some(dfExpectations)).withObservation(Some(CombinedObservation.create(observations)))
         }
         case _ => ()
       }
@@ -294,16 +297,17 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     output match {
       case evDataObject: DataObject with ExpectationValidation =>
         // collect additional aggregate expressions for Action expectations with scope Job
-        val additionalJobAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.Job).flatMap(_.getAggExpressionColumns(evDataObject.id))
+        val additionalJobExpectations = expectations.filter(_.scope == ExpectationScope.Job)
+        val additionalJobAggExpressionColumns = additionalJobExpectations.flatMap(_.getAggExpressionColumns(evDataObject.id))
+        val forceGenericObservation = additionalJobExpectations.exists(!_.calculateAsJobDataFrameObservation)
         // setup output observation
-        val (dfExpectations, outputObservation) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns)
-        // setup extracting Spark observations metrics on input DataFrames together with output observation
-        outputObservation match {
-          case outputSparkObservation: SparkObservation =>
-            inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
-            val inputSparkObservationNames = inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
-            outputSparkObservation.setOtherObservationNames(inputSparkObservationNames)
-          case _ => ()
+        val (dfExpectations, outputObservations) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns, forceGenericObservation = forceGenericObservation)
+        // setup extracting Spark observations metrics on input DataFrames and custom observation metrics together with output observation
+        outputObservations.collect{case x: SparkObservation => x}.foreach { outputSparkObservation =>
+          inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
+          val inputSparkObservationNames = inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
+          outputSparkObservation.setOtherObservationNames(inputSparkObservationNames)
+          outputSparkObservation.setOtherObservationsPrefix(id.id+"#")
         }
         // Combine non-Spark observations on input DataFrames with output observation into one combined observation, which is then assigned to corresponding property of the SubFeed.
         // Combining input observations with output observation is needed because a SubFeed can only carry one observation.
@@ -314,7 +318,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             case None => None
           }
         }
-        val combinedObservation = CombinedObservation(inputObservationsToCombine :+ outputObservation)
+        val combinedObservation = CombinedObservation.create(inputObservationsToCombine ++ outputObservations)
         // add updated dataframe and observation to SubFeed
         subFeed
           .withDataFrame(Some(dfExpectations))
@@ -335,15 +339,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     outputSubFeed = output match {
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         // get metrics with scope Job from observations
-        val scopeJobExpectationMetrics = subFeed.observation.map { observation =>
-          observation match {
-            case sparkObservation: SparkObservation => sparkObservation.setOtherObservationsPrefix(id.id+"#")
-            case _ => ()
-          }
-          observation.waitFor()
-        }.getOrElse(Map())
-        // get input metrics with scope All
-        val inputMetrics = if (isMainOutput) getInputAggMetrics(subFeed) else Map()
+        val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
+        // get input metrics with scope All (scope=Job is calculated with preprocessInputSubFeedCustomized, scope=JobPartition is not supported on input)
+        val inputMetrics = if (isMainOutput) calculateInputAggMetricsWithScopeAll(subFeed) else Map()
         // if this is mainOutput, enrich main input metrics
         val enrichmentFunc: Map[String,_] => Map[String,_] = if (isMainOutput) enrichMainInputMetrics else identity
         // evaluate and validate expectations
@@ -365,21 +363,21 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     outputSubFeed
   }
 
-  def getInputAggMetrics(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): Map[String, Any] = {
+  def calculateInputAggMetricsWithScopeAll(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): Map[String, Any] = {
     val exprNameRegex = "([^#]+)#([^#]+)".r.anchored
-    val allInputAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.All).flatMap(_.getInputAggExpressionColumns(id))
+    val inputAggExpressionColumns = expectations.filter(_.scope == ExpectationScope.All).flatMap(_.getInputAggExpressionColumns(id))
       .map( expr => expr.getName match {
         case Some(exprNameRegex(name, dataObjectId)) => (DataObjectId(dataObjectId), expr.as(name))
         case Some(name) => (prioritizedMainInputCandidates.head.id, expr)
         case None => throw new IllegalStateException(s"($id) name of aggregate expression unknown: $expr")
       })
       .groupBy(_._1).mapValues(_.map(_._2)).toMap
-    allInputAggExpressionColumns.flatMap { case (dataObjectId, aggExpressions) =>
+    inputAggExpressionColumns.flatMap { case (dataObjectId, aggExpressions) =>
       val dataObject = inputMap(dataObjectId) match {
         case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame => evDataObject
         case _ => throw new IllegalStateException(s"($id) Cannot calculate input metric on $dataObjectId not supporting ExpectationValidation")
       }
-      dataObject.extractMetrics(dataObject.getDataFrame(Seq(),subFeed.tpe), aggExpressions, ExpectationScope.All)
+      dataObject.calculateMetrics(dataObject.getDataFrame(Seq(),subFeed.tpe), aggExpressions, ExpectationScope.All)
         .map{ case (k,v) => (k+"#"+dataObjectId.id, v)}
     }
   }

@@ -19,21 +19,19 @@
 
 package io.smartdatalake.workflow.dataobject.expectation
 
-import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.SparkExpressionUtil
-import io.smartdatalake.workflow.action.ActionHelper
-import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.ExpectationValidation
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.Column
+
+import scala.reflect.{ClassTag, classTag}
 
 /**
  * Trait to define expectations against a dataset.
@@ -79,11 +77,19 @@ trait BaseExpectation {
    */
   def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_])
 
+  /**
+   * Control if metrics are calculated as DataFrame observation for Spark.
+   * This can only be done for scope=Job, but implementations might be more restrictive.
+   */
+  def calculateAsJobDataFrameObservation: Boolean = scope == Job
+
   // helpers
-  protected def getMetric[T](dataObjectId: DataObjectId, metrics: Map[String,Any], key: String): T = {
-    metrics.getOrElse(key, throw new IllegalStateException(s"($dataObjectId) Metric '$key' for expectation ${name} not found for validation")) match {
+  protected def getMetric[T: ClassTag](dataObjectId: DataObjectId, metrics: Map[String,Any], key: String): T = {
+    val cls = classTag[T].runtimeClass
+    metrics.getOrElse(key, throw new IllegalStateException(s"($dataObjectId) Metric '$key' for expectation '${name}' not found for validation")) match {
       case Some(x: T) => x
       case x: T => x
+      case x => throw new IllegalStateException(s"($dataObjectId) Metric '$key' for expectation ${name} is '$x' instead of type ${cls.getSimpleName}")
     }
   }
 }

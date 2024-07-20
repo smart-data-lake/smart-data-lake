@@ -49,6 +49,7 @@ private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFr
     if (metricsRow.isDefined) {
       // convert results to metrics map
       dfObservations.schema.columns.zip(metricsRow.get.toSeq).toMap
+        .mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
     } else Map()
   }
 }
@@ -68,6 +69,13 @@ private[smartdatalake] case class PrefixedObservation(observation: DataFrameObse
 private[smartdatalake] case class CombinedObservation(observations: Seq[DataFrameObservation]) extends DataFrameObservation {
   override def waitFor(timeoutSec: Int): Map[String, _] = observations.foldLeft(Map[String,Any]()){
     case (agg, observation) => agg ++ observation.waitFor(timeoutSec)
+  }
+}
+object CombinedObservation {
+  def create(observations: Seq[DataFrameObservation]): DataFrameObservation = {
+    assert(observations.nonEmpty)
+    if (observations.size == 1) observations.head
+    else CombinedObservation(observations)
   }
 }
 

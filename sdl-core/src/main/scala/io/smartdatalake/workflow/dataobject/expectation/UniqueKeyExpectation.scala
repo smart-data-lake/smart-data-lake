@@ -24,13 +24,11 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
 import io.smartdatalake.workflow.dataobject.{DataObject, TableDataObject}
-
-import scala.reflect.runtime.universe.typeOf
 
 
 /**
@@ -38,19 +36,24 @@ import scala.reflect.runtime.universe.typeOf
  * Uniqueness is calculated as the fraction of output count distinct on key columns over output count.
  * It supports scope Job and All, but not JobPartition.
  *
- * Note that for scope=Job with Spark the approx_count_distinct function is used, as count_distinct is not allowed to be calculated within observations.
- * In this case the relative standard deviation of approx_count_distinct is set to a high precision.
- *
- * @param key Optional list of key columns to evaluate uniqueness
+ * @param key Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present.
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
  *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
  * @param precision Number of digits to keep when calculating fraction. Default is 4.
+ * @param approximate If approximate count distinct function should be used for counting distinct
+ *                    Note that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,
+ *                    but approx_count_distinct can be calculated as DataFrame observation.
+ *                    On the other hand primary key validation is normally expected to be exact and not approximated.
+ * @param approximateRsd Optional Relative Standard Deviation for approximate count distinct.
+ *                       Note that not all calculation engines support configuring Rsd with approximate count distinct function.
  */
 case class UniqueKeyExpectation(
                                  override val name: String, key: Seq[String] = Seq(),
                                  override val expectation: Option[String] = Some("= 1"),
                                  override val precision: Short = 4,
+                                 approximate: Boolean = false,
+                                 approximateRsd: Option[Double] = None,
                                  override val scope: ExpectationScope = Job,
                                  override val failedSeverity: ExpectationSeverity = ExpectationSeverity.Error )
   extends Expectation with ExpectationFractionMetricDefaultImpl {
@@ -71,11 +74,11 @@ case class UniqueKeyExpectation(
   }
   override def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Seq[GenericColumn] = {
     val colsToCheck = (if (key.isEmpty) getPrimaryKeyCols(dataObjectId) else key).map(functions.col)
-    Seq(
-      if (scope == ExpectationScope.Job && functions.requestSubFeedType() == typeOf[SparkSubFeed]) Some(functions.approxCountDistinct(functions.struct(colsToCheck:_*), Some(0.005)).as(countDistinctName))
-      else Some(functions.countDistinct(colsToCheck:_*).as(countDistinctName)),
-      if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
-    ).flatten
+    // if (scope == ExpectationScope.Job && functions.requestSubFeedType() == typeOf[SparkSubFeed])
+    val countDistinctCol = if (approximate) functions.approxCountDistinct(functions.struct(colsToCheck:_*), approximateRsd).as(countDistinctName)
+    else functions.countDistinct(colsToCheck:_*).as(countDistinctName)
+    val countCol = if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
+    Seq(Some(countDistinctCol), countCol).flatten
   }
   def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
     val countDistinct = getMetric[Long](dataObjectId,metrics,countDistinctName)
@@ -83,6 +86,10 @@ case class UniqueKeyExpectation(
     val (col, pct) = getValidationErrorColumn(dataObjectId, countDistinct, count)
     val updatedMetrics = metrics + (name -> pct)
     (col.map(SparkColumn).toSeq, updatedMetrics)
+  }
+  override def calculateAsJobDataFrameObservation: Boolean = {
+    // only calculate metrics as DataFrame observation for approximate_count_distinct function, as count_distinct is not supported as aggregate function for Spark observations.
+    super.calculateAsJobDataFrameObservation && approximate
   }
   override def factory: FromConfigFactory[Expectation] = UniqueKeyExpectation
 }
