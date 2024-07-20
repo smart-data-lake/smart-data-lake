@@ -19,13 +19,13 @@
 
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.{CollectMetrics, Filter, LogicalPlan, UnaryNode}
 import org.apache.spark.sql.catalyst.rules.Rule
 
 /**
- * Pushes Filter operators through CollectMetrics operator if it's name is marked with suffix "!tolerant".
+ * Pushes Filter operators through CollectMetrics operator if it's name is marked with suffix "!pushDownTolerant".
  * This is needed to count records read from input DataObjects correctly.
  */
 private[smartdatalake] case class PushPredicateThroughTolerantCollectMetricsRule(spark: SparkSession) extends Rule[LogicalPlan] {
@@ -34,7 +34,7 @@ private[smartdatalake] case class PushPredicateThroughTolerantCollectMetricsRule
   val applyLocally: PartialFunction[LogicalPlan, LogicalPlan] = {
     case filter @ Filter(_, u: UnaryNode) =>
       u match {
-        case m: CollectMetrics if m.name.endsWith(tolerantMetricsMarker) =>
+        case m: CollectMetrics if m.name.endsWith(pushDownTolerantMetricsMarker) =>
           u.withNewChildren(Seq(Filter(filter.condition, u.child)))
         case _ => filter
       }
@@ -42,5 +42,5 @@ private[smartdatalake] case class PushPredicateThroughTolerantCollectMetricsRule
 }
 
 object PushPredicateThroughTolerantCollectMetricsRuleObject {
-  val tolerantMetricsMarker = "!tolerant"
+  val pushDownTolerantMetricsMarker = "!pushDownTolerant"
 }

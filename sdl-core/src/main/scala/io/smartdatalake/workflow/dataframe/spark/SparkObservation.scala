@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import io.smartdatalake.workflow.dataframe.DataFrameObservation
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.QueryExecution
@@ -95,7 +95,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
     metrics.getOrElse(Map())
       .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
-      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherObservationsPrefix.map(name.stripPrefix).getOrElse(name).stripSuffix(tolerantMetricsMarker), e))}
+      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherObservationsPrefix.map(name.stripPrefix).getOrElse(name).stripSuffix(pushDownTolerantMetricsMarker), e))}
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {

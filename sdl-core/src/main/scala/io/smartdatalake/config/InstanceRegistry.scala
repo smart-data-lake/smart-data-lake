@@ -19,9 +19,9 @@
 package io.smartdatalake.config
 
 import io.smartdatalake.config.SdlConfigObject.{ConfigObjectId, DataObjectId}
-import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, ExpectationValidation}
 
 import scala.collection.mutable
 
@@ -40,7 +40,7 @@ class InstanceRegistry {
    */
   def register[A <: ConfigObjectId, B <: SdlConfigObject](instancesToAdd: Map[A, B]): Unit = {
     instances ++= instancesToAdd
-    _inputOnlyDataObjectIds = None // reset precomputed value
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
   }
 
   /**
@@ -56,7 +56,7 @@ class InstanceRegistry {
    * @param instance the instance to register
    */
   def register(instance: SdlConfigObject): Unit = {
-    _inputOnlyDataObjectIds = None // reset precomputed value
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
     instances(instance.id) = instance
   }
 
@@ -76,7 +76,7 @@ class InstanceRegistry {
    *          or `None` if no instance was registered with this id.
    */
   def remove(objectId: ConfigObjectId): Option[SdlConfigObject] = {
-    _inputOnlyDataObjectIds = None // reset precomputed value
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
     instances.remove(objectId)
   }
 
@@ -87,7 +87,7 @@ class InstanceRegistry {
    * Registered instances can not be garbage collected by the JVM.
    */
   def clear(): Unit = {
-    _inputOnlyDataObjectIds = None // reset precomputed value
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
     instances.clear()
   }
 
@@ -107,20 +107,24 @@ class InstanceRegistry {
   def getConnections: Seq[Connection] = instances.values.collect{ case c: Connection => c}.toSeq
 
   /**
-   * Returns Ids of DataObjects that are used as input only, e.g. there is no Action having these DataObjects as output.
+   * Returns Ids of DataObjects for which expectations and constraints should be validated on read, e.g. there is no DataFrame-Action having these DataObjects as output.
    * Value is precomputed to avoid evaluation for every Action.
    */
-  def getInputOnlyDataObjectIds: Seq[DataObjectId] = {
-    //TODO should we only consider DataObjects with ExpectationValidation?
-    if (_inputOnlyDataObjectIds.isEmpty) {
-      _inputOnlyDataObjectIds = Some(getDataObjects.map(_.id).diff(getActions.flatMap(_.outputs.map(_.id))))
+  def getDataObjectIdsToValdiateOnRead: Seq[DataObjectId] = {
+    if (_dataObjectIdsToValidateOnRead.isEmpty) {
+      // only DataObjects that can Create/Write DataFrames with ExpectationValidation are relevant
+      val expectationValidationDataObjects = getDataObjects.collect{case x: CanCreateDataFrame with CanWriteDataFrame with ExpectationValidation => x}
+      // get DataObjects that are written by an Action using DataFrames
+      val dataFrameActions = getActions.collect{case x: DataFrameActionImpl => x}.flatMap(_.outputs)
+      // all DataObjects which are not used as an output should be validated on read
+      _dataObjectIdsToValidateOnRead = Some(expectationValidationDataObjects.map(_.id).diff(dataFrameActions.map(_.id)))
     }
-    _inputOnlyDataObjectIds.get
+    _dataObjectIdsToValidateOnRead.get
   }
-  private var _inputOnlyDataObjectIds: Option[Seq[DataObjectId]] = None
+  private var _dataObjectIdsToValidateOnRead: Option[Seq[DataObjectId]] = None
 
   /**
-   * Check if this is an input only DataObject
+   * Check if this is DataObject should be validated on read
    */
-  def isInputOnlyDataObject(id: DataObjectId) = getInputOnlyDataObjectIds.contains(id)
+  def shouldValidateDataObjectOnRead(id: DataObjectId): Boolean = getDataObjectIdsToValdiateOnRead.contains(id)
 }

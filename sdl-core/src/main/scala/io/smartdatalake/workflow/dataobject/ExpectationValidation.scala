@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.tolerantMetricsMarker
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
@@ -33,7 +33,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import java.util.UUID
 
 /**
- * A trait that allows for optional constraint validation and expectation evaluation on write when implemented by a [[DataObject]].
+ * A trait that allows for optional constraint validation and expectation evaluation and validation on write when implemented by a [[DataObject]].
+ *
+ * An expectation validation means that the evaluated metric value is compared against a condition set the the user as `expectation` attribute. This could be for instance {{{<value> <= 20}}}
  */
 private[smartdatalake] trait ExpectationValidation { this: DataObject with SmartDataLakeLogger =>
 
@@ -59,6 +61,13 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
    */
   def expectations: Seq[Expectation]
 
+  /**
+   * Add constraints validation and metrics collection for Expectations with scope=Job to DataFrame.
+   * @param defaultExpectationsOnly if true only default exepctations, e.g. count, is added to the DataFrame, and no constraints are validated.
+   *                                Set defaultExpectationsOnly=true for input DataObjects which are also written by SDLB, as constraints and expectations are then validated on write.
+   * @param predicateTolerant
+   * @param additionalJobAggExpressionColumns
+   */
   def setupConstraintsAndJobExpectations(df: GenericDataFrame, defaultExpectationsOnly: Boolean = false, predicateTolerant: Boolean = false, additionalJobAggExpressionColumns: Seq[GenericColumn] = Seq())(implicit context: ActionPipelineContext): (GenericDataFrame, DataFrameObservation) = {
     // add constraint validation column
     val dfConstraints = if (defaultExpectationsOnly) df else setupConstraintsValidation(df)
@@ -183,7 +192,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
 
   protected def forceGenericObservation = false // can be overridden by subclass
   private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean, predicateTolerant: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
-    val observationName = this.id.id + "#" + UUID.randomUUID() + (if (predicateTolerant) tolerantMetricsMarker else "")
+    val observationName = this.id.id + "#" + UUID.randomUUID() + (if (predicateTolerant) pushDownTolerantMetricsMarker else "")
     val (dfObserved, observation) = df.setupObservation(observationName, expectationColumns, isExecPhase, forceGenericObservation)
     (dfObserved, observation)
   }
