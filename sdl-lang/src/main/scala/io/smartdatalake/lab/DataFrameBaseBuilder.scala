@@ -71,7 +71,14 @@ abstract class DataFrameBaseBuilder[R] {
    * @param colName column name to filter on.
    * @param literal a literal to be used in equals condition on column.
    */
-  def withFilterEquals(colName: String, literal: AnyRef): R = setFilters(filters + (colName -> (col(colName) === lit(literal))))
+  def withFilterEquals(colName: String, literal: Any): R = {
+    val literalExpr = literal match {
+      case x: String => lit(x)
+      case x: AnyRef => throw new IllegalArgumentException("Only AnyVal (Int, Long, ... ) and String supported as parameter of withFilterEquals method")
+      case x => lit(x) // if type is not AnyRef, it is AnyVal; but Scala can not match against AnyVal...
+    }
+    setFilters(filters + (colName -> (col(colName) === literalExpr)))
+  }
 
   /**
    * Get DataFrames using selected options.
