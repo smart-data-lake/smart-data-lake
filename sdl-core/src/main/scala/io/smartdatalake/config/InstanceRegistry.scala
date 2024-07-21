@@ -110,7 +110,7 @@ class InstanceRegistry {
    * Returns Ids of DataObjects for which expectations and constraints should be validated on read, e.g. there is no DataFrame-Action having these DataObjects as output.
    * Value is precomputed to avoid evaluation for every Action.
    */
-  def getDataObjectIdsToValdiateOnRead: Seq[DataObjectId] = {
+  def getDataObjectIdsToValidateOnRead: Seq[DataObjectId] = {
     if (_dataObjectIdsToValidateOnRead.isEmpty) {
       // only DataObjects that can Create/Write DataFrames with ExpectationValidation are relevant
       val expectationValidationDataObjects = getDataObjects.collect{case x: CanCreateDataFrame with CanWriteDataFrame with ExpectationValidation => x}
@@ -126,5 +126,5 @@ class InstanceRegistry {
   /**
    * Check if this is DataObject should be validated on read
    */
-  def shouldValidateDataObjectOnRead(id: DataObjectId): Boolean = getDataObjectIdsToValdiateOnRead.contains(id)
+  def shouldValidateDataObjectOnRead(id: DataObjectId): Boolean = getDataObjectIdsToValidateOnRead.contains(id)
 }

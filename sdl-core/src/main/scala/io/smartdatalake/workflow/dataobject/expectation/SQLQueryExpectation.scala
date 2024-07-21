@@ -50,17 +50,17 @@ case class SQLQueryExpectation(override val name: String, override val descripti
     // SQLQueryExpectation implements getCustomMetrics and does not need getAggExpressionColumns
     Seq()
   }
-  override def getCustomMetrics(dataObjectId: DataObjectId, df: GenericDataFrame)(implicit context: ActionPipelineContext): Map[String, _] = {
-    val function = DataFrameSubFeed.getFunctions(df.subFeedType)
+  override def getCustomMetrics(dataObjectId: DataObjectId, df: Option[GenericDataFrame])(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Map[String, _] = {
+    if (df.isEmpty) throw ConfigurationException(s"($dataObjectId) Can not calculate custom metrics for Expectations with scope=JobPartition/Job on read")
     val inputName = dataObjectId.id
     val inputViewName = ActionHelper.createTemporaryViewName(inputName)
     val inputViewNameOptions = Map(INPUT_VIEW_NAME -> inputViewName, s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
     val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some(s"expectations.$name.code"), code, inputViewNameOptions)
     try {
-      df.createOrReplaceTempView(s"$inputViewName")
+      df.get.createOrReplaceTempView(s"$inputViewName")
       // create DataFrame from SQL
       logger.debug(s"($dataObjectId.expectations.$name) Preparing DataFrame from SQL statement: $preparedSql")
-      val dfMetrics = function.sql(preparedSql, dataObjectId)
+      val dfMetrics = functions.sql(preparedSql, dataObjectId)
       if (dfMetrics.schema.columns.size > 1 && !dfMetrics.schema.columns.contains(name)) throw new RuntimeException(s"($dataObjectId) Query of SQLQueryExpectation $name returns more than one column and no column is named the same as the expectation")
       logger.info(s"($dataObjectId) collecting custom metrics for SQLQueryExpectation $name")
       val rows = dfMetrics.collect

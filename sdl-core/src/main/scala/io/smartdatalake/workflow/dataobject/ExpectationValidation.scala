@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
@@ -31,6 +32,7 @@ import io.smartdatalake.workflow.dataobject.expectation._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import java.util.UUID
+import scala.reflect.runtime.universe.Type
 
 /**
  * A trait that allows for optional constraint validation and expectation evaluation and validation on write when implemented by a [[DataObject]].
@@ -99,16 +101,17 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   /**
    * Collect metrics for expectations with scope = JobPartition
    */
-  def getScopeJobPartitionAggMetrics(dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], expectationsToValidate: Seq[BaseExpectation])(implicit context: ActionPipelineContext): Map[String,_] = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfAll.subFeedType)
+  def getScopeJobPartitionAggMetrics(subFeedType: Type, dfJob: Option[GenericDataFrame], partitionValues: Seq[PartitionValues], expectationsToValidate: Seq[BaseExpectation])(implicit context: ActionPipelineContext): Map[String,_] = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     import ExpectationValidation._
     val aggExpressions = expectationsToValidate.filter(_.scope == ExpectationScope.JobPartition)
       .flatMap(e => e.getAggExpressionColumns(this.id))
     if (aggExpressions.nonEmpty) {
       this match {
         case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.nonEmpty =>
+          if (dfJob.isEmpty) throw ConfigurationException(s"($id) Can not calculate metrics for Expectations with scope=JobPartition on read")
           logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope JobPartition")
-          val dfMetrics = dfAll.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(deduplicate(aggExpressions))
+          val dfMetrics = dfJob.get.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(deduplicate(aggExpressions))
           val rawMetrics = dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap)
           val metrics = rawMetrics.flatMap { rawMetrics =>
             val partitionValuesStr = partitionedDataObject.partitions.map(rawMetrics).map(_.toString).mkString(partitionDelimiter)
@@ -143,15 +146,15 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     aggExpressions.groupBy(_.getName).map(_._2.head).toSeq // remove potential duplicates
   }
 
-  def validateExpectations(dfJob: GenericDataFrame, dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String,_] => Map[String,_])(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfJob.subFeedType)
+  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String,_] => Map[String,_])(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     val expectationsToValidate = expectations ++ additionalExpectations
     // collect metrics with scope = JobPartition
-    val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(dfJob, partitionValues, expectationsToValidate)
+    val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All
     val scopeAllMetrics = getScopeAllAggMetrics(dfAll, expectationsToValidate)
     // collect custom metrics
-    val customMetrics = expectationsToValidate.flatMap(e => e.getCustomMetrics(this.id, if (e.scope==ExpectationScope.All) dfAll else dfJob))
+    val customMetrics = expectationsToValidate.flatMap(e => e.getCustomMetrics(this.id, if (e.scope==ExpectationScope.All) Some(dfAll) else dfJob))
     // enrich metrics
     val metrics = enrichmentFunc(scopeJobAndInputMetrics ++ scopeJobPartitionMetrics ++ scopeAllMetrics ++ customMetrics)
     // evaluate expectations using dummy ExpressionData

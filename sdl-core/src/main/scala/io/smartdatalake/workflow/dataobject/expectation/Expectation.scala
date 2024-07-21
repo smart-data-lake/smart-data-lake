@@ -69,7 +69,7 @@ trait BaseExpectation {
    * Define a custom evaluation of the DataObjects data and return metrics, as alternative to creating aggregate expressions (by defining getAggExpressionColumns).
    * @param df DataFrame of the processed DataObject filtered by scope.
    */
-  def getCustomMetrics(dataObjectId: DataObjectId, df: GenericDataFrame)(implicit context: ActionPipelineContext): Map[String,_] = Map()
+  def getCustomMetrics(dataObjectId: DataObjectId, df: Option[GenericDataFrame])(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Map[String,_] = Map()
 
   /**
    * Create columns to validate the expectation and return error message if failed.
