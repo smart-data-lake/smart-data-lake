@@ -84,7 +84,7 @@ case class UniqueKeyExpectation(
     val countDistinct = getMetric[Long](dataObjectId,metrics,countDistinctName)
     val count = getMetric[Long](dataObjectId,metrics,countName)
     val (col, pct) = getValidationErrorColumn(dataObjectId, countDistinct, count)
-    val updatedMetrics = metrics + (name -> pct)
+    val updatedMetrics = metrics.filterKeys(_ != countDistinctName).toMap + (name -> pct)
     (col.map(SparkColumn).toSeq, updatedMetrics)
   }
   override def calculateAsJobDataFrameObservation: Boolean = {

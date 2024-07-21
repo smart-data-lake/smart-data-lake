@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
@@ -108,7 +109,7 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     val doSrc1 = ParquetFileDataObject.fromConfig(config)
     doSrc1.writeSparkDataFrame(testDf, Seq())
     val (df, observation) = doSrc1.getDataFrame(Seq(), SparkSubFeed.subFeedType)(contextExec)
-      .observe("test#input!tolerant", Seq(SparkSubFeed.count(SparkSubFeed.lit("*")).as("count")), isExecPhase = true)
+      .observe("test#input"+pushDownTolerantMetricsMarker, Seq(SparkSubFeed.count(SparkSubFeed.lit("*")).as("count")), isExecPhase = true)
       .where(SparkSubFeed.col("str")===SparkSubFeed.lit("test"))
       .setupObservation("final", Seq(SparkSubFeed.count(SparkSubFeed.lit("*")).as("count")), isExecPhase = true)
 

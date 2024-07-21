@@ -232,7 +232,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics
     val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 0.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0, "countDistinctPrimaryKey" -> 1))
+    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 0.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0))
 
     // overwrite src with another record & process
     val l2 = Seq(("dau", "peter", 5)).toDF("lastname", "firstname", "rating")
@@ -242,7 +242,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics - countAll should be 2 now, but count should stay 1
     val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 2, "countAll#src1" -> 1, "countAll#mainInput" -> 1, "pctComplete" -> 2.0, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None, "primaryKey" -> 1.0, "countDistinctPrimaryKey" -> 1))
+    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 2, "countAll#src1" -> 1, "countAll#mainInput" -> 1, "pctComplete" -> 2.0, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None, "primaryKey" -> 1.0))
 
     // fail tgt constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,

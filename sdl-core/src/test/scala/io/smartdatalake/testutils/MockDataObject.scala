@@ -22,7 +22,8 @@ package io.smartdatalake.testutils
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.SaveModeOptions
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
@@ -40,13 +41,15 @@ import scala.jdk.CollectionConverters._
  * Partitioned transactional mock data object.
  * Set dataFrame and partitionValues to be served by using writeSparkDataFrame.
  * PartitionValues are inferred if parameter of writeSparkDataFrame is empty.
- * writeSparkDataFrame mimicks overwrite mode, also for partitions.
  */
 case class MockDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(),
                           override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None, tableName: String = "mock",
                           override val constraints: Seq[Constraint] = Seq(),
-                          override val expectations: Seq[Expectation] = Seq()
+                          override val expectations: Seq[Expectation] = Seq(),
+                          saveMode: SDLSaveMode = SDLSaveMode.Overwrite
                          ) extends DataObject with CanHandlePartitions with TransactionalTableDataObject with ExpectationValidation {
+  assert(partitions.isEmpty || saveMode==SDLSaveMode.Overwrite, s"($id) Only saveMode=Overwrite implemented for partitioned MockDataObjects")
+  assert(saveMode==SDLSaveMode.Overwrite || saveMode==SDLSaveMode.Append, s"($id) Only saveMode=Overwrite or saveMode=Append implemented for MockDataObjects")
 
   // variables to store mock values. They are filled using writeSparkDataFrame
   private var dataFrameMock: Option[DataFrame] = None
@@ -85,8 +88,10 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
       partitionValuesMock = partitionValuesMock ++ inferredPartitionValues
       dataFrameMock = None
     } else {
-      // overwrite all
-      dataFrameMock = Some(newDf)
+      saveMode match {
+        case SDLSaveMode.Overwrite => dataFrameMock = Some(newDf)
+        case SDLSaveMode.Append => dataFrameMock = Some(Seq(dataFrameMock, Some(newDf)).flatten.reduceLeft(_.unionAll(_)))
+      }
       partitionValuesMock = Set()
       partitionedDataFrameMock = None
     }
