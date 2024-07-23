@@ -19,17 +19,25 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
+import io.smartdatalake.workflow.dataobject.ExpectationValidation.defaultExpectations
+import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.ExpectationScope
+import io.smartdatalake.workflow.dataobject.expectation._
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import java.util.UUID
+import scala.reflect.runtime.universe.Type
 
 /**
- * A trait that allows for optional constraint validation and expectation evaluation on write when implemented by a [[DataObject]].
+ * A trait that allows for optional constraint validation and expectation evaluation and validation on write when implemented by a [[DataObject]].
+ *
+ * An expectation validation means that the evaluated metric value is compared against a condition set the the user as `expectation` attribute. This could be for instance {{{<value> <= 20}}}
  */
 private[smartdatalake] trait ExpectationValidation { this: DataObject with SmartDataLakeLogger =>
 
@@ -44,7 +52,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   def constraints: Seq[Constraint]
 
   /**
-   * Map of expectation name and definition to evaluate on write, see [[Expectation]] for details.
+   * List expectation definitions to evaluate on write, see [[Expectation]] for details.
    * Expectations are aggregation expressions defined on dataset-level and evaluated on every write.
    * By default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.
    * In case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.
@@ -55,48 +63,62 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
    */
   def expectations: Seq[Expectation]
 
-  def setupConstraintsAndJobExpectations(df: GenericDataFrame)(implicit context: ActionPipelineContext): (GenericDataFrame, DataFrameObservation) = {
+  /**
+   * Add constraints validation and metrics collection for Expectations with scope=Job to DataFrame.
+   * @param defaultExpectationsOnly if true only default exepctations, e.g. count, is added to the DataFrame, and no constraints are validated.
+   *                                Set defaultExpectationsOnly=true for input DataObjects which are also written by SDLB, as constraints and expectations are then validated on write.
+   * @param pushDownTolerant
+   * @param additionalJobAggExpressionColumns
+   */
+  def setupConstraintsAndJobExpectations(df: GenericDataFrame, defaultExpectationsOnly: Boolean = false, pushDownTolerant: Boolean = false, additionalJobAggExpressionColumns: Seq[GenericColumn] = Seq(), forceGenericObservation: Boolean = false)(implicit context: ActionPipelineContext): (GenericDataFrame, Seq[DataFrameObservation]) = {
     // add constraint validation column
-    val dfConstraints = setupConstraintsValidation(df)
+    val dfConstraints = if (defaultExpectationsOnly) df else setupConstraintsValidation(df)
     // setup job expectations as DataFrame observation
     val jobExpectations = expectations.filter(_.scope == ExpectationScope.Job)
-    val (dfJobExpectations, observation) = {
+    val (dfJobExpectations, observations) = {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
-      val expectationColumns = (defaultExpectations ++ jobExpectations).flatMap(_.getAggExpressionColumns(this.id))
-      setupObservation(dfConstraints, expectationColumns, context.isExecPhase)
+      // prepare aggregation columns
+      val defaultAggColumns = defaultExpectations.flatMap(_.getAggExpressionColumns(this.id))
+      val jobAggColumns = (if (defaultExpectationsOnly) Seq() else jobExpectations).flatMap(_.getAggExpressionColumns(this.id)) ++ additionalJobAggExpressionColumns
+      // try to calculate defaultAggColumns always as non-generic observation, so that there is a SparkObservation to catch additional input and custom Spark observations
+      val forceGenericObservationCons = forceGenericObservation || jobExpectations.exists(!_.calculateAsJobDataFrameObservation)
+      val normalAggColumns = defaultAggColumns ++ (if (!forceGenericObservationCons) jobAggColumns else Seq())
+      val forceGenericAggColumns = if (forceGenericObservationCons) jobAggColumns else Seq()
+      val (dfObserved, normalObservation) = setupObservation(dfConstraints, normalAggColumns, context.isExecPhase, pushDownTolerant, forceGenericObservation = false)
+      val genericObservation = if (forceGenericAggColumns.nonEmpty) Some(setupObservation(dfConstraints, forceGenericAggColumns, context.isExecPhase, pushDownTolerant, forceGenericObservation = true)._2) else None
+      // if there are now two GenericCalculatedObservations, combine them to avoid duplicate query execution
+      val observations = (normalObservation, genericObservation) match {
+        case (o1: GenericCalculatedObservation, Some(o2: GenericCalculatedObservation)) => Seq(GenericCalculatedObservation(o1.df, (o1.aggregateColumns ++ o2.aggregateColumns):_*))
+        case (o1, o2) => Seq(Some(o1), o2).flatten
+      }
+      (dfObserved, observations)
     }
-    // setup add caching if there are expectations with scope != job
-    if (expectations.exists(_.scope != ExpectationScope.Job)) (dfJobExpectations.cache, observation)
-    else (dfJobExpectations, observation)
+    // add caching if there are expectations with scope != job
+    if (expectations.exists(_.scope != ExpectationScope.Job)) dfJobExpectations.cache
+    (dfJobExpectations, observations)
   }
-
-  private val defaultExpectations = Seq(SQLExpectation(name = "count", aggExpression = "count(*)" ))
 
   /**
    * Collect metrics for expectations with scope = JobPartition
    */
-  private def getScopeJobPartitionAggMetrics(df: GenericDataFrame, partitionValues: Seq[PartitionValues]): Map[String,_] = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
+  def getScopeJobPartitionAggMetrics(subFeedType: Type, dfJob: Option[GenericDataFrame], partitionValues: Seq[PartitionValues], expectationsToValidate: Seq[BaseExpectation])(implicit context: ActionPipelineContext): Map[String,_] = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     import ExpectationValidation._
-    val jobPartitionExpectations = expectations.filter(_.scope == ExpectationScope.JobPartition)
-      .map(e => (e, e.getAggExpressionColumns(this.id)))
-      .filter(_._2.nonEmpty)
-    if (jobPartitionExpectations.nonEmpty) {
+    val aggExpressions = expectationsToValidate.filter(_.scope == ExpectationScope.JobPartition)
+      .flatMap(e => e.getAggExpressionColumns(this.id))
+    if (aggExpressions.nonEmpty) {
       this match {
         case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.nonEmpty =>
-          val aggExpressions = jobPartitionExpectations.flatMap(_._2)
-          if (aggExpressions.nonEmpty) {
-            logger.info(s"($id) collecting aggregate column metrics for expectations with scope = JobPartition")
-            val dfMetrics = df.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(aggExpressions)
-            val colNames = dfMetrics.schema.columns
-            def colNameIndex(colName: String) = colNames.indexOf(colName)
-            val metrics = dfMetrics.collect.flatMap { row =>
-              val partitionValuesStr = partitionedDataObject.partitions.map(c => Option(row.getAs[Any](colNameIndex(c))).map(_.toString).getOrElse(None)).mkString(partitionDelimiter)
-              val metricsNameAndValue = jobPartitionExpectations.map(_._1).map(e => (e.name, Option(row.getAs[Any](colNameIndex(e.name))).getOrElse(None)))
-              metricsNameAndValue.map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
-            }
-            metrics.toMap
-          } else Map()
+          if (dfJob.isEmpty) throw ConfigurationException(s"($id) Can not calculate metrics for Expectations with scope=JobPartition on read")
+          logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope JobPartition")
+          val dfMetrics = dfJob.get.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(deduplicate(aggExpressions))
+          val rawMetrics = dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap)
+          val metrics = rawMetrics.flatMap { rawMetrics =>
+            val partitionValuesStr = partitionedDataObject.partitions.map(rawMetrics).map(_.toString).mkString(partitionDelimiter)
+            rawMetrics.filterKeys(!partitionedDataObject.partitions.contains(_))
+              .map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
+          }
+          metrics.toMap
         case _ => throw new IllegalStateException(s"($id) Expectation with scope = JobPartition defined for unpartitioned DataObject")
       }
     } else Map()
@@ -105,40 +127,44 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   /**
    * Collect metrics for expectations with scope = All
    */
-  private def getScopeAllAggMetrics(df: GenericDataFrame): Map[String,_] = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
-    val allExpectationsWithExpressions = expectations.filter(_.scope == ExpectationScope.All)
-      .map(e => (e,e.getAggExpressionColumns(this.id)))
-      .filter(_._2.nonEmpty)
-    val aggExpressions = allExpectationsWithExpressions.flatMap(_._2)
+  def getScopeAllAggMetrics(dfAll: GenericDataFrame, expectationsToValidate: Seq[BaseExpectation])(implicit context: ActionPipelineContext): Map[String,_] = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfAll.subFeedType)
+    val aggExpressions = expectationsToValidate.filter(x => x.scope == ExpectationScope.All).flatMap(_.getAggExpressionColumns(this.id))
+    calculateMetrics(dfAll, aggExpressions, ExpectationScope.All)
+  }
+
+  def calculateMetrics(df: GenericDataFrame, aggExpressions: Seq[GenericColumn], scope: ExpectationScope): Map[String,_] = {
     if (aggExpressions.nonEmpty) {
-      logger.info(s"($id) collecting aggregate column metrics for expectations with scope = All")
-      val dfMetrics = df.agg(aggExpressions)
-      val colNames = dfMetrics.schema.columns
-      def colNameIndex(colName: String) = colNames.indexOf(colName)
-      val metrics = dfMetrics.collect.flatMap {
-        case row: GenericRow => allExpectationsWithExpressions.map(_._1).map(e => (e.name, Option(row.getAs[Any](colNameIndex(e.name))).getOrElse(None)))
-      }
-      metrics.toMap
+      logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope $scope")
+      val dfMetrics = df.agg(deduplicate(aggExpressions))
+      dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap).head
+        .mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
     } else Map()
   }
 
-  def validateExpectations(dfJob: GenericDataFrame, dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobMetrics: Map[String, _])(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
-    // the evaluation of expectations is made with Spark expressions
+  def deduplicate(aggExpressions: Seq[GenericColumn]): Seq[GenericColumn] = {
+    aggExpressions.groupBy(_.getName).map(_._2.head).toSeq // remove potential duplicates
+  }
+
+  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String,_] => Map[String,_])(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
+    val expectationsToValidate = expectations ++ additionalExpectations
     // collect metrics with scope = JobPartition
-    val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(dfJob, partitionValues)
+    val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All
-    val scopeAllMetrics = getScopeAllAggMetrics(dfAll)
+    val scopeAllMetrics = getScopeAllAggMetrics(dfAll, expectationsToValidate)
     // collect custom metrics
-    val customMetrics = expectations.flatMap(e => e.getCustomMetrics(this.id, if (e.scope==ExpectationScope.All) dfAll else dfJob))
+    val customMetrics = expectationsToValidate.flatMap(e => e.getCustomMetrics(this.id, if (e.scope==ExpectationScope.All) Some(dfAll) else dfJob))
+    // enrich metrics
+    val metrics = enrichmentFunc(scopeJobAndInputMetrics ++ scopeJobPartitionMetrics ++ scopeAllMetrics ++ customMetrics)
     // evaluate expectations using dummy ExpressionData
-    val metrics = scopeJobMetrics ++ scopeJobPartitionMetrics ++ scopeAllMetrics ++ customMetrics
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
-    val (expectationValidationCols, updatedMetrics) = expectations.foldLeft(Seq[(Expectation,SparkColumn)](), metrics) {
+    val (expectationValidationCols, updatedMetrics) = expectationsToValidate.foldLeft(Seq[(BaseExpectation,SparkColumn)](), metrics) {
       case ((cols, metrics), expectation) =>
         val (newCols, updatedMetrics) = expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
         (cols ++ newCols.map(c => (expectation,c)), updatedMetrics)
     }
+    // the evaluation of expectations is made using Spark expressions
     val validationResults = expectationValidationCols.map {
       case (expectation, col) =>
         val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner, defaultExpressionData)
@@ -177,13 +203,15 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     } else df
   }
 
-  protected def forceGenericObservation = false
-  private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean): (GenericDataFrame, DataFrameObservation) = {
-    val (dfObserved, observation) = df.setupObservation(this.id + "-" + UUID.randomUUID(), expectationColumns, isExecPhase, forceGenericObservation)
+  protected def forceGenericObservation = false // can be overridden by subclass
+  private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean, pushDownTolerant: Boolean = false, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
+    val observationName = this.id.id + "#" + UUID.randomUUID() + (if (pushDownTolerant) pushDownTolerantMetricsMarker else "")
+    val (dfObserved, observation) = df.setupObservation(observationName, expectationColumns, isExecPhase, this.forceGenericObservation || forceGenericObservation)
     (dfObserved, observation)
   }
 }
 
 object ExpectationValidation {
   private[smartdatalake] final val partitionDelimiter = "#"
+  private[smartdatalake] val defaultExpectations = Seq(SQLExpectation(name = "count", aggExpression = "count(*)" ))
 }

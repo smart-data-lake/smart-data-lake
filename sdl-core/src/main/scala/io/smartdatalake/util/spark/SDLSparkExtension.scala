@@ -38,6 +38,9 @@ private[smartdatalake] class SDLSparkExtension extends (SparkSessionExtensions =
     e.injectPreCBORule(SparkPlanNoDataCheckRule) // this is for checking final optimized and simplied plan, e.g. PropagateEmptyRelation rule has been executed.
     e.injectRuntimeOptimizerRule(SparkPlanNoDataCheckRule) // this is for checking runtime statistics with Spark AQE
 
+    // Allow filter push-down over CollectMetrics for observations with special marker.
+    if (Environment.enableInputDataObjectCount) e.injectOptimizerRule(PushPredicateThroughTolerantCollectMetricsRule)
+
     logger.info("initialized")
   }
 }

@@ -35,6 +35,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, 
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.expectation.CountExpectation
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction

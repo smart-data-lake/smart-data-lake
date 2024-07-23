@@ -32,12 +32,10 @@ import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
-import org.apache.spark.SparkContext
 import org.slf4j.event.Level
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 
 private[smartdatalake] case class ActionDAGEdge(override val nodeIdFrom: NodeId, override val nodeIdTo: NodeId, override val resultId: String) extends DAGEdge
 
