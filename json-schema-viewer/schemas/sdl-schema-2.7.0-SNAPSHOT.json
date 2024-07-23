@@ -1487,7 +1487,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -1497,17 +1497,13 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -1516,21 +1512,47 @@
                     "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "ExpectationDefaultImpl"
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type `any` ."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame.\nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -1563,76 +1585,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -1655,9 +1607,14 @@
                     "type" : "string",
                     "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -1670,6 +1627,92 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.\nOn the other hand primary key validation is normally expected to be exact and not approximated."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.\nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2022,7 +2065,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -2032,17 +2075,13 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -2051,21 +2090,47 @@
                     "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "ExpectationDefaultImpl"
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type `any` ."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame.\nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2098,76 +2163,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -2190,9 +2185,14 @@
                     "type" : "string",
                     "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -2205,6 +2205,92 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.\nOn the other hand primary key validation is normally expected to be exact and not approximated."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.\nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2351,7 +2437,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -2361,17 +2447,13 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -2380,21 +2462,47 @@
                     "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "ExpectationDefaultImpl"
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type `any` ."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame.\nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2427,76 +2535,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -2519,9 +2557,14 @@
                     "type" : "string",
                     "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -2534,6 +2577,92 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.\nOn the other hand primary key validation is normally expected to be exact and not approximated."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.\nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -2702,7 +2831,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -2712,17 +2841,13 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -2731,21 +2856,47 @@
                     "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "ExpectationDefaultImpl"
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type `any` ."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame.\nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2778,76 +2929,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -2870,9 +2951,14 @@
                     "type" : "string",
                     "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -2885,6 +2971,92 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.\nOn the other hand primary key validation is normally expected to be exact and not approximated."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.\nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -3787,7 +3959,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -3797,17 +3969,13 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -3816,21 +3984,47 @@
                     "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "ExpectationDefaultImpl"
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type `any` ."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame.\nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -3863,76 +4057,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -3955,9 +4079,14 @@
                     "type" : "string",
                     "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -3970,6 +4099,92 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.\nOn the other hand primary key validation is normally expected to be exact and not approximated."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.\nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
             "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
@@ -4149,7 +4364,7 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLExpectation"
+                    "const" : "CountExpectation"
                   },
                   "name" : {
                     "type" : "string",
@@ -4159,17 +4374,13 @@
                     "type" : "string",
                     "description" : "Optional detailed description of the expectation"
                   },
-                  "aggExpression" : {
-                    "type" : "string",
-                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
-                  },
                   "expectation" : {
                     "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
                   },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -4178,21 +4389,47 @@
                     "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "SQLExpectation",
-                "required" : [ "name", "aggExpression", "type" ],
+                "title" : "CountExpectation",
+                "required" : [ "type" ],
                 "additionalProperties" : false,
-                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+                "description" : "Definition of an expectation based on the number of records."
               }, {
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "ExpectationDefaultImpl"
+                    "const" : "SQLQueryExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "code" : {
+                    "type" : "string",
+                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
                   }
                 },
-                "title" : "ExpectationDefaultImpl",
-                "required" : [ "type" ],
+                "title" : "SQLQueryExpectation",
+                "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
-                "description" : "Default implementation for getValidationErrorColumn for metric of type `any` ."
+                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame.\nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -4225,76 +4462,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "SQLQueryExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "code" : {
-                    "type" : "string",
-                    "description" : "a SQL query returning a single row. All column will be added as metrics.\nIf there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.\nThe special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "SQLQueryExpectation",
-                "required" : [ "name", "code", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.\nThe SQL query will be evaluated in a separate Spark job against the DataFrame."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
-                    "const" : "CountExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "description" : {
-                    "type" : "string",
-                    "description" : "Optional detailed description of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000\".\nIf no expectation is defined, the result value is is just recorded in metrics."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CountExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of an expectation based on the number of records."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "SQLFractionExpectation"
                   },
                   "name" : {
@@ -4317,9 +4484,14 @@
                     "type" : "string",
                     "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".\nIf no expectation is defined, the result value is just recorded in metrics."
                   },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
                   "scope" : {
                     "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartitions', which are implemented by reading the output data again.",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
                     "enum" : [ "All", "JobPartition", "Job" ]
                   },
                   "failedSeverity" : {
@@ -4332,9 +4504,95 @@
                 "required" : [ "name", "countConditionExpression", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on counting how many rows match an expression vs the number of all rows.\nThe fraction of these two counts is compared against a given expectation."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "SQLExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "description" : {
+                    "type" : "string",
+                    "description" : "Optional detailed description of the expectation"
+                  },
+                  "aggExpression" : {
+                    "type" : "string",
+                    "description" : "SQL aggregate expression to evaluate on dataset, e.g. count(*)."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "SQLExpectation",
+                "required" : [ "name", "aggExpression", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.\nOn the other hand primary key validation is normally expected to be exact and not approximated."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.\nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.\nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.\nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
-            "description" : "Map of expectation name and definition to evaluate on write, see [[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
+            "description" : "List expectation definitions to evaluate on write, see [[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "preReadSql" : {
             "type" : "string"
@@ -4810,6 +5068,71 @@
           "metricsFailCondition" : {
             "type" : "string",
             "description" : "optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletnessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletnessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.\nCompletness is calculated as the fraction of main output count-all over main input count-all."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "TransferRateExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "TransferRateExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on transfer rate.\nTransfer rate is calculated as the fraction of main output count over main input count."
+              } ]
+            },
+            "description" : "List of expectation definitions to evaluate when executing this Action, see [[Expectation]] for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.\nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
           },
           "saveModeOptions" : {
             "oneOf" : [ {
