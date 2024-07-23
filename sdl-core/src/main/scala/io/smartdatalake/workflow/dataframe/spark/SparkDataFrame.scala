@@ -342,7 +342,7 @@ trait SparkDataType extends GenericDataType {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
 
   override def isSortable: Boolean = inner match {
-    case StringType || LongType || IntegerType || ShortType || FloatType || DoubleType || TimestampType || DateType => true
+    case StringType | LongType | IntegerType | ShortType | FloatType | DoubleType | TimestampType | DateType => true
     case _: DecimalType => true // strange scala error in IntelliJ for unapply method, but ok if matching against the type.
     case _ => false
   }

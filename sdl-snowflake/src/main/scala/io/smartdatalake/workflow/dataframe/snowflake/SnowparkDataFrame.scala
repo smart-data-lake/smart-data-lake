@@ -32,7 +32,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.json4s.JString
 import org.json4s.JsonAST.JValue
 
-import scala.collection.immutable.Seq
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -257,7 +256,7 @@ trait SnowparkDataType extends GenericDataType {
   def inner: DataType
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def isSortable: Boolean = inner match {
-    case StringType || LongType || IntegerType || ShortType || FloatType || DoubleType || DecimalType(_,_) || TimestampType || TimeType || DateType => true
+    case StringType | LongType | IntegerType | ShortType | FloatType | DoubleType | DecimalType(_,_) | TimestampType | TimeType | DateType => true
     case _ => false
   }
   override def typeName: String = inner.typeName
