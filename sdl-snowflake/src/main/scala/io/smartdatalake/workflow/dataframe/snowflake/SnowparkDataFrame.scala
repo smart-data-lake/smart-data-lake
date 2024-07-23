@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.json4s.JString
 import org.json4s.JsonAST.JValue
 
+import scala.collection.immutable.Seq
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -110,7 +111,6 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
   }
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
     throw new NotImplementedError("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")
-    this
   }
   override def apply(columnName: String): GenericColumn = SnowparkColumn(inner.apply(columnName))
 }
@@ -256,7 +256,10 @@ case class SnowparkField(inner: StructField) extends GenericField {
 trait SnowparkDataType extends GenericDataType {
   def inner: DataType
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
-  override def isSortable: Boolean = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, DecimalType, TimestampType, TimeType, DateType).contains(inner)
+  override def isSortable: Boolean = inner match {
+    case StringType || LongType || IntegerType || ShortType || FloatType || DoubleType || DecimalType(_,_) || TimestampType || TimeType || DateType => true
+    case _ => false
+  }
   override def typeName: String = inner.typeName
   override def sql: String = convertToSFType(inner)
   override def makeNullable: SnowparkDataType
