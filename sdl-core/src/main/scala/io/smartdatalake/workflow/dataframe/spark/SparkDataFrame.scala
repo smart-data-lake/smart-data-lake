@@ -23,13 +23,12 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.{DataFrameUtil, SDLSparkExtension}
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.execution.ExplainMode
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{col, expr, row_number}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -142,6 +141,13 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
       val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns: _*)
       (SparkDataFrame(dfObserved), observation)
     }
+  }
+
+  def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
+    val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
+    val dfObserved = inner.observe(name, sparkAggregatedColumns.head, sparkAggregatedColumns.tail: _*)
+    SparkDataFrame(dfObserved)
   }
 
   override def apply(columnName: String): GenericColumn = SparkColumn(inner.apply(columnName))
@@ -305,6 +311,10 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def desc: GenericColumn = SparkColumn(inner.desc)
 
   override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
+  override def getName: Option[String] = inner.expr match {
+    case c: NamedExpression => Some(c.name)
+    case _ => None
+  }
 }
 
 case class SparkField(inner: StructField) extends GenericField {
@@ -331,7 +341,11 @@ trait SparkDataType extends GenericDataType {
 
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
 
-  override def isSortable: Boolean = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, DecimalType, TimestampType, DateType).contains(inner)
+  override def isSortable: Boolean = inner match {
+    case StringType | LongType | IntegerType | ShortType | FloatType | DoubleType | TimestampType | DateType => true
+    case _: DecimalType => true // strange scala error in IntelliJ for unapply method, but ok if matching against the type.
+    case _ => false
+  }
 
   override def typeName: String = inner.typeName
 

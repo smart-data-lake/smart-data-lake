@@ -201,7 +201,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
         val df = outputDataFrames.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"(${action.id}) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDataFrames.keys.mkString(", ")}."))
         subFeed.withDataFrame(Some(df))
       }
-      outputSubFeeds = action.postprocessOutputSubFeeds(outputSubFeeds)(context)
+      outputSubFeeds = action.postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)(context)
       outputSubFeeds.map(s => (s.dataObjectId.id, s.dataFrame.get)).toMap
     } else {
       outputDataFrames

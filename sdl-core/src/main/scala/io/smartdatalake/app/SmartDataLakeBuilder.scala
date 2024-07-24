@@ -205,11 +205,12 @@ object TestMode extends Enumeration {
 }
 
 /**
- * Abstract Smart Data Lake Command Line Application.
+ * Abstract Smart Data Lake Builder Command Line Application.
  */
 abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
-  val appVersion: String = AppUtil.getManifestVersion.map("v" + _).getOrElse("develop") + ", sdlb-build-version: " + BuildVersionInfo.readBuildVersionInfo.getOrElse("unknown")
+  val appVersion: String = "appVersion: " + BuildVersionInfo.appVersionInfo.orElse(AppUtil.getManifestVersion.map("version=" + _)).getOrElse("develop") +
+    ", sdlbVersion: " + BuildVersionInfo.sdlbVersionInfo.getOrElse("unknown")
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
    /**

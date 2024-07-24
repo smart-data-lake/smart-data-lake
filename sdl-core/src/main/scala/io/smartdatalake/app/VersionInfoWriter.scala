@@ -19,7 +19,7 @@
 
 package io.smartdatalake.app
 
-import io.smartdatalake.app.BuildVersionInfo.buildVersionInfoFilename
+import io.smartdatalake.app.BuildVersionInfo.getFilename
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import scopt.OptionParser
@@ -28,6 +28,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Properties
+import scala.language.postfixOps
 import scala.util.Using
 
 /**
@@ -35,11 +36,52 @@ import scala.util.Using
  */
 case class VersionInfoWriterConfig(
                                      outputDir: String = null,
-                                     version: String = null
+                                     version: String = null,
+                                     app: Boolean = false
                                    )
 
 /**
- * Main class to writing SDLB version info file
+ * Main class to write SDLB or App version info file.
+ * This is intended to be executed during build phase with maven.
+ *
+ * Version information can then be read during runtime using
+ * {{{BuildVersionInfo.readBuildVersionInfo(app=true)}}}
+ *
+ * Example maven configuration:
+ * {{{
+ * <!-- generate app-version-info.properties file -->
+ * <plugin>
+ *     <groupId>org.codehaus.mojo</groupId>
+ *     <artifactId>exec-maven-plugin</artifactId>
+ *     <executions>
+ *         <execution>
+ *             <id>generate-version-info</id>
+ *             <phase>prepare-package</phase>
+ *             <goals>
+ *                 <!-- use exec instead of java, so it runs in a separate jvm from mvn -->
+ *                 <goal>exec</goal>
+ *             </goals>
+ *             <configuration>
+ *                 <executable>java</executable>
+ *                 <longClasspath>true</longClasspath>
+ *                 <arguments>
+ *                     <argument>-Dlog4j.configurationFile=log4j2.yml</argument>
+ *                     <argument>-classpath</argument>
+ *                     <classpath />
+ *                     <argument>io.smartdatalake.custom.VersionInfoWriter</argument>
+ *                     <argument>--outputDir</argument>
+ *                     <argument>${project.build.outputDirectory}</argument>
+ *                     <argument>--version</argument>
+ *                     <argument>${project.version}</argument>
+ *                     <argument>--app</argument>
+ *                     <argument>true</argument>
+ *                 </arguments>
+ *             <classpathScope>compile</classpathScope>
+ *             </configuration>
+ *         </execution>
+ *     </executions>
+ * </plugin>
+ * }}}
  */
 object VersionInfoWriter extends SmartDataLakeLogger {
 
@@ -54,7 +96,10 @@ object VersionInfoWriter extends SmartDataLakeLogger {
       .text("Directory to write version info file into")
     opt[String]('v', "version")
       .action((v, c) => c.copy(version = v))
-      .text("SDLB Version to write to json file")
+      .text("Version to write to json file")
+    opt[String]('a', "app")
+      .action((v, c) => c.copy(app = v.toBoolean))
+      .text("If true, create app-version-info.properties, otherwise sdlb-version-info.properties")
     help("help").text("Display the help text.")
   }
 
@@ -65,32 +110,37 @@ object VersionInfoWriter extends SmartDataLakeLogger {
 
     // Parse command line
     parser.parse(args, config) match {
-      case Some(config) => BuildVersionInfo(config.version).writeBuildVersionInfo(config.outputDir)
+      case Some(config) => BuildVersionInfo(config.version).writeBuildVersionInfo(config.outputDir, config.app)
       case None => logAndThrowException(s"Error parsing command line parameters", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 }
 
-case class BuildVersionInfo(version: String, user: String, date: LocalDateTime) extends SmartDataLakeLogger {
+case class BuildVersionInfo(version: String, user: String, date: LocalDateTime, revision: String) extends SmartDataLakeLogger {
 
   /**
    * Write the SDLB version info properties file to the given output directory.
    * This is called during maven build.
    */
-  def writeBuildVersionInfo(outputDir: String): Unit = {
-    val versionInfoFile = s"$outputDir/$buildVersionInfoFilename"
+  def writeBuildVersionInfo(outputDir: String, app: Boolean): Unit = {
+    val versionInfoFile = s"$outputDir/${getFilename(app)}"
     logger.info(s"writing $versionInfoFile")
     val props = new Properties()
     props.setProperty("version", version)
     props.setProperty("user", user)
     props.setProperty("date", date.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+    props.setProperty("revision", revision)
     Using.resource(Files.newOutputStream(Paths.get(versionInfoFile), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
       os => props.store(os, "")
     }
   }
 
+  def entries(): Seq[(String,Any)] = {
+    Seq("version" -> version, "user" -> user, "date" -> date, "revision" -> revision)
+  }
+
   override def toString: String = {
-    s"version=$version user=$user date=$date"
+    s"version=$version user=$user date=$date revision=$revision"
   }
 }
 
@@ -100,27 +150,48 @@ object BuildVersionInfo extends SmartDataLakeLogger {
    * Create new build version informations with given version
    */
   def apply(version: String): BuildVersionInfo = {
-    BuildVersionInfo(version, sys.env.get("USERNAME").orElse(sys.env.get("USER")).getOrElse("unknown"), LocalDateTime.now)
+    BuildVersionInfo(version, getUser, LocalDateTime.now, getRevision)
   }
 
   /**
-   * Read the SDLB version info properties from the corresponding classpath resource.
-   * @return: version, user, date
+   * Read the version info properties from the corresponding classpath resource.
    */
-  def readBuildVersionInfo: Option[BuildVersionInfo] = {
-    val resourceStream = Thread.currentThread().getContextClassLoader.getResourceAsStream(buildVersionInfoFilename)
+  private def readBuildVersionInfo(app: Boolean = false): Option[BuildVersionInfo] = {
+    val filename = getFilename(app)
+    val resourceStream = Thread.currentThread().getContextClassLoader.getResourceAsStream(filename)
     if (resourceStream == null) {
-      logger.warn(s"Could not find resource $buildVersionInfoFilename")
+      logger.warn(s"Could not find resource $filename")
       None
     } else {
       Using.resource(resourceStream) {
         stream =>
           val props = new Properties()
           props.load(stream)
-          Some(BuildVersionInfo(props.getProperty("version"), props.getProperty("user"), LocalDateTime.parse(props.getProperty("date"), DateTimeFormatter.ISO_LOCAL_DATE_TIME)))
+          Some(BuildVersionInfo(props.getProperty("version"), props.getProperty("user"), LocalDateTime.parse(props.getProperty("date"), DateTimeFormatter.ISO_LOCAL_DATE_TIME), props.getProperty("revision")))
       }
     }
   }
+  lazy val sdlbVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo(app=false)
+  lazy val appVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo(app=true)
 
-  private val buildVersionInfoFilename = "sdlb-version-info.properties"
+  def getRevision: String = {
+    import sys.process._
+    try {
+      s"git rev-parse --verify --short=$gitRevisionLength HEAD" !!
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Could not get Git revision number: ${e.getClass.getSimpleName} ${e.getMessage}")
+        "unknown"
+    }
+  }
+
+  def getUser: String = {
+    sys.env.get("USERNAME").orElse(sys.env.get("USER")).getOrElse("unknown")
+  }
+
+  def getFilename(app: Boolean): String = if (app) appVersionInfoFilename else sdlbVersionInfoFilename
+
+  private val sdlbVersionInfoFilename = "sdlb-version-info.properties"
+  private val appVersionInfoFilename = "app-version-info.properties"
+  private val gitRevisionLength = 10
 }

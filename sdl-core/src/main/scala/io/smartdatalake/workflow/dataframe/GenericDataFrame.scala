@@ -105,6 +105,15 @@ trait GenericDataFrame extends GenericTypedObject {
   def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation)
 
   /**
+   * Observe metrics on this DataFrame.
+   * Note that this doesn't create a listener. These metrics will only be collected together using setupObservation.
+   * @param name name of the observation
+   * @param aggregateColumns aggregate columns to observe on the DataFrame
+   * @return the modified DataFrame
+   */
+  def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame
+
+  /**
    * returns data frame which consists of those rows which contain at least a null in the specified columns
    */
   def getNulls(cols: Seq[String]): GenericDataFrame = {
@@ -294,6 +303,7 @@ trait GenericColumn extends GenericTypedObject {
   def exprSql: String
   def desc: GenericColumn
   def apply(extraction: Any): GenericColumn
+  def getName: Option[String]
 }
 
 /**

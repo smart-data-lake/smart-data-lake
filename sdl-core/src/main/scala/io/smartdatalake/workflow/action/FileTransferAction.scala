@@ -95,7 +95,7 @@ case class FileTransferAction(override val id: ActionId,
     subFeed.withMetrics(metrics)
   }
 
-  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
+  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
     // create output sample file in init-phase
     if (context.phase == ExecutionPhase.Init) {
       subFeed.fileRefMapping.flatMap(_.headOption).foreach {

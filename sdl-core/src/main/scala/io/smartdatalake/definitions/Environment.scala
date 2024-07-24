@@ -367,6 +367,21 @@ object Environment extends SmartDataLakeLogger {
   var _enableSparkPlanNoDataCheck: Option[Boolean] = None
 
   /**
+   * Enable counting records read from input DataObjects and creating corresponding metrics.
+   * Note that this is using Spark observations, and is not implemented for other execution engines.
+   */
+  def enableInputDataObjectCount: Boolean = {
+    if (_enableInputDataObjectCount.isEmpty) {
+      _enableInputDataObjectCount = Some(
+        EnvironmentUtil.getSdlParameter("enableInputDataObjectCount")
+          .map(_.toBoolean).getOrElse(true)
+      )
+    }
+    _enableInputDataObjectCount.get
+  }
+  var _enableInputDataObjectCount: Option[Boolean] = None
+
+  /**
    * Maximal line length for DAG graph log, before switching to list mode.
    */
   def dagGraphLogMaxLineLength: Int = {
