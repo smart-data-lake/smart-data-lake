@@ -346,10 +346,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         if (partitions.isEmpty) {
           SDLSaveMode.execV2(finalSaveMode, dfWriterV2, partitionValues)
         } else {
-          if (finalSaveMode == SDLSaveMode.Overwrite && partitionValues.isEmpty) {
-            throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+          val overwriteModeIsDynamic = options.get("partitionOverwriteMode").orElse(session.conf.getOption("spark.sql.sources.partitionOverwriteMode")).contains("dynamic")
+          if (finalSaveMode == SDLSaveMode.Overwrite && partitionValues.isEmpty && !overwriteModeIsDynamic) {
+            throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this IcebergTableDataObject to enable dynamic partitioning and get around this exception.")
           }
-          SDLSaveMode.execV2(finalSaveMode, dfWriterV2, partitionValues)
+          SDLSaveMode.execV2(finalSaveMode, dfWriterV2, partitionValues, overwriteModeIsDynamic)
         }
       })
     } else SparkStageMetricsListener.execWithMetrics(this.id, {
