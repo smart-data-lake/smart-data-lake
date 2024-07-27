@@ -398,7 +398,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   /**
    * Start a simulation run.
    * This executes the DAG and returns all SubFeeds including the transformed DataFrames.
-   * Only prepare and init phase are executed.
+   * Only the init phase is executed. All data is passed directly in the form of a Spark DataFrame from one SparkSubFeed to the next. No data is fetched from the DataObjects. Good for Unit Testing as it allows to execute your DAG without outside depedencies.
    * Actions and DataObjects needed have to be provided through implicit instanceRegistry parameter.
    * The Actions to execute are selected by appConfig.feedSel attribute.
    *
