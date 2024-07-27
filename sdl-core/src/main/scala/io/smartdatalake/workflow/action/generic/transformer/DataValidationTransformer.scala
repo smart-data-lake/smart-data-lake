@@ -69,6 +69,6 @@ sealed trait ValidationRule {
 case class RowLevelValidationRule(condition: String, errorMsg: Option[String] = None) extends ValidationRule {
   override def getValidationColumn(implicit functions: DataFrameFunctions): GenericColumn = {
     import functions._
-    when(not(expr(condition)), lit(errorMsg.getOrElse(s"""validation rule "$condition" failed!"""")))
+    when(not(expr(condition)), lit(errorMsg.getOrElse(s"""validation rule "$condition" failed!""")))
   }
 }

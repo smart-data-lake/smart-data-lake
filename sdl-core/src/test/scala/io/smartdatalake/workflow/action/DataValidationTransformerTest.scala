@@ -39,11 +39,11 @@ class DataValidationTransformerTest extends FunSuite {
     val df = Seq(("jonson","rob",Some(5)),("doe","bob",None)).toDF("lastname", "firstname", "rating")
     val validator = DataValidationTransformer(rules = Seq(
       RowLevelValidationRule("rating is not null", Some("rating should not be empty")),
-      RowLevelValidationRule("firstname != 'bob'", Some("first should not be 'bob'"))
+      RowLevelValidationRule("firstname != 'bob'", None) //If no errorMsg is specified, the string representation of the rule should be used
     ))
     val dfValidated = validator.transform("testAction", Seq(), SparkDataFrame(df), "testDO", None, Map()).asInstanceOf[SparkDataFrame]
     import SparkSubFeed._
-    assert(dfValidated.filter(col("firstname") === lit("bob")).select(explode(col("errors"))).asInstanceOf[SparkDataFrame].inner.as[String].collect().toSet == Set("rating should not be empty", "first should not be 'bob'"))
+    assert(dfValidated.filter(col("firstname") === lit("bob")).select(explode(col("errors"))).asInstanceOf[SparkDataFrame].inner.as[String].collect().toSet == Set("rating should not be empty", "validation rule \"firstname != 'bob'\" failed!"))
   }
 
 }
