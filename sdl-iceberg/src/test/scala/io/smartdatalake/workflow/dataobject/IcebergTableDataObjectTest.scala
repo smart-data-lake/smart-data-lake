@@ -156,7 +156,9 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
   test("SaveMode overwrite and delete partition") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type")
+      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static")
+    )
     targetDO.dropTable
 
     // first load
@@ -187,7 +189,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
   }
 
   test("SaveMode overwrite partitions dynamically") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite_dynamic", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type")
       , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "dynamic")
