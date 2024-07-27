@@ -248,6 +248,35 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
     assert(targetDO.listPartitions == Seq(PartitionValues(Map("type"->"ext"))))
   }
 
+  test("SaveMode overwrite partitions dynamically") {
+    val targetTable = Table(db = Some(deltaDb), name = "test_overwrite", query = None)
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type")
+      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "dynamic"))
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
+
+    assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
+
+    // 2nd load: dynamically overwrite partition type=ext
+    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df2) // allowed overwriting partitions because of partitionOverwriteMode=dynamic
+    val expected2 = df2.union(df1.where($"type"=!="ext"))
+    val actual2 = targetDO.getSparkDataFrame()
+    val resul2 = expected2.isEqual(actual2)
+    if (!resul2) TestUtil.printFailedTestResult("SaveMode overwrite partitions dynamically",Seq())(actual2)(expected2)
+    assert(resul2)
+  }
+
   test("SaveMode overwrite and delete partition on managed table") {
     val targetTable = Table(db = Some(deltaDb), name = "test_overwrite_managed", query = None)
     val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static"))
