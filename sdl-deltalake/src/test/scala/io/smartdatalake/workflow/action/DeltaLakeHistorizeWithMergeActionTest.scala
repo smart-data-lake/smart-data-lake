@@ -24,6 +24,7 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
@@ -54,7 +55,7 @@ import java.time.LocalDateTime
 
      // setup DataObjects
      val srcDO = MockDataObject("src1").register
-     val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
+     val tgtTable = Table(Some(deltaDb), "historize_output", None, Some(Seq("lastname","firstname")))
      val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
      tgtDO.dropTable(context)
      instanceRegistry.register(tgtDO)
@@ -136,7 +137,7 @@ import java.time.LocalDateTime
 
      // setup DataObjects
      val srcDO = MockDataObject("src1").register
-     val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
+     val tgtTable = Table(Some(deltaDb), "historize_output", None, Some(Seq("lastname","firstname")))
      val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
      tgtDO.dropTable(context)
      instanceRegistry.register(tgtDO)
@@ -218,11 +219,11 @@ import java.time.LocalDateTime
 
    test("switch from incremental cdc historization to incremental historization on existing dataframe") {
      // setup DataObjects
-     val srcTable = Table(Some("default"), "historize_input")
+     val srcTable = Table(Some(deltaDb), "historize_input")
      val srcPath = tempPath + s"/${srcTable.fullName}"
      val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
      instanceRegistry.register(srcDO)
-     val tgtTable = Table(Some("default"), "historize_output", primaryKey = Some(Seq("id")))
+     val tgtTable = Table(Some(deltaDb), "historize_output", primaryKey = Some(Seq("id")))
      val tgtPath = tempPath + s"/${tgtTable.fullName}"
      val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tgtPath), table = tgtTable, allowSchemaEvolution = true)
      instanceRegistry.register(tgtDO)

@@ -1255,7 +1255,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // prepare DAG
     val df1 = Seq[(String,String,Int)]().toDF("lastname", "firstname", "rating")
     val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
+    Environment._enableSparkPlanNoDataCheck = Some(false)
     srcDO.writeSparkDataFrame(df1, expectedPartitions)
+    Environment._enableSparkPlanNoDataCheck = Some(true)
     val actions: Seq[DataFrameOneToOneActionImpl] = Seq(
       CopyAction("a", srcDO.id, tgt1DO.id)
     )

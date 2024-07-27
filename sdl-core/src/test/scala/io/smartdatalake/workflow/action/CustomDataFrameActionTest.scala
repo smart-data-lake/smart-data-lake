@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions._
+import io.smartdatalake.testutils.TestUtil.createParquetDataObject
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -31,6 +32,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
@@ -344,6 +346,58 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextExec)
+  }
+
+  test("copy load detect no-data warning from SparkPlan on main output") {
+
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1").register
+    val srcDO2 = MockDataObject("src2").register
+    val tgtDO1 = createParquetDataObject("tgt1")
+    val tgtDO2 = createParquetDataObject("tgt2")
+
+    // prepare & start load
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
+    instanceRegistry.register(action1)
+    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(l.where(lit(false)), Seq()) // empty DataFrame on main input -> main output
+    srcDO2.writeSparkDataFrame(l, Seq())
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    intercept[NoDataToProcessWarning](action1.exec(srcSubFeeds)(contextExec).head)
+
+    // check that tgt1 is empty
+    // getSparkDataFrame will throw IllegalArgumentException because it no files have been written to this DataObject...
+    intercept[IllegalArgumentException](tgtDO1.getSparkDataFrame())
+    // check that tgt2 is written nevertheless!
+    assert(tgtDO2.getSparkDataFrame().count() == 2)
+  }
+
+  test("copy load ignore no-data warning from SparkPlan if not main output ") {
+
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1").register
+    val srcDO2 = MockDataObject("src2").register
+    val tgtDO1 = createParquetDataObject("tgt1")
+    val tgtDO2 = createParquetDataObject("tgt2")
+
+    // prepare & start load
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
+    instanceRegistry.register(action1)
+    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(l, Seq())
+    srcDO2.writeSparkDataFrame(l.where(lit(false)), Seq()) // empty DataFrame on non-main-input -> non-main-output
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    action1.exec(srcSubFeeds)(contextExec).head
+
+    // check that tgt1 is not empty
+    assert(tgtDO1.getSparkDataFrame().count == 2)
+    // check that tgt2 is empty
+    // getSparkDataFrame will throw IllegalArgumentException because it no files have been written to this DataObject...
+    intercept[IllegalArgumentException](tgtDO2.getSparkDataFrame())
   }
 }
 

@@ -27,7 +27,6 @@ trait DataFrameObservation {
 
   /**
    * Get the observed metrics.
-   *
    * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
    *                   timeoutSec can be ignored if the Observation implementation is calculating results.
    * @return the observed metrics as a `Map[String, Any]`
@@ -50,7 +49,34 @@ private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFr
     if (metricsRow.isDefined) {
       // convert results to metrics map
       dfObservations.schema.columns.zip(metricsRow.get.toSeq).toMap
+        .mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
     } else Map()
   }
 }
+
+/**
+ * Observation that wraps another observation and adds a prefix to all metrics.
+ */
+private[smartdatalake] case class PrefixedObservation(observation: DataFrameObservation, metricsPrefix: String) extends DataFrameObservation {
+  override def waitFor(timeoutSec: Int): Map[String, _] = observation.waitFor(timeoutSec).map{
+    case (k,v) => metricsPrefix+k -> v
+  }
+}
+
+/**
+ * Observation to combine multiple observation into one.
+ */
+private[smartdatalake] case class CombinedObservation(observations: Seq[DataFrameObservation]) extends DataFrameObservation {
+  override def waitFor(timeoutSec: Int): Map[String, _] = observations.foldLeft(Map[String,Any]()){
+    case (agg, observation) => agg ++ observation.waitFor(timeoutSec)
+  }
+}
+object CombinedObservation {
+  def create(observations: Seq[DataFrameObservation]): DataFrameObservation = {
+    assert(observations.nonEmpty)
+    if (observations.size == 1) observations.head
+    else CombinedObservation(observations)
+  }
+}
+
 

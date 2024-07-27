@@ -30,11 +30,13 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactor
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
+import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
 import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.delta.DeltaLog
@@ -66,7 +68,8 @@ import scala.util.Try
  * - Overwriting partitions is implemented by replaceWhere option in one transaction.
  *
  * @param id unique name of this data object
- * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
+ * @param path Optional hadoop directory for this table. If path is not defined, table is handled as a managed table.
+ *             If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  * @param partitions partition columns for this data object
  * @param options Options for Delta Lake tables see: [[https://docs.delta.io/latest/delta-batch.html]] and [[org.apache.spark.sql.delta.DeltaOptions]]
@@ -96,7 +99,7 @@ import scala.util.Try
  * @param metadata meta data
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
-                                    path: Option[String],
+                                    path: Option[String] = None,
                                     override val partitions: Seq[String] = Seq(),
                                     override val options: Map[String,String] = Map(),
                                     override val schemaMin: Option[GenericSchema] = None,
@@ -131,7 +134,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = context.sparkSession
     val thisIsTableExisting = isTableExisting
-    require(thisIsTableExisting || path.isDefined, s"($id) DeltaTable ${table.fullName} does not exist, so path must be set.")
+    require(thisIsTableExisting || path.isDefined, s"($id) DeltaTable ${table.fullName} does not exist, so path must be set or table should be managed (isManaged=true)")
 
     if (hadoopPathHolder == null) {
       hadoopPathHolder = {
@@ -164,6 +167,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite and Append supported for now.")
 
+  def deltaTable(implicit session: SparkSession) = DeltaTable.forName(session, table.fullName)
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     super.prepare
@@ -172,30 +177,32 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
     require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
-    if (!isTableExisting) {
-      require(path.isDefined, s"($id) If DeltaLake table does not exist yet, path must be set.")
-      if (filesystem.exists(hadoopPath)) {
-        if (DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
-          // define a delta table, metadata can be read from files.
-          DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
-          logger.info(s"($id) Creating delta table ${table.fullName} for existing path $hadoopPath")
-        } else {
-          // if path has existing parquet files, convert to delta table
+    // initialize external table if needed
+    if (path.isDefined) { // if path is not defined, it is handled as managed table.
+      if (!isTableExisting) {
+        if (filesystem.exists(hadoopPath)) {
+          if (DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
+            // define a delta table, metadata can be read from files.
+            DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
+            logger.info(s"($id) Creating delta table ${table.fullName} for existing path $hadoopPath")
+          } else {
+            // if path has existing parquet files, convert to delta table
+            require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset delta table.")
+            convertPathToDeltaFormat
+            DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
+          }
+        }
+      } else if (filesystem.exists(hadoopPath)) {
+        if (!DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
+          // if path has existing parquet files but not in delta format, convert to delta format
           require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset delta table.")
           convertPathToDeltaFormat
-          DeltaTable.create(session).tableName(table.fullName).location(hadoopPath.toString).execute()
+          logger.info(s"($id) Converted existing path $hadoopPath to delta table ${table.fullName}")
         }
+      } else {
+        dropTable
+        logger.info(s"($id) Dropped existing delta table ${table.fullName} because path was missing")
       }
-    } else if (filesystem.exists(hadoopPath)) {
-      if (!DeltaTable.isDeltaTable(session, hadoopPath.toString)) {
-        // if path has existing parquet files but not in delta format, convert to delta format
-        require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset delta table.")
-        convertPathToDeltaFormat
-        logger.info(s"($id) Converted existing path $hadoopPath to delta table ${table.fullName}")
-      }
-    } else {
-      dropTable
-      logger.info(s"($id) Dropped existing delta table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
   }
@@ -219,15 +226,15 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
-    val details = DeltaTable.forName(session, table.fullName).detail()
-    val properties = details.select("properties").head.getMap[String, String](0)
+    val details = deltaTable.detail()
+    val properties = details.select("properties").head().getMap[String, String](0)
 
     properties.contains(name)
   }
 
   private def propertyExistsWithValue(name: String, value: String) (implicit session: SparkSession): Boolean = {
-    val details = DeltaTable.forName(session, table.fullName).detail()
-    val properties = details.select("properties").head.getMap[String, String](0)
+    val details = deltaTable.detail()
+    val properties = details.select("properties").head().getMap[String, String](0)
 
     properties.exists(_ == name -> value)
   }
@@ -263,8 +270,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     df
-
-
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
@@ -311,8 +316,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val dfWriter = saveModeTargetDf.write
       .format("delta")
       .options(options)
-      .option("path", hadoopPath.toString)
+      .conditionalOption("path", path.isDefined, () => hadoopPath.toString) // evaluate hadoopPath only for external tables
       .option("userMetadata", userMetadata)
+      .option("mergeSchema", allowSchemaEvolution) // allow schema evolution for SaveMode.Append
 
     val sparkMetrics = if (isTableExisting) {
       if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
@@ -321,47 +327,38 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         if (partitions.isEmpty) {
+          // overwrite all
           dfWriter
             .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
-            .option("mergeSchema", allowSchemaEvolution)
             .mode(SparkSaveMode.from(finalSaveMode))
-            .save() // SaveMode append has strange errors with Table API in delta version 1.1.9
+            .saveAsTable(table.fullName)
         } else {
-          // insert
           if (finalSaveMode == SDLSaveMode.Overwrite) {
-            val overwriteModeisDynamic = options.get("partitionOverwriteMode").contains("dynamic")
-            (partitionValues.isEmpty, overwriteModeisDynamic) match {
-              case (true, false) => throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this DeltaLakeTableDataObject to enable delta lake dynamic partitioning and get around this exception.")
-              case (true, true) => { 
-                dfWriter
-                .option("mergeSchema", allowSchemaEvolution)
-                .mode(SparkSaveMode.from(finalSaveMode))
-                .save() // atomic replace (replaceWhere) doesn't work with Table API
-              }
-              case _ => {
-                dfWriter
-                .option("replaceWhere", partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
-                .option("mergeSchema", allowSchemaEvolution)
-                .mode(SparkSaveMode.from(finalSaveMode))
-                .save() // atomic replace (replaceWhere) doesn't work with Table API
-              }
-            }
+            // insert overwrite
+            val overwriteModeIsDynamic = options.get("partitionOverwriteMode").orElse(session.conf.getOption("spark.sql.sources.partitionOverwriteMode")).contains("dynamic")
+            if (partitionValues.isEmpty && !overwriteModeIsDynamic) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this DeltaLakeTableDataObject to enable delta lake dynamic partitioning and get around this exception.")
+            dfWriter
+              .conditionalOption("replaceWhere", partitionValues.nonEmpty, () => partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql)
+              .conditionalOption("partitionOverwriteMode", partitionValues.nonEmpty, () => "static") // reset partitionOverwriteMode=dynamic when using replaceWhere
+              .mode(SparkSaveMode.from(finalSaveMode))
+              .saveAsTable(table.fullName)
           } else {
+            // insert append
             dfWriter
               .mode(SparkSaveMode.from(finalSaveMode))
-              .option("mergeSchema", allowSchemaEvolution)
-              .save() // it seems generally more stable to work without Table API
+              .saveAsTable(table.fullName)
           }
         }
       })
     } else SparkStageMetricsListener.execWithMetrics(this.id,
+      // create new table
       dfWriter
-        .partitionBy(partitions: _*)
+        .optionalPartitionBy(partitions)
         .saveAsTable(table.fullName)
     )
 
     // get delta table operational metrics
-    val dfHistory = DeltaTable.forName(session, table.fullName).history(1)
+    val dfHistory = deltaTable.history(1)
     if (logger.isDebugEnabled) dfHistory.show(false)
     val latestHistoryEntry = dfHistory.select("operationMetrics", "userMetadata").head()
     assert(latestHistoryEntry.getString(1) == userMetadata, s"($id) current delta lake history entry is not written by this spark application (userMetadata should be $userMetadata). Is there someone else writing to this table?!")
@@ -414,13 +411,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         }
       }
       session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", allowSchemaEvolution)
-      val deltaTable = DeltaTable.forName(session, table.fullName).as("existing")
+      val existingDeltaTable = deltaTable.as("existing")
       // prepare join condition
       val joinCondition = table.primaryKey.get.map(colName => col(s"new.$colName") === col(s"existing.$colName")).reduce(_ and _)
-      var mergeStmt = deltaTable.merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
+      var mergeStmt = existingDeltaTable.merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
       // add delete clause if configured
       saveModeOptions.deleteConditionExpr.foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
       // add update clause - updateExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and updateAll otherwise
+      // see also https://github.com/delta-io/delta/issues/2300
       mergeStmt = if (saveModeOptions.updateColumnsOpt.isDefined) {
         val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
         mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
@@ -510,13 +508,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val helper: SparkSubFeed.type = SparkSubFeed
-    val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
-    partitionValues.map(_.getFilterExpr).foreach(expr => deltaTable.delete(expr.exprSql))
+    partitionValues.map(_.getFilterExpr).foreach(expr => deltaTable(context.sparkSession).delete(expr.exprSql))
   }
 
   override def movePartitions(partitionValues: Seq[(PartitionValues, PartitionValues)])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    val deltaTable = DeltaTable.forName(context.sparkSession, table.fullName)
     partitionValues.foreach {
       case (pvExisting, pvNew) =>
         deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit).toMap)
@@ -526,24 +522,24 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    HiveUtil.dropTable(table, hadoopPath, doPurge = false)
+    HiveUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
   }
 
   def getDetails(implicit session: SparkSession): DataFrame = {
-    DeltaTable.forName(session, table.fullName).detail()
+    deltaTable.detail()
   }
 
   override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
     try {
       implicit val session = context.sparkSession
       import session.implicits._
-      val dfHistory = DeltaTable.forName(session, table.fullName).history()
+      val dfHistory = deltaTable.history()
         .select("timestamp", "userMetadata").as[(Long,String)]
       val (_,lastCommitMsg) = dfHistory.head()
       val (oldestSnapshot,_) = dfHistory.head()
       val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, properties) = getDetails
         .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head()
-      val numRows = DeltaTable.forName(session, table.fullName).toDF.count() // This is actionally calculated by Metadata only :-)
+      val numRows = deltaTable.toDF.count() // This is actionally calculated by Metadata only :-)
       val deltaStats = Map(TableStatsType.CreatedAt.toString -> createdAt, TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.LastCommitMsg.toString -> lastCommitMsg, TableStatsType.NumDataFilesCurrent.toString -> numDataFilesCurrent, TableStatsType.SizeInBytesCurrent.toString -> sizeInBytesCurrent, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshot, TableStatsType.NumRows.toString -> numRows)
       val columnStats = getColumnStats(update, Some(lastModifiedAt))
       HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ deltaStats ++ getPartitionStats + (TableStatsType.Columns.toString -> columnStats)
@@ -610,7 +606,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def getState: Option[String] = {
 
     val dfHistory = DeltaTable.forName(table.fullName).history(1)
-    val latestVersion = String.valueOf(dfHistory.select("version").head.get(0))
+    val latestVersion = String.valueOf(dfHistory.select("version").head().get(0))
 
     Option(latestVersion)
   }

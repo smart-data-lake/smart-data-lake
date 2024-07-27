@@ -30,7 +30,7 @@ import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFram
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSimpleDataType, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
@@ -38,7 +38,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
 import org.apache.spark.sql.functions.{col, input_file_name, lit}
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.{DataType, StringType, StructType}
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
@@ -55,7 +55,7 @@ import scala.util.Try
 trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
-  with UserDefinedSchema with SchemaValidation {
+  with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger {
 
   /**
    * The Spark-Format provider to be used
@@ -85,7 +85,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
-    schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
+    getSchema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
     df
   }
 
@@ -98,7 +98,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     implicit val session: SparkSession = context.sparkSession
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
-    schema.map(createReadSchema).foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "read"))
+    getSchema.map(createReadSchema).foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "read"))
     df
   }
 
@@ -109,12 +109,18 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * If a user-defined schema is returned, it overrides any schema inference. If no user-defined schema is set, the
    * schema may be inferred depending on the configuration and type of data frame reader.
    *
-   * @return The schema to use for the data frame reader when reading from the source.
+   * @return The consolidated schema to validate the schema on read and write, and for the data frame reader when reading from the source.
    */
   def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
     _schemaHolder = _schemaHolder.orElse(
-        // get defined schema
-        schema.map(_.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema])
+        // get defined schema, add potentially missing partition columns as type string
+        schema.map(_.convert(typeOf[SparkSubFeed])).map { s =>
+          val missingPartitions = partitions.filterNot(s.columnExists)
+          if (missingPartitions.nonEmpty) {
+            logger.info(s"($id) adding missing partition columns ${missingPartitions.mkString(", ")} to schema")
+            missingPartitions.foldLeft(s){ case (s,c) => s.add(c, SparkSimpleDataType(StringType))}.asInstanceOf[SparkSchema]
+          } else s.asInstanceOf[SparkSchema]
+        }
       )
       .orElse (
         // or try reading schema file
@@ -153,12 +159,13 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   /**
-   * Provide a sample data file name to be created to file-based Action. If none is returned, no file is created.
+   * Provide a sample data file name to be created by file-based Action. If none is returned, no file is created.
    */
   override def createSampleFile(implicit context: ActionPipelineContext): Option[String] = {
-    // only create new sample file there is no schema file and if it doesnt exist yet, or an update is forced by the environment configuration
-    if (!filesystem.exists(schemaFile) && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) Some(sampleFile.toString)
-    else None
+    // only create new sample file if there is no schema defined, and no schema file exists or an update is forced by the environment configuration
+    if (schema.isEmpty && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) {
+      Some(sampleFile.toString)
+    } else None
   }
   private def sampleFile(implicit context: ActionPipelineContext) = new Path( new Path(hadoopPath, ".sample"), s"sampleData.${fileName.split('.').last.filter(_ != '*')}")
 

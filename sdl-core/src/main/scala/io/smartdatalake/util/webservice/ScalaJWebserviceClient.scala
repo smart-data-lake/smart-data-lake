@@ -67,6 +67,7 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
             proxy: Option[HttpProxyConfig],
             followRedirects: Boolean
            ): ScalaJWebserviceClient = {
+    logger.debug(s"Creating request for $url: additionalHeaders=$additionalHeaders")
     val request = Http(url)
       .headers(additionalHeaders)
       .optionally(timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
@@ -92,7 +93,8 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
     response match {
       // Request was sent, but the response contains an error
       case errorResponse if errorResponse.isError =>
-        logger.error(s"Error when calling ${request.url}: Http status code: ${errorResponse.code}, response body: ${new String(errorResponse.body).take(200)}...")
+        val bodyStr = if (logger.isDebugEnabled) new String(errorResponse.body) else new String(errorResponse.body).take(200)+"..."
+        logger.error(s"Error when calling ${request.url}: Http status code: ${errorResponse.code}, response body: $bodyStr")
         Failure(new WebserviceException(s"Webservice Request failed with error <${errorResponse.code}>", Some(errorResponse.code), Some(new String(errorResponse.body))))
       // Request was successful and response can be processed further
       case normalResponse if normalResponse.isSuccess => Success(normalResponse.body)
