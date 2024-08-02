@@ -82,11 +82,13 @@ case class MockDataObject(override val id: DataObjectId, override val partitions
       val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) PartitionValues.fromDataFrame(SparkDataFrame(df.select(partitions.map(col):_*)))
       else partitionValues
       val newDataFrames = inferredPartitionValues.map(pv => (pv, newDf.where(getPartitionValueFilter(pv)))).toMap
-      partitionedDataFrameMock = Some(
-        partitionedDataFrameMock.getOrElse(Map()) ++ newDataFrames
-      )
-      partitionValuesMock = partitionValuesMock ++ inferredPartitionValues
-      dataFrameMock = None
+      if (newDataFrames.nonEmpty) {
+        partitionedDataFrameMock = Some(
+          partitionedDataFrameMock.getOrElse(Map()) ++ newDataFrames
+        )
+        partitionValuesMock = partitionValuesMock ++ inferredPartitionValues
+        dataFrameMock = None
+      }
     } else {
       saveMode match {
         case SDLSaveMode.Overwrite => dataFrameMock = Some(newDf)
