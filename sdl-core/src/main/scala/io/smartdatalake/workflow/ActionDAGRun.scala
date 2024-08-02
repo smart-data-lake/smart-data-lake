@@ -180,7 +180,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
             resultSubFeeds
           } catch {
             case ex: Exception =>
-              node.postExecFailed
+              node.postExecFailed(ex)
               throw ex
           } finally {
             setThreadName(previousThreadName)

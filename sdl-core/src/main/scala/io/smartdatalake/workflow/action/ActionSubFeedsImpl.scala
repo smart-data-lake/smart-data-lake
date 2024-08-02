@@ -175,9 +175,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
           }
         } else (outputSubFeeds :+ subFeed, taskFailedException, noDataWarning)
     }
-    // if there is a TaskFailedException, enrich it will all results and throw it.
+    // if there is a TaskFailedException, enrich it with all results and throw it.
     taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
-    // if there is a NoDataToProcessWarning, enrich it will all results and throw it.
+    // if there is a NoDataToProcessWarning, enrich it with all results and throw it.
     noDataWarning.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
     // return processed SubFeeds
     outputSubFeeds

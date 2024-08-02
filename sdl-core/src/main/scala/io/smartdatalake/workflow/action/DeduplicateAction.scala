@@ -64,10 +64,6 @@ import scala.reflect.runtime.universe.Type
  * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
  *                                Specify a condition to select existing data to be used in transformation as Spark SQL expression.
  *                                Use table alias 'existing' to reference columns of the existing table data.
- * @param executionMode optional execution mode for this Action
- * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,

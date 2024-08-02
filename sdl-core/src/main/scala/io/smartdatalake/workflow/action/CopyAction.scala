@@ -44,11 +44,6 @@ import scala.reflect.runtime.universe.Type
  * @param transformer optional custom transformation to apply.
  * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
- * @param executionMode optional execution mode for this Action
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
- * @param saveModeOptions override and parametrize saveMode set in output DataObject configurations when writing to DataObjects.
  */
 case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
