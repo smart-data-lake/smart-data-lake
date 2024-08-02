@@ -30,7 +30,7 @@ import io.smartdatalake.util.misc.{EnvironmentUtil, StateUploader}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
-import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -385,6 +385,62 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
         action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,1))
       )
       assert(resultActionsState == expectedActionsState)
+    }
+  }
+
+
+  test("sdlb run 2nd action skipped, check metrics") {
+
+    // init sdlb
+    val appName = "sdlb-skipped-metrics"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+
+    // setup DataObjects
+    val srcDO = MockDataObject( "src1", partitions = Seq("dt")).register
+    val tgt1DO = MockDataObject( "tgt1", partitions = Seq("dt")).register
+    val tgt2DO = MockDataObject( "tgt2", partitions = Seq("dt")).register
+
+    // prepare data
+    val dfSrc = Seq(("20180101", "person", "doe","john",5), ("20190101", "company", "olmo","-",10))
+      .toDF("dt", "type", "lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
+
+    // start first dag run -> fail
+    // action1 should execute
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    // action2 skipped (ExecNoDataTransformer)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(FilterTransformer(filterClause = "false")) // force no data, so that the Action gets skipped
+    )
+    instanceRegistry.register(action2.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+
+    // start dag run
+    sdlb.run(sdlConfig)
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
+      val stateFile = stateStore.getLatestStateId().get
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 1)
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId)).toMap
+      val expectedActionsState = Map(
+        action1.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,1)),
+        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,1))
+      )
+      assert(resultActionsState == expectedActionsState)
+      val action1Metrics = runState.actionsState(action1.id).results.head.metrics.get
+      assert(action1Metrics == Map("count" -> 2, "records_written" -> 2, "count#mainInput" -> 2, "count#src1" -> 2))
+      // no metrics for skipped Action2
+      assert(runState.actionsState(action2.id).results.head.metrics.isEmpty)
     }
   }
 

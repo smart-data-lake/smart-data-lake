@@ -77,7 +77,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   }
 
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId)
+    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None)
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
