@@ -47,10 +47,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *                     but in the end only outputs of the last transformer are mapped to output DataObjects.
  * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
- * @param executionMode          optional execution mode for this Action
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition   optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                               If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  * @param recursiveInputIds      output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
  */

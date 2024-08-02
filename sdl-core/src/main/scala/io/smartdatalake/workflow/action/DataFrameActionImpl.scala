@@ -77,7 +77,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   override def isAsynchronousProcessStarted: Boolean = isAsynchronous && sparkStreamingQuery.nonEmpty
 
   /**
-   * Override and parametrize saveMode in output DataObject configurations when writing to DataObjects.
+   * Optionally override and parametrize saveMode in output DataObject configurations when writing to DataObjects.
    */
   def saveModeOptions: Option[SaveModeOptions] = None
 
@@ -552,9 +552,5 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
           subFeed.unpersist
         }
     }
-  }
-
-  override def postExecFailed(implicit context: ActionPipelineContext): Unit = {
-    super.postExecFailed
   }
 }
