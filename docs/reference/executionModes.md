@@ -97,6 +97,7 @@ If you need to read everything from one DataObject, even though it does have the
 you can again use `CustomDataFrameAction.inputIdsToIgnoreFilter` to override the default behavior.
 :::
 
+
 ### FailIfNoPartitionValuesMode
 If you use the method described above, you might want to set the executionMode to `FailIfNoPartitionValuesMode`.
 This mode enforces having partition values specified.
@@ -178,6 +179,7 @@ With these setting, you can limit the amount of columns used for the comparison 
 #### nbOfPartitionValuesPerRun
 If you have a lot of partitions, you might want to limit the number of partitions processed per run.
 If you define `nbOfPartitionValuesPerRun`, PartitionDiffMode will only process the first n partitions and ignore the rest.
+
 
 ### CustomPartitionMode
 This execution mode allows for complete customized logic to select partitions to process in Scala.
