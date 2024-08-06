@@ -97,8 +97,6 @@ If you need to read everything from one DataObject, even though it does have the
 you can again use `CustomDataFrameAction.inputIdsToIgnoreFilter` to override the default behavior.
 :::
 
-####
-
 ### FailIfNoPartitionValuesMode
 If you use the method described above, you might want to set the executionMode to `FailIfNoPartitionValuesMode`.
 This mode enforces having partition values specified.
