@@ -69,9 +69,10 @@ More details on the roadmap will follow shortly.
 * Automatic adaption of DataObjects with fixed schema (Jdbc, DeltaLake)
 
 ## Metrics
-* Number of rows written per DataObject
+* Number of rows read/written per DataObject
 * Execution duration per Action
 * Arbitrary custom metrics defined by aggregation expressions
+* Predefined metric for transfer rate, completness and ensuring unique constraints.
 * StateListener interface to get notified about progress & metrics
 
 ## Data Catalog
