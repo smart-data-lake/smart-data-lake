@@ -41,7 +41,7 @@ Expectations can be defined on DataObjects (and Actions, see below) to monitor a
 
 Using the `type = SQLExpectation`, a simple aggregation SQL expression is evaluated over the dataset. Further, an arbitrary SQL expression can be configured as expectation condition, which is compared against the metric value. If no expectation condition is given, the custom metric value is just logged in the `finished writing to DataObject~xyz:...` log message, see example in [Metrics](#metrics) section.
 
-SDLB supports other expectation types, see [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html) for a list. A special type is the UniquKeyExpectations, which can be used to validate primary keys, or just report it's uniqueness as metric.
+SDLB supports other expectation types, see [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html) for a list. A special type is the UniqueKeyExpectations, which can be used to validate primary keys, or just report it's uniqueness as metric.
 
 By default, the expectation is evaluated against the currently processed dataset (scope=Job), which may consist of multiple partition values. Using `scope=Job` results in one metric for the processed dataset. Using the option `scope=JobPartition`, the scope can be changed to evalute against *each* partition value in the dataset processed by the job. This results in one metric per processed partition. The option `scope=All` would take all data in the output DataObject into account, and create one metric for it. Note that expectations with scope!=Job need reading the data from the output again after it has been written, while expectations with scope=Job can be calculated on the fly when using Spark as execution engine.
 
