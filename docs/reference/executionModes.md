@@ -185,7 +185,7 @@ If you define `nbOfPartitionValuesPerRun`, PartitionDiffMode will only process t
 This execution mode allows for complete customized logic to select partitions to process in Scala.
 Implement trait `CustomPartitionModeLogic` by defining a function which receives main input & output DataObjects and returns partition values to process as `Seq[Map[String,String]]`.
 The contents of the command-line parameters `--partition-values` and `--multi-partition-values` is provided in the input argument `givenPartitionValues`.
-You are free to use or ignore this information in your custom execution mode. You can also use a `CustomPartitionMode` together with the Default Behavior in the same DAG run by having some Actions define a `CustomPartitionMode` and others not. For example, you can partition measurement data by day and select individual days using `--partition-values`, but fetch master data based on a different, custom logic.
+You are free to use or ignore this information in your custom execution mode. You can also use a `CustomPartitionMode` together with the Default Behavior in the same DAG run by having some Actions define a `CustomPartitionMode` and others not. For example, you can partition transaction data by day and select individual days using `--partition-values`, but fetch master data based on a different, custom logic.
 
 ### ProcessAllMode
 An execution mode which forces processing of all data from its inputs.
