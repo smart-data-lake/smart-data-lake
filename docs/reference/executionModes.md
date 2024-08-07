@@ -183,8 +183,13 @@ If you define `nbOfPartitionValuesPerRun`, PartitionDiffMode will only process t
 
 ### CustomPartitionMode
 This execution mode allows for complete customized logic to select partitions to process in Scala.
-Implement trait `CustomPartitionModeLogic` by defining a function which receives main input & output DataObjects and returns partition values to process as `Seq[Map[String,String]]`
+Implement trait `CustomPartitionModeLogic` by defining a function which receives main input & output DataObjects and returns partition values to process as `Seq[Map[String,String]]`.
+The contents of the command-line parameters `--partition-values` and `--multi-partition-values` is provided in the input argument `givenPartitionValues`.
+You are free to use or ignore this information in your custom execution mode. You can also use a `CustomPartitionMode` together with the Default Behavior in the same DAG run by having some Actions define a `CustomPartitionMode` and others not. For example, you can partition transaction data by day and select individual days using `--partition-values`, but fetch master data based on a different, custom logic.
 
+### ProcessAllMode
+An execution mode which forces processing of all data from its inputs.
+Any partitionValues and filter conditions received from previous actions are ignored.
 
 ## Incremental load
 Some DataObjects are not partitioned, but nevertheless you don't want to read all data from the input on every run.
@@ -260,20 +265,12 @@ FileIncrementalMoveMode can be used with the file engine (see also [Execution en
 
 ## Others
 
-### ProcessAllMode
-An execution mode which forces processing of all data from its inputs.
-Any partitionValues and filter conditions received from previous actions are ignored.
-
-### CustomPartitionMode
-This execution mode allows to implement arbitrary custom partition logic using Scala.
-
-Implement trait `CustomPartitionMode` by defining a function which receives the main input and output DataObjects
-and returns the partition values that need to be processed.
-
 ### CustomMode
+
 This execution mode allows to implement arbitrary processing logic using Scala.
 
 Implement trait `CustomModeLogic` by defining a function which receives main input and output DataObjects and returns an `ExecutionModeResult`.
 The result can contain input and output partition values, but also options which are passed to the transformations defined in the Action.
+
 
 
