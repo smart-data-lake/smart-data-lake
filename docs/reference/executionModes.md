@@ -263,7 +263,14 @@ This can be achieved by using FileIncrementalMoveMode. If option `archiveSubdire
 
 FileIncrementalMoveMode can be used with the file engine (see also [Execution engines](executionEngines.md)), but also with SparkFileDataObjects and the data frame engine.
 
+## Others
 
+### CustomMode
+
+This execution mode allows to implement arbitrary processing logic using Scala.
+
+Implement trait `CustomModeLogic` by defining a function which receives main input and output DataObjects and returns an `ExecutionModeResult`.
+The result can contain input and output partition values, but also options which are passed to the transformations defined in the Action.
 
 
 
