@@ -896,7 +896,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val temp_dir_base = Files.createTempDirectory("odatatest_filebuffer").toFile
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
-    val temp_dir = new File(temp_dir_base, "testSource_1717974000")
+    val temp_dir = new File(temp_dir_base, "test-dataobject_1717974000")
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
