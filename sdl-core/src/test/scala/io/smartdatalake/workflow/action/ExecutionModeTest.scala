@@ -36,6 +36,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
+import java.io.FileNotFoundException
 import java.nio.file.Files
 
 class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
@@ -64,6 +65,10 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
   val tgt2DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
   instanceRegistry.register(tgt2DO)
 
+  val tgt3Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname", "firstname")))
+  val tgt3DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+  instanceRegistry.register(tgt3DO)
+
   val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath + s"/fileTestSrc", partitions = Seq("lastname"))
   instanceRegistry.register(fileSrcDO)
 
@@ -77,6 +82,8 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     tgt1DO.dropTable
     tgt2DO.dropTable
     tgt2DO.writeSparkDataFrame(l1.where($"rating" <= 2), Seq())
+    tgt3DO.dropTable
+    tgt3DO.writeSparkDataFrame(l1.where($"rating" <= 2).withColumnRenamed("rating", "Rating"), Seq())
     fileSrcDO.writeSparkDataFrame(l1, Seq())
   }
 
@@ -192,6 +199,20 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.nonEmpty)
   }
+  test("DataFrameIncrementalMode comparison column has different case than InputDataObject Column") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "Rating")
+    executionMode.prepare(ActionId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filter.nonEmpty)
+  }
+    test("DataFrameIncrementalMode comparison column has different case than OutputDataObject Column") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating")
+    executionMode.prepare(ActionId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filter.nonEmpty)
+  }
 
   test("DataFrameIncrementalMode no data to process") {
     val executionMode = DataFrameIncrementalMode(compareCol = "rating")
@@ -239,6 +260,44 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     executionMode.postExec(ActionId("test"), srcDOArchive, srcDOArchive, subFeedWithFileRefs, subFeedWithFileRefs)
     assert(srcDOArchive.getFileRefs(Seq()).isEmpty)
     assert(srcDOArchive.filesystem.listStatus(new Path(srcDOArchive.path + s"/archive")).toSeq.nonEmpty)
+  }
+
+  test("FileIncrementalMoveMode archive relative path with partitions") {
+    val srcDOArchive = ParquetFileDataObject("srcArchive", tempPath + s"/srcArchive", partitions = Seq("lastname"))
+    srcDOArchive.deleteAll
+    instanceRegistry.register(srcDOArchive)
+    val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
+    srcDOArchive.writeSparkDataFrame(l1, Seq())
+
+    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = srcDOArchive.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDOArchive, srcDOArchive, subFeed, PartitionValues.oneToOneMapping).get
+    val subFeedWithFileRefs = subFeed.copy(fileRefs = result.fileRefs, fileRefMapping = result.fileRefs.map(_.map(fileRef => FileRefMapping(fileRef, fileRef))))
+    assert(srcDOArchive.getFileRefs(Seq()).nonEmpty)
+    executionMode.postExec(ActionId("test"), srcDOArchive, srcDOArchive, subFeedWithFileRefs, subFeedWithFileRefs)
+    assert(srcDOArchive.getFileRefs(Seq()).isEmpty)
+    assert(srcDOArchive.filesystem.listStatus(new Path(srcDOArchive.path + s"/archive")).nonEmpty)
+    assert(srcDOArchive.filesystem.globStatus(new Path(srcDOArchive.path + s"/*/archive/*")).isEmpty)
+  }
+
+  test("FileIncrementalMoveMode archive relative path with partitions and archiveInsidePartition") {
+    val srcDOArchive = ParquetFileDataObject("srcArchive", tempPath + s"/srcArchive", partitions = Seq("lastname"))
+    srcDOArchive.deleteAll
+    instanceRegistry.register(srcDOArchive)
+    val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
+    srcDOArchive.writeSparkDataFrame(l1, Seq())
+
+    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"), archiveInsidePartition = true)
+    executionMode.prepare(ActionId("test"))
+    val subFeed: FileSubFeed = FileSubFeed(fileRefs = None, dataObjectId = srcDOArchive.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDOArchive, srcDOArchive, subFeed, PartitionValues.oneToOneMapping).get
+    val subFeedWithFileRefs = subFeed.copy(fileRefs = result.fileRefs, fileRefMapping = result.fileRefs.map(_.map(fileRef => FileRefMapping(fileRef, fileRef))))
+    assert(srcDOArchive.getFileRefs(Seq()).nonEmpty)
+    executionMode.postExec(ActionId("test"), srcDOArchive, srcDOArchive, subFeedWithFileRefs, subFeedWithFileRefs)
+    assert(srcDOArchive.getFileRefs(Seq()).isEmpty)
+    intercept[FileNotFoundException](srcDOArchive.filesystem.listStatus(new Path(srcDOArchive.path + s"/archive")))
+    assert(srcDOArchive.filesystem.globStatus(new Path(srcDOArchive.path + s"/*/archive/*")).toSeq.nonEmpty)
   }
 
   test("FileIncrementalMoveMode archive absolute path") {

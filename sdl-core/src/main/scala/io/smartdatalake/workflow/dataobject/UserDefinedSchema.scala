@@ -38,6 +38,7 @@ trait UserDefinedSchema {
    * If defined, any automatic schema inference is avoided.
    *
    * The schema corresponds to the schema on write, it must not include optional columns on read, e.g. the filenameColumn for SparkFileDataObjects.
+   * If partition columns are missing, they will be added with type String.
    *
    * Define the schema by using one of the schema providers below, default is DDL.
    * The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
@@ -57,8 +58,8 @@ trait UserDefinedSchema {
    *   If true, the singular name of the array element in the XSD is converted to a plural name by adding an 's'
    *   in order to read corresponding json files.
    *   Default is false.
-   * - jsonSchemaFile: read a Json Schema file and create a schema, e.g. `xsdFile#abc/xyz.json`
-   *   The following parameters allow to customize the behavior: `xsdFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`
+   * - jsonSchemaFile: read a Json Schema file and create a schema, e.g. `jsonSchemaFile#abc/xyz.json`
+   *   The following parameters allow to customize the behavior: `jsonSchemaFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`
    *   <row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.
    *   <strictTyping>: if true
    *   union types (oneOf) are merged if rational, otherwise they are simply mapped to StringType;
@@ -67,8 +68,8 @@ trait UserDefinedSchema {
    *   <additionalPropertiesDefault>: Set to true or false.
    *   This is used as default value for 'additionalProperties'-field if it is missing in a schema with type='object'.
    *   Default value is additionalPropertiesDefault=true, as this is conform with the specification.
-   * - avroSchemaFile: read an Avro Schema file and create a schema, e.g. `xsdFile#abc/xyz.avsc`
-   *   The following parameters allow to customize the behavior: `xsdFile#<path-to-avsc-file>;<row-tag>`
+   * - avroSchemaFile: read an Avro Schema file and create a schema, e.g. `avroSchemaFile#abc/xyz.avsc`
+   *   The following parameters allow to customize the behavior: `avroSchemaFile#<path-to-avsc-file>;<row-tag>`
    *   <row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.
    *
    * Note that all schema files are configured as Hadoop path. The custom prefix 'cp' can be used to read schema files

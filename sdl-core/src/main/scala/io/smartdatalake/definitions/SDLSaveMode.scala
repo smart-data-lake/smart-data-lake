@@ -87,12 +87,13 @@ object SDLSaveMode extends Enumeration {
    */
   val Merge: Value = Value("Merge")
 
-  private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues]): Unit = {
+  private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     saveMode match {
       case SDLSaveMode.Append => writer.append()
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
       case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty => writer.overwrite(expr(partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql))
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty && partitionOverwriteModeDynamic => writer.overwritePartitions()
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
     }
   }
 }
@@ -125,6 +126,7 @@ case class SaveModeGenericOptions(override val saveMode: SDLSaveMode) extends Sa
 case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
                                 updateCondition: Option[String] = None,
                                 updateColumns: Seq[String] = Seq(),
+                                updateExistingCondition: Option[String] = None,
                                 insertCondition: Option[String] = None,
                                 insertColumnsToIgnore: Seq[String] = Seq(),
                                 insertValuesOverride: Map[String, String] = Map(),
@@ -133,6 +135,7 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
   override private[smartdatalake] val saveMode = SDLSaveMode.Merge
   private[smartdatalake] val deleteConditionExpr = deleteCondition.map(expr)
   private[smartdatalake] val updateConditionExpr = updateCondition.map(expr)
+  private[smartdatalake] val updateExistingConditionExpr = updateExistingCondition.map(expr)
   private[smartdatalake] val insertConditionExpr = insertCondition.map(expr)
   private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
   private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)

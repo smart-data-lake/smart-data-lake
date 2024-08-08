@@ -173,8 +173,9 @@ private object IndexEntry {
       state.appConfig.appName, state.runId, state.attemptId, state.appConfig.feedSel,
       state.runStartTime, state.attemptStartTime, runEndTime,
       state.finalState.get, actionsState,
-      state.buildVersionInfo.map(_.version),
-      state.appVersion, relativePath
+      state.sdlbVersionInfo.flatMap(_.get("version")).map(_.toString),
+      state.appVersionInfo.flatMap(_.get("version")).map(_.toString),
+      relativePath
     )
   }
 }

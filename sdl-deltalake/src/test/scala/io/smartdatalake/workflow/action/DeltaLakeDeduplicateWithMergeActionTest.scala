@@ -22,6 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.{DeltaLakeModulePlugin, DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
@@ -51,7 +52,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
+    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
@@ -115,7 +116,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
+    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname","firstname")))
     val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)

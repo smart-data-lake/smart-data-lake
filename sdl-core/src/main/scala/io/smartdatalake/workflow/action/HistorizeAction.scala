@@ -156,11 +156,13 @@ case class HistorizeAction(
     } else if (mergeModeEnable) {
       // customize update condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = Seq(TechnicalTableColumn.delimited)
+      val updateCols = if (input.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(TechnicalTableColumn.delimited)
+        else Seq(TechnicalTableColumn.delimited, Historization.historizeHashColName)
+      val updateExistingCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateExisting}'")
       val insertCondition =  Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
       val insertColsToIgnore = Seq(Historization.historizeOperationColName)
       val additionalMergePredicate = Some((s"new.${TechnicalTableColumn.captured} = existing.${TechnicalTableColumn.captured}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
+      Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, updateExistingCondition = updateExistingCondition, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
     } else {
       // force SDLSaveMode.Overwrite otherwise
       Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
@@ -192,7 +194,7 @@ case class HistorizeAction(
     transformerDefs.foreach(_.prepare(id))
   }
 
-  private def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val capturedTs = getReferenceTimestamp
     val pks = output.table.primaryKey.get // existance is validated earlier
 
@@ -263,14 +265,24 @@ case class HistorizeAction(
 
     val newFeedDf = newDf.dropDuplicates(pks)
 
+    // if context is init check if column needs to be added -> save in needsHashColumn
+    if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
+      case Some(df) => Some(df.columns.contains(Historization.historizeHashColName))
+      case _ => Some(false)
+    }
+
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
       if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
+
+      val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
       // note that schema evolution is done by output DataObject
-      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist)
+      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
     } else Historization.getInitialHistoryWithHashCol(newFeedDf, refTimestamp, historizeWhitelist, historizeBlacklist)
   }
+
+  private var existingDfNeedsHashColumn: Option[Boolean] = None
 
   // TODO: make generic
   protected def incrementalCDCHistorizeDataFrame(existingDf: Option[DataFrame], pks: Seq[String], mergeModeDeletedRecordsConditionExpr: Column, refTimestamp: LocalDateTime)(newDf: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
@@ -287,6 +299,11 @@ case class HistorizeAction(
 
   private def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime = {
     context.referenceTimestamp.getOrElse(LocalDateTime.now)
+  }
+
+  override private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
+    super.reset
+    existingDfNeedsHashColumn = None
   }
 
   override def factory: FromConfigFactory[Action] = HistorizeAction

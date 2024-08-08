@@ -61,12 +61,18 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def collect: Seq[GenericRow]
 
+  def distinct: GenericDataFrame
+
   def withColumn(colName: String, expression: GenericColumn): GenericDataFrame
 
   def drop(colName: String): GenericDataFrame
 
   def createOrReplaceTempView(viewName: String): Unit
 
+  /**
+   * isEmpty evaluates the DataFrame and checks if the result size = 0.
+   * @return
+   */
   def isEmpty: Boolean
 
   def count: Long
@@ -97,6 +103,15 @@ trait GenericDataFrame extends GenericTypedObject {
    * @return an Observation object which can return observed metrics after execution
    */
   def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation)
+
+  /**
+   * Observe metrics on this DataFrame.
+   * Note that this doesn't create a listener. These metrics will only be collected together using setupObservation.
+   * @param name name of the observation
+   * @param aggregateColumns aggregate columns to observe on the DataFrame
+   * @return the modified DataFrame
+   */
+  def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame
 
   /**
    * returns data frame which consists of those rows which contain at least a null in the specified columns
@@ -216,6 +231,8 @@ trait GenericDataFrame extends GenericTypedObject {
    */
   def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
 
+  def apply(columnName: String): GenericColumn
+
 }
 
 /**
@@ -284,8 +301,9 @@ trait GenericColumn extends GenericTypedObject {
    * Convert expression to SQL representation
    */
   def exprSql: String
-
   def desc: GenericColumn
+  def apply(extraction: Any): GenericColumn
+  def getName: Option[String]
 }
 
 /**

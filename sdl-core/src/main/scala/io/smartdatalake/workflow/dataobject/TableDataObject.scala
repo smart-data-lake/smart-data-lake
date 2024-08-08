@@ -75,5 +75,4 @@ trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaVali
    * @return column statistics about this DataObject
    */
   def getColumnStats(update: Boolean = false, lastModifiedAt: Option[Long] = None)(implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = Map()
-
 }

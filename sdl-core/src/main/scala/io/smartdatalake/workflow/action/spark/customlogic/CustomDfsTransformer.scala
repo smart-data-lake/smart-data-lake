@@ -21,24 +21,25 @@ package io.smartdatalake.workflow.action.spark.customlogic
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, MethodParameterInfo, ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DefaultExpressionData
-import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OUTPUT_DATAOBJECT_ID
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, getConverterFor}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.tolerantGet
-import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.{prepareTolerantKey, tolerantGet}
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaClassSparkDsNTo1Transformer, ScalaCodeSparkDfsTransformer}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import java.lang.reflect.InvocationTargetException
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
+import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Interface to define a custom Spark-DataFrame transformation (n:m)
  * Same trait as [[CustomDfTransformer]], but multiple input and outputs supported.
  */
-trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable with SmartDataLakeLogger {
+trait CustomDfsTransformer extends CustomTransformMethodDef with TransformInfo with TransformDfsMethod with Serializable with SmartDataLakeLogger {
 
   /**
    * Function to define the transformation between several input and output DataFrames (n:m).
@@ -51,77 +52,10 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
    * @param dfs DataFrames to be transformed
    * @return Map of transformed DataFrames
    */
-  def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] = {
-    val transformMethod = customTransformMethod.get
-    val rt = transformMethod.returnType
-    require(rt =:= typeOf[DataFrame] || rt <:< typeOf[Dataset[_]] || rt =:= typeOf[Map[String, DataFrame]] || rt <:< typeOf[Map[String, Dataset[_]]]
-      , s"The return type of the transform method is ${transformMethod.returnType} but should be one of DataFrame Dataset[_], Map[String,DataFrame] or Map[String,Dataset[_]]")
-
-    // prepare parameters
-    val transformParameters = getCustomTransformMethodParameterInfo.get
-    val mappedParameters = transformParameters.map {
-      case dfParam if dfParam.tpe <:< typeOf[DataFrame] =>
-        val paramName = dfParam.name
-        val dfName = paramName.stripPrefix("df")
-        val df = tolerantGet(dfs, dfName)
-          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dfName for parameter $paramName"))
-        (dfParam, df)
-      case dsParam if dsParam.tpe <:< typeOf[Dataset[_]] =>
-        val paramName = dsParam.name
-        val dsName = paramName.stripPrefix("ds")
-        val dsType = dsParam.tpe.typeArgs.head
-        val df = tolerantGet(dfs, dsName)
-          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName"))
-        val dfWithSelect = {
-          val columnNames = ProductUtil.classAccessorNames(dsType)
-          df.select(columnNames.map(col): _*)
-        }
-        val ds = ProductUtil.createDataset(dfWithSelect, dsType)
-        (dsParam, ds)
-      case sessionParam if sessionParam.tpe =:= typeOf[SparkSession] => (sessionParam, session)
-      case optionsParam if optionsParam.tpe =:= typeOf[Map[String, String]] => (optionsParam, options)
-      case optionalParam if optionalParam.tpe <:< typeOf[Option[_]] =>
-        val optionVal = try {
-          Some(extractOptionVal(options, optionalParam, getConverterFor(optionalParam.tpe.typeArgs.head)))
-        } catch {
-          case _: NotFoundError => optionalParam.defaultValue.map(_.asInstanceOf[Option[Any]]).getOrElse(None)
-        }
-        (optionalParam, optionVal)
-      case defaultParam if defaultParam.defaultValue.isDefined =>
-        val defaultVal = try {
-          extractOptionVal(options, defaultParam, getConverterFor(defaultParam.tpe))
-        } catch {
-          case _: NotFoundError => defaultParam.defaultValue.get
-        }
-        (defaultParam, defaultVal)
-      case otherParam => (otherParam, extractOptionVal(options, otherParam, getConverterFor(otherParam.tpe)))
-    }
-
-    // call transform method
-    val transformResult = try {
-      CustomCodeUtil.callMethod[Any](this, transformMethod, mappedParameters.map(_._2))
-    } catch {
-      case e: InvocationTargetException =>
-        // Simplify nested exception to hide reflection complexity in exceptions from custom transformer code.
-        val targetException = e.getTargetException
-        targetException.setStackTrace(e.getTargetException.getStackTrace ++ e.getStackTrace)
-        throw targetException
-    }
-
-    // distinguish between returning single and multiple DataFrames.
-    if (transformMethod.returnType =:= typeOf[Map[String, DataFrame]]) {
-      transformResult.asInstanceOf[Map[String, DataFrame]]
-    } else if (transformMethod.returnType <:< typeOf[Map[String, Dataset[_]]]) {
-      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF).toMap
-    } else if (transformMethod.returnType =:= typeOf[DataFrame]) {
-      require(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
-      Map(options(OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
-    } else if (transformMethod.returnType <:< typeOf[Dataset[_]]) {
-      require(options.isDefinedAt(OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
-      Map(options(OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[Dataset[_]].toDF)
-    } else {
-      throw new IllegalStateException(s"Custom transform function has unsupported return type ${transformMethod.returnType}")
-    }
+  override def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame] = {
+    require(customTransformMethod.isDefined, s"${this.getClass.getSimpleName} transform method is not overridden and no custom transform method is defined")
+    require(customTransformMethodWrapper.get.returnsSingleDataset || customTransformMethodWrapper.get.returnsMultipleDatasets, s"The return type of the transform method is ${customTransformMethod.get.returnType} but should be one of DataFrame, Dataset[_], Map[String,DataFrame] or Map[String,Dataset[_]]")
+    customTransformMethodWrapper.get.call(this, dfs, options)(session)
   }
 
   /**
@@ -153,6 +87,11 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with Serializable wi
     val defaultTransformMethod = typeOf[CustomDfsTransformer].member(TermName("transform"))
     transformMethods.find(_.typeSignature != defaultTransformMethod.typeSignature)
   }
+
+  @transient private lazy val customTransformMethodWrapper = customTransformMethod.map(new CustomTransformMethodWrapper(_))
+  override def getInputDataObjectsNameAndType: Option[Seq[(String, universe.Type)]] = customTransformMethodWrapper.map(_.getInputDataObjectNames.mapValues(_.tpe).toSeq)
+  override def isSingleInput: Boolean = customTransformMethodWrapper.map(_.getInputDataObjectNames.keys.size==1).getOrElse(false)
+  override def isSingleOutput: Boolean = customTransformMethodWrapper.map(_.returnsSingleDataset).getOrElse(false)
 }
 
 /**
@@ -224,10 +163,141 @@ object CustomDfsTransformer {
  */
 trait CustomTransformMethodDef {
   private[smartdatalake] def customTransformMethod: Option[universe.MethodSymbol]
+}
 
-  private[smartdatalake] final def getCustomTransformMethodParameterInfo: Option[Seq[MethodParameterInfo]] = {
-    customTransformMethod.map(m => CustomCodeUtil.analyzeMethodParameters(this, m))
+/**
+ * A wrapper around a custom transform method to analyse parameters and dynamically call the method
+ */
+class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
+
+  /**
+   * Extract parameter info from method.
+   * @param instance to extract default parameter values, an object instance implementing this.method has to be provided.
+   */
+  private[smartdatalake] final def getParameterInfo(instance: Option[AnyRef] = None): Seq[MethodParameterInfo] = {
+    CustomCodeUtil.analyzeMethodParameters(instance, method)
   }
+
+  /**
+   * Returns true if method has a single DataFrame/Dataset return type
+   */
+  private[smartdatalake] def returnsSingleDataset: Boolean = {
+    method.returnType.exists(rt => rt =:= typeOf[DataFrame] || rt <:< typeOf[Dataset[_]])
+  }
+
+  /**
+   * Returns true if method has a Map[String,DataFrame/Dataset] return type
+   */
+  private[smartdatalake] def returnsMultipleDatasets: Boolean = {
+    method.returnType.exists(rt => rt =:= typeOf[Map[String, DataFrame]] || rt <:< typeOf[Map[String, Dataset[_]]])
+  }
+
+  private[smartdatalake] def getInputDataObjectNames[T : TypeTag]: Map[String, MethodParameterInfo] = {
+    getParameterInfo().collect {
+      case dfParam if dfParam.tpe <:< typeOf[DataFrame] => (prepareTolerantKey(dfParam.name.stripPrefix("df")), dfParam)
+      case dsParam if dsParam.tpe <:< typeOf[Dataset[T]] => (prepareTolerantKey(dsParam.name.stripPrefix("ds")), dsParam)
+    }.toMap
+  }
+
+  /**
+   * Dynamically call transform method
+   * @param instance object instance implementing method
+   */
+  private[smartdatalake] def call(instance: AnyRef, dfs: Map[String,DataFrame], options: Map[String,String])(implicit session: SparkSession): Map[String, DataFrame] = {
+    val transformParameters = getParameterInfo(Some(instance))
+    val returnType = method.returnType
+    val mappedParameters = transformParameters.map {
+      case dfParam if dfParam.tpe <:< typeOf[DataFrame] =>
+        val paramName = dfParam.name
+        val dfName = paramName.stripPrefix("df")
+        val df = tolerantGet(dfs, dfName)
+          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dfName for parameter $paramName"))
+        (dfParam, df)
+      case dsParam if dsParam.tpe <:< typeOf[Dataset[_]] =>
+        val paramName = dsParam.name
+        val dsName = paramName.stripPrefix("ds")
+        val dsType = dsParam.tpe.typeArgs.head
+        val df = tolerantGet(dfs, dsName)
+          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName"))
+        val dfWithSelect = {
+          val columnNames = ProductUtil.classAccessorNames(dsType)
+          df.select(columnNames.map(col): _*)
+        }
+        val ds = ProductUtil.createDataset(dfWithSelect, dsType)
+        (dsParam, ds)
+      case sessionParam if sessionParam.tpe =:= typeOf[SparkSession] => (sessionParam, session)
+      case optionsParam if optionsParam.tpe =:= typeOf[Map[String, String]] => (optionsParam, options)
+      case optionalParam if optionalParam.tpe <:< typeOf[Option[_]] =>
+        val optionVal = try {
+          Some(extractOptionVal(options, optionalParam, getConverterFor(optionalParam.tpe.typeArgs.head)))
+        } catch {
+          case _: NotFoundError => optionalParam.defaultValue.map(_.asInstanceOf[Option[Any]]).getOrElse(None)
+        }
+        (optionalParam, optionVal)
+      case defaultParam if defaultParam.defaultValue.isDefined =>
+        val defaultVal = try {
+          extractOptionVal(options, defaultParam, getConverterFor(defaultParam.tpe))
+        } catch {
+          case _: NotFoundError => defaultParam.defaultValue.get
+        }
+        (defaultParam, defaultVal)
+      case otherParam => (otherParam, extractOptionVal(options, otherParam, getConverterFor(otherParam.tpe)))
+    }
+
+    // call transform method
+    val transformResult = try {
+      CustomCodeUtil.callMethod[Any](instance, method, mappedParameters.map(_._2))
+    } catch {
+      case e: InvocationTargetException =>
+        // Simplify nested exception to hide reflection complexity in exceptions from custom transformer code.
+        val targetException = e.getTargetException
+        targetException.setStackTrace(e.getTargetException.getStackTrace ++ e.getStackTrace)
+        throw targetException
+    }
+
+    // distinguish between returning single and multiple DataFrames.
+    if (returnType =:= typeOf[Map[String, DataFrame]]) {
+      transformResult.asInstanceOf[Map[String, DataFrame]]
+    } else if (returnType <:< typeOf[Map[String, Dataset[_]]]) {
+      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF).toMap
+    } else if (returnType =:= typeOf[DataFrame]) {
+      require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
+      Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
+    } else if (returnType <:< typeOf[Dataset[_]]) {
+      require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
+      Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[Dataset[_]].toDF)
+    } else {
+      throw new IllegalStateException(s"Custom transform function has unsupported return type ${returnType}")
+    }
+  }
+ }
+
+/**
+ * A trait to provide detailed information about a transformation
+ */
+trait TransformInfo {
+  /**
+   * Get names of input DataObjects. The Names can be DataObjectIds or names of intermediate DataFrames.
+   * @return None if input DataObjects are unknown, otherwise a list of input DataObjects in CamelCase notation.
+   */
+  def getInputDataObjectsNameAndType: Option[Seq[(String,universe.Type)]]
+
+  /**
+   * If the transformer has only one output DataObject
+   */
+  def isSingleOutput: Boolean
+
+  /**
+   * If the transformer has only one input DataObject
+   */
+  def isSingleInput: Boolean
+}
+
+/**
+ * A trait to define the method to transform m:n DataFrames
+ */
+trait TransformDfsMethod {
+  def transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) : Map[String,DataFrame]
 }
 
 case class NotFoundError(msg: String) extends Exception(msg)

@@ -42,20 +42,26 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * Deletes a Hive table
    *
    * @param table Hive table
-   * @param tablePath path of table to delete
+   * @param tablePath Optional path of table to delete (can be None for managed tables...)
    * @param doPurge Flag to indicate if PURGE should be used when deleting (don't delete to HDFS trash). Default: true
    * @param existingOnly Flag if check "if exists" should be executed. Default: true
    */
-  def dropTable(table: Table, tablePath: Path, filesystem: Option[FileSystem] = None, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
+  def dropTableOptionalPath(table: Table, tablePath: Option[Path], filesystem: Option[FileSystem] = None, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
     val existsClause = if (existingOnly) "if exists " else ""
     val purgeClause = if (doPurge) " purge" else ""
     val stmt = s"drop table $existsClause${table.fullName}$purgeClause"
     execSqlStmt(stmt)
-    implicit val fs: FileSystem = filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(tablePath))
-    HdfsUtil.deletePath(tablePath, false)
+    tablePath.foreach { path =>
+      implicit val fs: FileSystem = filesystem.getOrElse(HdfsUtil.getHadoopFsFromSpark(path))
+      HdfsUtil.deletePath(path, doWarn = false)
+    }
   }
 
-  /**
+  def dropTable(table: Table, tablePath: Path, filesystem: Option[FileSystem] = None, doPurge: Boolean = true, existingOnly: Boolean = true)(implicit session: SparkSession): Unit = {
+    dropTableOptionalPath(table, Some(tablePath), filesystem, doPurge, existingOnly)
+  }
+
+    /**
    * Collects table-level statistics
    *
    * @param table Hive table

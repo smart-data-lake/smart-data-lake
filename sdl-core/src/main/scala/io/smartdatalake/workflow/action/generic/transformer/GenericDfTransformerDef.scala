@@ -33,7 +33,9 @@ import org.apache.spark.sql.DataFrame
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-trait PartitionValueTransformer {
+trait Transformer
+
+trait PartitionValueTransformer extends Transformer {
   /**
    * Optional function to define the transformation of input to output partition values.
    * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.

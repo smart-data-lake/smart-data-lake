@@ -29,14 +29,17 @@ import scala.util.{Failure, Success, Try}
 
 private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) extends WebserviceClient {
   private val contentTypeHeader = "content-type"
-  override def get(): Try[Array[Byte]] = {
-    exec(request)
+  override def get(params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.params(params))
   }
-  override def post(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).postData(body))
+  override def post(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.header(contentTypeHeader, mimeType).params(params).postData(body))
   }
-  override def put(body: Array[Byte], mimeType: String): Try[Array[Byte]] = {
-    exec(request.header(contentTypeHeader, mimeType).put(body))
+  override def put(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.header(contentTypeHeader, mimeType).params(params).put(body))
+  }
+  override def patch(body: Array[Byte], mimeType: String, params: Map[String,String] = Map()): Try[Array[Byte]] = {
+    exec(request.header(contentTypeHeader, mimeType).params(params).postData(body).method("PATCH"))
   }
   private def exec(request: HttpRequest): Try[Array[Byte]] = {
     Try(request.asBytes) match {
@@ -64,6 +67,7 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
             proxy: Option[HttpProxyConfig],
             followRedirects: Boolean
            ): ScalaJWebserviceClient = {
+    logger.debug(s"Creating request for $url: additionalHeaders=$additionalHeaders")
     val request = Http(url)
       .headers(additionalHeaders)
       .optionally(timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
@@ -89,7 +93,8 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
     response match {
       // Request was sent, but the response contains an error
       case errorResponse if errorResponse.isError =>
-        logger.error(s"Error when calling ${request.url}: Http status code: ${errorResponse.code}, response body: ${new String(errorResponse.body).take(200)}...")
+        val bodyStr = if (logger.isDebugEnabled) new String(errorResponse.body) else new String(errorResponse.body).take(200)+"..."
+        logger.error(s"Error when calling ${request.url}: Http status code: ${errorResponse.code}, response body: $bodyStr")
         Failure(new WebserviceException(s"Webservice Request failed with error <${errorResponse.code}>", Some(errorResponse.code), Some(new String(errorResponse.body))))
       // Request was successful and response can be processed further
       case normalResponse if normalResponse.isSuccess => Success(normalResponse.body)

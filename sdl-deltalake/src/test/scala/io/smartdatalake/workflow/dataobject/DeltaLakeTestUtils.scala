@@ -23,11 +23,20 @@ import io.smartdatalake.testutils.TestUtil
 import org.apache.spark.sql.SparkSession
 
 object DeltaLakeTestUtils {
+
   // set additional spark options for delta lake
   private val additionalSparkProperties = new DeltaLakeModulePlugin().additionalSparkProperties() +
     ("spark.databricks.delta.snapshotPartitions" -> "2") // improve performance for testing with small data sets
+
+  private[smartdatalake] lazy val deltaDb = {
+    val dbname = "delta"
+    session.sql(s"create database if not exists $dbname;")
+    dbname
+  }
+
   def session : SparkSession = additionalSparkProperties
     .foldLeft(TestUtil.sparkSessionBuilder()) {
       case (builder, config) => builder.config(config._1, config._2)
     }.getOrCreate()
+
 }

@@ -31,6 +31,9 @@ import scala.reflect.runtime.universe
 trait DataFrameFunctions {
   protected def subFeedType: universe.Type
 
+  // Attention: Don't name this method getSubFeedType, Scala will otherwise compile it as a property and StatusInfoServer will try to serialize it and get an error "Direct self-reference leading to cycle..."
+  def requestSubFeedType(): universe.Type = subFeedType
+
   def col(colName: String): GenericColumn
   def lit(value: Any): GenericColumn
   def min(column: GenericColumn): GenericColumn
@@ -46,6 +49,8 @@ trait DataFrameFunctions {
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
+  def countDistinct(columns: GenericColumn*): GenericColumn
+  def approxCountDistinct(columns: GenericColumn, rsd: Option[Double] = None): GenericColumn
   def coalesce(columns: GenericColumn*): GenericColumn
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn
   def stringType: GenericDataType
@@ -64,4 +69,7 @@ trait DataFrameFunctions {
 
   def row_number: GenericColumn
 
+  def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn
+  def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
+  def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
 }
