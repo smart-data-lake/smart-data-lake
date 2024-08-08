@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.definitions.OAuthMode
 
 import scala.collection.mutable.ArrayBuffer
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
@@ -232,19 +233,6 @@ class ODataIOC {
 
 
 /**
- * [[ODataAuthorization]] contains the coordinates and credentials to gain access to the DataSource
- * @param oauthUrl: URL to the OAuth2 authorization instance like "https://login.microsoftonline.com/{tenant-guid}/oauth2/v2.0/token"
- * @param clientId: Name of the user (supports secrets providers)
- * @param clientPassword: Password of the user (supports secret providers)
- * @param oauthScope: OAuth authorization scope (like https://xxx.crm4.dynamics.com/.default)
- */
-case class ODataAuthorization(oauthUrl: String
-                              , clientId: StringOrSecret
-                              , clientPassword: StringOrSecret
-                              , oauthScope: String
-                             )
-
-/**
  * [[ODataBearerToken]] contains the current bearer token and a method to check whether the token is still valid.
  * @param token : The token string
  * @param expiresAt : Instant at which the token expires
@@ -279,7 +267,7 @@ case class ODataDataObject(override val id: DataObjectId,
                            tableName: String,
                            sourceFilters: Option[String] = None,
                            timeouts: Option[HttpTimeoutConfig] = None,
-                           authorization: Option[ODataAuthorization] = None,
+                           authorization: Option[OAuthMode] = None,
                            changeDateColumnName: Option[String] = None,
                            nRetry: Int = 1,
                            responseBufferSetup : Option [ODataResponseBufferSetup] = None,
@@ -358,19 +346,19 @@ case class ODataDataObject(override val id: DataObjectId,
    * @param authorization : authorization parameters
    * @return new [[ODataBearerToken]] instance
    */
-  def getBearerToken(authorization: ODataAuthorization) : ODataBearerToken = {
+  def getBearerToken(authorization: OAuthMode) : ODataBearerToken = {
     implicit val formats: Formats = DefaultFormats
 
     val payload : Map[String, String] = Map(
       "grant_type" -> "client_credentials",
       "client_id" -> authorization.clientId.resolve(),
-      "client_secret" -> authorization.clientPassword.resolve(),
-      "scope" ->  authorization.oauthScope
+      "client_secret" -> authorization.clientSecret.resolve(),
+      "scope" ->  authorization.oauthScope.resolve()
     )
 
     val payloadString = getFormUrlEncodedBody(payload)
 
-    val response = request(authorization.oauthUrl, method=WebserviceMethod.Post, body=payloadString, mimeType="application/x-www-form-urlencoded")
+    val response = request(authorization.oauthUrl.resolve(), method=WebserviceMethod.Post, body=payloadString, mimeType="application/x-www-form-urlencoded")
     val responseString : String = new String(response)
     val responseMap : Map[String, Any] = Serialization.read[Map[String, Any]](responseString)
 

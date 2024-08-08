@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.OAuthMode
 import org.mockito.{Mockito => m}
 import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
@@ -32,7 +33,7 @@ import io.smartdatalake.workflow.action.RuntimeEventState
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.{DataFrameReader, SparkSession}
-import org.apache.spark.sql.types.{StructType, StructField, StringType, IntegerType}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import java.io.File
 import java.nio.file.Files
@@ -511,7 +512,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
 class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL basic") {
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -531,7 +532,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getODataURL with state") {
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -553,7 +554,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getODataURL with state and source filter") {
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -576,7 +577,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getODataURL with maxrecordcount") {
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -597,7 +598,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getSparkDataFrame in init phase") {
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val context = this.contextInit
     //val context_mock = m.mock(classOf[ActionPipelineContext])
@@ -660,7 +661,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(response1))
     )
 
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     
     val sut = ODataDataObject(
@@ -718,7 +719,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val now = Instant.parse("2024-06-09T23:00:00Z")
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -800,7 +801,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val now = Instant.parse("2024-06-09T23:00:00Z")
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -893,7 +894,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
 
     val temp_dir_base = Files.createTempDirectory("odatatest_filebuffer").toFile
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
     val temp_dir = new File(temp_dir_base, "testSource_1717974000")
 
@@ -978,7 +979,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(response1))
     )
 
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -1020,7 +1021,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER))
     )
 
-    val auth_setup = ODataAuthorization("http://localhost:8080/tenantid/oauth2/v2.0/token", StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), "Scope")
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(

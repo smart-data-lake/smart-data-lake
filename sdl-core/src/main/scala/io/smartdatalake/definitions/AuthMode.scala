@@ -206,6 +206,20 @@ case class SASLSCRAMAuthMode (
 
 
 /**
+ * [[OAuthMode]] contains the coordinates and credentials to gain access to the OData DataSource
+ * @param oauthUrl URL to the OAuth2 authorization instance like "https://login.microsoftonline.com/{tenant-guid}/oauth2/v2.0/token" (supports secret providers)
+ * @param clientId Name of the user (supports secrets providers)
+ * @param clientSecret Password of the user (supports secret providers)
+ * @param oauthScope OAuth authorization scope (like https://xxx.crm4.dynamics.com/.default) (supports secret providers)
+ */
+case class OAuthMode (
+                       oauthUrl: StringOrSecret,
+                       clientId: StringOrSecret,
+                       clientSecret: StringOrSecret,
+                       oauthScope: StringOrSecret
+                     )
+
+/**
  * Interface to generalize authentication for HTTP requests
  */
 trait HttpHeaderAuth {
