@@ -26,7 +26,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.{DebeziumConnection, DebeziumDatabaseEngine}
 
-object DebeziumCdcDataObjectIT extends App with SmartDataLakeLogger {
+object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
   implicit val sparkSession = TestUtil.session
   implicit val instanceRegistry = new InstanceRegistry()
@@ -42,7 +42,7 @@ object DebeziumCdcDataObjectIT extends App with SmartDataLakeLogger {
 
   instanceRegistry.register(connection)
 
-  val testDO = DebeziumCdcDataObject("test1", connectionId = "dbzCon", Table(Some("demo"), "test"))
+  val testDO = DebeziumCdcDataObject("test1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true")))
   instanceRegistry.register(testDO)
 
   val df = testDO.getSparkDataFrame()
