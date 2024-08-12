@@ -55,7 +55,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     val defaultOffsetProperties: Map[String, String] = Map(
       "offset.storage" -> "org.apache.kafka.connect.storage.FileOffsetBackingStore", // TODO: implement custom backing store to store the data in sdlb state
-      "offset.storage.file.filename" -> "", //TODO: change before commit and push
+      "offset.storage.file.filename" -> "C://TEMP/offsets.dat", //TODO: change before commit and push
       "offset.flush.interval.ms" -> "1000")
 
     // If duplicate offset properties are set, prefer the ones the user has set in the config file
@@ -65,7 +65,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     val defaultSchemaHistoryProperties: Map[String, String] = Map(
       "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", // TODO: Implement custom schema history that ignores the changes and just logs
-      "schema.history.internal.file.filename" -> "" // TODO: change before commit an push
+      "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat" // TODO: change before commit an push
     )
 
     // If duplicate schema history properties are set, prefer the ones the user has set in the config file
@@ -144,9 +144,8 @@ private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.Chang
   override def handleBatch(batch: util.List[ChangeEvent[String, String]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[String, String]]): Unit = {
 
     batch.forEach(record => {
-      // handle here the record
 
-      this.records :+ record.value()
+      this.records = this.records :+ record.value()
 
       recordCommitter.markProcessed(record)
     })
