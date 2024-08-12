@@ -4,7 +4,7 @@
   ~ Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
-  ~ it under the terms of the GNU General Public License as published by
+  ~ it under the terms of the GNU General Pufblic License as published by
   ~ the Free Software Foundation, either version 3 of the License, or
   ~ (at your option) any later version.
   ~
@@ -398,7 +398,7 @@
         <jsr305.version>3.0.0</jsr305.version>
         <libthrift.version>0.12.0</libthrift.version>
         <!-- Please don't upgrade the version to 4.10+, it depends on JDK 11 -->
-        <antlr4.version>4.9.3</antlr4.version>
+        <antlr4.version>4.10.1</antlr4.version>
         <jpam.version>1.1</jpam.version>
         <selenium.version>4.9.1</selenium.version>
         <htmlunit-driver.version>4.9.1</htmlunit-driver.version>
@@ -466,7 +466,7 @@
 
         <scalatest.test.version>3.0.8</scalatest.test.version>
         <sshd.test.version>2.10.0</sshd.test.version>
-        <debezium.version>2.6.1.Final</debezium.version>
+        <debezium.version>2.1.4.Final</debezium.version>
 
         <!-- Sonar related -->
         <sonar.organization>smart-data-lake</sonar.organization>
