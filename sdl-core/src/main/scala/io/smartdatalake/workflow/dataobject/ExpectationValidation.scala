@@ -20,10 +20,12 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.metrics.MetricsUtil.orderMetrics
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataobject.ExpectationValidation.defaultExpectations
@@ -178,7 +180,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
       })
     // throw exception on error, but log metrics before
     val errors = validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Error)
-    if (errors.nonEmpty) logger.error(s"($id) Expectation validation failed with metrics "+updatedMetrics.map{case(k,v) => s"$k=$v"}.mkString(" "))
+    if (errors.nonEmpty) logger.error(s"($id) Expectation validation failed with metrics "+orderMetrics(updatedMetrics).map{case(k,v) => s"$k=$v"}.mkString(" "))
     val exceptions = errors.map(result => ExpectationValidationException(result._2)).toSeq
     // return consolidated and updated metrics
     (updatedMetrics, exceptions)
