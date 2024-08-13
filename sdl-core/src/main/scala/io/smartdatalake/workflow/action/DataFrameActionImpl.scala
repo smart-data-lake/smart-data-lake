@@ -352,7 +352,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             .collect{case x: DataObject with ExpectationValidation => x}
           inputExpectationsToEvaluateOnRead.foreach { dataObject =>
             val metricsSuffix = "#"+dataObject.id.id
-            val (inputMetrics, inputExceptions) = dataObject.validateExpectations(subFeedType, None, evDataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity,
+            val (inputMetrics, inputExceptions) = dataObject.validateExpectations(subFeedType, None, dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity,
               scopeJobAndInputMetrics = metrics.filter(_._1.endsWith(metricsSuffix)).map{case (k,v) => (k.stripSuffix(metricsSuffix), v)}
             )
             metrics = metrics ++ inputMetrics.map{case(k,v) => (k+metricsSuffix,v)}

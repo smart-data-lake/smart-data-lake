@@ -95,8 +95,6 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
       }
       (dfObserved, observations)
     }
-    // add caching if there are expectations with scope != job
-    if (expectations.exists(_.scope != ExpectationScope.Job)) dfJobExpectations.cache
     (dfJobExpectations, observations)
   }
 
@@ -129,9 +127,10 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
   /**
    * Collect metrics for expectations with scope = All
    */
-  def getScopeAllAggMetrics(dfAll: GenericDataFrame, expectationsToValidate: Seq[BaseExpectation])(implicit context: ActionPipelineContext): Map[String,_] = {
+  def getScopeAllAggMetrics(dfAll: GenericDataFrame, expectationsToValidate: Seq[BaseExpectation], existingMetrics: MetricsMap)(implicit context: ActionPipelineContext): Map[String,_] = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfAll.subFeedType)
     val aggExpressions = expectationsToValidate.filter(x => x.scope == ExpectationScope.All).flatMap(_.getAggExpressionColumns(this.id))
+      .filter(!_.getName.exists(existingMetrics.contains))
     calculateMetrics(dfAll, aggExpressions, ExpectationScope.All)
   }
 
@@ -154,7 +153,7 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     // collect metrics with scope = JobPartition
     val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All
-    val scopeAllMetrics = getScopeAllAggMetrics(dfAll, expectationsToValidate)
+    val scopeAllMetrics = getScopeAllAggMetrics(dfAll, expectationsToValidate, scopeJobAndInputMetrics)
     // collect custom metrics
     val customMetrics = expectationsToValidate.flatMap(e => e.getCustomMetrics(this.id, if (e.scope==ExpectationScope.All) Some(dfAll) else dfJob))
     // enrich metrics
