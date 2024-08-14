@@ -30,6 +30,7 @@ import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
@@ -318,6 +319,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
+    // remember previous snapshot timestamp
+    val previousSnapshotId: Option[Long] = if (isTableExisting) Some(getIcebergTable.currentSnapshot().snapshotId()) else None
     // V1 writer is needed to create external table
     val dfWriter = saveModeTargetDf.write
       .format("iceberg")
@@ -364,8 +367,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     })
 
     // get iceberg snapshot summary / stats
-    val summary = getIcebergTable.currentSnapshot().summary().asScala
-    assert(summary("spark.app.id") == session.sparkContext.applicationId, s"($id) current iceberg snapshot is not written by this spark application (spark.app.id should be ${summary("spark.app.id")}. Is there someone else writing to this table?!")
+    val currentSnapshot = getIcebergTable.currentSnapshot()
+    if (logger.isDebugEnabled) logger.debug(s"snapshot after write: ${currentSnapshot.toString}")
+    val summary = currentSnapshot.summary().asScala
+    if (previousSnapshotId.contains(currentSnapshot.snapshotId())) {
+      logger.info(s"($id) No new iceberg snapshot was written. No data was written to this Iceberg table.")
+      throw NoDataToProcessWarning(id.id, s"($id) No data was written to Iceberg table by Spark.")
+    }
+    // add all summary entries except spark application id to metrics
     val icebergMetrics = (summary - "spark.app.id")
       // normalize names lowercase with underscore
       .map{case(k,v) => (k.replace("-","_"), Try(v.toLong).getOrElse(v))}
