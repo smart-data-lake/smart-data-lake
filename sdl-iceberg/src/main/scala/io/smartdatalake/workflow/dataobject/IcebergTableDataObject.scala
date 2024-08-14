@@ -320,7 +320,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
     // remember previous snapshot timestamp
-    val previousSnapshotId = if (isTableExisting) Some(getIcebergTable.currentSnapshot().snapshotId()) else None
+    val previousSnapshotId: Option[Long] = if (isTableExisting) Some(getIcebergTable.currentSnapshot().snapshotId()) else None
     // V1 writer is needed to create external table
     val dfWriter = saveModeTargetDf.write
       .format("iceberg")
