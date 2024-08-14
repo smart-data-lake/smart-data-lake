@@ -26,6 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -63,6 +64,7 @@ case class CustomDataFrameAction(override val id: ActionId,
                                  override val executionMode: Option[ExecutionMode] = None,
                                  override val executionCondition: Option[Condition] = None,
                                  override val metricsFailCondition: Option[String] = None,
+                                 override val expectations: Seq[ActionExpectation] = Seq(),
                                  override val metadata: Option[ActionMetadata] = None,
                                  recursiveInputIds: Seq[DataObjectId] = Seq(),
                                  override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()

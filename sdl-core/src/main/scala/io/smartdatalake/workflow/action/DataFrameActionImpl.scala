@@ -340,22 +340,22 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         // get metrics with scope Job from observations
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitFor()).getOrElse(Map())
-        // get input metrics with scope All (scope=Job is calculated with preprocessInputSubFeedCustomized, scope=JobPartition is not supported on input)
-        val inputMetrics = if (isMainOutput) calculateInputAggMetricsWithScopeAll(subFeed) else Map()
+        // get input metrics for this actions expectations with scope All (scope=Job is calculated with preprocessInputSubFeedCustomized, scope=JobPartition is not supported on input)
+        // Note that scope All metrics are only calculated if this is the main output.
+        val actionExpectationsInputMetrics = if (isMainOutput) calculateInputAggMetricsWithScopeAll(subFeed) else Map()
         // if this is mainOutput, enrich main input metrics
         val enrichmentFunc: Map[String,_] => Map[String,_] = if (isMainOutput) enrichMainInputMetrics else identity
         // evaluate and validate expectations
-        var (metrics,exceptions) = evDataObject.validateExpectations(subFeedType, subFeed.dataFrame, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ inputMetrics, expectations, enrichmentFunc)
+        var (metrics,exceptions) = evDataObject.validateExpectations(subFeedType, subFeed.dataFrame, evDataObject.getDataFrame(Seq(),subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ actionExpectationsInputMetrics, if (isMainOutput) expectations else Seq(), enrichmentFunc)
         // evaluate and validate expectations of input DataObjects to be validated on read
-        if (isMainOutput) {
-          val inputExpectationsToEvaluateOnRead = inputs.filter(i => context.instanceRegistry.shouldValidateDataObjectOnRead(i.id))
-            .collect{case x: DataObject with ExpectationValidation => x}
-          inputExpectationsToEvaluateOnRead.foreach { dataObject =>
-            val metricsSuffix = "#"+dataObject.id.id
-            val (inputMetrics, inputExceptions) = dataObject.validateExpectations(subFeedType, None, dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity,
-              scopeJobAndInputMetrics = metrics.filter(_._1.endsWith(metricsSuffix)).map{case (k,v) => (k.stripSuffix(metricsSuffix), v)}
-            )
-            metrics = metrics ++ inputMetrics.map{case(k,v) => (k+metricsSuffix,v)}
+        val inputExpectationsToEvaluateOnRead = inputs.filter(i => context.instanceRegistry.shouldValidateDataObjectOnRead(i.id))
+          .collect{case x: DataObject with ExpectationValidation => x}
+        inputExpectationsToEvaluateOnRead.foreach { dataObject =>
+          val metricsSuffix = "#"+dataObject.id.id
+          val inputMetrics = metrics.filter(_._1.endsWith(metricsSuffix)).map{case (k,v) => (k.stripSuffix(metricsSuffix), v)}
+          if (inputMetrics.nonEmpty) {
+            val (updatedInputMetrics, inputExceptions) = dataObject.validateExpectations(subFeedType, None, dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity, scopeJobAndInputMetrics = inputMetrics)
+            metrics = metrics ++ updatedInputMetrics.map { case (k, v) => (k + metricsSuffix, v) }
             exceptions = exceptions ++ inputExceptions
           }
         }

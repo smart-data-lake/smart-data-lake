@@ -147,9 +147,10 @@ private[smartdatalake] trait ExpectationValidation { this: DataObject with Smart
     aggExpressions.groupBy(_.getName).map(_._2.head).toSeq // remove potential duplicates
   }
 
-  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String,_] => Map[String,_])(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
+  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String,_] => Map[String,_], scopeJobOnly: Boolean = false)(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
-    val expectationsToValidate = expectations ++ additionalExpectations
+    val expectationsToValidate = (expectations ++ additionalExpectations)
+      .filter(e => !scopeJobOnly || e.scope==ExpectationScope.Job)
     // collect metrics with scope = JobPartition
     val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All

@@ -25,11 +25,13 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionModeResult, PartitionDiffMode}
+import io.smartdatalake.workflow.action.expectation.{CompletnessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, SQLExpectation}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.lit
@@ -398,6 +400,95 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // check that tgt2 is empty
     // getSparkDataFrame will throw IllegalArgumentException because it no files have been written to this DataObject...
     intercept[IllegalArgumentException](tgtDO2.getSparkDataFrame())
+  }
+
+  test("copy load with constraints and expectations non-main input no_data") {
+
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some(">= 1"))
+    )).register
+    val srcDO2 = MockDataObject("src2", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some("= 0")),
+      CountExpectation(name = "countAll", expectation = Some("= 0"), scope = ExpectationScope.All)
+    )).register
+    val tgtDO1 = MockDataObject("tgt1", expectations = Seq(
+      CountExpectation(expectation = Some(">= 1")),
+      SQLExpectation("tgt1AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+    val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
+      CountExpectation(expectation = Some("= 0")),
+      SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+
+    // prepare & start load
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id),
+      transformers = Seq(customTransformerConfig1, customTransformerConfig2),
+      expectations = Seq(TransferRateExpectation(), CompletnessExpectation(expectation = None))
+    )
+    instanceRegistry.register(action1)
+    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+
+    // run with src2 empty (non-main input)
+    srcDO1.writeSparkDataFrame(l, Seq())
+    srcDO2.writeSparkDataFrame(l.where(lit(false)), Seq())
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    val tgtSubFeeds = action1.exec(srcSubFeeds)(contextExec)
+    val tgtSubFeed1 = tgtSubFeeds.find(_.dataObjectId == tgtDO1.id).get
+    val tgtSubFeed2 = tgtSubFeeds.find(_.dataObjectId == tgtDO2.id).get
+
+    // check expectation value in metrics
+    val metrics1 = tgtSubFeed1.metrics.get
+    assert(metrics1 == Map("count" -> 2, "countAll" -> 2, "records_written" -> 2, "tgt1AvgRatingGt1" -> 4.0, "count#src1" -> 2, "count#mainInput" -> 2, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "pctComplete" -> 1.0))
+    val metrics2 = tgtSubFeed2.metrics.get
+    assert(metrics2 == Map("count" -> 0, "tgt2AvgRatingGt1" -> None, "count#src2" -> 0, "countAll#src2" -> 0, "no_data" -> true))
+  }
+
+  test("copy load with constraints and expectations main input no_data") {
+
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some("= 0"))
+    )).register
+    val srcDO2 = MockDataObject("src2", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some("= 2")),
+      CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All)
+    )).register
+    val tgtDO1 = MockDataObject("tgt1", expectations = Seq(
+      CountExpectation(expectation = Some("= 0")),
+      SQLExpectation("tgt1AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+    val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
+      CountExpectation(expectation = Some("= 2")),
+      SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+
+    // prepare & start load
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id),
+      transformers = Seq(customTransformerConfig1, customTransformerConfig2),
+      expectations = Seq(TransferRateExpectation(), CompletnessExpectation(expectation = None))
+    )
+    instanceRegistry.register(action1)
+    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+
+    // run with src1 empty (main input)
+    srcDO1.writeSparkDataFrame(l.where(lit(false)), Seq())
+    srcDO2.writeSparkDataFrame(l, Seq())
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    val tgtSubFeeds = action1.exec(srcSubFeeds)(contextExec)
+    val tgtSubFeed1 = tgtSubFeeds.find(_.dataObjectId == tgtDO1.id).get
+    val tgtSubFeed2 = tgtSubFeeds.find(_.dataObjectId == tgtDO2.id).get
+
+    // check expectation value in metrics
+    val metrics1 = tgtSubFeed1.metrics.get
+    assert(metrics1 == Map("count" -> 0, "countAll" -> 0, "tgt1AvgRatingGt1" -> None, "count#src1" -> 0, "count#mainInput" -> 0, "countAll#src1" -> 0, "countAll#mainInput" -> 0, "pctTransfer" -> "null", "pctComplete" -> "null", "no_data" -> true))
+    val metrics2 = tgtSubFeed2.metrics.get
+    assert(metrics2 == Map("count" -> 2, "tgt2AvgRatingGt1" -> 4.0, "count#src2" -> 2, "countAll#src2" -> 2, "records_written" -> 2))
+
   }
 }
 
