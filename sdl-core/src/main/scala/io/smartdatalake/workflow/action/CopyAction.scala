@@ -27,6 +27,7 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 import scala.reflect.runtime.universe.Type
@@ -43,11 +44,6 @@ import scala.reflect.runtime.universe.Type
  * @param transformer optional custom transformation to apply.
  * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
- * @param executionMode optional execution mode for this Action
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
- * @param saveModeOptions override and parametrize saveMode set in output DataObject configurations when writing to DataObjects.
  */
 case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
@@ -61,6 +57,7 @@ case class CopyAction(override val id: ActionId,
                       override val executionMode: Option[ExecutionMode] = None,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
+                      override val expectations: Seq[ActionExpectation] = Seq(),
                       override val saveModeOptions: Option[SaveModeOptions] = None,
                       override val metadata: Option[ActionMetadata] = None,
                       override val agentId: Option[AgentId] = None

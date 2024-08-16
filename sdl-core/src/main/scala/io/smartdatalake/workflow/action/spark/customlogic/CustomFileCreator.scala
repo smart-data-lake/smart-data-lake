@@ -26,10 +26,13 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 
+/**
+ * An interface to implement the logic for a CustomFileDataObject.
+ */
 trait CustomFileCreator extends Serializable {
 
   /**
-   * This function creates a [[InputStream]] based on custom code.
+   * This function creates an [[InputStream]] based on custom code.
    *
    * @param session the Spark Session
    * @param config  input config of the action
@@ -38,6 +41,18 @@ trait CustomFileCreator extends Serializable {
   def exec(session: SparkSession, config: Map[String, String]): InputStream
 }
 
+/**
+ * Configure a custom file creator by scala class or code that implements interface [[CustomFileCreator]].
+ *
+ * Example:
+ * {{{
+ * class MyCustomFileCreator extends CustomFileCreator {
+ *   override def exec(session: SparkSession, config: Map[String, String]) = {
+ *     new ByteArrayInputStream("test data".getBytes)
+ *   }
+ * }
+ * }}}
+ */
 case class CustomFileCreatorConfig(className: Option[String] = None,
                                    scalaFile: Option[String] = None,
                                    scalaCode: Option[String] = None,

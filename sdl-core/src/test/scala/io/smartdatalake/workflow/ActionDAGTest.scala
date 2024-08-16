@@ -26,7 +26,7 @@ import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode._
-import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{DebugTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -1175,7 +1175,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(action2MainMetrics("records_written")==1)
   }
 
-  test("action dag failes because of metricsFailCondition") {
+  test("action dag fails because of metricsFailCondition") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -1190,7 +1190,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.writeSparkDataFrame(df1, Seq())
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and value > 0"))
-    val dag: ActionDAGRun = ActionDAGRun(Seq(action1))
+    val dag = ActionDAGRun(Seq(action1))
 
     // first dag run, first file processed
     dag.prepare(contextPrep)
@@ -1199,7 +1199,26 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(ex.cause.isInstanceOf[MetricsCheckFailed])
   }
 
-  test("action dag failes because of executionMode=PartitionDiffMode failCondition") {
+  test("action dag with Action skipped because of no-data fails with metricsFailCondition") {
+    // setup DataObjects
+    val feed = "actionpipeline"
+    val srcDO = MockDataObject("src1").register
+    val tgt1DO = MockDataObject("tgt1").register
+
+    // prepare DAG, note that srcDO remains empty to trigger NoDataToProcessWarning
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id,
+      transformers = Seq(FilterTransformer(filterClause = "false")), // force no data -> action will be skipped
+      metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'skipped' and value = 'true'")
+    )
+    val dag = ActionDAGRun(Seq(action1))
+
+    // run: action 1 will be skipped because of no-data, then metricsFailCondition will change its result to failed
+    Environment._enableSparkPlanNoDataCheck = Some(true)
+    val ex = intercept[TaskFailedException](dag.exec(contextExec))
+    assert(ex.cause.isInstanceOf[MetricsCheckFailed])
+  }
+
+  test("action dag fails because of executionMode=PartitionDiffMode failCondition") {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
@@ -1255,7 +1274,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     // prepare DAG
     val df1 = Seq[(String,String,Int)]().toDF("lastname", "firstname", "rating")
     val expectedPartitions = Seq(PartitionValues(Map("lastname"->"doe")))
+    Environment._enableSparkPlanNoDataCheck = Some(false)
     srcDO.writeSparkDataFrame(df1, expectedPartitions)
+    Environment._enableSparkPlanNoDataCheck = Some(true)
     val actions: Seq[DataFrameOneToOneActionImpl] = Seq(
       CopyAction("a", srcDO.id, tgt1DO.id)
     )

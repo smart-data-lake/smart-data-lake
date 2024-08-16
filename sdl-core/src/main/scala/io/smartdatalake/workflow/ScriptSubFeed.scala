@@ -58,7 +58,7 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
     this.copy(isSkipped = false)
   }
   override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
-    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false)
+    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None)
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case subFeed: ScriptSubFeed =>

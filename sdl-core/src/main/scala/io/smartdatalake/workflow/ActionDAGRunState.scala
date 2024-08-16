@@ -40,7 +40,7 @@ import java.time.{Duration, LocalDateTime}
  */
 case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, attemptId: Int, runStartTime: LocalDateTime, attemptStartTime: LocalDateTime,
                              actionsState: Map[ActionId, RuntimeInfo], isFinal: Boolean, runStateFormatVersion: Option[Int],
-                             buildVersionInfo: Option[BuildVersionInfo], appVersion: Option[String]) {
+                             sdlbVersionInfo: Option[Map[String,Any]], appVersionInfo: Option[Map[String,Any]]) {
 
   def toJson: String = ActionDAGRunState.toJson(this)
 
@@ -80,7 +80,7 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
   // Note: if increasing this version, please check if a StateMigrator is needed to read files of older versions. See also stateMigrators below.
-  val runStateFormatVersion: Int = 4
+  val runStateFormatVersion: Int = 5
 
   private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
     {
@@ -174,7 +174,8 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
   // list of state migrators, sorted in ascending order
   private val stateMigrators: Seq[StateMigratorDef] = Seq(
-    new StateMigratorDef3To4()
+    new StateMigratorDef3To4(),
+    new StateMigratorDef4To5()
   ).sortBy(_.versionFrom) // force ordering
   assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unique
   assert(stateMigrators.forall(m => m.versionFrom + 1 == m.versionTo)) // check that a state migrator always converts to the next version, without skipping a version.

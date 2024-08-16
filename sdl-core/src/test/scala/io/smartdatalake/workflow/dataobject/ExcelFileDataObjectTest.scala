@@ -277,13 +277,13 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
   }
 
   private def createDataObject(options: ExcelOptions)(path: String, schemaOpt: Option[StructType]): ExcelFileDataObject = {
-    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt.map(SparkSchema), excelOptions = options)
+    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt.map(SparkSchema.apply), excelOptions = options)
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   private def createDataObjectWithSchemaMin(options: ExcelOptions)(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): ExcelFileDataObject = {
-    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema), excelOptions = options)
+    val dataObj = ExcelFileDataObject(id = "schemaTestExcelDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply), excelOptions = options)
     instanceRegistry.register(dataObj)
     dataObj
   }

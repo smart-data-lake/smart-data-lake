@@ -24,7 +24,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.types.StructType
 
 import java.time.{Instant, LocalDateTime, ZoneId}
@@ -53,6 +53,10 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
       .where(partitionValues.map(_.getFilterExpr).reduce(_ or _))
       .asInstanceOf[SparkDataFrame].inner
   }
+
+  def where(condition: Column): DataFrame = get().where(condition)
+  def select(cols: Column*): DataFrame = get().select(cols:_*)
+
   def write(dataFrame: DataFrame, topLevelPartitions: Seq[String] = Seq()): Unit = {
     writeWithPartitions(dataFrame, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
   }
@@ -86,10 +90,8 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
    * @param updateStats if true, more costly operations such as "analyze table" are executed before returning results.
    */
   def infos(updateStats: Boolean = false): Map[String,String] = {
-    Seq(
-      Some(dataObject).collect{case o: TableDataObject => ("table", o.table.fullName)},
-      Some(dataObject).collect{case o: FileRefDataObject => ("path", o.getPath(context))}
-    ).flatten.toMap ++ dataObject.getStats(updateStats)(context).mapValues(_.toString)
+    Seq(tableName().map("table" -> _), path().map("path" -> _)).flatten.toMap ++
+      dataObject.getStats(updateStats)(context).mapValues(_.toString)
   }
 
   def partitionColumns: Seq[String] = dataObject match {
@@ -101,6 +103,14 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
   def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head)).distinct
+
+  def tableName(): Option[String] = {
+    Some(dataObject).collect{case o: TableDataObject => o.table.fullName}
+  }
+
+  def path(): Option[String] = {
+    Some(dataObject).collect{case o: FileRefDataObject => o.getPath(context)}
+  }
 
   /**
    * lists modification date of partition folders

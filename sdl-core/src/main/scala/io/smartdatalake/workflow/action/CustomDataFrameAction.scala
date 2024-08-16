@@ -26,6 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -47,10 +48,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *                     but in the end only outputs of the last transformer are mapped to output DataObjects.
  * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
- * @param executionMode          optional execution mode for this Action
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition   optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                               If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  * @param recursiveInputIds      output of action that are used as input in the same action
  * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
  */
@@ -67,6 +64,7 @@ case class CustomDataFrameAction(override val id: ActionId,
                                  override val executionMode: Option[ExecutionMode] = None,
                                  override val executionCondition: Option[Condition] = None,
                                  override val metricsFailCondition: Option[String] = None,
+                                 override val expectations: Seq[ActionExpectation] = Seq(),
                                  override val metadata: Option[ActionMetadata] = None,
                                  recursiveInputIds: Seq[DataObjectId] = Seq(),
                                  override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()

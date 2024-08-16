@@ -55,8 +55,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val metrics: Option[MetricsMap] = None
                        )
   extends DataFrameSubFeed {
-  @transient
-  override val tpe: Type = typeOf[SparkSubFeed]
+  @transient override val tpe: Type = typeOf[SparkSubFeed]
   override def breakLineage(implicit context: ActionPipelineContext): SparkSubFeed = {
     // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
     // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
@@ -85,7 +84,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(isSkipped = false)
   }
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId)
+    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
     val (dataFrame, dummy) = other match {
@@ -150,7 +149,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
       .applyFilter
   }
   override def withMetrics(metrics: MetricsMap): SparkSubFeed = this.copy(metrics = Some(metrics))
-  def appendMetrics(metrics: MetricsMap): SparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+  override def appendMetrics(metrics: MetricsMap): SparkSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 
 }
 
@@ -164,7 +163,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
-  override def subFeedType: universe.Type = typeOf[SparkSubFeed]
+  @transient override def subFeedType: universe.Type = typeOf[SparkSubFeed]
   override def col(colName: String): GenericColumn = {
     SparkColumn(functions.col(colName))
   }
@@ -186,6 +185,19 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def count(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.count(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def countDistinct(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    val innerColumns = columns.map(_.asInstanceOf[SparkColumn].inner)
+    SparkColumn(functions.count_distinct(functions.struct(innerColumns:_*)))
+  }
+  override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn =>
+        if (rsd.isDefined) SparkColumn(functions.approx_count_distinct(sparkColumn.inner, rsd.get))
+        else SparkColumn(functions.approx_count_distinct(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
@@ -231,12 +243,9 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     val sparkFields = fields.map{ case (name,dataType) => StructField(name, dataType.asInstanceOf[SparkDataType].inner)}.toSeq
     SparkDataType(StructType(sparkFields))
   }
-  /**
-   * Construct array from given columns removing null values (Snowpark API)
-   */
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
-    SparkColumn(functions.flatten(functions.array(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))))
+    SparkColumn(functions.array_compact(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*)))
   }
   override def array(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)

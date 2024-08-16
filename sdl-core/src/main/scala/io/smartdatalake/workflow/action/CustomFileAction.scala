@@ -41,10 +41,6 @@ import scala.util.Using
  * @param outputId output DataObject
  * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
  * @param filesPerPartition number of files per Spark partition
- * @param executionMode optional execution mode for this Action
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
@@ -116,7 +112,7 @@ case class CustomFileAction(override val id: ActionId,
     subFeed.withMetrics(metrics)
   }
 
-  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
+  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
     // create output sample file in init-phase
     if (context.phase == ExecutionPhase.Init) {
       subFeed.fileRefMapping.flatMap(_.headOption).foreach {

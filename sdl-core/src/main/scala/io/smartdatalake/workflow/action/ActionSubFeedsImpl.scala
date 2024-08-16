@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.metrics.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
@@ -131,7 +132,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   // TODO: this should be a property of the SubFeed. Like that it is passed to the Action and its Input/Output DataObjects.
   protected var executionModeResultOptions: Map[String,String] = Map()
 
-  def postprocessOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
+  def postprocessOutputSubFeeds(subFeeds: Seq[S], inputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // assert all outputs have a subFeed
     outputs.foreach{ output =>
         subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
@@ -139,17 +140,18 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // validate & update subfeeds
     subFeeds.map { subFeed =>
       outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"($id) No output found for result ${subFeed.dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
-      postprocessOutputSubFeedCustomized(subFeed)
+      postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
     }
   }
 
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
     // This way metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
-    val (outputSubFeeds,taskFailedException) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException])) {
-      case ((outputSubFeeds, taskFailedException), output) =>
+    val (outputSubFeeds,taskFailedException,noDataWarning) = outputs.foldLeft((Seq[S](),Option.empty[TaskFailedException],Option.empty[NoDataToProcessWarning])) {
+      case ((outputSubFeeds, taskFailedException, noDataWarning), output) =>
         // find SubFeed for output and write it
         val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
+        // process this subFeed if there was no failure in previous subFeeds
         if (taskFailedException.isEmpty) {
           logWritingStarted(subFeed)
           val isRecursiveInput = recursiveInputs.exists(_.id == subFeed.dataObjectId)
@@ -158,14 +160,30 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
               writeSubFeed(subFeed, isRecursiveInput)
             }
             logWritingFinished(outputSubFeed, d)
-            (outputSubFeeds :+ outputSubFeed, None)
+            (outputSubFeeds :+ outputSubFeed, taskFailedException, noDataWarning)
           } catch {
-            case ex: TaskFailedException => (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex))
+            // remember NoDataToProcessWarning on main output for later
+            case ex: NoDataToProcessWarning if mainOutputId.isEmpty || mainOutputId.contains(output.id) =>
+              logNoData(subFeed, isMainSubFeed = true)
+              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, Some(ex))
+            // ignore NoDataToProcessWarning if not main output
+            case ex: NoDataToProcessWarning =>
+              logNoData(subFeed, isMainSubFeed = false)
+              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, noDataWarning)
+            // remember taskedFailedException for next iteration and ignore processing of further feeds.
+            case ex: TaskFailedException =>
+              ex.results.flatMap(_.headOption.flatMap(_.metrics)).foreach{ metrics =>
+                val metricsLog = orderMetricsDefault(metrics).map( x => x._1+"="+x._2).mkString(" ")
+                logger.warn(s"($id) failed writing to ${subFeed.dataObjectId.id}: " + metricsLog)
+              }
+              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex), noDataWarning)
           }
-        } else (outputSubFeeds :+ subFeed, taskFailedException)
+        } else (outputSubFeeds :+ subFeed, taskFailedException, noDataWarning)
     }
-    // if there is a TaskFailedException, enrich it will all results and throw it.
+    // if there is a TaskFailedException, enrich it with all results and throw it.
     taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
+    // if there is a NoDataToProcessWarning, enrich it with all results and throw it.
+    noDataWarning.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
     // return processed SubFeeds
     outputSubFeeds
   }
@@ -191,7 +209,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // transform
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
     // update partition values to output's partition columns and update dataObjectId
-    outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
+    outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
     // return
     outputSubFeeds
   } catch {
@@ -211,7 +229,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       // transform
       outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
       // check and adapt output SubFeeds
-      outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds)
+      outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
       // write output
       outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
       // return
@@ -250,8 +268,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       .map( x => x._1+"="+x._2).mkString(" ")
     logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
   }
-  private def orderMetrics(metrics: Map[String,Any], orderedKeys: SortedSet[String]): Seq[(String,Any)] = {
-    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)
+  protected def logNoData(subFeed: SubFeed, isMainSubFeed: Boolean)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"($id) got NoDataToProcessWarning when writing to ${subFeed.dataObjectId.id}. ${if (isMainSubFeed) "As this is the main output, Action will be set to skipped." else "As this is not the main output, Action will not be set to skipped."}")
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {
@@ -336,7 +354,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Implement additional processing logic for SubFeeds after transformation.
    * Can be implemented by subclass.
    */
-  protected def postprocessOutputSubFeedCustomized(subFeed: S)(implicit context: ActionPipelineContext): S = subFeed
+  protected def postprocessOutputSubFeedCustomized(subFeed: S, inputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): S = subFeed
 
   /**
    * Transform partition values.

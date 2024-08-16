@@ -25,7 +25,7 @@ import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Ro
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -35,7 +35,7 @@ import org.json4s.JsonAST.JValue
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
+case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with SmartDataLakeLogger {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def schema: SnowparkSchema = SnowparkSchema(inner.schema)
   override def join(other: GenericDataFrame, joinCols: Seq[String]): SnowparkDataFrame = {
@@ -107,6 +107,9 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this.cache, observation)
+  }
+  override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
+    throw new NotImplementedError("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")
   }
   override def apply(columnName: String): GenericColumn = SnowparkColumn(inner.apply(columnName))
 }
@@ -235,6 +238,7 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
     case str: String => SnowparkColumn(inner.apply(str))
     case idx: Int => SnowparkColumn(inner.apply(idx))
   }
+  override def getName: Option[String] = inner.getName
 }
 
 case class SnowparkField(inner: StructField) extends GenericField {
@@ -251,7 +255,10 @@ case class SnowparkField(inner: StructField) extends GenericField {
 trait SnowparkDataType extends GenericDataType {
   def inner: DataType
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
-  override def isSortable: Boolean = Seq(StringType, LongType, IntegerType, ShortType, FloatType, DoubleType, DecimalType, TimestampType, TimeType, DateType).contains(inner)
+  override def isSortable: Boolean = inner match {
+    case StringType | LongType | IntegerType | ShortType | FloatType | DoubleType | DecimalType(_,_) | TimestampType | TimeType | DateType => true
+    case _ => false
+  }
   override def typeName: String = inner.typeName
   override def sql: String = convertToSFType(inner)
   override def makeNullable: SnowparkDataType

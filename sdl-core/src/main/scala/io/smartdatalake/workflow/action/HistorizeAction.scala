@@ -85,10 +85,6 @@ import scala.util.{Failure, Success, Try}
  *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
  *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode is no longer needed.
  * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
- * @param executionMode optional execution mode for this Action
- * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  */
 case class HistorizeAction(
                             override val id: ActionId,
