@@ -18,19 +18,19 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.util.concurrent.TimeUnit
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 
 /**
@@ -48,7 +48,7 @@ case class JmsDataObject(override val id: DataObjectId,
                          jndiContextFactory: String,
                          jndiProviderUrl: String,
                          override val schemaMin: Option[GenericSchema],
-                         authMode: AuthMode,
+                         authMode: BasicAuthMode,
                          batchSize: Int,
                          maxWaitSec: Int,
                          maxBatchAgeSec: Int,
@@ -59,16 +59,11 @@ case class JmsDataObject(override val id: DataObjectId,
                         (implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SchemaValidation {
 
-  // Allow only supported authentication modes
-  private val supportedAuths = Seq(classOf[BasicAuthMode])
-  require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
-  val basicAuthMode = authMode.asInstanceOf[BasicAuthMode]
-
   if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to payload:string")
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, basicAuthMode.userSecret.resolve(), basicAuthMode.passwordSecret.resolve(), connectionFactory, queue)
+    val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, authMode.userSecret.resolve(), authMode.passwordSecret.resolve(), connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),
       Duration(maxBatchAgeSec, TimeUnit.SECONDS), txBatchSize, session)

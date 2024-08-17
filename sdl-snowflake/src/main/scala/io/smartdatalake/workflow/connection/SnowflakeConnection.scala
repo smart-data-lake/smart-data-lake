@@ -22,15 +22,15 @@ import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
-import io.smartdatalake.util.misc.{ConnectionPoolConfig, JdbcExecution, JdbcUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{ConnectionPoolConfig, JdbcExecution, SmartDataLakeLogger}
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcCatalog}
 import io.smartdatalake.workflow.dataobject.HttpProxyConfig
 import net.snowflake.spark.snowflake.Utils
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
-import java.sql.{ResultSet, Connection => SqlConnection}
+import java.sql.{Connection => SqlConnection}
 
 /**
  * Connection information for Snowflake databases.

@@ -1,9 +1,9 @@
 package io.smartdatalake.util.azure
 
 import com.microsoft.aad.msal4j.{ClientCredentialFactory, ClientCredentialParameters, ConfidentialClientApplication}
-import io.smartdatalake.definitions.CustomHttpAuthModeLogic
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.connection.authMode.CustomHttpAuthModeLogic
 
 import java.util.Collections
 
@@ -23,9 +23,9 @@ class AzureADClientGrantAuthMode extends CustomHttpAuthModeLogic with SmartDataL
     // building Azure AD client
     val app = ConfidentialClientApplication.builder(applicationId.resolve(), ClientCredentialFactory.createFromSecret(clientSecret.resolve()))
       .authority(authority.resolve())
-      .build();
+      .build()
     val clientCredentialParam = ClientCredentialParameters.builder(Collections.singleton(scope.resolve()))
-      .build();
+      .build()
     // get token
     val future = app.acquireToken(clientCredentialParam)
     val token = future.get.accessToken()

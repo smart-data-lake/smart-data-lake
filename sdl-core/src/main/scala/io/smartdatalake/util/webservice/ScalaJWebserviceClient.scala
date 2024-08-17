@@ -20,8 +20,8 @@
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, HttpHeaderAuth}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpHeaderAuth}
 import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig, WebserviceFileDataObject}
 import scalaj.http.{Http, HttpOptions, HttpRequest, HttpResponse}
 
@@ -112,7 +112,6 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
       request.optionally(authMode, (v:AuthMode, request:HttpRequest) => {
         v match {
           case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
-          case basicAuth: BasicAuthMode => request.auth(basicAuth.userSecret.resolve(), basicAuth.passwordSecret.resolve())
           case x => throw ConfigurationException(s"authentication mode $x is not supported by ScalaJWebserviceClient")
         }
       })

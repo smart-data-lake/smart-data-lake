@@ -29,9 +29,10 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransforme
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic._
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpAuthMode}
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation}
 import io.smartdatalake.workflow.dataobject.HousekeepingMode
+import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation}
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -83,7 +84,6 @@ trait ConfigImplicits {
   implicit val sparkRepartitionDefReader: ConfigReader[SparkRepartitionDef] = ConfigReader.derive[SparkRepartitionDef]
   implicit val secretProviderConfigReader: ConfigReader[SecretProviderConfig] = ConfigReader.derive[SecretProviderConfig]
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
-  implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.derive[AuthMode]
   implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
   // --------------------------------------------------------------------------------
 
@@ -149,6 +149,24 @@ trait ConfigImplicits {
   implicit val actionExpectationReader: ConfigReader[ActionExpectation] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[ActionExpectation](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[AuthMode]] values.
+   * Note that AuthMode must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val authModeReader: ConfigReader[AuthMode] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[AuthMode](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[HttpAuthMode]] values.
+   * Note that AuthMode must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val httpAuthModeReader: ConfigReader[HttpAuthMode] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[HttpAuthMode](c.getConfig(p))
   }
 
   /**
