@@ -361,6 +361,12 @@
             <version>${jetty.version}</version>
         </dependency>
         <!--Jetty Websocket server dependencies end here -->
+
+        <dependency>
+            <groupId>com.softwaremill.sttp.client3</groupId>
+            <artifactId>core_${scala.minor.version}</artifactId>
+            <version>3.9.8</version>
+        </dependency>
     </dependencies>
 
     <build>
