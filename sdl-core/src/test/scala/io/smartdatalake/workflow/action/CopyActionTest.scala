@@ -23,8 +23,8 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOp
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.expectation.{CompletnessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
@@ -32,7 +32,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, SparkRepartitionTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, ExpectationValidationException, SQLExpectation, SQLFractionExpectation, SQLQueryExpectation, UniqueKeyExpectation}
+import io.smartdatalake.workflow.dataobject.expectation._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{lit, substring}

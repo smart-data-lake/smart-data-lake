@@ -22,9 +22,9 @@ import io.smartdatalake.app.{AppUtil, BuildVersionInfo, StateListener}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
