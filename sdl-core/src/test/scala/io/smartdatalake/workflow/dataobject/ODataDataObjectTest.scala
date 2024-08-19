@@ -620,20 +620,15 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val columnAIdx = resultSchema.fieldIndex("ColumnA")
     val columnBIdx = resultSchema.fieldIndex("ColumnB")
-    val columnCreatedIdx = resultSchema.fieldIndex("sdlb_created_on")
 
     val columnAType = resultSchema.fields(columnAIdx)
     val columnBType = resultSchema.fields(columnBIdx)
-    val columnCreatedType = resultSchema.fields(columnCreatedIdx)
 
     assert(columnAType.name == "ColumnA")
     assert(columnAType.dataType.typeName == "string")
 
     assert(columnBType.name == "ColumnB")
     assert(columnBType.dataType.typeName == "integer")
-
-    assert(columnCreatedType.name == "sdlb_created_on")
-    assert(columnCreatedType.dataType.typeName == "timestamp")
   }
 }
 

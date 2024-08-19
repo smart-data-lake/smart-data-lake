@@ -523,7 +523,6 @@ case class ODataDataObject(override val id: DataObjectId,
         .select(from_json($"responseString", arraySchema).as("response"))
         .select(explode($"response").as("record"))
         .select("record.*")
-        .withColumn("sdlb_created_on", current_timestamp())
     } else {
       //Extract the names of the columns
       val columnNames = recordSchema.columns
@@ -575,7 +574,6 @@ case class ODataDataObject(override val id: DataObjectId,
         .select(from_json($"responseString", responseSchema).as("response"))
         .select(explode($"response.value").as("record"))
         .select("record.*")
-        .withColumn("sdlb_created_on", current_timestamp())
 
       // put simple nextState logic below
       nextState = startTimeStamp.toString
