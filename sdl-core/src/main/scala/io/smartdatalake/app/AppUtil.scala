@@ -54,7 +54,8 @@ object AppUtil extends SmartDataLakeLogger {
                          sparkOptionsOpt: Map[String,StringOrSecret] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
-    logger.info(s"Creating spark session: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive")
+    logger.info(s"Creating spark session. Note that None means that the Defaults of the Spark Environment apply." +
+      s"name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt")
 
     // prepare extensions
     val noDataExtension = if (Environment.enableSparkPlanNoDataCheck) Some(new SDLSparkExtension) else None

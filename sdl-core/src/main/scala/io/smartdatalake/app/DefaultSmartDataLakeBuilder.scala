@@ -24,8 +24,8 @@ import scopt.OParser
 
 /**
  * Default Smart Data Lake Command Line Application.
- *
- * Implementation Note: This must be a class and not an object in order to be found by reflection in DatabricksSmartDataLakeBuilder
+ * Note: When running SDLB with Spark, this entrypoint assumes that there it is running in an environment where Spark Config
+ * such as master and deploy-mode are already set. This is for example the case with Databricks.
  */
 class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
