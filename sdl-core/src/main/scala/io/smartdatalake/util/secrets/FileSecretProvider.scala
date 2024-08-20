@@ -21,6 +21,8 @@ package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
 
+import java.io.FileNotFoundException
+import scala.io.Source
 import scala.util.Using
 
 /**
@@ -52,10 +54,11 @@ class FileSecretProvider(file: String) extends SecretProvider {
 }
 object FileSecretProvider {
   def getSecretFromFile(file: String, name: String): String = {
-    val props = Using.resource(scala.io.Source.fromFile(file))(_.getLines().toSeq)
-    val namePrefix = name + "="
-    props.find(_.startsWith(namePrefix))
-      .map(_.stripPrefix(namePrefix))
+    val source = Option(Source.fromFile(file))
+      .getOrElse(throw new FileNotFoundException(s"File $file not found"))
+    val props = Using.resource(source)(_.getLines().toArray)
+    props.find(_.matches(s"^$name\\s*[=:].*"))
+      .map(_.dropWhile(c => c != '=' && c != ':').drop(1).trim)
       .getOrElse(throw new ConfigurationException(s"Variable $name in file $file not found"))
   }
 }
