@@ -26,13 +26,13 @@ import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
-import io.smartdatalake.workflow.action.expectation.{CompletnessExpectation, TransferRateExpectation}
+import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, SparkRepartitionTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, ExpectationValidationException, SQLExpectation, SQLFractionExpectation, SQLQueryExpectation, UniqueKeyExpectation}
+import io.smartdatalake.workflow.dataobject.expectation._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{lit, substring}
@@ -221,7 +221,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from %{inputViewName} where rating = 5") // test multiple transformers - it doesnt matter if they do the same.
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
       transformers = Seq(customTransformerConfig1, customTransformerConfig2),
-      expectations = Seq(TransferRateExpectation(), CompletnessExpectation(expectation = None))
+      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
     )
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
