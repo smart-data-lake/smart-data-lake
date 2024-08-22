@@ -5076,35 +5076,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "CompletnessExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CompletnessExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on comparing count all records of input and output table.\nCompletness is calculated as the fraction of main output count-all over main input count-all."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "TransferRateExpectation"
                   },
                   "name" : {
@@ -5130,6 +5101,35 @@
                 "required" : [ "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation on transfer rate.\nTransfer rate is calculated as the fraction of main output count over main input count."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletenessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletenessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.\nCompletness is calculated as the fraction of main output count-all over main input count-all."
               } ]
             },
             "description" : "List of expectation definitions to evaluate when executing this Action, see [[Expectation]] for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.\nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
@@ -5307,35 +5307,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "CompletnessExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CompletnessExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on comparing count all records of input and output table.\nCompletness is calculated as the fraction of main output count-all over main input count-all."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "TransferRateExpectation"
                   },
                   "name" : {
@@ -5361,6 +5332,35 @@
                 "required" : [ "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation on transfer rate.\nTransfer rate is calculated as the fraction of main output count over main input count."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletenessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".\nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.\nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.\nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletenessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.\nCompletness is calculated as the fraction of main output count-all over main input count-all."
               } ]
             },
             "description" : "List of expectation definitions to evaluate when executing this Action, see [[Expectation]] for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.\nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
