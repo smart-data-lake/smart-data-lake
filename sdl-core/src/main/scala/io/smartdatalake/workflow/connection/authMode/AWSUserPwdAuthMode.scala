@@ -49,7 +49,12 @@ case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: String
   val cognitoUrl = s"https://cognito-idp.$region.amazonaws.com"
   val userPoolTokenUrl = s"https://$userPool.auth.$region.amazoncognito.com/oauth2/token"
 
-  private val oAuth2Service = OAuth2Service(userPoolTokenUrl, Some(clientId.resolve()), awsInitiateAuth)
+  private lazy val oAuth2Service = OAuth2Service(userPoolTokenUrl, Some(clientId.resolve()), awsInitiateAuth)
+
+  override def prepare(): Unit = {
+    // initialize oAuth2Service
+    oAuth2Service
+  }
 
   /**
    * See also https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_InitiateAuth.html
