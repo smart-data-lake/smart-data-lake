@@ -25,7 +25,7 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionModeResult, PartitionDiffMode}
-import io.smartdatalake.workflow.action.expectation.{CompletnessExpectation, TransferRateExpectation}
+import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -427,7 +427,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
     val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id),
       transformers = Seq(customTransformerConfig1, customTransformerConfig2),
-      expectations = Seq(TransferRateExpectation(), CompletnessExpectation(expectation = None))
+      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
     )
     instanceRegistry.register(action1)
     val dfInput = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
@@ -471,7 +471,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
     val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id),
       transformers = Seq(customTransformerConfig1, customTransformerConfig2),
-      expectations = Seq(TransferRateExpectation(), CompletnessExpectation(expectation = None))
+      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
     )
     instanceRegistry.register(action1)
     val dfInput = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
