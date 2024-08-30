@@ -53,8 +53,8 @@ import sttp.model.{Header, MediaType, Method, Uri}
  * }}}
  *
  * @param baseUrl        API base URL for upload. Add tenant, repo (required) and env as query parameters, e.g. https://<host>?tenant=<tenant>&repo=<repository>&env=<environment>"
- * @param tenant         Optional unique name for your organization within the SDLB UI. The userId set through authMode need to have access to this tenant.
- *                       Default for tenant is the special "PrivateTenant". In this case the API will use the userId of authenticated user as tenant.
+ * @param tenant         Optional unique name for your organization within the SDLB UI. The userId set through authMode needs to have access to this tenant.
+ *                       Default for tenant is the special "PrivateTenant". In this case the API will use the userId of the authenticated user as tenant.
  * @param repo           Repository under which this upload should be stored in the UI backend.
  *                       The repository name normally has the meaning of the project or application.
  * @param env            Environment under which this upload should be stored in the UI backend, e.g. dev or prd.
