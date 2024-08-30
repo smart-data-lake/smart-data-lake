@@ -24,7 +24,9 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 
 /**
- * Validate by SASL_SSL Authentication : user / password and truststore
+ * Authenticate using SASL_SSL Authentication.
+ *
+ * Configuration needed are user, password and a Java truststore.
  */
 case class SASLSCRAMAuthMode(
                               username: StringOrSecret,
