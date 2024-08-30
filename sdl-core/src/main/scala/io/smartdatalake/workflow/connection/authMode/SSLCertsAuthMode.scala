@@ -24,8 +24,9 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 
 /**
- * Validate by SSL Certificates : Only location an credentials. Additional attributes should be
- * supplied via options map
+ * Authenticate using SSL Certificates.
+ *
+ * Configuration needed are a Java keystore and truststore.
  */
 case class SSLCertsAuthMode(
                              keystorePath: String,
