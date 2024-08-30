@@ -568,13 +568,15 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/AWSUserPwdAuthMode"
+            }, {
               "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/AzureADClientGrantAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/BasicAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
@@ -685,13 +687,15 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/AWSUserPwdAuthMode"
+            }, {
               "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/AzureADClientGrantAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/BasicAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
@@ -727,13 +731,15 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/AWSUserPwdAuthMode"
+            }, {
               "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/AzureADClientGrantAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/BasicAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
@@ -812,13 +818,15 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/AWSUserPwdAuthMode"
+            }, {
               "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/AzureADClientGrantAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/BasicAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
@@ -877,13 +885,15 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/AWSUserPwdAuthMode"
+            }, {
               "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/AzureADClientGrantAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/BasicAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
@@ -3128,24 +3138,7 @@
             "description" : "An optional, minimal schema that a [[DataObject]] schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]] , that is,\nwhen reading or writing Spark data frames from/to the underlying data container. [[io.smartdatalake.workflow.action.Action]] s that work with files ignore the `schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist."
           },
           "authMode" : {
-            "oneOf" : [ {
-              "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/BasicAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/TokenAuthMode"
-            } ],
-            "description" : "authentication information: for now BasicAuthMode is supported."
+            "$ref" : "#/definitions/AuthMode/BasicAuthMode"
           },
           "batchSize" : {
             "type" : "integer",
@@ -4707,21 +4700,160 @@
           },
           "authMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AWSUserPwdAuthMode"
+                },
+                "region" : {
+                  "type" : "string",
+                  "description" : "AWS region"
+                },
+                "userPool" : {
+                  "type" : "string"
+                },
+                "clientId" : {
+                  "type" : "string",
+                  "description" : "client id of the AWS application\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "user" : {
+                  "type" : "string",
+                  "description" : "user to login\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "password" : {
+                  "type" : "string",
+                  "description" : "password to use for login.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "useIdToken" : {
+                  "type" : "boolean",
+                  "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                }
+              },
+              "title" : "AWSUserPwdAuthMode",
+              "required" : [ "region", "userPool", "clientId", "user", "password", "type" ],
+              "additionalProperties" : false,
+              "description" : "AWS User/Pwd Authentication.\n\nThis first calls AWS Cognito InitiateAuth endpoint from the selected region to authenticate the user.\nThe tokens returned can then be refreshed with the corresponding token endpoint of the user pool."
             }, {
-              "$ref" : "#/definitions/AuthMode/BasicAuthMode"
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "CustomHttpAuthMode"
+                },
+                "className" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait[[CustomHttpAuthModeLogic]]"
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "description" : "Options to pass to the custom auth mode logic in prepare function.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "CustomHttpAuthMode",
+              "required" : [ "className", "options", "type" ],
+              "additionalProperties" : false,
+              "description" : "Connect with custom HTTP-header based authentication"
             }, {
-              "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "TokenAuthMode"
+                },
+                "tokenType" : {
+                  "type" : "string",
+                  "description" : "token type to use in HTTP Authorization header. Default is \"Bearer\"."
+                },
+                "token" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "tokenVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                }
+              },
+              "title" : "TokenAuthMode",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Authenticate using a predefined token.\n\nFor HTTP Connections the token is used as Authorization header."
             }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "BasicAuthMode"
+                },
+                "user" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "password" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "userVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                },
+                "passwordVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                }
+              },
+              "title" : "BasicAuthMode",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Authenticate using basic user/pwd authentication.\n\nFor http connection this will create a basic authentication header."
             }, {
-              "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AzureADClientGrantAuthMode"
+                },
+                "authority" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "applicationId" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "clientSecret" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "scope" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "AzureADClientGrantAuthMode",
+              "required" : [ "authority", "applicationId", "clientSecret", "scope", "type" ],
+              "additionalProperties" : false
             }, {
-              "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/TokenAuthMode"
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AuthHeaderMode"
+                },
+                "headerName" : {
+                  "type" : "string"
+                },
+                "secret" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "secretVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                }
+              },
+              "title" : "AuthHeaderMode",
+              "required" : [ "headerName", "type" ],
+              "additionalProperties" : false,
+              "description" : "Authenticate using a custom HTTP header."
             } ],
             "description" : "Optional configuration of webservice authentication. Supported`AuthMode` s are BasicAuthMode and CustomHttpAuthMode.\nCustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module."
           },
@@ -6931,13 +7063,15 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/AWSUserPwdAuthMode"
+            }, {
               "$ref" : "#/definitions/AuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/AzureADClientGrantAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/BasicAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/CustomHttpAuthMode"
-            }, {
-              "$ref" : "#/definitions/AuthMode/KeycloakClientSecretAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
@@ -7109,6 +7243,41 @@
       }
     },
     "AuthMode" : {
+      "AWSUserPwdAuthMode" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "AWSUserPwdAuthMode"
+          },
+          "region" : {
+            "type" : "string",
+            "description" : "AWS region"
+          },
+          "userPool" : {
+            "type" : "string"
+          },
+          "clientId" : {
+            "type" : "string",
+            "description" : "client id of the AWS application\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "user" : {
+            "type" : "string",
+            "description" : "user to login\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "password" : {
+            "type" : "string",
+            "description" : "password to use for login.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "useIdToken" : {
+            "type" : "boolean",
+            "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+          }
+        },
+        "title" : "AWSUserPwdAuthMode",
+        "required" : [ "type", "region", "userPool", "clientId", "user", "password" ],
+        "additionalProperties" : false,
+        "description" : "AWS User/Pwd Authentication.\n\nThis first calls AWS Cognito InitiateAuth endpoint from the selected region to authenticate the user.\nThe tokens returned can then be refreshed with the corresponding token endpoint of the user pool."
+      },
       "AuthHeaderMode" : {
         "type" : "object",
         "properties" : {
@@ -7128,9 +7297,36 @@
           }
         },
         "title" : "AuthHeaderMode",
-        "required" : [ "type" ],
+        "required" : [ "type", "headerName" ],
         "additionalProperties" : false,
-        "description" : "Connect by custom authorization header"
+        "description" : "Authenticate using a custom HTTP header."
+      },
+      "AzureADClientGrantAuthMode" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "AzureADClientGrantAuthMode"
+          },
+          "authority" : {
+            "type" : "string",
+            "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "applicationId" : {
+            "type" : "string",
+            "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "clientSecret" : {
+            "type" : "string",
+            "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "scope" : {
+            "type" : "string",
+            "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          }
+        },
+        "title" : "AzureADClientGrantAuthMode",
+        "required" : [ "type", "authority", "applicationId", "clientSecret", "scope" ],
+        "additionalProperties" : false
       },
       "BasicAuthMode" : {
         "type" : "object",
@@ -7158,7 +7354,7 @@
         "title" : "BasicAuthMode",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Connect by basic authentication"
+        "description" : "Authenticate using basic user/pwd authentication.\n\nFor http connection this will create a basic authentication header."
       },
       "CustomHttpAuthMode" : {
         "type" : "object",
@@ -7183,43 +7379,6 @@
         "required" : [ "type", "className", "options" ],
         "additionalProperties" : false,
         "description" : "Connect with custom HTTP-header based authentication"
-      },
-      "KeycloakClientSecretAuthMode" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "KeycloakClientSecretAuthMode"
-          },
-          "ssoServer" : {
-            "type" : "string"
-          },
-          "ssoRealm" : {
-            "type" : "string"
-          },
-          "ssoGrantType" : {
-            "type" : "string"
-          },
-          "clientIdVariable" : {
-            "type" : "string",
-            "deprecated" : true
-          },
-          "clientId" : {
-            "type" : "string",
-            "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
-          },
-          "clientSecretVariable" : {
-            "type" : "string",
-            "deprecated" : true
-          },
-          "clientSecret" : {
-            "type" : "string",
-            "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
-          }
-        },
-        "title" : "KeycloakClientSecretAuthMode",
-        "required" : [ "type", "ssoServer", "ssoRealm", "ssoGrantType" ],
-        "additionalProperties" : false,
-        "description" : "Connect by using Keycloak to manage token and token refresh giving clientId/secret as information.\nFor HTTP Connection this is used as Bearer token in Authorization header."
       },
       "PublicKeyAuthMode" : {
         "type" : "object",
@@ -7280,7 +7439,7 @@
         "title" : "SASLSCRAMAuthMode",
         "required" : [ "type", "username", "sslMechanism" ],
         "additionalProperties" : false,
-        "description" : "Validate by SASL_SSL Authentication : user / password and truststore"
+        "description" : "Authenticate using SASL_SSL Authentication.\n\nConfiguration needed are user, password and a Java truststore."
       },
       "SSLCertsAuthMode" : {
         "type" : "object",
@@ -7320,7 +7479,7 @@
         "title" : "SSLCertsAuthMode",
         "required" : [ "type", "keystorePath", "truststorePath" ],
         "additionalProperties" : false,
-        "description" : "Validate by SSL Certificates : Only location an credentials. Additional attributes should be\nsupplied via options map"
+        "description" : "Authenticate using SSL Certificates.\n\nConfiguration needed are a Java keystore and truststore."
       },
       "TokenAuthMode" : {
         "type" : "object",
@@ -7328,19 +7487,23 @@
           "type" : {
             "const" : "TokenAuthMode"
           },
-          "tokenVariable" : {
+          "tokenType" : {
             "type" : "string",
-            "deprecated" : true
+            "description" : "token type to use in HTTP Authorization header. Default is \"Bearer\"."
           },
           "token" : {
             "type" : "string",
             "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          },
+          "tokenVariable" : {
+            "type" : "string",
+            "deprecated" : true
           }
         },
         "title" : "TokenAuthMode",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Connect by token\nFor HTTP Connection this is used as Bearer token in Authorization header."
+        "description" : "Authenticate using a predefined token.\n\nFor HTTP Connections the token is used as Authorization header."
       }
     },
     "GenericDfsTransformer" : {
@@ -7914,7 +8077,199 @@
             "type" : "string",
             "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
           },
-          "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+          "description" : "Options for SDLPlugin initialization.\nNote that SDLPlugin.startup is executed before SDLB parses the config, and pluginOptions are only available later when calling SDLPlugin.configure method.\nAn SDLPlugin is set through Environment.plugin, normally this is configured through the java system property \"sdl.pluginClassName\".\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+        },
+        "uiBackend" : {
+          "type" : "object",
+          "properties" : {
+            "baseUrl" : {
+              "type" : "string",
+              "description" : "API base URL for upload. Add tenant, repo (required) and env as query parameters, e.g. https://<host>?tenant=<tenant>&repo=<repository>&env=<environment>\""
+            },
+            "tenant" : {
+              "type" : "string",
+              "description" : "Optional unique name for your organization within the SDLB UI. The userId set through authMode needs to have access to this tenant.\nDefault for tenant is the special \"PrivateTenant\". In this case the API will use the userId of the authenticated user as tenant."
+            },
+            "repo" : {
+              "type" : "string",
+              "description" : "Repository under which this upload should be stored in the UI backend.\nThe repository name normally has the meaning of the project or application."
+            },
+            "env" : {
+              "type" : "string",
+              "description" : "Environment under which this upload should be stored in the UI backend, e.g. dev or prd.\nDefault is 'std'."
+            },
+            "authMode" : {
+              "oneOf" : [ {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AWSUserPwdAuthMode"
+                  },
+                  "region" : {
+                    "type" : "string",
+                    "description" : "AWS region"
+                  },
+                  "userPool" : {
+                    "type" : "string"
+                  },
+                  "clientId" : {
+                    "type" : "string",
+                    "description" : "client id of the AWS application\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "user" : {
+                    "type" : "string",
+                    "description" : "user to login\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "password" : {
+                    "type" : "string",
+                    "description" : "password to use for login.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "useIdToken" : {
+                    "type" : "boolean",
+                    "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                  }
+                },
+                "title" : "AWSUserPwdAuthMode",
+                "required" : [ "region", "userPool", "clientId", "user", "password", "type" ],
+                "additionalProperties" : false,
+                "description" : "AWS User/Pwd Authentication.\n\nThis first calls AWS Cognito InitiateAuth endpoint from the selected region to authenticate the user.\nThe tokens returned can then be refreshed with the corresponding token endpoint of the user pool."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CustomHttpAuthMode"
+                  },
+                  "className" : {
+                    "type" : "string",
+                    "description" : "class name implementing trait[[CustomHttpAuthModeLogic]]"
+                  },
+                  "options" : {
+                    "type" : "object",
+                    "additionalProperties" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                    },
+                    "description" : "Options to pass to the custom auth mode logic in prepare function.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  }
+                },
+                "title" : "CustomHttpAuthMode",
+                "required" : [ "className", "options", "type" ],
+                "additionalProperties" : false,
+                "description" : "Connect with custom HTTP-header based authentication"
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "TokenAuthMode"
+                  },
+                  "tokenType" : {
+                    "type" : "string",
+                    "description" : "token type to use in HTTP Authorization header. Default is \"Bearer\"."
+                  },
+                  "token" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "tokenVariable" : {
+                    "type" : "string",
+                    "deprecated" : true
+                  }
+                },
+                "title" : "TokenAuthMode",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Authenticate using a predefined token.\n\nFor HTTP Connections the token is used as Authorization header."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "BasicAuthMode"
+                  },
+                  "user" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "password" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "userVariable" : {
+                    "type" : "string",
+                    "deprecated" : true
+                  },
+                  "passwordVariable" : {
+                    "type" : "string",
+                    "deprecated" : true
+                  }
+                },
+                "title" : "BasicAuthMode",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Authenticate using basic user/pwd authentication.\n\nFor http connection this will create a basic authentication header."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AzureADClientGrantAuthMode"
+                  },
+                  "authority" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "applicationId" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "clientSecret" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  }
+                },
+                "title" : "AzureADClientGrantAuthMode",
+                "required" : [ "authority", "applicationId", "clientSecret", "scope", "type" ],
+                "additionalProperties" : false
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "AuthHeaderMode"
+                  },
+                  "headerName" : {
+                    "type" : "string"
+                  },
+                  "secret" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                  },
+                  "secretVariable" : {
+                    "type" : "string",
+                    "deprecated" : true
+                  }
+                },
+                "title" : "AuthHeaderMode",
+                "required" : [ "headerName", "type" ],
+                "additionalProperties" : false,
+                "description" : "Authenticate using a custom HTTP header."
+              } ],
+              "description" : "optional configuration of authentication to access UI backend API through baseUrl."
+            },
+            "stagePath" : {
+              "type" : "string",
+              "description" : "optional (but recommended) hadoop directory to save state if upload fails temporarily.\nUpload of these files is retried on initialization of next SDLB run."
+            },
+            "processUpdates" : {
+              "type" : "boolean",
+              "description" : "optional; if false, only initial & final state is uploaded, otherwise all state updates are uploaded as partial updates.\nDefault is processUpdates=true."
+            }
+          },
+          "title" : "UIBackendConfig",
+          "required" : [ "baseUrl", "repo" ],
+          "additionalProperties" : false,
+          "description" : "Configuration of the UI backend to upload state updates of the Job runs.\n\nThe UI backend can manage state from different projects and environments.\nUploaded job state is stored within the following hierarchy: tenant (customer), repository (project) and environment. Example to configure AWS UI Backend; additionally create a file 'ui-auth' in the project directory which contains key-value pairs for clientId, user and pwd.\n```global {\nuiBackend {\nbaseUrl = \"https://nn92uqy13e.execute-api.eu-central-1.amazonaws.com/DEV/api/v1\"\ntenant = PrivateTenant\nrepo = int-testing\nenv = std\nauthMode {\ntype = AWSUserPwdAuthMode\nregion = eu-central-1\nuserPool = sdlb-ui\nuseIdToken = true\nclientId = \"###FILE#ui-auth;clientId###\"\nuser = \"###FILE#ui-auth;user###\"\npassword = \"###FILE#ui-auth;pwd###\"\n}\n```}"
         }
       },
       "title" : "GlobalConfig",
