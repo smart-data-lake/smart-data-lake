@@ -72,7 +72,13 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
       .headers(additionalHeaders)
       .optionally(timeouts, (v:HttpTimeoutConfig, request:HttpRequest) => request.timeout(v.connectionTimeoutMs, v.readTimeoutMs))
       .applyAuthMode(authMode)
-      .optionally(proxy, (v:HttpProxyConfig, request:HttpRequest) => request.proxy(v.host, v.port))
+      .optionally(proxy, (v:HttpProxyConfig, request:HttpRequest) => {
+        val request1 = request.proxy(v.host, v.port)
+        (v.user, v.password) match {
+          case (Some(user), Some(pwd)) => request1.proxyAuth(user.resolve(), pwd.resolve())
+          case _ => request1
+        }
+      })
       .option(HttpOptions.followRedirects(followRedirects))
     new ScalaJWebserviceClient(request)
   }

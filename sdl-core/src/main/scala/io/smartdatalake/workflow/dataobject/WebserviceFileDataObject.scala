@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -47,7 +48,7 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  * @param host proxy host
  * @param port proxy port
  */
-case class HttpProxyConfig(host: String, port: Int)
+case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None)
 
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
