@@ -61,6 +61,10 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
     val metrics = testDO.writeSnowparkDataFrame(df, partitionValues = Seq(PartitionValues(Map("dt"->"20210201")),PartitionValues(Map("dt"->"20210202"))))
     logger.info("Finished writing using Snowpark " + metrics)
 
+    // partitions
+    val pvs = testDO.listPartitions
+    assert(pvs.toSet == Set(PartitionValues(Map("dt" -> "20210201")), PartitionValues(Map("dt" -> "20210202"))))
+
     // read data with Snowpark and Spark
     println("SNOWPARK")
     val dfTestSnowpark = testDO.getSnowparkDataFrame()
