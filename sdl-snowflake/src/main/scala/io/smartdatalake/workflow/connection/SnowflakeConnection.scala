@@ -31,6 +31,8 @@ import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
 import java.sql.{Connection => SqlConnection}
+import java.util
+import scala.jdk.CollectionConverters._
 
 /**
  * Connection information for Snowflake databases.
@@ -71,7 +73,11 @@ case class SnowflakeConnection(override val id: ConnectionId,
   override val jdbcDialect: JdbcDialect = JdbcDialects.get("snowflake")
 
   def getProxyOptions: Map[String,String] = {
-    proxy.map(p => Map("useProxy" -> "true", "proxyHost" -> p.host, "proxyPort" -> p.port.toString)).getOrElse(Map())
+    proxy.map(p =>
+      Map("useProxy" -> "true", "proxyHost" -> p.host, "proxyPort" -> p.port.toString)
+        ++ p.user.map("proxyUser" -> _.resolve())
+        ++ p.password.map("proxyPassword" -> _.resolve())
+    ).getOrElse(Map())
   }
 
   def getJdbcAuthOptions(schema: String): Map[String, String] = {

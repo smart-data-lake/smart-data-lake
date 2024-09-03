@@ -67,7 +67,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *                     These options override connection.options.
  * @param metadata     meta data
  */
-// TODO: we should add virtual partitions as for JdbcTableDataObject and KafkaDataObject, so that PartitionDiffMode can be used...
 case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override var table: Table,
                                     override val schemaMin: Option[GenericSchema] = None,
