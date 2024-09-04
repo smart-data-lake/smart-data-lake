@@ -85,8 +85,18 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
 
   /**
    * Optional execution condition for this action.
+   * By default, an Action is executed if all inputs are available, e.g. no input from a previous Action is skipped.
+   * Override the default behaviour by specifying an executionCondition in Spark SQL expression syntax.
+   * It is evaluated against the properties available in [[SubFeedsExpressionData]].
+   * If true, the Action is executed, otherwise it is skipped.
    *
-   * The Condition is a Spark sql expression evaluated against [[SubFeedsExpressionData]]. If result is true, the Action is executed, otherwise skipped. Details see [[Condition]].
+   * Example:
+   * {{{
+   *     executionCondition = {
+   *       description = "execute if input stg-src1 is not skipped"
+   *       expression = "!inputSubFeeds.stg-src1.isSkipped"
+   *     }
+   * }}}
    */
   def executionCondition: Option[Condition]
 
@@ -100,6 +110,11 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
    *
    * To check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject.
+   *
+   * Example - fail an action writing to output int-tgt in case there are no records written:
+   * {{{
+   *   dataObjectId = 'int-tgt' and key = 'no_data' and value = true"
+   * }}}
    */
   def metricsFailCondition: Option[String]
 
