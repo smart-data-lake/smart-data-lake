@@ -5199,7 +5199,7 @@
           },
           "metricsFailCondition" : {
             "type" : "string",
-            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject."
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```dataObjectId = 'int-tgt' and key = 'no_data' and value = true\"```"
           },
           "expectations" : {
             "type" : "array",
@@ -5430,7 +5430,7 @@
           },
           "metricsFailCondition" : {
             "type" : "string",
-            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject."
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```dataObjectId = 'int-tgt' and key = 'no_data' and value = true\"```"
           },
           "expectations" : {
             "type" : "array",
@@ -5612,7 +5612,7 @@
           },
           "metricsFailCondition" : {
             "type" : "string",
-            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject."
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```dataObjectId = 'int-tgt' and key = 'no_data' and value = true\"```"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ActionMetadata"
@@ -5820,7 +5820,7 @@
           },
           "metricsFailCondition" : {
             "type" : "string",
-            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject."
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```dataObjectId = 'int-tgt' and key = 'no_data' and value = true\"```"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ActionMetadata"
@@ -5904,7 +5904,7 @@
           },
           "metricsFailCondition" : {
             "type" : "string",
-            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject."
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```dataObjectId = 'int-tgt' and key = 'no_data' and value = true\"```"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ActionMetadata"
@@ -6077,7 +6077,7 @@
           },
           "metricsFailCondition" : {
             "type" : "string",
-            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject."
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.\nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```dataObjectId = 'int-tgt' and key = 'no_data' and value = true\"```"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ActionMetadata"
