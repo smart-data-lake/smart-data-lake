@@ -293,7 +293,7 @@ class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBuffe
 class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
 
   private var dirInitialized : Boolean = false
-  private implicit val filesystem: FileSystem = ioc.newHadoopFsWithConf(ioc.newHadoopPath("dbfs://"), context)
+  private implicit val filesystem: FileSystem = ioc.newHadoopFsWithConf(ioc.newHadoopPath("/"), context)
   private val temporaryTargetDirectoryPath = ioc.newHadoopPath(setup.tempFileDirectoryPath.get, tableName + s"_${Instant.now.getEpochSecond}")
 
   def initTemporaryDirectory(): Unit = {
