@@ -44,7 +44,7 @@ case class DebeziumConnection(override val id: ConnectionId,
 
     authMode match {
       case m: BasicAuthMode =>
-        Map("name" -> uniqueConnectorName,
+        Map(
           "connector.class" -> dbEngine.toString,
           "database.hostname" -> hostname,
           "database.port" -> port.toString,
