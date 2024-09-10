@@ -30,7 +30,11 @@ object IcebergTestUtils {
     "spark.sql.catalog.iceberg1" -> "org.apache.iceberg.spark.SparkCatalog",
     "spark.sql.catalog.iceberg1.catalog-impl" -> "org.apache.iceberg.jdbc.JdbcCatalog",
     "spark.sql.catalog.iceberg1.warehouse" -> "target/iceberg1warehouse",
-    "spark.sql.catalog.iceberg1.uri" -> "jdbc:hsqldb:mem:catalog"
+    "spark.sql.catalog.iceberg1.uri" -> "jdbc:hsqldb:mem:catalog",
+    // Additional Iceberg Hadoop catalog, for testing compatibility
+    "spark.sql.catalog.iceberg_hadoop" -> "org.apache.iceberg.spark.SparkCatalog",
+    "spark.sql.catalog.iceberg_hadoop.type" -> "hadoop",
+    "spark.sql.catalog.iceberg_hadoop.warehouse" -> "target/icebergHadoopWarehouse"
   )
   def session : SparkSession = additionalSparkProperties
     .foldLeft(TestUtil.sparkSessionBuilder()) {
