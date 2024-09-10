@@ -455,8 +455,7 @@
         <snowflake-spark.version>3.0.0</snowflake-spark.version>
         <snowflake-snowpark.version>1.13.2</snowflake-snowpark.version>
         <delta.version>3.2.0</delta.version>
-        <!-- Version 1.4.x has a problem with deleting partitions, data is deleted but the partition still appears when listing partitions, see IcebergTableDataObjectTest -->
-        <iceberg.version>1.6.0</iceberg.version>
+        <iceberg.version>1.6.1</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 

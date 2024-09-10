@@ -271,7 +271,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      PartitionValues.fromDataFrame(SnowparkDataFrame(getSnowparkDataFrame().select(partitions.map(snowpark.functions.col)).distinct()))
+      if (isTableExisting) PartitionValues.fromDataFrame(SnowparkDataFrame(getSnowparkDataFrame().select(partitions.map(snowpark.functions.col)).distinct()))
+      else Seq()
     } else Seq()
   }
 
