@@ -34,7 +34,8 @@ import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.StructType
 
-import java.sql.{DriverManager, Connection => SqlConnection}
+import scala.collection.mutable.{Set => MutableSet}
+import java.sql.{DatabaseMetaData, DriverManager, ResultSet, SQLException, Connection => SqlConnection}
 
 /**
  * Connection information for JDBC tables.
@@ -149,6 +150,25 @@ case class JdbcTableConnection(override val id: ConnectionId,
   def dropTable(tableName: String, logging: Boolean = true): Unit = {
     if (catalog.isTableExisting(tableName)) {
       execJdbcStatement(s"drop table $tableName", logging = logging)
+    }
+  }
+
+  case class JdbcPrimaryKey(pkColumns: Seq[String], pkName: Option[String] = None)
+
+  private lazy val connectionMetadata: DatabaseMetaData = this.getConnection.getMetaData
+  def getJdbcPrimaryKey(catalog: String, schema: String, tableName: String): Option[JdbcPrimaryKey] = {
+    var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
+    var primaryKeyCols: MutableSet[String] = MutableSet()
+    var primaryKeyName: MutableSet[String] = MutableSet()
+    while (resultSet.next()) {
+      primaryKeyCols += resultSet.getString("COLUMN_NAME")
+      primaryKeyName += resultSet.getString("PK_NAME")
+    }
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(JdbcPrimaryKey(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection for $tableName returns more than one Primary Key!")
+      case (cols, pk) => Some(JdbcPrimaryKey(cols, Some(pk.head)))
     }
   }
 
