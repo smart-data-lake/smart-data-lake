@@ -895,10 +895,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val now = Instant.parse("2024-06-09T23:00:00Z")
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
-    //val test_file_system = new LocalFileSystem()
-    //m.doReturn(test_file_system, Seq.empty: _*).when(ioc_spy).newHadoopFsWithConf(any[org.apache.hadoop.fs.Path], any[ActionPipelineContext])
-
-
     val temp_dir_base = Files.createTempDirectory("odatatest_filebuffer").toFile
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
@@ -917,13 +913,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     sut.injectIOC(ioc_spy)
     sut.setState(Some("2024-06-10T10:03:44Z"))
 
-
-
-    //val context_mock = m.mock(classOf[ActionPipelineContext])
-    //m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
-
-
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session, ExecutionPhase.Exec)
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec)
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
