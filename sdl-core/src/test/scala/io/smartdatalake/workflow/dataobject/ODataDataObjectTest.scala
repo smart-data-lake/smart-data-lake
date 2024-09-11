@@ -32,6 +32,7 @@ import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import io.smartdatalake.workflow.action.RuntimeEventState
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.hadoop.fs.LocalFileSystem
 import org.apache.spark.sql.{DataFrameReader, SparkSession}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
@@ -48,7 +49,7 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
 
   def init_sut(ioc: ODataIOC = new ODataIOC(), threshold: Int = 9999, tableName: String = null): ODataResponseMemoryBuffer = {
     val context = this.contextExec
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("TEMPFILEPATH"), Some(threshold))
+    val setup = ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(threshold))
 
     if (tableName != null) {
       setup.setActionName(tableName)
@@ -124,30 +125,30 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
     val result = sut.switchIfNecessary()
 
     assert(result == sut)
-    m.verify(ioc, m.never()).newODataResponseFileBufferByType(any[String], any[ODataResponseBufferSetup], any[ActionPipelineContext])
+    m.verify(ioc, m.never()).newODataResponseFileBuffer(any[String], any[ODataResponseBufferSetup], any[ActionPipelineContext])
   }
 
   test("ODataResponseMemoryBuffer - switchIfNecessary - new buffer") {
     val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("TEMPFILEPATH"), Some(3))
+    val setup = ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(3))
     setup.setActionName("TABLE")
 
     val ioc = init_ioc()
-    val newBuffer = m.mock(classOf[ODataResponseDBFSFileBuffer])
-    m.when(ioc.newODataResponseFileBufferByType("TABLE", setup, context)).thenReturn(newBuffer)
+    val newBuffer = m.mock(classOf[ODataResponseFileBuffer])
+    m.when(ioc.newODataResponseFileBuffer("TABLE", setup, context)).thenReturn(newBuffer)
     val sut = new ODataResponseMemoryBuffer(setup, context, ioc)
 
     sut.addResponse("TEST")
     val result = sut.switchIfNecessary()
 
     assert(result == newBuffer)
-    m.verify(ioc, m.times(1)).newODataResponseFileBufferByType("TABLE", setup, context)
+    m.verify(ioc, m.times(1)).newODataResponseFileBuffer("TABLE", setup, context)
   }
 
 
   test("ODataResponseMemoryBuffer - switchIfNecessary - above threshold but no path") {
     val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), None, Some(3))
+    val setup = ODataResponseBufferSetup(None, Some(3))
     setup.setActionName("TABLE")
 
     val ioc = init_ioc()
@@ -157,13 +158,14 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
     val result = sut.switchIfNecessary()
 
     assert(result == sut)
-    m.verify(ioc, m.never()).newODataResponseFileBufferByType(any[String], any[ODataResponseBufferSetup], any[ActionPipelineContext])
+    m.verify(ioc, m.never()).newODataResponseFileBuffer(any[String], any[ODataResponseBufferSetup], any[ActionPipelineContext])
   }
 
   test("ODataResponseLocalFileBuffer - getDirectoryPath") {
   }
 }
 
+/*
 class ODataResponseLocalFileBufferTest extends DataObjectTestSuite {
 
     def init_ioc() : ODataIOC = {
@@ -172,7 +174,7 @@ class ODataResponseLocalFileBufferTest extends DataObjectTestSuite {
 
   test("ODataResponseLocalFileBuffer - makeTempDirIfNotExists - If not exists") {
     val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
+    val setup = ODataResponseBufferSetup(Some("PATH"), Some(3))
     val ioc = init_ioc()
     val mock_path = m.mock(classOf[java.nio.file.Path])
 
@@ -508,12 +510,13 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     assert(result == sut)
   }
 }
+*/
 
 class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL basic") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -533,7 +536,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL with state") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -555,7 +558,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL with state and source filter") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -578,7 +581,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL with maxrecordcount") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -599,7 +602,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getSparkDataFrame in init phase") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val context = this.contextInit
     //val context_mock = m.mock(classOf[ActionPipelineContext])
     //m.doReturn(ExecutionPhase.Init, Seq.empty: _*).when(context_mock).phase
@@ -662,7 +665,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     )
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     
     val sut = ODataDataObject(
         id = DataObjectId("test-dataobject")
@@ -720,7 +723,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -802,7 +805,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -848,7 +851,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     server.stop()
   }
 
-  test("With three pages with local temp file buffer") {
+  test("With three pages with temp file buffer") {
     val port = 8080
     val httpsPort = 8443
     val host = "127.0.0.1"
@@ -892,10 +895,13 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val now = Instant.parse("2024-06-09T23:00:00Z")
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
+    //val test_file_system = new LocalFileSystem()
+    //m.doReturn(test_file_system, Seq.empty: _*).when(ioc_spy).newHadoopFsWithConf(any[org.apache.hadoop.fs.Path], any[ActionPipelineContext])
+
 
     val temp_dir_base = Files.createTempDirectory("odatatest_filebuffer").toFile
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
     val temp_dir = new File(temp_dir_base, "test-dataobject_1717974000")
 
     val sut = ODataDataObject(
@@ -911,10 +917,15 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     sut.injectIOC(ioc_spy)
     sut.setState(Some("2024-06-10T10:03:44Z"))
 
-    val context_mock = m.mock(classOf[ActionPipelineContext])
-    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
 
-    val resultDf = sut.getSparkDataFrame(Seq.empty)(context_mock)
+
+    //val context_mock = m.mock(classOf[ActionPipelineContext])
+    //m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+
+
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session, ExecutionPhase.Exec)
+
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
 
     assert(resultData.length == 4)
@@ -938,12 +949,12 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val newState = sut.getState
     assert(newState.get == "2024-06-09T23:00:00Z")
 
-    val numOfTempFiles1 = temp_dir.listFiles().length
-    assert(numOfTempFiles1 == 3)
+    val numOfTempFiles1 = temp_dir_base.listFiles().length
+    assert(numOfTempFiles1 == 1)
 
     sut.postRead(null)
 
-    val numOfTempFiles2 = temp_dir.listFiles().length
+    val numOfTempFiles2 = temp_dir_base.listFiles().length
     assert(numOfTempFiles2 == 0)
 
     temp_dir_base.delete()
@@ -980,7 +991,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     )
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -1022,7 +1033,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     )
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileBufferType = Some("local"), tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")

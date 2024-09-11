@@ -28,6 +28,7 @@ import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLak
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, replaceNonSqlWithUnderscores}
 import io.smartdatalake.util.spark.SDLSparkExtension
+import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -97,10 +98,14 @@ object TestUtil extends SmartDataLakeLogger {
     getDefaultActionPipelineContext(session) // initialize with Spark session incl. Hive support
   }
 
-  def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
+  def getDefaultActionPipelineContext(phase : ExecutionPhase)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
+    getDefaultActionPipelineContext(session, phase = phase) // initialize with Spark session incl. Hive support
+  }
+
+  def getDefaultActionPipelineContext(sparkSession: SparkSession, phase : ExecutionPhase = ExecutionPhase.Init)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
     val globalConfig = GlobalConfig()
-    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
+    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = phase, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
     // reuse existing spark session
     globalConfig._sparkSession = Some(sparkSession)
     context

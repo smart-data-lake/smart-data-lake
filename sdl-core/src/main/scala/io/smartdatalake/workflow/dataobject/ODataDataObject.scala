@@ -85,50 +85,15 @@ class ODataIOC {
   }
 
   /**
-   * Create a new instance of the ODataReponseLocalFileBuffer class
-   * @param tmpDirName path to the temporary direction to write to
-   * @param setup buffer configuration
-   * @param context pipeline context
-   * @return ODataReponseLocalFileBuffer
-   */
-  def newODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseLocalFileBuffer =
-  {
-    new ODataResponseLocalFileBuffer(tmpDirName, setup, context, this)
-  }
-
-  /**
-   * Create a new instance of the ODataResponseDBFSFileBuffer class
+   * Create a new instance of the ODataResponseFileBuffer class
    * @param tmpDirName path to the temporary direction to write to
    * @param setup buffer configuration
    * @param context pipeline context
    * @return ODataResponseDBFSFileBuffer
    */
-  def newODataResponseDBFSFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseDBFSFileBuffer =
+  def newODataResponseFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseFileBuffer =
   {
-    new ODataResponseDBFSFileBuffer(tmpDirName, setup, context, this)
-  }
-
-  /**
-   * Create a new instance of a ResponseFileBuffer class, based on the provided parameters
-   * @param tmpDirName path to the temporary direction to write to
-   * @param setup buffer configuration
-   * @param context pipeline context
-   * @return either ODataResponseLocalFileBuffer or ODataResponseDBFSFileBuffer
-   */
-  def newODataResponseFileBufferByType(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseBuffer = {
-    var result : ODataResponseBuffer = null
-
-    if (setup != null) {
-      setup.tempFileBufferType.getOrElse("").toLowerCase match {
-        case "local" => result = newODataResponseLocalFileBuffer(tmpDirName, setup, context)
-        case "dbfs"  => result = newODataResponseDBFSFileBuffer(tmpDirName, setup, context)
-        case _ => throw ConfigurationException(s"(Unknown FileBufferType '$setup.tempFileBufferType'")
-      }
-    }
-    else {
-      throw ConfigurationException("No configuration available to the create FileResponseBuffer")
-    }
-    result
+    new ODataResponseFileBuffer(tmpDirName, setup, context, this)
   }
 
   /**
