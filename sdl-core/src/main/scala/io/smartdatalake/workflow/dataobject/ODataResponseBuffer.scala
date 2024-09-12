@@ -30,13 +30,11 @@ import scala.collection.mutable.ArrayBuffer
 
 /**
  * [[ODataResponseBufferSetup]] contains configurations related to the response buffer
- * @param tempFileBufferType : Name of the buffer type when file buffering is required (can either be "local" or "dbfs")
  * @param tempFileDirectoryPath : Path to the temporary directory in which the temporary files can be stored
  * @param memoryToFileSwitchThresholdNumOfChars : Max number of character which can be stored in memory before switching to file buffering. (If set to 0 then no swichting will occur)
  */
 case class ODataResponseBufferSetup(
-                                     tempFileBufferType: Option[String] = None
-                                     , tempFileDirectoryPath: Option[String] = None
+                                       tempFileDirectoryPath: Option[String] = None
                                      , memoryToFileSwitchThresholdNumOfChars: Option[Long] = None
                                    ) {
 
@@ -165,7 +163,8 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
       val threshold = setup.memoryToFileSwitchThresholdNumOfChars.getOrElse(-1L)
 
       if (dirPath != "" && threshold > 0L && this.getStoredCharacterCount > threshold) {
-        result = ioc.newODataResponseFileBufferByType(setup.getActionName, setup, context)
+
+        result = ioc.newODataResponseFileBuffer(setup.getActionName, setup, context)
         result.addResponses(this.getResponseBuffer)
       }
     }
@@ -173,128 +172,15 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
   }
 }
 
-/**
- * [[ODataResponseLocalFileBuffer]] is using the local file system to buffer all received responses.
- * @param tmpDirName : Name of sub directory which will be created to only contain files of this instance
- * @param setup: The setup object which contains the configuration for this response buffer
- */
-class ODataResponseLocalFileBuffer(tmpDirName: String, setup: ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
+
+
+
+
+class ODataResponseFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
 
   private var dirInitialized : Boolean = false
-  private var dirPath: Option[String] = None
-  private var fileCount: Int = 0
-
-  /**
-   * Initializes the temporary directory by making sure, that the path exists and the target directory is empty.
-   */
-  def initTempDir(): Unit = {
-    if (!dirInitialized) {
-      makeTempDirIfNotExists()
-      clearTempDir()
-      dirInitialized = true
-    }
-  }
-
-  /**
-   * @return the path to the temporary directory
-   */
-  def getDirectoryPath: String = {
-    if (this.dirPath.nonEmpty)
-      dirPath.get
-    else if (setup != null && setup.tempFileDirectoryPath.isDefined) {
-      dirPath = Option(ioc.newPath(setup.tempFileDirectoryPath.get).resolve(tmpDirName + s"_${ioc.getInstantNow.getEpochSecond}").toString)
-      dirPath.get
-    } else
-      throw new ConfigurationException("TempFileDirectoryPath not configured")
-  }
-
-  /**
-   * Deletes all files in the temporary directory
-   */
-  def clearTempDir(): Unit = {
-    val file = ioc.newFile(this.getDirectoryPath)
-    val files = file.listFiles()
-    files.foreach( f => if (!f.isDirectory) f.delete())
-  }
-
-  /**
-   * Creates the path and the temporary directories if either does not exists.
-   */
-  def makeTempDirIfNotExists(): Unit = {
-    val dirPath = ioc.newPath(this.getDirectoryPath)
-    if (!ioc.fileExists(dirPath)) {
-      ioc.fileCreateDirectories(dirPath)
-    }
-  }
-
-  /**
-   * Write the provided data as a new file into the temporary directory
-   * @param fileName: Name of the file
-   * @param data: Content of the file
-   */
-  def writeToFile(fileName: String, data: String): Unit = {
-    val dirPath : java.nio.file.Path = ioc.newPath(this.getDirectoryPath)
-    val filepath = dirPath.resolve(fileName)
-    val file = ioc.newFile(filepath.toString)
-    val writer = ioc.newBufferedWriter(ioc.newFileWriter(file))
-    writer.write(data)
-    writer.close()
-  }
-
-
-  /**
-   * @return name the current temporary file
-   */
-  def getFileName : String = {
-    val curTime = DateTimeFormatter.ofPattern("yyyyMMdd'_'HHmmss").withZone(ZoneId.of("UTC")).format(ioc.getInstantNow)
-    s"${curTime}_${this.fileCount}.json"
-  }
-
-  /**
-   * Adds the provided response to the buffer
-   * @param response : The response to be added
-   */
-  override def addResponse(response: String): Unit = {
-    initTempDir()
-    writeToFile(getFileName, response)
-    super.addResponse(response)
-    this.fileCount += 1
-  }
-
-  /**
-   * Creates a dataframe which reads all stored temporary files
-   *  @return : The Dataframe referencing the stored responses
-   */
-  override def getDataFrame: DataFrame = {
-    val session = context.sparkSession
-    val dataFrame = session.read.option("wholetext", value = true).text(this.getDirectoryPath).withColumnRenamed("value", "responseString")
-    dataFrame
-  }
-
-  /**
-   * Deletes all temporary stored files.
-   */
-  override def cleanUp(): Unit = {
-    clearTempDir()
-    super.cleanUp()
-  }
-
-  /**
-   * There is no switch path from the FileBuffer. This method returns always the current instance
-   *  @return This instance
-   */
-  override def switchIfNecessary(): ODataResponseBuffer = {
-    this
-  }
-}
-
-
-
-class ODataResponseDBFSFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
-
-  private var dirInitialized : Boolean = false
-  private implicit val filesystem: FileSystem = ioc.newHadoopFsWithConf(ioc.newHadoopPath("/"), context)
-  private val temporaryTargetDirectoryPath = ioc.newHadoopPath(setup.tempFileDirectoryPath.get, tableName + s"_${Instant.now.getEpochSecond}")
+  private implicit val filesystem: FileSystem = ioc.newHadoopFsWithConf(ioc.newHadoopPath("//"), context)
+  private val temporaryTargetDirectoryPath = ioc.newHadoopPath(setup.tempFileDirectoryPath.get, tableName + s"_${ioc.getInstantNow.getEpochSecond}")
 
   def initTemporaryDirectory(): Unit = {
     if (!dirInitialized) {
