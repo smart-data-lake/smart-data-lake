@@ -172,6 +172,20 @@ case class JdbcTableConnection(override val id: ConnectionId,
     }
   }
 
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String], logging: Boolean = true): Unit = {
+    if (catalog.isTableExisting(tableName)) {
+      val stmt: String = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")})"
+      execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String, logging: Boolean = true): Unit = {
+    if (catalog.isTableExisting(tableName)) {
+      val stmt: String = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
+      execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
   override def factory: FromConfigFactory[Connection] = JdbcTableConnection
 }
 

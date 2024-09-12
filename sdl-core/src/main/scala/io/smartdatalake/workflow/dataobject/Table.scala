@@ -31,6 +31,15 @@ import org.apache.spark.sql.catalyst.TableIdentifier
  * @param name        table name
  * @param query       optional select query
  * @param primaryKey  optional sequence of primary key columns
+ * @param createAndReplacePrimaryKey Parameter to define if the primary key should be created and updated
+ *                                   according to the SDLB configuration (=TRUE), or if they are configured just
+ *                                   for information purposes (=FALSE). It defaults to false. For the creation / replacement to work,
+ *                                   at least one primary Key column must be defined.
+ *                                   As of now, this feature is only available for JdbcTableDataObject. Using it in other DataObjects
+ *                                   will have no effect.
+ * @param primaryKeyConstraintName  This parameter is used in case that createAndReplaceParameterPrimaryKey is set to TRUE.
+ *                                  In case a constraint name is not given, the default value sdlb_"tableName" will be used
+ *                                  when updating the primary key.
  * @param foreignKeys optional sequence of foreign key definitions.
  *                    This is used as metadata for a data catalog.
  * Each foreign key in the .conf files is an object with the following properties: 
@@ -52,6 +61,8 @@ case class Table(
                   name: String,
                   query: Option[String] = None,
                   primaryKey: Option[Seq[String]] = None,
+                  createAndReplacePrimaryKey: Boolean = false,
+                  primaryKeyConstraintName: Option[String] = None,
                   foreignKeys: Option[Seq[ForeignKey]] = None,
                   catalog: Option[String] = None
                 ) {

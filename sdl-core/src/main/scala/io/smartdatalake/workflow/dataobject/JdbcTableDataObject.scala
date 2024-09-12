@@ -162,6 +162,22 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
     }
 
+    //If enabled, create or replace the primary Key of the table
+    if (table.createAndReplacePrimaryKey) {
+      val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
+      val existingPrimaryKeyOp: Option[connection.JdbcPrimaryKey] = connection.getJdbcPrimaryKey(table.catalog.getOrElse(""), table.db.getOrElse(""), table.name)
+      val pkConstraintName: String = table.primaryKeyConstraintName.getOrElse(f"sdlb_${table.name}")
+      (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
+        case (None, _) => logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
+        case (Some(pkcols), None) => connection.createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
+        case (Some(definedPkCols), Some(existingPkCols)) if (definedPkCols.toSet.diff(existingPkCols.pkColumns.toSet).isEmpty) => {
+          if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!");
+          connection.dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
+          connection.createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
+        }
+      }
+    }
+
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
       val missingPartitionColumns = partitions.toSet.diff(getExistingSchema.get.fieldNames.toSet)
