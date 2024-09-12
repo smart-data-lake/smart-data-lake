@@ -15,8 +15,9 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.FileSystem
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.{ArrayType, DataType, StructType, StructField, StringType}
+import org.apache.spark.sql.{DataFrame, functions}
+import org.apache.spark.sql.types.{ArrayType, DateType, StringType, StructField, StructType, TimestampType}
+import org.apache.spark.sql.functions.{col, date_format, expr, max}
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -24,10 +25,10 @@ import java.net.URLEncoder
 import java.nio.file.{Files, Paths}
 import java.io.{BufferedWriter, File, FileWriter}
 import java.time.{Instant, ZoneId}
-import java.time.format.DateTimeFormatter
 import scala.annotation.tailrec
 import scala.util.{Failure, Success}
 import org.apache.hadoop.fs.{Path => HadoopPath}
+import org.apache.spark.sql.custom.ExpressionEvaluator
 
 import scala.reflect.runtime.universe.typeOf
 
@@ -219,7 +220,7 @@ case class ODataBearerToken(token: String, expiresAt:java.time.Instant) {
  * @param sourceFilters : Optional. OData filter string which will be applied to the access operation like "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
  * @param timeouts : Optional. Timeout settings of type [[HttpTimeoutConfig]]
  * @param authorization: Optional. Authorization credentials of type [[ODataAuthorization]]
- * @param changeDateColumnName: Optional. Name of the column which will be used to read incrementally. like "modifiedon"
+ * @param incrementalOutputExpr: Optional. Name of the column which will be used to read incrementally (like "modifiedon"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems.
  * @param nRetry: Optional. Number of retries after a failed attempt, default = 1
  * @param responseBufferSetup: Optional. Setup for response buffers of type [[ODataResponseBufferSetup]]
  * @param maxRecordCount: Optional. Maximum number of records to be extracted.
@@ -233,7 +234,7 @@ case class ODataDataObject(override val id: DataObjectId,
                            sourceFilters: Option[String] = None,
                            timeouts: Option[HttpTimeoutConfig] = None,
                            authorization: Option[OAuthMode] = None,
-                           changeDateColumnName: Option[String] = None,
+                           incrementalOutputExpr: Option[String] = None,
                            nRetry: Int = 1,
                            responseBufferSetup : Option [ODataResponseBufferSetup] = None,
                            maxRecordCount: Option[Int] = None,
@@ -383,21 +384,11 @@ case class ODataDataObject(override val id: DataObjectId,
   }
 
   /**
-   * Converts the proviced [[java.time.Instant]] into a properly formated , Odata-Compatible  string
-   * @param instant : Instant to be converted
-   * @return String
-   */
-  private def getODataInstantFilterLiteral(instant: Instant) : String = {
-    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX").withZone(ZoneId.of("UTC")).format(instant)
-  }
-
-  /**
    * Creates the URL to be called by combining all necessary parameters into the url
    * @param columnNames : Names of the expected columns
-   * @param extractStart: Start of the program to exclude records that were modified after this start.
    * @return OData request URL
    */
-  def getODataURL(columnNames: Seq[String], extractStart: Instant) : String = {
+  def getODataURL(columnNames: Seq[String]) : String = {
 
     //Start with the base url and the table name
     var requestUrl = s"$baseUrl$tableName"
@@ -411,7 +402,7 @@ case class ODataDataObject(override val id: DataObjectId,
     }
 
     //If there are any filters required, add them too
-    val filters = getODataURLFilters(extractStart)
+    val filters = getODataURLFilters
     if (filters.isDefined) {
       oDataModifiers.append(filters.get)
     }
@@ -430,10 +421,9 @@ case class ODataDataObject(override val id: DataObjectId,
 
   /**
    * Sub method to collect all required filters
-   * @param extractStart : Start of the program to exclude records that were modified after this start.
    * @return
    */
-  private def getODataURLFilters(extractStart: Instant) : Option[String] = {
+  private def getODataURLFilters : Option[String] = {
     val filters = ArrayBuffer[String]()
 
     //If there are any predefined filters configured, treat these filters as one unit and add them
@@ -442,15 +432,11 @@ case class ODataDataObject(override val id: DataObjectId,
       filters.append("(" + sourceFilters.get + ")")
     }
 
-    //If there is a changeDateColumnName and a previousState specified, use this column to filter only the records that
+    //If there is a incrementalOutputExpr and a previousState specified, use this column to filter only the records that
     //were modified since the last run (previousState) and the start of this run.
-    if (changeDateColumnName.isDefined && previousState != "") {
+    if (incrementalOutputExpr.isDefined && previousState != "") {
 
-      val endRange = getODataInstantFilterLiteral(extractStart)
-      filters.append(s"${changeDateColumnName.get} lt $endRange")
-
-      val startRange = getODataInstantFilterLiteral(Instant.parse(previousState))
-      filters.append(s"${changeDateColumnName.get} ge $startRange")
+      filters.append(s"${incrementalOutputExpr.get} gt $previousState")
     }
 
     //If there are any filters found, combine them with AND into one string and return it
@@ -476,9 +462,6 @@ case class ODataDataObject(override val id: DataObjectId,
     val session = context.sparkSession
     import session.implicits._
 
-    //Marking the current time to exclude records which are modified after this instant
-    val startTimeStamp = this.ioc.getInstantNow
-
     val recordSchema = schema.get.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema]
     val arraySchema = ArrayType(recordSchema.inner)
 
@@ -493,7 +476,7 @@ case class ODataDataObject(override val id: DataObjectId,
       val columnNames = recordSchema.columns
 
       //Generate the URL for the first API call
-      var requestUrl = getODataURL(columnNames, startTimeStamp)
+      var requestUrl = getODataURL(columnNames)
 
       //Request the bearer token
       var bearerToken = getBearerToken(authorization.get)
@@ -540,10 +523,52 @@ case class ODataDataObject(override val id: DataObjectId,
         .select(explode($"response.value").as("record"))
         .select("record.*")
 
-      // put simple nextState logic below
-      nextState = startTimeStamp.toString
+      //If the DataObject has a incrementalOutputExpr defined, the following code will determine the nextState
+      //value out of the received data. If there is no new data the previousState will also be the nextState.
+      if (incrementalOutputExpr.isDefined) {
+        val new_nextState = getNextODataState(responsesDf)
+        if (new_nextState.isDefined) {
+          nextState = new_nextState.get
+        }
+        else {
+          nextState = previousState
+        }
+
+      }
+
       // return
       responsesDf
+    }
+  }
+
+  /***
+   * This method determines the maximum value of the incrementalOutputExpr from the received data and converts it
+   * to an OData representation. The resulting string can then be used for the next query
+   * @param df The data frame with the received data
+   * @return OData representation of the new incrementalOutputExpr value
+   */
+  def getNextODataState(df: DataFrame): Option[String] = {
+    val incExpr = ExpressionEvaluator.resolveExpression(expr(this.incrementalOutputExpr.get), df.schema, caseSensitive = false)
+    val incExprDataType = incExpr.dataType
+
+    var work_df = df.select(max(expr(this.incrementalOutputExpr.get)).alias("nextState"))
+
+    incExprDataType match {
+      case _: TimestampType => work_df = work_df.withColumn("nextState", date_format(col("nextState"), "yyyy-MM-dd'T'HH:mm:ss.SSSX"))
+
+      case _: DateType => work_df = work_df.withColumn("nextState", date_format(col("nextState"), "yyyy-MM-dd"))
+
+      case _: StringType => work_df = work_df.withColumn("nextState", col("nextState"))
+
+      case _ => work_df = work_df.withColumn("nextState", col("nextState").cast(StringType))
+    }
+
+    val result_record = work_df.collect()
+
+    if (result_record.length > 0) {
+      Some(result_record(0).getString(0))
+    } else {
+      None
     }
   }
 

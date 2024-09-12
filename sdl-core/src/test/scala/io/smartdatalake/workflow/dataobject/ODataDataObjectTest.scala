@@ -165,214 +165,35 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
   }
 }
 
-/*
-class ODataResponseLocalFileBufferTest extends DataObjectTestSuite {
-
-    def init_ioc() : ODataIOC = {
-      org.mockito.Mockito.mock(classOf[ODataIOC])
-    }
-
-  test("ODataResponseLocalFileBuffer - makeTempDirIfNotExists - If not exists") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("PATH"), Some(3))
-    val ioc = init_ioc()
-    val mock_path = m.mock(classOf[java.nio.file.Path])
-
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doReturn("DIRPATH", Seq.empty: _*).when(sut_spy).getDirectoryPath
-    m.doReturn(mock_path , Seq.empty: _*).when(ioc).newPath("DIRPATH")
-    m.doReturn(false, Seq.empty: _*).when(ioc).fileExists(mock_path)
-    m.doReturn(mock_path, Seq.empty: _*).when(ioc).fileCreateDirectories(mock_path)
-
-    sut_spy.makeTempDirIfNotExists()
-
-    m.verify(sut_spy, m.times(1)).getDirectoryPath
-    m.verify(ioc, m.times(1)).newPath("DIRPATH")
-    m.verify(ioc, m.times(1)).fileExists(mock_path)
-    m.verify(ioc, m.times(1)).fileCreateDirectories(mock_path)
-  }
-
-  test("ODataResponseLocalFileBuffer - makeTempDirIfNotExists - If does exist") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-    val mock_path = m.mock(classOf[java.nio.file.Path])
-
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doReturn("DIRPATH", Seq.empty: _*).when(sut_spy).getDirectoryPath
-    m.doReturn(mock_path , Seq.empty: _*).when(ioc).newPath("DIRPATH")
-    m.doReturn(true, Seq.empty: _*).when(ioc).fileExists(mock_path)
-    m.doReturn(mock_path, Seq.empty: _*).when(ioc).fileCreateDirectories(mock_path)
-
-    sut_spy.makeTempDirIfNotExists()
-
-    m.verify(sut_spy, m.times(1)).getDirectoryPath
-    m.verify(ioc, m.times(1)).newPath("DIRPATH")
-    m.verify(ioc, m.times(1)).fileExists(mock_path)
-    m.verify(ioc, m.times(0)).fileCreateDirectories(mock_path)
-  }
-
-  test("ODataResponseLocalFileBuffer - initTempDir") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doNothing().when(sut_spy).makeTempDirIfNotExists();
-    m.doNothing().when(sut_spy).clearTempDir();
-
-    sut_spy.initTempDir()
-    m.verify(sut_spy, m.times(1)).makeTempDirIfNotExists()
-    m.verify(sut_spy, m.times(1)).clearTempDir()
-
-
-    sut_spy.initTempDir()
-    m.verify(sut_spy, m.times(1)).makeTempDirIfNotExists()
-    m.verify(sut_spy, m.times(1)).clearTempDir()
-  }
-
-  test("ODataResponseLocalFileBuffer - clearTempDir") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-    val mock_file = m.mock(classOf[java.io.File])
-    val mock_file1 = m.mock(classOf[java.io.File])
-    val mock_file2 = m.mock(classOf[java.io.File])
-    val mock_files = Array(mock_file1, mock_file2)
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doReturn("DIRPATH", Seq.empty: _*).when(sut_spy).getDirectoryPath
-    m.doReturn(mock_file, Seq.empty: _*).when(ioc).newFile("DIRPATH")
-    m.doReturn(mock_files, Seq.empty: _*).when(mock_file).listFiles()
-
-    sut_spy.clearTempDir()
-
-    m.verify(mock_file1, m.times(1)).delete()
-    m.verify(mock_file2, m.times(1)).delete()
-  }
-
-  test("ODataResponseLocalFileBuffer - writeToFile") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-    val mock_dirpath = m.mock(classOf[java.nio.file.Path])
-    val mock_filepath = m.mock(classOf[java.nio.file.Path])
-    val mock_file = m.mock(classOf[java.io.File])
-    val mock_filewriter = m.mock(classOf[java.io.FileWriter])
-    val mock_bufferwriter = m.mock(classOf[java.io.BufferedWriter])
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doReturn("DIRPATH", Seq.empty: _*).when(sut_spy).getDirectoryPath
-    m.doReturn(mock_dirpath , Seq.empty: _*).when(ioc).newPath("DIRPATH")
-    m.doReturn(mock_filepath, Seq.empty: _*).when(mock_dirpath).resolve("FILENAME")
-    m.doReturn("FILEPATHSTRING", Seq.empty: _*).when(mock_filepath).toString
-    m.doReturn(mock_file, Seq.empty: _*).when(ioc).newFile("FILEPATHSTRING")
-    m.doReturn(mock_filewriter, Seq.empty: _*).when(ioc).newFileWriter(mock_file)
-    m.doReturn(mock_bufferwriter, Seq.empty: _*).when(ioc).newBufferedWriter(mock_filewriter)
-
-    sut_spy.writeToFile("FILENAME", "DATA")
-
-    m.verify(mock_bufferwriter, m.times(1)).write("DATA")
-    m.verify(mock_bufferwriter, m.times(1)).close()
-  }
-
-  test("ODataResponseLocalFileBuffer - getFileName") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-    val testInstant = java.time.Instant.parse("2024-06-05T15:33:00.123Z")
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doReturn(testInstant, Seq.empty: _* ).when(ioc).getInstantNow
-
-    val result = sut_spy.getFileName
-
-    assert(result == "20240605_153300_0.json")
-  }
-
-  test("ODataResponseLocalFileBuffer - addResponse") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doReturn("FILENAME", Seq.empty: _* ).when(sut_spy).getFileName
-    m.doNothing().when(sut_spy).initTempDir()
-    m.doNothing().when(sut_spy).writeToFile(any[String], any[String])
-
-    sut_spy.addResponse("DATA")
-
-    m.verify(sut_spy, m.times(1)).initTempDir()
-    m.verify(sut_spy, m.times(1)).writeToFile("FILENAME", "DATA")
-  }
-
-  test("ODataResponseLocalFileBuffer - cleanUp") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    m.doNothing().when(sut_spy).clearTempDir()
-
-    sut_spy.cleanUp()
-
-    m.verify(sut_spy, m.times(1)).clearTempDir()
-  }
-
-  test("ODataResponseLocalFileBuffer - switchIfNecessary") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
-    val ioc = init_ioc()
-
-    val sut = new ODataResponseLocalFileBuffer("TMPDIR", setup, context, ioc)
-    val sut_spy = m.spy(sut)
-
-    val result = sut_spy.switchIfNecessary()
-
-    assert(result == sut_spy)
-  }
-}
-
-class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
+class ODataResponseFileBufferTest extends DataObjectTestSuite {
 
   def init_ioc_mock(): ODataIOC = {
-    org.mockito.Mockito.mock(classOf[ODataIOC])
+
+    val instant = Instant.ofEpochSecond(1726124260)
+
+    val mock_ioc = org.mockito.Mockito.mock(classOf[ODataIOC])
+    m.doReturn(instant, Seq.empty: _*).when(mock_ioc).getInstantNow
+
+    mock_ioc
+
   }
 
   def init_context(): ActionPipelineContext = {
     m.mock(classOf[ActionPipelineContext])
   }
 
-  def init_sut_spy(ioc:ODataIOC,  bufferType: String = "BUFFERTYPE", path: String = "PATH", limit: Int = 3, context: Option[ActionPipelineContext] = None, fileSystem: Option[org.apache.hadoop.fs.FileSystem] = None): ODataResponseDBFSFileBuffer = {
-    val setup = ODataResponseBufferSetup(Some("BUFFERTYPE"), Some("PATH"), Some(3))
+  def init_sut_spy(ioc:ODataIOC,  bufferType: String = "BUFFERTYPE", path: String = "PATH", limit: Int = 3, context: Option[ActionPipelineContext] = None, fileSystem: Option[org.apache.hadoop.fs.FileSystem] = None): ODataResponseFileBuffer = {
+    val setup = ODataResponseBufferSetup(Some("PATH"), Some(3))
 
     val filesystem_mock = fileSystem.getOrElse(m.mock(classOf[org.apache.hadoop.fs.FileSystem]))
 
     m.doReturn(filesystem_mock, Seq.empty: _*).when(ioc).newHadoopFsWithConf(any[org.apache.hadoop.fs.Path], any[ActionPipelineContext])
 
-    val sut = new ODataResponseDBFSFileBuffer("TMPDIR", setup, context.getOrElse(init_context()), ioc)
+    val sut = new ODataResponseFileBuffer("TMPDIR", setup, context.getOrElse(init_context()), ioc)
     m.spy(sut)
   }
 
-  test("ODataResponseDBFSFileBufferTest - initTemporaryDirectory") {
+  test("ODataResponseFileBufferTest - initTemporaryDirectory") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
 
@@ -388,7 +209,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(sut, m.times(1)).makeTempDirIfNotExists()
   }
 
-  test("ODataResponseDBFSFileBufferTest - makeTempDirIfNotExists") {
+  test("ODataResponseFileBufferTest - makeTempDirIfNotExists") {
     val ioc = init_ioc_mock()
     val filesystem = m.mock(classOf[org.apache.hadoop.fs.FileSystem])
     val mock_path = m.mock(classOf[org.apache.hadoop.fs.Path])
@@ -402,7 +223,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(filesystem, m.times(1)).mkdirs(isNull[org.apache.hadoop.fs.Path])
   }
 
-  test("ODataResponseDBFSFileBufferTest - cleanUp") {
+  test("ODataResponseFileBufferTest - cleanUp") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
 
@@ -413,7 +234,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(sut, m.times(1)).clearTemporaryDirectory()
   }
 
-  test("ODataResponseDBFSFileBufferTest - clearTemporaryDirectory - when exists") {
+  test("ODataResponseFileBufferTest - clearTemporaryDirectory - when exists") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
     val filesystem = sut.getFileSystem
@@ -426,7 +247,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(filesystem, m.times(1)).delete(any[org.apache.hadoop.fs.Path], eqTo(true))
   }
 
-  test("ODataResponseDBFSFileBufferTest - clearTemporaryDirectory - when not exists") {
+  test("ODataResponseFileBufferTest - clearTemporaryDirectory - when not exists") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
     val filesystem = sut.getFileSystem
@@ -439,7 +260,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(filesystem, m.times(0)).delete(any[org.apache.hadoop.fs.Path], any[Boolean])
   }
 
-  test("ODataResponseDBFSFileBufferTest - writeToFile") {
+  test("ODataResponseFileBufferTest - writeToFile") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
     val filesystem = sut.getFileSystem
@@ -455,7 +276,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(ioc, m.times(1)).writeHadoopFile(eqTo(path_mock), eqTo("CONTENT"), eqTo(filesystem))
   }
 
-  test("ODataResponseDBFSFileBufferTest - generateFileName") {
+  test("ODataResponseFileBufferTest - generateFileName") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
 
@@ -466,7 +287,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     assert(result == "42.json")
   }
 
-  test("ODataResponseDBFSFileBufferTest - addResponse") {
+  test("ODataResponseFileBufferTest - addResponse") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
 
@@ -478,7 +299,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     m.verify(sut, m.times(1)).writeToFile("FILENAME", "RESPONSE")
   }
 
-  test("ODataResponseDBFSFileBufferTest - getDataFrame") {
+  test("ODataResponseFileBufferTest - getDataFrame") {
     val ioc = init_ioc_mock()
     val context = init_context()
     val session = m.mock(classOf[SparkSession])
@@ -501,7 +322,7 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     assert(result == dataframe)
   }
 
-  test("ODataResponseDBFSFileBufferTest - switchIfNecessary") {
+  test("ODataResponseFileBufferTest - switchIfNecessary") {
     val ioc = init_ioc_mock()
     val sut = init_sut_spy(ioc)
 
@@ -510,7 +331,6 @@ class ODataResponseDBFSFileBufferTest extends DataObjectTestSuite {
     assert(result == sut)
   }
 }
-*/
 
 class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
@@ -528,8 +348,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , responseBufferSetup = Some(buffer_setup)
     )
 
-    val testInstant = Instant.parse("2024-06-10T12:12:13Z")
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"), testInstant)
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB")
   }
@@ -546,14 +365,13 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , authorization = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
-      , changeDateColumnName = Some("lastModified")
+      , incrementalOutputExpr = Some("lastModified")
     )
 
-    sut.setState(Some("2024-06-08T10:48:00Z"))
-    val testInstant = Instant.parse("2024-06-10T12:12:13Z")
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"), testInstant)
+    sut.setState(Some("PREVIOUSSTATE"))
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
 
-    assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$filter=lastModified+lt+2024-06-10T12%3A12%3A13.000Z+and+lastModified+ge+2024-06-08T10%3A48%3A00.000Z")
+    assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$filter=lastModified+gt+PREVIOUSSTATE")
   }
 
   test("getODataURL with state and source filter") {
@@ -568,15 +386,14 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , authorization = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
-      , changeDateColumnName = Some("lastModified")
+      , incrementalOutputExpr = Some("lastModified")
       , sourceFilters = Some("type eq TEST")
     )
 
-    sut.setState(Some("2024-06-08T10:48:00Z"))
-    val testInstant = Instant.parse("2024-06-10T12:12:13Z")
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"), testInstant)
+    sut.setState(Some("4242424242"))
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
 
-    assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$filter=%28type+eq+TEST%29+and+lastModified+lt+2024-06-10T12%3A12%3A13.000Z+and+lastModified+ge+2024-06-08T10%3A48%3A00.000Z")
+    assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$filter=%28type+eq+TEST%29+and+lastModified+gt+4242424242")
   }
 
   test("getODataURL with maxrecordcount") {
@@ -594,8 +411,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , maxRecordCount = Some(9999)
     )
 
-    val testInstant = Instant.parse("2024-06-10T12:12:13Z")
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"), testInstant)
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$top=9999")
   }
@@ -623,20 +439,15 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val columnAIdx = resultSchema.fieldIndex("ColumnA")
     val columnBIdx = resultSchema.fieldIndex("ColumnB")
-    val columnCreatedIdx = resultSchema.fieldIndex("sdlb_created_on")
 
     val columnAType = resultSchema.fields(columnAIdx)
     val columnBType = resultSchema.fields(columnBIdx)
-    val columnCreatedType = resultSchema.fields(columnCreatedIdx)
 
     assert(columnAType.name == "ColumnA")
     assert(columnAType.dataType.typeName == "string")
 
     assert(columnBType.name == "ColumnB")
     assert(columnBType.dataType.typeName == "integer")
-
-    assert(columnCreatedType.name == "sdlb_created_on")
-    assert(columnCreatedType.dataType.typeName == "timestamp")
   }
 }
 
@@ -708,35 +519,33 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(auth_response))
     )
 
-    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2}]}"""
+    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:40.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:44.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
       .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
-      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB"))
-      .withQueryParam("$filter", w.equalTo("modifiedOn lt 2024-06-09T23:00:00.000Z and modifiedOn ge 2024-06-10T10:03:44.000Z"))
+      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB,modifiedOn"))
+      .withQueryParam("$filter", w.equalTo("modifiedOn gt 2024-06-10T08:00:00.000Z"))
       .willReturn(w.aResponse().withBody(response1))
     )
 
     val ioc_spy = m.spy(new ODataIOC())
-    val now = Instant.parse("2024-06-09T23:00:00Z")
-    m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("modifiedOn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
-      , changeDateColumnName = Some("modifiedOn")
+      , incrementalOutputExpr = Some("modifiedOn")
     )
     sut.injectIOC(ioc_spy)
-    sut.setState(Some("2024-06-10T10:03:44Z"))
+    sut.setState(Some("2024-06-10T08:00:00.000Z"))
 
     val context_mock = m.mock(classOf[ActionPipelineContext])
     m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
@@ -749,13 +558,15 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val record1 = resultData(0)
     assert(record1.getString(0) == "FOOBAR_1A")
     assert(record1.getInt(1) == 1)
+    assert(record1.getString(2) == "2024-06-10T10:03:40.000Z")
 
     val record2 = resultData(1)
     assert(record2.getString(0) == "FOOBAR_2A")
     assert(record2.getInt(1) == 2)
+    assert(record2.getString(2) == "2024-06-10T10:03:44.000Z")
 
     val newState = sut.getState
-    assert(newState.get == "2024-06-09T23:00:00Z")
+    assert(newState.get == "2024-06-10T10:03:44.000Z")
 
     server.stop()
   }
@@ -772,17 +583,17 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(auth_response))
     )
 
-    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=2", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2}]}"""
+    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=2", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:45.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:46.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
       .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
-      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB"))
-      .withQueryParam("$filter", w.equalTo("modifiedOn lt 2024-06-09T23:00:00.000Z and modifiedOn ge 2024-06-10T10:03:44.000Z"))
+      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB,modifiedOn"))
+      .withQueryParam("$filter", w.equalTo("modifiedOn gt 2024-06-10T10:03:44.000Z"))
       .willReturn(w.aResponse().withBody(response1))
     )
 
-    val response2 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=3", "value": [{"@odata.id":"ODATAID3", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_3A", "ColumnB":3}]}"""
+    val response2 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=3", "value": [{"@odata.id":"ODATAID3", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_3A", "ColumnB":3, "modifiedOn":"2024-06-10T10:03:47.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
@@ -791,7 +602,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(response2))
     )
 
-    val response3 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID4", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_4A", "ColumnB":4}]}"""
+    val response3 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID4", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_4A", "ColumnB":4, "modifiedOn":"2024-06-10T10:03:48.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
@@ -801,24 +612,22 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     )
 
     val ioc_spy = m.spy(new ODataIOC())
-    val now = Instant.parse("2024-06-09T23:00:00Z")
-    m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("modifiedOn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
-      , changeDateColumnName = Some("modifiedOn")
+      , incrementalOutputExpr = Some("modifiedOn")
     )
     sut.injectIOC(ioc_spy)
-    sut.setState(Some("2024-06-10T10:03:44Z"))
+    sut.setState(Some("2024-06-10T10:03:44.000Z"))
 
     val context_mock = m.mock(classOf[ActionPipelineContext])
     m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
@@ -831,22 +640,25 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val record1 = resultData(0)
     assert(record1.getString(0) == "FOOBAR_1A")
     assert(record1.getInt(1) == 1)
+    assert(record1.getString(2) == "2024-06-10T10:03:45.000Z")
 
     val record2 = resultData(1)
     assert(record2.getString(0) == "FOOBAR_2A")
     assert(record2.getInt(1) == 2)
+    assert(record2.getString(2) == "2024-06-10T10:03:46.000Z")
 
     val record3 = resultData(2)
     assert(record3.getString(0) == "FOOBAR_3A")
     assert(record3.getInt(1) == 3)
+    assert(record3.getString(2) == "2024-06-10T10:03:47.000Z")
 
     val record4 = resultData(3)
     assert(record4.getString(0) == "FOOBAR_4A")
     assert(record4.getInt(1) == 4)
-
+    assert(record4.getString(2) == "2024-06-10T10:03:48.000Z")
 
     val newState = sut.getState
-    assert(newState.get == "2024-06-09T23:00:00Z")
+    assert(newState.get == "2024-06-10T10:03:48.000Z")
 
     server.stop()
   }
@@ -863,17 +675,17 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(auth_response))
     )
 
-    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=2", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2}]}"""
+    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=2", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:45.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:46.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
       .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
-      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB"))
-      .withQueryParam("$filter", w.equalTo("modifiedOn lt 2024-06-09T23:00:00.000Z and modifiedOn ge 2024-06-10T10:03:44.000Z"))
+      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB,modifiedOn"))
+      .withQueryParam("$filter", w.equalTo("modifiedOn gt 2024-06-10T10:03:44.000Z"))
       .willReturn(w.aResponse().withBody(response1))
     )
 
-    val response2 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=3", "value": [{"@odata.id":"ODATAID3", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_3A", "ColumnB":3}]}"""
+    val response2 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=3", "value": [{"@odata.id":"ODATAID3", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_3A", "ColumnB":3, "modifiedOn":"2024-06-10T10:03:47.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
@@ -882,7 +694,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(response2))
     )
 
-    val response3 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID4", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_4A", "ColumnB":4}]}"""
+    val response3 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID4", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_4A", "ColumnB":4, "modifiedOn":"2024-06-10T10:03:48.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
@@ -902,16 +714,16 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
-      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("modifiedOn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
-      , changeDateColumnName = Some("modifiedOn")
+      , incrementalOutputExpr = Some("modifiedOn")
     )
     sut.injectIOC(ioc_spy)
-    sut.setState(Some("2024-06-10T10:03:44Z"))
+    sut.setState(Some("2024-06-10T10:03:44.000Z"))
 
     val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec)
 
@@ -923,21 +735,25 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val record1 = resultData(0)
     assert(record1.getString(0) == "FOOBAR_1A")
     assert(record1.getInt(1) == 1)
+    assert(record1.getString(2) == "2024-06-10T10:03:45.000Z")
 
     val record2 = resultData(1)
     assert(record2.getString(0) == "FOOBAR_2A")
     assert(record2.getInt(1) == 2)
+    assert(record2.getString(2) == "2024-06-10T10:03:46.000Z")
 
     val record3 = resultData(2)
     assert(record3.getString(0) == "FOOBAR_3A")
     assert(record3.getInt(1) == 3)
+    assert(record3.getString(2) == "2024-06-10T10:03:47.000Z")
 
     val record4 = resultData(3)
     assert(record4.getString(0) == "FOOBAR_4A")
     assert(record4.getInt(1) == 4)
+    assert(record4.getString(2) == "2024-06-10T10:03:48.000Z")
 
     val newState = sut.getState
-    assert(newState.get == "2024-06-09T23:00:00Z")
+    assert(newState.get == "2024-06-10T10:03:48.000Z")
 
     val numOfTempFiles1 = temp_dir_base.listFiles().length
     assert(numOfTempFiles1 == 1)
