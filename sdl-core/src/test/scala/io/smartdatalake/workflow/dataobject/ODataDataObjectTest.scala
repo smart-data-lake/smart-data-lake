@@ -20,7 +20,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.definitions.OAuthMode
 import org.mockito.{Mockito => m}
 import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
@@ -29,7 +30,8 @@ import io.smartdatalake.util.misc.SchemaProviderType
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
-import io.smartdatalake.workflow.action.RuntimeEventState
+import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ProcessAllMode}
+import io.smartdatalake.workflow.action.{CopyAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.LocalFileSystem
@@ -419,9 +421,11 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getSparkDataFrame in init phase") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
-    val context = this.contextInit
-    //val context_mock = m.mock(classOf[ActionPipelineContext])
-    //m.doReturn(ExecutionPhase.Init, Seq.empty: _*).when(context_mock).phase
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
+
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -433,7 +437,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , responseBufferSetup = Some(buffer_setup)
     )
 
-    val result = sut.getSparkDataFrame(Seq.empty)(context)
+    val result = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
 
     val resultSchema = result.schema
 
@@ -448,6 +452,114 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     assert(columnBType.name == "ColumnB")
     assert(columnBType.dataType.typeName == "integer")
+  }
+
+  test("validateConfiguration - non-incremental mode") {
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    sut.validateConfiguration(actionPipelineContext)
+  }
+
+  test("validateConfiguration - non-incremental mode with incrementalOutputExpr") {
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+      , incrementalOutputExpr = Some("FOOBAR")
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    sut.validateConfiguration(actionPipelineContext)
+  }
+
+  test("validateConfiguration - incremental mode with correct setup") {
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("IncColumn", StringType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+      , incrementalOutputExpr = Some("IncColumn")
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    sut.validateConfiguration(actionPipelineContext)
+  }
+
+  test("validateConfiguration - incremental mode with no incColumn") {
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("IncColumn", StringType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+      , incrementalOutputExpr = None
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    assertThrows[ConfigurationException] {
+      sut.validateConfiguration(actionPipelineContext)
+    }
+  }
+
+  test("validateConfiguration - incremental mode with no incColumn in schema") {
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+      , incrementalOutputExpr = Some("incColumn")
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    assertThrows[ConfigurationException] {
+      sut.validateConfiguration(actionPipelineContext)
+    }
   }
 }
 
@@ -488,10 +600,11 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , responseBufferSetup = Some(buffer_setup)
     )
 
-    val context_mock = m.mock(classOf[ActionPipelineContext])
-    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
-    val resultDf = sut.getSparkDataFrame(Seq.empty)(context_mock)
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
 
     assert(resultData.length == 2)
@@ -547,10 +660,11 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     sut.injectIOC(ioc_spy)
     sut.setState(Some("2024-06-10T08:00:00.000Z"))
 
-    val context_mock = m.mock(classOf[ActionPipelineContext])
-    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
-    val resultDf = sut.getSparkDataFrame(Seq.empty)(context_mock)
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
 
     assert(resultData.length == 2)
@@ -629,10 +743,11 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     sut.injectIOC(ioc_spy)
     sut.setState(Some("2024-06-10T10:03:44.000Z"))
 
-    val context_mock = m.mock(classOf[ActionPipelineContext])
-    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
-    val resultDf = sut.getSparkDataFrame(Seq.empty)(context_mock)
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
 
     assert(resultData.length == 4)
@@ -725,7 +840,9 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     sut.injectIOC(ioc_spy)
     sut.setState(Some("2024-06-10T10:03:44.000Z"))
 
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec)
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
@@ -809,10 +926,12 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , responseBufferSetup = Some(buffer_setup)
     )
 
-    val context_mock = m.mock(classOf[ActionPipelineContext])
-    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
-    val resultDf = sut.getSparkDataFrame(Seq.empty)(context_mock)
+
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
 
     assert(resultData.length == 2)
@@ -851,12 +970,16 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , responseBufferSetup = Some(buffer_setup)
     )
 
-    val context_mock = m.mock(classOf[ActionPipelineContext])
-    m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    //val context_mock = m.mock(classOf[ActionPipelineContext])
+    //m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
     var exceptionCaught = false
 
     try {
-      sut.getSparkDataFrame(Seq.empty)(context_mock)
+      sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     }
     catch
     {

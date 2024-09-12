@@ -11,6 +11,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceException, WebserviceMethod}
+import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -466,6 +467,8 @@ case class ODataDataObject(override val id: DataObjectId,
     val arraySchema = ArrayType(recordSchema.inner)
 
     if(context.phase == ExecutionPhase.Init){
+      validateConfiguration(context)
+
       // In Init phase, return an empty DataFrame
       Seq[String]().toDF("responseString")
         .select(from_json($"responseString", arraySchema).as("response"))
@@ -525,7 +528,7 @@ case class ODataDataObject(override val id: DataObjectId,
 
       //If the DataObject has a incrementalOutputExpr defined, the following code will determine the nextState
       //value out of the received data. If there is no new data the previousState will also be the nextState.
-      if (incrementalOutputExpr.isDefined) {
+      if (isRunningIncrementally(context)) {
         val new_nextState = getNextODataState(responsesDf)
         if (new_nextState.isDefined) {
           nextState = new_nextState.get
@@ -538,6 +541,34 @@ case class ODataDataObject(override val id: DataObjectId,
 
       // return
       responsesDf
+    }
+  }
+
+  def validateConfiguration(context: ActionPipelineContext): Unit = {
+    if (isRunningIncrementally(context)) {
+      if (incrementalOutputExpr.isEmpty) {
+        throw new ConfigurationException("In execution mode DataObjectStateIncrementalMode you must configure an incrementalOutputExpr and also include it in the output schema")
+      }
+
+      val recordSchema = schema.get.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema]
+      if (!recordSchema.inner.fieldNames.contains(incrementalOutputExpr.get)) {
+        throw new ConfigurationException(s"incrementalOutputExpr '${incrementalOutputExpr.get}' must be included in the output schema")
+      }
+    }
+  }
+
+  /*** Determines if the calling action of this DataObject is running the DataObjectStateIncrementalMode
+   *
+   * @param context the current ActionPipelineContext
+   * @return true if incremental, false otherwise
+   */
+  def isRunningIncrementally(context: ActionPipelineContext): Boolean = {
+    val mode = context.currentAction.get.executionMode
+    if (mode.isDefined) {
+      mode.get.isInstanceOf[DataObjectStateIncrementalMode]
+    }
+    else {
+      false
     }
   }
 
