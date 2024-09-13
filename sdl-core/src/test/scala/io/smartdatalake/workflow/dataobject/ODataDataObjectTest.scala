@@ -991,4 +991,30 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     assert(exceptionCaught)
   }
+
+  test("Regression test - Missing incremental column in schema") {
+
+    val mock_auto = m.mock(classOf[OAuthMode])
+    val mock_buffer_setup = m.mock(classOf[ODataResponseBufferSetup])
+
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("annotationid", StringType), StructField("_objectid_value", StringType), StructField("createdon", StringType), StructField("documentbody", StringType)))))
+      , baseUrl = "NOT RELEVANT"
+      , tableName = "annotations"
+      , authorization = Some(mock_auto)
+      , timeouts = None
+      , responseBufferSetup = Some(mock_buffer_setup)
+      , incrementalOutputExpr = Some("modifiedon")
+      , sourceFilters = Some("objecttypecode eq 'msdyn_transcript'")
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
+
+    assertThrows[ConfigurationException] {
+      sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
+    }
+  }
 }
