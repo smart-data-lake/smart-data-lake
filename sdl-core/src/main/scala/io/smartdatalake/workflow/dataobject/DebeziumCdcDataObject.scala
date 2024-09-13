@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
-import io.debezium.engine.format.Json
+import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
@@ -27,11 +27,16 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
-import org.apache.spark.sql.DataFrame
+import org.apache.kafka.connect.data.Schema.Type
+import org.apache.kafka.connect.data.{Field, Schema, Struct}
+import org.apache.kafka.connect.source.SourceRecord
+import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.types._
 
 import java.util
 import java.util.Properties
 import java.util.concurrent.{ExecutorService, Executors}
+import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
@@ -107,7 +112,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     val changeConsumer = new DebeziumChangeConsumer
     val completionCallback = new DebeziumCompletionCallback(this.executorService)
 
-    val engine = DebeziumEngine.create(classOf[Json])
+    val engine = DebeziumEngine.create(classOf[Connect])
       .using(properties)
       .notifying(changeConsumer)
       .using(completionCallback)
@@ -122,12 +127,40 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     completionCallback.error.foreach(err => throw new Exception(err))
 
-    val jsonDataset = spark.sparkContext.parallelize(changeConsumer.records).toDS()
+    val records = changeConsumer.records
+    val sparkSchema = inferSparkSchema(records.head.valueSchema())
+    val rows = records.map{ record =>
+      Row(record.value())
+    }
 
-    val df = spark.read.json(jsonDataset)
+
+    val df = spark.createDataFrame(rows.asJava, sparkSchema)
 
     df
 
+  }
+
+  private def inferSparkSchema(schema: Schema): StructType = {
+    val fields = schema.fields().asScala.map { field =>
+      val fieldName = field.name()
+      val fieldType: DataType = field.schema().`type`() match {
+        case Type.INT8 => ByteType
+        case Type.INT16 => ShortType
+        case Type.INT32 => IntegerType
+        case Type.INT64 => LongType
+        case Type.FLOAT32 => FloatType
+        case Type.FLOAT64 => DoubleType
+        case Type.BOOLEAN => BooleanType
+        case Type.STRING => StringType
+        case Type.BYTES => BinaryType
+        case Type.STRUCT => inferSparkSchema(field.schema())
+        case _ => StringType
+        // Todo: add more conversions
+      }
+      StructField(fieldName, fieldType, nullable = true)
+    }
+
+    StructType(fields.toArray)
   }
 }
 
@@ -138,18 +171,18 @@ object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
 }
 
 
-private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[String, String]] {
+private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] {
 
 
-  var records: List[String] = List()
+  var records: List[SourceRecord] = List()
 
-  override def handleBatch(batch: util.List[ChangeEvent[String, String]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[String, String]]): Unit = {
+  override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
 
-    batch.forEach(record => {
+    batch.forEach(r => {
 
-      this.records = this.records :+ record.value()
+      records = records :+ r.value()
 
-      recordCommitter.markProcessed(record)
+      recordCommitter.markProcessed(r)
     })
 
     recordCommitter.markBatchFinished()
