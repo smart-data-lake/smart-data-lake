@@ -1014,7 +1014,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
 
     assertThrows[ConfigurationException] {
-      sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
+      sut.prepare(actionPipelineContext)
     }
   }
 }

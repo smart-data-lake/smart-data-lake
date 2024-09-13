@@ -451,8 +451,19 @@ case class ODataDataObject(override val id: DataObjectId,
   }
 
   /**
+   * Prepare & test [[DataObject]]'s prerequisits
+   *
+   * This runs during the "prepare" operation of the DAG.
+   */
+  override private[smartdatalake] def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    validateConfiguration(context)
+  }
+
+  /**
    * Creates the DataFrame of the received responses. This is the main method which triggers the OData-API-Calls.
    * It blocks until all data is received.
+   *
    * @param partitionValues
    * @param context
    * @return
@@ -467,8 +478,6 @@ case class ODataDataObject(override val id: DataObjectId,
     val arraySchema = ArrayType(recordSchema.inner)
 
     if(context.phase == ExecutionPhase.Init){
-      validateConfiguration(context)
-
       // In Init phase, return an empty DataFrame
       Seq[String]().toDF("responseString")
         .select(from_json($"responseString", arraySchema).as("response"))
