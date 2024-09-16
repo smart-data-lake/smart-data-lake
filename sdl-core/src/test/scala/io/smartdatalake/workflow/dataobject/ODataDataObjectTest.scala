@@ -1062,6 +1062,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val webServiceExceptionCaught = exceptionCaught.asInstanceOf[WebserviceException]
     assert(webServiceExceptionCaught.responseBody.get == "FoobarErrorMessage")
-
+    assert(webServiceExceptionCaught.getMessage == "Webservice Request failed with error <400> - FoobarErrorMessage")
   }
 }
