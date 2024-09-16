@@ -288,8 +288,16 @@ case class ODataDataObject(override val id: DataObjectId,
         c
       case Failure(e) =>
         if(retry == 0) {
-          logger.error(e.getMessage, e)
-          throw new WebserviceException(e.getMessage)
+
+          val errMessage = e match {
+            case ee: WebserviceException =>
+              ee.message + " - " + ee.responseBody.getOrElse("")
+            case _ =>
+              e.getMessage
+          }
+
+          logger.error(errMessage, e)
+          throw e
         }
         logger.info(s"Request will be repeated, because the server responded with: ${e.getMessage}. \nRequest retries left: ${retry-1}")
         request(url, method, headers, body, mimeType, retry-1)

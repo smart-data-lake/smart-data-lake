@@ -29,7 +29,7 @@ import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.misc.SchemaProviderType
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceException}
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ProcessAllMode}
 import io.smartdatalake.workflow.action.{CopyAction, RuntimeEventState}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -1016,5 +1016,52 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     assertThrows[ConfigurationException] {
       sut.prepare(actionPipelineContext)
     }
+  }
+
+  test("Test with error message on remote errors") {
+    val port = 8080
+    val httpsPort = 8443
+    val host = "127.0.0.1"
+    val server = TestUtil.startWebservice(host, port, httpsPort)
+
+    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
+      .willReturn(w.aResponse().withStatus(400).withBody("FoobarErrorMessage"))
+    )
+
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
+    val sut = ODataDataObject(
+      id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authorization = Some(auth_setup)
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    var exceptionCaught : Exception = null
+
+    try {
+      sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
+    }
+    catch
+    {
+      case x: Exception => exceptionCaught = x
+    }
+    finally {
+      server.stop()
+    }
+
+    assert(exceptionCaught.isInstanceOf[WebserviceException])
+
+    val webServiceExceptionCaught = exceptionCaught.asInstanceOf[WebserviceException]
+    assert(webServiceExceptionCaught.responseBody.get == "FoobarErrorMessage")
+
   }
 }
