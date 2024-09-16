@@ -389,7 +389,7 @@ case class ODataDataObject(override val id: DataObjectId,
    * @param columnNames : Names of the expected columns
    * @return OData request URL
    */
-  def getODataURL(columnNames: Seq[String]) : String = {
+  def getODataURL(columnNames: Seq[String], context: ActionPipelineContext) : String = {
 
     //Start with the base url and the table name
     var requestUrl = s"$baseUrl$tableName"
@@ -403,7 +403,7 @@ case class ODataDataObject(override val id: DataObjectId,
     }
 
     //If there are any filters required, add them too
-    val filters = getODataURLFilters
+    val filters = getODataURLFilters(context)
     if (filters.isDefined) {
       oDataModifiers.append(filters.get)
     }
@@ -424,7 +424,7 @@ case class ODataDataObject(override val id: DataObjectId,
    * Sub method to collect all required filters
    * @return
    */
-  private def getODataURLFilters : Option[String] = {
+  private def getODataURLFilters(context: ActionPipelineContext) : Option[String] = {
     val filters = ArrayBuffer[String]()
 
     //If there are any predefined filters configured, treat these filters as one unit and add them
@@ -435,7 +435,7 @@ case class ODataDataObject(override val id: DataObjectId,
 
     //If there is a incrementalOutputExpr and a previousState specified, use this column to filter only the records that
     //were modified since the last run (previousState) and the start of this run.
-    if (incrementalOutputExpr.isDefined && previousState != "") {
+    if (this.isRunningIncrementally(context) & incrementalOutputExpr.isDefined & previousState != "" & previousState != null) {
 
       filters.append(s"${incrementalOutputExpr.get} gt $previousState")
     }
@@ -488,7 +488,7 @@ case class ODataDataObject(override val id: DataObjectId,
       val columnNames = recordSchema.columns
 
       //Generate the URL for the first API call
-      var requestUrl = getODataURL(columnNames)
+      var requestUrl = getODataURL(columnNames, context)
 
       //Request the bearer token
       var bearerToken = getBearerToken(authorization.get)

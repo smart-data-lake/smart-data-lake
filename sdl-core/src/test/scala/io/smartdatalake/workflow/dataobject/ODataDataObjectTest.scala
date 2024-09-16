@@ -340,6 +340,10 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
@@ -350,7 +354,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , responseBufferSetup = Some(buffer_setup)
     )
 
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"), actionPipelineContext)
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB")
   }
@@ -358,6 +362,10 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL with state") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -371,7 +379,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
     )
 
     sut.setState(Some("PREVIOUSSTATE"))
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"), actionPipelineContext)
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$filter=lastModified+gt+PREVIOUSSTATE")
   }
@@ -379,6 +387,10 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL with state and source filter") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -393,7 +405,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
     )
 
     sut.setState(Some("4242424242"))
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"), actionPipelineContext)
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$filter=%28type+eq+TEST%29+and+lastModified+gt+4242424242")
   }
@@ -401,6 +413,10 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL with maxrecordcount") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -413,7 +429,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , maxRecordCount = Some(9999)
     )
 
-    val result = sut.getODataURL(List("ColumnA", "ColumnB"))
+    val result = sut.getODataURL(List("ColumnA", "ColumnB"), actionPipelineContext)
 
     assert(result == "http://localhost:8080/dataapi/api/data/v9.2/testSource?$select=ColumnA%2CColumnB&$top=9999")
   }
