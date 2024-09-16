@@ -110,7 +110,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
-    with CanCreateIncrementalOutput with ExpectationValidation {
+    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleConstraints {
 
   /**
    * Connection defines driver, url and db in central location
@@ -163,20 +163,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
 
     //If enabled, create or replace the primary Key of the table
-    if (table.createAndReplacePrimaryKey) {
-      val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
-      val existingPrimaryKeyOp: Option[connection.JdbcPrimaryKey] = connection.getJdbcPrimaryKey(table.catalog.getOrElse(""), table.db.getOrElse(""), table.name)
-      val pkConstraintName: String = table.primaryKeyConstraintName.getOrElse(f"sdlb_${table.name}")
-      (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
-        case (None, _) => logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
-        case (Some(pkcols), None) => connection.createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
-        case (Some(definedPkCols), Some(existingPkCols)) if (definedPkCols.toSet.diff(existingPkCols.pkColumns.toSet).isEmpty) => {
-          if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!")
-          connection.dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
-          connection.createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
-        }
-      }
-    }
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint();
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
@@ -560,6 +547,16 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
     }
   }
+
+  override def getExistingPKConstraint(catalog: String,
+                                       schema: String,
+                                       tableName: String): Option[PrimaryKeyDefinition] = {
+    connection.getJdbcPrimaryKey(catalog, schema, tableName)
+  }
+
+  override def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit = connection.dropPrimaryKeyConstraint(tableName, constraintName)
+
+  override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit = connection.createPrimaryKeyConstraint(tableName, constraintName, cols)
 }
 
 private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {

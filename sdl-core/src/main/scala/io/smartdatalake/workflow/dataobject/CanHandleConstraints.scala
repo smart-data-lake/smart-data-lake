@@ -19,28 +19,40 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+
+import java.sql.SQLException
+
+
+case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] = None)
+
 /**
  * This trait defines the general approach to handle constraints such as primary and foreign keys
- * within a dataObject.
+ * within a TransactionalTableDataObject.
  */
-trait CanHandleConstraints {
+trait CanHandleConstraints { self: TransactionalTableDataObject =>
   /**
    * @param pkColumns List of columns in a primary key constraint
    * @param pkName Primary Key constraint name. It can be null, since some databases have constraints without names.
    */
-  case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] = None)
-
   def getExistingPKConstraint(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition]
-
-  def getDefinedPKConstraint(): Option[Seq[String]]
-
-  def getDefinedPKConstraintName(): String
-
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit
-
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit
 
-  //TODO
-  def createOrReplacePrimaryKeyConstraint(): Unit = ???
+  private val pkConstraintName: String = table.primaryKeyConstraintName.getOrElse(f"sdlb_${table.name}")
+
+  def createOrReplacePrimaryKeyConstraint(): Unit = {
+    val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
+    val existingPrimaryKeyOp: Option[PrimaryKeyDefinition] =  getExistingPKConstraint(table.catalog.getOrElse(""), table.db.getOrElse(""), table.name)
+    (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
+      case (None, _) => logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
+      case (Some(pkcols), None) => createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
+      case (Some(definedPkCols), Some(existingPkCols)) if (definedPkCols.toSet.diff(existingPkCols.pkColumns.toSet).isEmpty) => {
+        if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!")
+        dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
+        createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
+      }
+    }
+  }
 
 }

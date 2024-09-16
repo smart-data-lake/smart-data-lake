@@ -25,6 +25,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
@@ -153,10 +154,8 @@ case class JdbcTableConnection(override val id: ConnectionId,
     }
   }
 
-  case class JdbcPrimaryKey(pkColumns: Seq[String], pkName: Option[String] = None)
-
   private lazy val connectionMetadata: DatabaseMetaData = this.getConnection.getMetaData
-  def getJdbcPrimaryKey(catalog: String, schema: String, tableName: String): Option[JdbcPrimaryKey] = {
+  def getJdbcPrimaryKey(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition] = {
     var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
     var primaryKeyCols: MutableSet[String] = MutableSet()
     var primaryKeyName: MutableSet[String] = MutableSet()
@@ -166,9 +165,9 @@ case class JdbcTableConnection(override val id: ConnectionId,
     }
     (primaryKeyCols.toList, primaryKeyName.toList) match {
       case (List(), _) => None
-      case (cols, List()) => Some(JdbcPrimaryKey(cols))
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
       case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection for $tableName returns more than one Primary Key!")
-      case (cols, pk) => Some(JdbcPrimaryKey(cols, Some(pk.head)))
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
     }
   }
 
