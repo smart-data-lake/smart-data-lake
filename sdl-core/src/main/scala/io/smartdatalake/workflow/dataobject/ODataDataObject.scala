@@ -3,35 +3,31 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.definitions.OAuthMode
-
-import scala.collection.mutable.ArrayBuffer
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
-import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceException, WebserviceMethod}
+import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceMethod}
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, OAuthMode}
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import org.apache.hadoop.fs.FileSystem
-import org.apache.spark.sql.{DataFrame, functions}
-import org.apache.spark.sql.types.{ArrayType, DateType, StringType, StructField, StructType, TimestampType}
+import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.{col, date_format, expr, max}
+import org.apache.spark.sql.types._
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
+import java.io.{BufferedWriter, File, FileWriter}
 import java.net.URLEncoder
 import java.nio.file.{Files, Paths}
-import java.io.{BufferedWriter, File, FileWriter}
-import java.time.{Instant, ZoneId}
+import java.time.Instant
 import scala.annotation.tailrec
-import scala.util.{Failure, Success}
-import org.apache.hadoop.fs.{Path => HadoopPath}
-import org.apache.spark.sql.custom.ExpressionEvaluator
-
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe.typeOf
+import scala.util.{Failure, Success}
 
 /**
  * InversionOfControl container class
@@ -157,7 +153,7 @@ class ODataIOC {
    * @param followRedirects
    * @return io.smartdatalake.util.webservice.ScalaJWebserviceClient
    */
-  def newScalaJWebServiceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[io.smartdatalake.definitions.AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : ScalaJWebserviceClient = {
+  def newScalaJWebServiceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : ScalaJWebserviceClient = {
     ScalaJWebserviceClient(url, headers, timeouts, authMode, proxy, followRedirects)
   }
 

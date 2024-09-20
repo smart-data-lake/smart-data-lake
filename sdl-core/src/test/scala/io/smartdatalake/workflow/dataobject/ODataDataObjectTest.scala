@@ -21,22 +21,19 @@ package io.smartdatalake.workflow.dataobject
 
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.OAuthMode
-import org.mockito.{Mockito => m}
-import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
-import io.smartdatalake.util.misc.SchemaProviderType
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceException}
+import io.smartdatalake.util.webservice.WebserviceException
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ProcessAllMode}
-import io.smartdatalake.workflow.action.{CopyAction, RuntimeEventState}
+import io.smartdatalake.workflow.connection.authMode.OAuthMode
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import org.apache.hadoop.fs.LocalFileSystem
-import org.apache.spark.sql.{DataFrameReader, SparkSession}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.{DataFrameReader, SparkSession}
+import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
+import org.mockito.{Mockito => m}
 
 import java.io.File
 import java.nio.file.Files
