@@ -1,6 +1,6 @@
 package io.smartdatalake.meta
 
-import io.smartdatalake.definitions.{AuthMode, SaveModeOptions}
+import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.meta.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
@@ -8,13 +8,14 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransforme
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
+import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
 import org.reflections.Reflections
 import scaladoc.Tag
 
-import scala.reflect.internal.Symbols
 import scala.jdk.CollectionConverters._
+import scala.reflect.internal.Symbols
 import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
 
 

@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.metrics.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
@@ -171,13 +172,17 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
               (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, noDataWarning)
             // remember taskedFailedException for next iteration and ignore processing of further feeds.
             case ex: TaskFailedException =>
+              ex.results.flatMap(_.headOption.flatMap(_.metrics)).foreach{ metrics =>
+                val metricsLog = orderMetricsDefault(metrics).map( x => x._1+"="+x._2).mkString(" ")
+                logger.warn(s"($id) failed writing to ${subFeed.dataObjectId.id}: " + metricsLog)
+              }
               (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex), noDataWarning)
           }
         } else (outputSubFeeds :+ subFeed, taskFailedException, noDataWarning)
     }
-    // if there is a TaskFailedException, enrich it will all results and throw it.
+    // if there is a TaskFailedException, enrich it with all results and throw it.
     taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
-    // if there is a NoDataToProcessWarning, enrich it will all results and throw it.
+    // if there is a NoDataToProcessWarning, enrich it with all results and throw it.
     noDataWarning.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
     // return processed SubFeeds
     outputSubFeeds
@@ -265,9 +270,6 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
   protected def logNoData(subFeed: SubFeed, isMainSubFeed: Boolean)(implicit context: ActionPipelineContext): Unit = {
     logger.info(s"($id) got NoDataToProcessWarning when writing to ${subFeed.dataObjectId.id}. ${if (isMainSubFeed) "As this is the main output, Action will be set to skipped." else "As this is not the main output, Action will not be set to skipped."}")
-  }
-  private def orderMetrics(metrics: Map[String,Any], orderedKeys: SortedSet[String]): Seq[(String,Any)] = {
-    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)
   }
 
   private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {

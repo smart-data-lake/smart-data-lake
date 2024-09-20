@@ -65,7 +65,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   }
 
   override def toOutput(dataObjectId: DataObjectId): SnowparkSubFeed = {
-    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None)
+    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {

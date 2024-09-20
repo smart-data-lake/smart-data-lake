@@ -23,16 +23,16 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOp
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
-import io.smartdatalake.workflow.action.expectation.{CompletnessExpectation, TransferRateExpectation}
+import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, SparkRepartitionTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, ExpectationValidationException, SQLExpectation, SQLFractionExpectation, SQLQueryExpectation, UniqueKeyExpectation}
+import io.smartdatalake.workflow.dataobject.expectation._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{lit, substring}
@@ -180,20 +180,25 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
   }
 
-  test("copy load with transformation from sql code and constraint and expectation - Spark DataFrame observations") {
+  test("copy load with transformation from sql code and constraint and expectation - Generic DataFrame observations") {
     // if approximate=false, metrics are calculated as generic calculated metrics (because Spark does not support count_distinct as observations aggregate expression)
     testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint = false)
   }
 
-  test("copy load with transformation from sql code and constraint and expectation - Generic DataFrame observations") {
-    // if approximateUniqueConstraint=true, metrics are calculated as Spark DataFRame observations
+  test("copy load with transformation from sql code and constraint and expectation - Spark DataFrame observations") {
+    // if approximateUniqueConstraint=true, metrics are calculated as Spark DataFrame observations
     testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint = true)
   }
 
   def testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint: Boolean): Unit = {
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockDataObject("src1",
+      expectations = Seq(
+        CountExpectation(name = "count", expectation = Some(">= 1")),
+        CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All),
+      )
+    ).register
     val tgtTable = Table(Some("default"), "copy_output", None, primaryKey = Some(Seq("lastname","firstname")))
     val tgtDO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite=true, table = tgtTable, numInitialHdfsPartitions = 1,
       constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
@@ -216,7 +221,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from %{inputViewName} where rating = 5") // test multiple transformers - it doesnt matter if they do the same.
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
       transformers = Seq(customTransformerConfig1, customTransformerConfig2),
-      expectations = Seq(TransferRateExpectation(), CompletnessExpectation(expectation = None))
+      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
     )
     val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
@@ -232,17 +237,17 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
 
     // check expectation value in metrics
     val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 0.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0))
+    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "countAll" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 0.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0))
 
-    // overwrite src with another record & process
-    val l2 = Seq(("dau", "peter", 5)).toDF("lastname", "firstname", "rating")
+    // overwrite src with 2 record to process
+    val l2 = Seq(("dau", "peter", 5), ("dau", "pan", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())
     action1.reset
     val tgtSubFeed2 = action1.exec(Seq(srcSubFeed))(contextExec).head
 
     // check expectation value in metrics - countAll should be 2 now, but count should stay 1
     val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "pctTransfer" -> 1.0, "countAll" -> 2, "countAll#src1" -> 1, "countAll#mainInput" -> 1, "pctComplete" -> 2.0, "countOfPartitionsWith1Record" -> 2, "resultNull" -> None, "primaryKey" -> 1.0))
+    assert(metrics2 == Map("count" -> 2, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 2, "count#src1" -> 2, "count#mainInput" -> 2, "pctTransfer" -> 1.0, "countAll" -> 3, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 1.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0))
 
     // fail tgt constraint evaluation
     val tgtDOConstraintFail = HiveTableDataObject( "tgt1constraintFail", Some(tempPath+s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,

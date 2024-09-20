@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.expectation
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
@@ -29,7 +29,6 @@ import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.ExpectationScope
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, ExpectationFractionMetricDefaultImpl, ExpectationScope, ExpectationSeverity}
-import org.apache.spark.sql.Column
 
 
 /**
@@ -41,7 +40,7 @@ import org.apache.spark.sql.Column
  *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
  * @param precision Number of digits to keep when calculating fraction. Default is 4.
  */
-case class CompletnessExpectation(
+case class CompletenessExpectation(
                                     override val name: String = "pctComplete",
                                     override val expectation: Option[String] = Some("= 1"),
                                     override val precision: Short = 4,
@@ -66,11 +65,12 @@ case class CompletnessExpectation(
     val updatedMetrics = metrics + (name -> pct)
     (col.map(SparkColumn).toSeq, updatedMetrics)
   }
-  override def factory: FromConfigFactory[ActionExpectation] = CompletnessExpectation
+
+  override def factory: FromConfigFactory[ActionExpectation] = CompletenessExpectation
 }
 
-object CompletnessExpectation extends FromConfigFactory[ActionExpectation] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CompletnessExpectation = {
-    extract[CompletnessExpectation](config)
+object CompletenessExpectation extends FromConfigFactory[ActionExpectation] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CompletenessExpectation = {
+    extract[CompletenessExpectation](config)
   }
 }

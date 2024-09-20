@@ -67,6 +67,10 @@ import org.apache.spark.util.PrivateAccessor
  *                              Note that if 1) is true, also 2) must be fullfilled for Spark to work properly (because Spark can't read/write the same storage location in the same job),
  *                              but there might be cases with recursions with different Actions involved, that dont need to fullfill 2).
  * @param environment    Override environment settings defined in Environment object by setting the corresponding key to the desired value (key in camelcase notation with the first letter in lowercase)
+ * @param pluginOptions  Options for SDLPlugin initialization.
+ *                       Note that SDLPlugin.startup is executed before SDLB parses the config, and pluginOptions are only available later when calling SDLPlugin.configure method.
+ *                       An SDLPlugin is set through Environment.plugin, normally this is configured through the java system property "sdl.pluginClassName".
+ * @param uiBackend      Configuration of the UI backend to upload state updates of the Job runs.
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , sparkOptions: Option[Map[String, StringOrSecret]] = None
@@ -83,6 +87,7 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , synchronousStreamingTriggerIntervalSec: Int = 60
                         , environment: Map[String, String] = Map()
                         , pluginOptions: Map[String, StringOrSecret] = Map()
+                        , uiBackend: Option[UIBackendConfig] = None
                        )
 extends SmartDataLakeLogger {
 

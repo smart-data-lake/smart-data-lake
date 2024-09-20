@@ -43,10 +43,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
  * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
  *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
  *                               Default is None which keeps the whole filename (without path).
- * @param executionMode optional execution mode for this Action
- * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  * @param breakFileRefLineage If set to true, file references passed on from previous action are ignored by this action.
  *                            The action will detect on its own what files it is going to process.
  */

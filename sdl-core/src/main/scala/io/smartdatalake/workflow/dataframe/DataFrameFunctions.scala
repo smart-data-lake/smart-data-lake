@@ -41,7 +41,7 @@ trait DataFrameFunctions {
   def size(column: GenericColumn): GenericColumn
   def explode(column: GenericColumn): GenericColumn
   /**
-   * Construct array from given columns and removing null values (Snowpark API)
+   * Construct array from given columns and removing null values
    */
   def array_construct_compact(columns: GenericColumn*): GenericColumn
   def array(columns: GenericColumn*): GenericColumn

@@ -22,7 +22,7 @@ import com.splunk.{SSLSecurityProtocol, Service, ServiceArgs}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions._
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode, TokenAuthMode}
 
 /**
  * Connection information for splunk queries

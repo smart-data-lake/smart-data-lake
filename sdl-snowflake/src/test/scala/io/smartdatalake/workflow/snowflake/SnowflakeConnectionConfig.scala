@@ -19,10 +19,9 @@
 
 package io.smartdatalake.workflow.snowflake
 
-import io.smartdatalake.definitions.BasicAuthMode
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.SnowflakeConnection
-import io.smartdatalake.workflow.dataobject.HttpProxyConfig
+import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 
 /**
  * Configuration of Snowflake connection for integration tests

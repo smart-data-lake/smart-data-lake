@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, SASLSCRAMAuthMode, SSLCertsAuthMode}
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, SASLSCRAMAuthMode, SSLCertsAuthMode}
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.config.SslConfigs

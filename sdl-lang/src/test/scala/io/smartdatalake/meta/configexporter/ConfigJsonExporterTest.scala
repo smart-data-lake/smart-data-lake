@@ -19,7 +19,7 @@
 
 package io.smartdatalake.meta.configexporter
 
-import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, put, putRequestedFor, stubFor, urlPathMatching, verify}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import io.smartdatalake.testutils.TestUtil
 import org.apache.hadoop.conf.Configuration
 import org.json4s.jackson.JsonMethods
@@ -38,11 +38,11 @@ class ConfigJsonExporterTest extends FunSuite {
     val actualJsonOutput = JsonMethods.parse(StringInput(actualOutput))
     assert((actualJsonOutput \ "actions").children.size === 8)
     assert((actualJsonOutput \ "dataObjects").children.size === 14)
-    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(66))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(80))
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))
-    assert((actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "b.[].b1").asInstanceOf[JString].s.linesIterator.toSeq === Seq("Beschreibung B1","2nd line B1 text"))
+    assert((actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "b.[].b1").asInstanceOf[JString].s.linesIterator.toSeq === Seq("Beschreibung B1", "2nd line B1 text"))
     assert(((actualJsonOutput \ "actions" \ "actionId6" \ "transformers")(0) \ "_parameters")(0) \ "name" === JString("session"))
     assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" === JString("Documentation for TestTransformer.\nThis should be exported by ConfigJsonExporter!"))
   }
@@ -58,7 +58,7 @@ class ConfigJsonExporterTest extends FunSuite {
     assert(new File("exportedConfig.json").exists())
   }
 
-  test("test main api uplaod") {
+  test("test main api upload") {
     val port = 8080 // for some reason, only the default port seems to work
     val httpsPort = 8443
     val host = "127.0.0.1"
@@ -71,5 +71,9 @@ class ConfigJsonExporterTest extends FunSuite {
     verify(putRequestedFor(urlPathMatching("/api/v1/config?.*")))
     verify(putRequestedFor(urlPathMatching("/api/v1/description?.*")))
     wireMockServer.stop()
+  }
+
+  ignore("test aws ui upload") {
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-t", "uibackend", "-d", descriptionPath))
   }
 }

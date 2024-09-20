@@ -23,7 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.expectation.{ExpectationScope, ExpectationValidationException, UniqueKeyExpectation}

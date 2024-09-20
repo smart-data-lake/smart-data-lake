@@ -469,8 +469,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         Seq(snapshotListener, incrementalListener)
       else Nil
 
-    val stateListeners =
-      globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
+    val stateListeners = globalConfig.stateListeners.map(_.listener) ++ globalConfig.uiBackend.map(_.getStateListener) ++
+      Environment._additionalStateListeners ++ statusInfoListeners
 
     if (Environment._globalConfig.statusInfo.isDefined) {
       StatusInfoServer.start(snapshotListener, incrementalListener, Environment._globalConfig.statusInfo.get)

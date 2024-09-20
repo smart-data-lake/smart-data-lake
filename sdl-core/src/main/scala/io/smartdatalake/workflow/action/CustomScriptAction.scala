@@ -34,8 +34,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
  * @param scripts                definition of scripts to execute
- * @param executionCondition     optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- *                               default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
  */
 case class CustomScriptAction(override val id: ActionId,
                               inputIds: Seq[DataObjectId],
