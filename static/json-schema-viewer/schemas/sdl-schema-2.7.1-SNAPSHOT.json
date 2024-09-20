@@ -541,7 +541,12 @@
             "description" : "Describes a complete ACL Specification (basic owner/group/other permissions AND extended ACLS)\nto be applied to a Data Object on writing"
           },
           "checkIcebergSparkOptions" : {
-            "type" : "boolean"
+            "type" : "boolean",
+            "description" : "if true check if IcebergSparkSessionExtensions is registered through spark.sql.extensions property.\nDefault is true."
+          },
+          "addFilesParallelism" : {
+            "type" : "integer",
+            "description" : "Number of thread to use for file reading when migrating table from parquet to iceberg using procedure 'system.add_files'.\nIcberg Default value is 1, but should be increased for acceptable performance with larger tables."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata"
@@ -848,6 +853,14 @@
               "port" : {
                 "type" : "integer",
                 "description" : "proxy port"
+              },
+              "user" : {
+                "type" : "string",
+                "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+              },
+              "password" : {
+                "type" : "string",
+                "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
               }
             },
             "title" : "HttpProxyConfig",
@@ -2385,14 +2398,14 @@
           },
           "path" : {
             "type" : "string",
-            "description" : "hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.\nIf pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied."
+            "description" : "hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.\nIf pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.\nIf Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure."
           },
           "partitions" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "partition columns for this data object"
+            "description" : "Definition of partition columns\n\nExample: `[dt]`"
           },
           "options" : {
             "type" : "object",
@@ -2403,7 +2416,7 @@
           },
           "schemaMin" : {
             "type" : "string",
-            "description" : "An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.\nDefine schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING."
+            "description" : "An optional, minimal schema that a [[DataObject]] schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.\n- A column of B is contained in A when A contains a column with equal name and data type.\n- Column order is ignored.\n- Column nullability is ignored.\n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in [[CanCreateDataFrame]] and [[CanWriteDataFrame]] , that is,\nwhen reading or writing Spark data frames from/to the underlying data container. [[io.smartdatalake.workflow.action.Action]] s that work with files ignore the `schemaMin` attribute\nif it is defined.\nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist."
           },
           "table" : {
             "$ref" : "#/definitions/Others/Table"
@@ -2438,7 +2451,7 @@
               "additionalProperties" : false,
               "description" : "Definition of row-level constraint to validate."
             },
-            "description" : "List of row-level[[Constraint]] s to enforce when writing to this data object."
+            "description" : "List of constraint definitions to validate on write, see [[Constraint]] for details.\nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.\nIf validation fails an exception is thrown and further processing is stopped.\nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.\nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
           },
           "expectations" : {
             "type" : "array",
@@ -2675,7 +2688,7 @@
                 "description" : "Definition of expectation on uniqueness of a given key.\nUniqueness is calculated as the fraction of output count distinct on key columns over output count.\nIt supports scope Job and All, but not JobPartition."
               } ]
             },
-            "description" : "List of[[Expectation]] s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
+            "description" : "List expectation definitions to evaluate on write, see [[Expectation]] for details.\nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.\nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.\nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.\nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "saveMode" : {
             "type" : "string",
@@ -2734,7 +2747,7 @@
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
-            "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
+            "description" : "Definition of partitions that are expected to exists.\nThis is used to validate that partitions being read exists and don't return no data.\nDefine a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false\n\nExample: \"elements['yourColName'] > 2017\"\n\nIf empty (default) all partition are expected to exists.\n\nOTHERTAG: true if partition is expected to exist."
           },
           "housekeepingMode" : {
             "oneOf" : [ {
@@ -2742,7 +2755,7 @@
             }, {
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
-            "description" : "Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.\nSee HousekeepingMode for available implementations. Default is None."
+            "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -4876,6 +4889,14 @@
               "port" : {
                 "type" : "integer",
                 "description" : "proxy port"
+              },
+              "user" : {
+                "type" : "string",
+                "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+              },
+              "password" : {
+                "type" : "string",
+                "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
               }
             },
             "title" : "HttpProxyConfig",
