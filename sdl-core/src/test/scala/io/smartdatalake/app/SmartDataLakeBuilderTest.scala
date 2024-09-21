@@ -26,11 +26,11 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.{EnvironmentUtil, StateUploader}
+import io.smartdatalake.util.misc.StateUploader
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
-import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -40,9 +40,7 @@ import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, Exec
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{lit, raise_error, udf}
-import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
-import org.scalactic.source.Position
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
@@ -385,6 +383,62 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
         action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,1))
       )
       assert(resultActionsState == expectedActionsState)
+    }
+  }
+
+
+  test("sdlb run 2nd action skipped, check metrics") {
+
+    // init sdlb
+    val appName = "sdlb-skipped-metrics"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(new Path(statePath), false)
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+
+    // setup DataObjects
+    val srcDO = MockDataObject( "src1", partitions = Seq("dt")).register
+    val tgt1DO = MockDataObject( "tgt1", partitions = Seq("dt")).register
+    val tgt2DO = MockDataObject( "tgt2", partitions = Seq("dt")).register
+
+    // prepare data
+    val dfSrc = Seq(("20180101", "person", "doe","john",5), ("20190101", "company", "olmo","-",10))
+      .toDF("dt", "type", "lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
+
+    // start first dag run -> fail
+    // action1 should execute
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    // action2 skipped (ExecNoDataTransformer)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(FilterTransformer(filterClause = "false")) // force no data, so that the Action gets skipped
+    )
+    instanceRegistry.register(action2.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+
+    // start dag run
+    sdlb.run(sdlConfig)
+
+    // check latest state
+    {
+      val stateStore = HadoopFileActionDAGRunStateStore(statePath, appName, session.sparkContext.hadoopConfiguration)
+      val stateFile = stateStore.getLatestStateId().get
+      val runState = stateStore.recoverRunState(stateFile)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 1)
+      val resultActionsState = runState.actionsState.mapValues(x=>(x.state, x.executionId)).toMap
+      val expectedActionsState = Map(
+        action1.id -> (RuntimeEventState.SUCCEEDED,SDLExecutionId(1,1)),
+        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1,1))
+      )
+      assert(resultActionsState == expectedActionsState)
+      val action1Metrics = runState.actionsState(action1.id).results.head.metrics.get
+      assert(action1Metrics == Map("count" -> 2, "records_written" -> 2, "count#mainInput" -> 2, "count#src1" -> 2))
+      // no metrics for skipped Action2
+      assert(runState.actionsState(action2.id).results.head.metrics.isEmpty)
     }
   }
 
@@ -747,7 +801,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
 
-  test("sdlb run with state file using FinalStateWriter, StateUploader and FinalMetricsWriter and Environment setting override from config") {
+  test("sdlb run with state file using FinalStateWriter, FinalMetricsWriter, uiBackend and Environment setting override from config") {
 
     val port = 8080 // for some reason, only the default port seems to work
     val httpsPort = 8443
@@ -779,22 +833,20 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(Environment.dagGraphLogMaxLineLength == 100)
 
     // check result
-    val uploadStagePath = "target/ext-state/upload-stage-path-test"
+    val uploadStagePath = Environment._globalConfig.uiBackend.get.stagePath.get
     assert(filesystem.exists(new Path("target/ext-state/state-test")))
     assert(filesystem.exists(new Path(uploadStagePath)))
-    filesystem.listFiles(new Path(uploadStagePath), true).hasNext
+    assert(filesystem.listFiles(new Path(uploadStagePath), true).hasNext)
     val dfActionLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("actionLog")).getSparkDataFrame()
     assert(dfActionLog.select($"run_id", $"action_id", $"attempt_id",$"state").as[(Long,String,Int,String)].collect().toSet == Set((1L,"act",1,"SUCCEEDED")))
     val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("metricsLog")).getSparkDataFrame()
     assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long,String,String,Long)].collect().toSet == Set((1L,"act","tgt",1L)))
 
     // check StateUploader retry
-    val writer = new StateUploader(Map(
-      "baseUrl" -> "https://localhost/good/post/no_auth?tenant=1&repo=abc",
-      "stagePath" -> uploadStagePath
-    ).mapValues(StringOrSecret).toMap)
-    writer.prepare(actionPipelineContext)
-    writer.stageStateStore.get.getFiles().isEmpty
+    val uiBackend2 = Environment._globalConfig.uiBackend.get.copy(baseUrl = "https://localhost/good/post/no_auth?tenant=1&repo=abc")
+    val stateUploader = uiBackend2.getStateListener.asInstanceOf[StateUploader]
+    stateUploader.prepare(actionPipelineContext)
+    assert(stateUploader.stageStateStore.get.getFiles().isEmpty)
 
     wireMockServer.stop()
   }
@@ -906,6 +958,27 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
   }
+
+  // Integration test - create a file 'ui-auth' in the project directory which contains key-value pairs for clientId, user and pwd.
+  ignore("sdlb run test aws ui upload") {
+
+    val feedName = "test"
+    val sdlb = new DefaultSmartDataLakeBuilder()
+    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
+
+    // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
+    val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")(sdlb.instanceRegistry)
+    val dfSrc1 = Seq("testData").toDF("testColumn")
+    dummySrcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
+
+    // load data from configuration file
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some("test"), configuration = Some(Seq(
+      getClass.getResource("/configState/WithRealUIBackend.conf").getPath)))
+
+    // Run SDLB
+    sdlb.run(sdlConfig)
+  }
+
 }
 
 class RuntimeFailTransformer extends CustomDfTransformer {

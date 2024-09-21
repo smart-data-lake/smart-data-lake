@@ -84,7 +84,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(isSkipped = false)
   }
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None)
+    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
     val (dataFrame, dummy) = other match {
@@ -243,12 +243,9 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     val sparkFields = fields.map{ case (name,dataType) => StructField(name, dataType.asInstanceOf[SparkDataType].inner)}.toSeq
     SparkDataType(StructType(sparkFields))
   }
-  /**
-   * Construct array from given columns removing null values (Snowpark API)
-   */
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
-    SparkColumn(functions.flatten(functions.array(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))))
+    SparkColumn(functions.array_compact(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*)))
   }
   override def array(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)

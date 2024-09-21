@@ -25,11 +25,13 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionModeResult, PartitionDiffMode}
+import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, SQLExpectation}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.lit
@@ -40,6 +42,7 @@ import java.nio.file.{Files, Path => NioPath}
 
 class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -63,8 +66,8 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
     val srcDO2 = MockDataObject("src2").register
-    val tgtDO1 = MockDataObject("tgt1", primaryKey = Some(Seq("lastname","firstname"))).register
-    val tgtDO2 = MockDataObject("tgt2", primaryKey = Some(Seq("lastname","firstname"))).register
+    val tgtDO1 = MockDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO2 = MockDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     val customTransformerConfig = ScalaClassSparkDfsTransformer(
@@ -101,7 +104,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
+    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerRecursive].getName)
@@ -136,7 +139,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val srcDO = MockDataObject("src1", partitions = Seq("type")).register
-    val tgtDO = MockDataObject("tgt1", partitions = Seq("type"), primaryKey = Some(Seq("type","lastname","firstname"))).register
+    val tgtDO = MockDataObject("tgt1", partitions = Seq("type"), primaryKey = Some(Seq("type", "lastname", "firstname"))).register
 
     // prepare action
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
@@ -144,8 +147,8 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = InitSubFeed("src1", Seq())
 
     // prepare & start first load
-    val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
-    val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
+    val l1 = Seq(("A", "doe", "john", 5)).toDF("type", "lastname", "firstname", "rating")
+    val l1PartitionValues = Seq(PartitionValues(Map("type" -> "A")))
     srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
     action.init(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
@@ -158,8 +161,8 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & start 2nd load
     action.reset
-    val l2 = Seq(("B","pan","peter",11)).toDF("type", "lastname", "firstname", "rating")
-    val l2PartitionValues = Seq(PartitionValues(Map("type"->"B")))
+    val l2 = Seq(("B", "pan", "peter", 11)).toDF("type", "lastname", "firstname", "rating")
+    val l2PartitionValues = Seq(PartitionValues(Map("type" -> "B")))
     srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
     assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
@@ -191,10 +194,10 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed3 = InitSubFeed("src3", Seq())
 
     // prepare & start first load
-    val l1 = Seq(("A","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
-    val l2 = Seq(("A","doe","john",5),("B","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
-    val l1PartitionValues = Seq(PartitionValues(Map("type"->"A")))
-    val l2PartitionValues = Seq(PartitionValues(Map("type"->"A")),PartitionValues(Map("type"->"B")))
+    val l1 = Seq(("A", "doe", "john", 5)).toDF("type", "lastname", "firstname", "rating")
+    val l2 = Seq(("A", "doe", "john", 5), ("B", "doe", "john", 5)).toDF("type", "lastname", "firstname", "rating")
+    val l1PartitionValues = Seq(PartitionValues(Map("type" -> "A")))
+    val l2PartitionValues = Seq(PartitionValues(Map("type" -> "A")), PartitionValues(Map("type" -> "B")))
     srcDO1.writeSparkDataFrame(l1, l1PartitionValues)
     srcDO2.writeSparkDataFrame(l2, l2PartitionValues)
     srcDO3.writeSparkDataFrame(l2, Seq()) // src3 is not partitioned
@@ -216,21 +219,21 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
     val srcDO2 = MockDataObject("src2").register
-    val intDO1 = MockDataObject("int1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
-    val tgtDO2 = MockDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
+    val intDO1 = MockDataObject("int1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO2 = MockDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     // note that src2 is passed on to customTransformerConfig2, even if it's not re-defined in customTransformerConfig1
     // note that intermediate dataframe int1 is used as output, and tgt1 is a transformer output but not used as action output
     val customTransformerConfig1 = SQLDfsTransformer(code = Map(intDO1.id.id -> "select * from src1 where rating = 5"))
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from int1", tgtDO2.id.id -> "select * from src2 where rating = 3"))
-    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(intDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig1,customTransformerConfig2))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(intDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     instanceRegistry.register(action1)
-    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l, Seq())
     srcDO2.writeSparkDataFrame(l, Seq())
-    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
     val tgtSubFeed = action1.exec(srcSubFeeds)(contextExec).head
 
     val r1 = intDO1.getSparkDataFrame()
@@ -252,13 +255,13 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
     val srcDO2 = MockDataObject("src2").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
+    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare
     val customTransformerConfig = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1 union all select * from src2"))
-    val l1 = Seq(("jonson","rob",5)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("jonson", "rob", 5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l1, Seq())
-    val l2 = Seq(("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l2 = Seq(("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO2.writeSparkDataFrame(l2, Seq())
 
     // condition: skip only if both input subfeeds are skipped
@@ -270,9 +273,9 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
     val tgtSubFeed1 = SparkSubFeed(None, "tgt1", Seq(), isSkipped = true)
-    action1.preInit(Seq(srcSubFeed1,srcSubFeed2), Seq())
-    intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1,srcSubFeed2))(contextExec))
-    action1.postExec(Seq(srcSubFeed1,srcSubFeed2), Seq(tgtSubFeed1))(contextExec)
+    action1.preInit(Seq(srcSubFeed1, srcSubFeed2), Seq())
+    intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1, srcSubFeed2))(contextExec))
+    action1.postExec(Seq(srcSubFeed1, srcSubFeed2), Seq(tgtSubFeed1))(contextExec)
 
     // dont skip if one subfeed skipped
     val action2 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id),
@@ -280,8 +283,8 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(action2)
     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
     val srcSubFeed4 = SparkSubFeed(None, "src2", Seq(), isSkipped = false)
-    action2.preInit(Seq(srcSubFeed3,srcSubFeed4), Seq()) // no exception
-    action2.preExec(Seq(srcSubFeed3,srcSubFeed4)) // no exception
+    action2.preInit(Seq(srcSubFeed3, srcSubFeed4), Seq()) // no exception
+    action2.preExec(Seq(srcSubFeed3, srcSubFeed4)) // no exception
   }
 
   // data from skipped input is nevertheless read, after decision to execute Action is made (e.g. subFeed,isSkipped will be set to false).
@@ -323,7 +326,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerPartitionValues].getName)
     val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig))
-    val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
+    val l1 = Seq(("20100101", "jonson", "rob", 5), ("20100103", "doe", "bob", 3)).toDF("dt", "lastname", "firstname", "rating")
     val srcPartitionValues = Seq(PartitionValues(Map("dt" -> "20100101")), PartitionValues(Map("dt" -> "20100103")))
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", srcPartitionValues)
@@ -340,9 +343,9 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
 
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerOptions].getName)
-    val customExecutionMode = CustomMode(className=classOf[TestResultOptionsCustomMode].getName)
+    val customExecutionMode = CustomMode(className = classOf[TestResultOptionsCustomMode].getName)
     val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionMode = Some(customExecutionMode))
-    val l1 = Seq(("20100101","jonson","rob",5),("20100103","doe","bob",3)).toDF("dt", "lastname", "firstname", "rating")
+    val l1 = Seq(("20100101", "jonson", "rob", 5), ("20100103", "doe", "bob", 3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextExec)
@@ -361,10 +364,10 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
     val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     instanceRegistry.register(action1)
-    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l.where(lit(false)), Seq()) // empty DataFrame on main input -> main output
     srcDO2.writeSparkDataFrame(l, Seq())
-    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
     intercept[NoDataToProcessWarning](action1.exec(srcSubFeeds)(contextExec).head)
 
     // check that tgt1 is empty
@@ -387,10 +390,10 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
     val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     instanceRegistry.register(action1)
-    val l = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l, Seq())
     srcDO2.writeSparkDataFrame(l.where(lit(false)), Seq()) // empty DataFrame on non-main-input -> non-main-output
-    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()),SparkSubFeed(None, "src2", Seq()))
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
     action1.exec(srcSubFeeds)(contextExec).head
 
     // check that tgt1 is not empty
@@ -399,32 +402,121 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     // getSparkDataFrame will throw IllegalArgumentException because it no files have been written to this DataObject...
     intercept[IllegalArgumentException](tgtDO2.getSparkDataFrame())
   }
+
+  test("copy load with constraints and expectations non-main input no_data") {
+
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some(">= 1"))
+    )).register
+    val srcDO2 = MockDataObject("src2", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some("= 0")),
+      CountExpectation(name = "countAll", expectation = Some("= 0"), scope = ExpectationScope.All)
+    )).register
+    val tgtDO1 = MockDataObject("tgt1", expectations = Seq(
+      CountExpectation(expectation = Some(">= 1")),
+      SQLExpectation("tgt1AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+    val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
+      CountExpectation(expectation = Some("= 0")),
+      SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+
+    // prepare & start load
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id),
+      transformers = Seq(customTransformerConfig1, customTransformerConfig2),
+      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
+    )
+    instanceRegistry.register(action1)
+    val dfInput = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
+
+    // run with src2 empty (non-main input)
+    srcDO1.writeSparkDataFrame(dfInput, Seq())
+    srcDO2.writeSparkDataFrame(dfInput.where(lit(false)), Seq())
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
+    val tgtSubFeeds = action1.exec(srcSubFeeds)(contextExec)
+    val tgtSubFeed1 = tgtSubFeeds.find(_.dataObjectId == tgtDO1.id).get
+    val tgtSubFeed2 = tgtSubFeeds.find(_.dataObjectId == tgtDO2.id).get
+
+    // check expectation value in metrics
+    val metrics1 = tgtSubFeed1.metrics.get
+    assert(metrics1 == Map("count" -> 2, "countAll" -> 2, "records_written" -> 2, "tgt1AvgRatingGt1" -> 4.0, "count#src1" -> 2, "count#mainInput" -> 2, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "pctComplete" -> 1.0))
+    val metrics2 = tgtSubFeed2.metrics.get
+    assert(metrics2 == Map("count" -> 0, "tgt2AvgRatingGt1" -> None, "count#src2" -> 0, "countAll#src2" -> 0, "no_data" -> true))
+  }
+
+  test("copy load with constraints and expectations main input no_data") {
+
+    // setup DataObjects
+    val srcDO1 = MockDataObject("src1", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some("= 0"))
+    )).register
+    val srcDO2 = MockDataObject("src2", expectations = Seq(
+      CountExpectation(name = "count", expectation = Some("= 2")),
+      CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All)
+    )).register
+    val tgtDO1 = MockDataObject("tgt1", expectations = Seq(
+      CountExpectation(expectation = Some("= 0")),
+      SQLExpectation("tgt1AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+    val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
+      CountExpectation(expectation = Some("= 2")),
+      SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+    )).register
+
+    // prepare & start load
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1"))
+    val customTransformerConfig2 = SQLDfsTransformer(code = Map(tgtDO2.id.id -> "select * from src2"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), mainInputId = Some(srcDO1.id), mainOutputId = Some(tgtDO1.id),
+      transformers = Seq(customTransformerConfig1, customTransformerConfig2),
+      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
+    )
+    instanceRegistry.register(action1)
+    val dfInput = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
+
+    // run with src1 empty (main input)
+    srcDO1.writeSparkDataFrame(dfInput.where(lit(false)), Seq())
+    srcDO2.writeSparkDataFrame(dfInput, Seq())
+    val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
+    val tgtSubFeeds = action1.exec(srcSubFeeds)(contextExec)
+    val tgtSubFeed1 = tgtSubFeeds.find(_.dataObjectId == tgtDO1.id).get
+    val tgtSubFeed2 = tgtSubFeeds.find(_.dataObjectId == tgtDO2.id).get
+
+    // check expectation value in metrics
+    val metrics1 = tgtSubFeed1.metrics.get
+    assert(metrics1 == Map("count" -> 0, "countAll" -> 0, "tgt1AvgRatingGt1" -> None, "count#src1" -> 0, "count#mainInput" -> 0, "countAll#src1" -> 0, "countAll#mainInput" -> 0, "pctTransfer" -> "null", "pctComplete" -> "null", "no_data" -> true))
+    val metrics2 = tgtSubFeed2.metrics.get
+    assert(metrics2 == Map("count" -> 2, "tgt2AvgRatingGt1" -> 4.0, "count#src2" -> 2, "countAll#src2" -> 2, "records_written" -> 2))
+
+  }
 }
 
 
 class TestDfsTransformerIncrement extends CustomDfsTransformer {
-  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     import session.implicits._
     Map(
       "tgt1" -> dfs("src1").withColumn("rating", $"rating" + options("increment1").toInt)
-    , "tgt2" -> dfs("src2").withColumn("rating", $"rating" + options("increment2").toInt)
+      , "tgt2" -> dfs("src2").withColumn("rating", $"rating" + options("increment2").toInt)
     )
   }
 }
 
 class TestDfsTransformerRecursive extends CustomDfsTransformer {
-  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     import session.implicits._
-    if(!dfs.contains("tgt1")) {
+    if (!dfs.contains("tgt1")) {
       // first run without recursive inputs
       Map(
-        "tgt1" -> dfs("src1").withColumn("rating", $"rating"+1)
+        "tgt1" -> dfs("src1").withColumn("rating", $"rating" + 1)
       )
     }
     else {
       // second run with recursive inputs
       Map(
-        "tgt1" -> dfs("tgt1").withColumn("rating", $"rating"+5)
+        "tgt1" -> dfs("tgt1").withColumn("rating", $"rating" + 5)
       )
     }
 
@@ -432,30 +524,33 @@ class TestDfsTransformerRecursive extends CustomDfsTransformer {
 }
 
 class TestDfsTransformerDummy extends CustomDfsTransformer {
-  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     // one to one...
-    dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
+    dfs.map { case (id, df) => (id.replaceFirst("src", "tgt"), df) }
   }
 }
 
 // aggregate date partitions to month partitions
 class TestDfsTransformerPartitionValues extends CustomDfsTransformer {
+
   import org.apache.spark.sql.functions._
-  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     import session.implicits._
-    val dfTgt = dfs("src1").withColumn("mt", substring($"dt",1,6))
+    val dfTgt = dfs("src1").withColumn("mt", substring($"dt", 1, 6))
     Map("tgt1" -> dfTgt)
   }
-  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = {
+
+  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] = {
     Some(partitionValues.map(pv => (pv, PartitionValues(Map("mt" -> pv("dt").toString.take(6))))).toMap)
   }
 }
 
 
 class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
-  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     // return only the first df sorted by ID
-    dfs.toSeq.sortBy(_._1).take(1).map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }.toMap
+    dfs.toSeq.sortBy(_._1).take(1).map { case (id, df) => (id.replaceFirst("src", "tgt"), df) }.toMap
   }
 }
 
@@ -466,9 +561,9 @@ class TestResultOptionsCustomMode extends CustomModeLogic {
 }
 
 class TestDfsTransformerOptions extends CustomDfsTransformer {
-  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String,DataFrame]): Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     assert(options.get("testOption").contains("test"))
     // one to one...
-    dfs.map{ case (id, df) => (id.replaceFirst("src","tgt"), df) }
+    dfs.map { case (id, df) => (id.replaceFirst("src", "tgt"), df) }
   }
 }

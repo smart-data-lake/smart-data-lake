@@ -20,12 +20,12 @@ package io.smartdatalake.util.webservice
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthMode, CustomHttpAuthModeLogic}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthMode, CustomHttpAuthModeLogic}
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, BeforeAndAfterEach, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 import scalaj.http.{Http, HttpResponse}
 
 class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll  {

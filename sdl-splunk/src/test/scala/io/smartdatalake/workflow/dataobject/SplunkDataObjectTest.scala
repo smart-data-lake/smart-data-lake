@@ -18,18 +18,19 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.time.format.DateTimeFormatter
-import java.time.{Duration, LocalDateTime}
 import com.splunk.{JobExportArgs, Service}
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.BasicAuthMode
+import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.{SplunkConnection, SplunkConnectionService}
 import org.apache.spark.sql.Row
 import org.scalatest.Assertions
+
+import java.time.format.DateTimeFormatter
+import java.time.{Duration, LocalDateTime}
 
 class SplunkDataObjectTest extends DataObjectTestSuite {
 

@@ -22,8 +22,8 @@ package io.smartdatalake.util.dag
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.LogUtil
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.{SimplifiedAnalysisException, SubFeed}
-import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.ExtendedAnalysisException
 
 private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
@@ -52,10 +52,6 @@ private[smartdatalake] object TaskFailedException {
     // remove stacktrace: avoid many lines of DAG, Monix and Java stacktrace and show directly the real exception that made the task fail
     ex.setStackTrace(Array())
     ex
-  }
-  // recursively get root cause of exception
-  def getRootCause(cause: Throwable): Throwable = {
-    Option(cause.getCause).map(getRootCause).getOrElse(cause)
   }
 }
 

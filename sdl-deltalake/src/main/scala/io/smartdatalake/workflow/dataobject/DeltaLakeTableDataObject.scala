@@ -33,6 +33,7 @@ import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUti
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
 import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
@@ -361,7 +362,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val dfHistory = deltaTable.history(1)
     if (logger.isDebugEnabled) dfHistory.show(false)
     val latestHistoryEntry = dfHistory.select("operationMetrics", "userMetadata").head()
-    assert(latestHistoryEntry.getString(1) == userMetadata, s"($id) current delta lake history entry is not written by this spark application (userMetadata should be $userMetadata). Is there someone else writing to this table?!")
+    if (latestHistoryEntry.getString(1) != userMetadata) {
+      logger.info(s"($id) No new version was written. No data was written to this DeltaLake table.")
+      throw NoDataToProcessWarning(id.id, s"($id) No data was written to DeltaLake table by Spark.")
+    }
     val deltaMetrics = dfHistory.select("operationMetrics").head().getMap[String,String](0)
       // normalize names lowercase with underscore
       .map{case (k,v) => (DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}

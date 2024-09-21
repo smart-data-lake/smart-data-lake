@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
@@ -163,8 +164,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.getSparkDataFrame(Seq()).show()
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
-    assert(partitionValues.size == 2)
-    assert(partitionValues.map(_.elements("abc")).toSet == Set("ext","int"))
+    assert(partitionValues.toSet == Set(PartitionValues(Map("abc" -> "ext")), PartitionValues(Map("abc" -> "int"))))
   }
 
   test("list jdbc table virtual partitions case quoted identifier") {
@@ -179,8 +179,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.getSparkDataFrame(Seq()).show()
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions
-    assert(partitionValues.size == 2)
-    assert(partitionValues.map(_.elements("abc")).toSet == Set("ext","int"))
+    assert(partitionValues.toSet == Set(PartitionValues(Map("abc" -> "ext")), PartitionValues(Map("abc" -> "int"))))
     dataObject.getSparkDataFrame().select($"abc").show()
   }
 

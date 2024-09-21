@@ -19,13 +19,15 @@
 
 package io.smartdatalake.meta.configexporter
 
-import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigLoader, ConfigurationException}
 import io.smartdatalake.util.misc.FileUtil.readFile
-import io.smartdatalake.util.misc.UploadDefaults.uploadMimeType
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, URIUtil, UploadDefaults}
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, URIUtil}
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import org.apache.commons.lang.NotImplementedException
+import org.apache.hadoop.conf.Configuration
+import sttp.model.Method
 
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
 import scala.io.Source
@@ -43,11 +45,12 @@ object ExportWriter {
   /**
    * create document writer depending on target uri scheme
    */
-  def apply(uri: String): ExportWriter = {
-    uri.takeWhile(_ != ':') match {
+  def apply(uri: String, configPaths: Seq[String]): ExportWriter = {
+    uri.takeWhile(_ != ':').toLowerCase match {
       case "file" => FileExportWriter(Paths.get(uri.stripPrefix("file:")))
+      case "uibackend" => UIExportWriter(configPaths)
       case "http" | "https" => HttpExportWriter(uri)
-      case x => throw new ConfigurationException(s"scheme of target uri must be 'file:' or 'http[s]:', but got '${x}:'")
+      case x => throw new ConfigurationException(s"scheme of target uri must be 'file:', 'uiBackend' or 'http[s]:', but got '${x}:'")
     }
   }
 }
@@ -108,6 +111,37 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
   }
 }
 
+
+case class UIExportWriter(configPaths: Seq[String]) extends ExportWriter with SmartDataLakeLogger {
+
+  implicit val hadoopConf: Configuration = new Configuration()
+  private val config = ConfigLoader.loadConfigFromFilesystem(configPaths, hadoopConf)
+  private val globalConfig = GlobalConfig.from(config)
+  private val uploader = globalConfig.uiBackend.map(_.getUploadService)
+    .getOrElse(throw ConfigurationException("global.uiBackend configuration missing in SDLB configuration files"))
+
+  override def writeConfig(document: String, version: Option[String]): Unit = {
+    upload(document.getBytes("UTF-8"), "config", additionalParams = Seq(version.map("version" -> _)).flatten.toMap)
+  }
+
+  override def writeSchema(document: String, dataObjectId: DataObjectId, tstamp: Long): Unit = {
+    upload(document.getBytes("UTF-8"), s"dataobject/schema/${dataObjectId.id}", additionalParams = Map("tstamp" -> tstamp.toString))
+  }
+
+  override def writeStats(document: String, dataObjectId: DataObjectId, tstamp: Long): Unit = {
+    upload(document.getBytes("UTF-8"), s"dataobject/stats/${dataObjectId.id}", additionalParams = Map("tstamp" -> tstamp.toString))
+  }
+
+  override def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = {
+    upload(content, "description", additionalParams = Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
+  }
+
+  private def upload(content: Array[Byte], subPath: String, method: Method = Method.PUT, additionalParams: Map[String, String] = Map()): Unit = {
+    logger.info(s"Uploading $subPath " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
+    uploader.sendBytes(subPath, content, method, additionalParams = additionalParams)
+  }
+}
+
 case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartDataLakeLogger {
 
   override def writeConfig(document: String, version: Option[String]): Unit = {
@@ -127,13 +161,8 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
   }
 
   private def upload(content: Array[Byte], subPath: String, additionalParams: Map[String,String] = Map()): Unit = {
-    val defaultUploadCategoryParams = Map(
-      "tenant" -> (if (!baseUrl.contains("tenant=")) Some(UploadDefaults.privateTenant) else None),
-      "env" -> (if (!baseUrl.contains("env=")) Some(UploadDefaults.envDefault) else None),
-    ).filter(_._2.nonEmpty).mapValues(_.get).toMap
-    assert(baseUrl.contains("repo="), throw new IllegalArgumentException(s"repository not defined in upload target=$baseUrl, add query parameter 'repo' to target, e.g. https://<host>?repo=<repository>"))
     logger.info(s"Uploading $subPath "+additionalParams.map{case (k,v) => s"$k=$v"}.mkString(" "))
     val wsClient = ScalaJWebserviceClient(URIUtil.appendPath(baseUrl, subPath), Map(), None, None, None, followRedirects = true)
-    wsClient.put(content, uploadMimeType, defaultUploadCategoryParams ++ additionalParams).get
+    wsClient.put(content, "application/json", additionalParams).get
   }
 }

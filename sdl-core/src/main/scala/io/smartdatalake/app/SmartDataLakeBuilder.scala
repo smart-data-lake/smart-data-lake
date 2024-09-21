@@ -275,7 +275,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       opt[Int]("parallelism")
         .action((arg, config) => config.withparallelism(arg))
         .valueName("<int>")
-        .text(s"Parallelism for DAG run."),
+        .text(s"Max number of parallel executed SDLB actions"),
       opt[String]("state-path")
         .action((arg, config) => config.withstatePath(Some(arg)))
         .valueName("<path>")
@@ -469,8 +469,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         Seq(snapshotListener, incrementalListener)
       else Nil
 
-    val stateListeners =
-      globalConfig.stateListeners.map(_.listener) ++ Environment._additionalStateListeners ++ statusInfoListeners
+    val stateListeners = globalConfig.stateListeners.map(_.listener) ++ globalConfig.uiBackend.map(_.getStateListener) ++
+      Environment._additionalStateListeners ++ statusInfoListeners
 
     if (Environment._globalConfig.statusInfo.isDefined) {
       StatusInfoServer.start(snapshotListener, incrementalListener, Environment._globalConfig.statusInfo.get)

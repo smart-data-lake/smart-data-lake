@@ -21,8 +21,9 @@ package io.smartdatalake.workflow.connection.jdbc
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, Environment}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.SparkSession

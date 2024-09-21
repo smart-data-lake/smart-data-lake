@@ -2,7 +2,7 @@ package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config._
 import configs.ConfigObject
-import io.smartdatalake.app.AppUtil
+import io.smartdatalake.app.{AppUtil, UploadDefaults}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
@@ -10,7 +10,7 @@ import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
-import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger, UploadDefaults}
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -38,7 +38,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .text("Deprecated: Use target instead. File to export configuration to.")
     opt[String]('t', "target")
       .action((value, c) => c.copy(target = value))
-      .text("Target URI to export configuration to. Can be file:./xyz.json but also API baseUrl like https://ui-demo.test.com/api/v1. Default: file:./exportedConfig.json")
+      .text("Target URI to export configuration to. Can be 'file:./xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: file:./exportedConfig.json")
     opt[Boolean]("enrichOrigin")
       .action((value, c) => c.copy(enrichOrigin = value))
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
@@ -52,8 +52,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   }
 
   /**
-   * Takes as input an SDL Config and exports it as one json document, everything resolved.
-   * Additionally a separate file with the mapping of first class config objects to source code origin is created.
+   * Takes as input an SDL Config and exports it as one json document, everything resolved and with some metadata enrichment's.
    *
    * Use the following maven profile to add an additional export step to your build:
    * ```
@@ -85,9 +84,9 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    *                                         io.smartdatalake.meta.configexporter.ConfigJsonExporter
    *                                     </argument>
    *                                     <argument>--config</argument>
-   *                                     <argument>./config,./envConfig/yarn.conf</argument>
-   *                                     <argument>--filename</argument>
-   *                                     <argument>./viz/exportedConfig.json</argument>
+   * <argument>./config,./envConfig/dev.conf</argument>
+   * <argument>--target</argument>
+   * <argument>file:./viz/exportedConfig.json</argument>
    *                                     <argument>--descriptionPath</argument>
    *                                     <argument>./description</argument>
    *                                 </arguments>
@@ -100,7 +99,8 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    *         </build>
    *     </profile>
    * ```
-   * It can be executed by the following maven command line: `mvn exec:exec@parse-export-config -Dorg.slf4j.simpleLogger.log.org.apache=ERROR -Pexport-config`
+   *
+   * The new profile can then be executed by the following maven command line: `mvn exec:exec@parse-export-config -Dorg.slf4j.simpleLogger.log.org.apache=ERROR -Pexport-config`
    */
   def main(args: Array[String]): Unit = {
     // Parse all command line arguments
@@ -112,7 +112,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         val configAsJson = exportConfigJson(config)
 
         // create document writer depending on target uri scheme
-        val writer = ExportWriter.apply(config.target)
+        val writer = ExportWriter.apply(config.target, config.configPaths)
 
         // write export config
         val version = if (!config.target.contains("version=")) AppUtil.getManifestVersion.orElse(Some(UploadDefaults.versionDefault)) else None

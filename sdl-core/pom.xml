@@ -23,7 +23,7 @@
     <parent>
         <groupId>io.smartdatalake</groupId>
         <artifactId>sdl-parent</artifactId>
-		<version>2.7.0</version>
+		<version>2.7.1-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -209,47 +209,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-core</artifactId>
-            <version>${keycloak.version}</version>
-            <exclusions>
-                <!-- this is a different version than used by spark-core -->
-                <exclusion>
-                    <groupId>jakarta.activation</groupId>
-                    <artifactId>jakarta.activation-api</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-admin-client</artifactId>
-            <version>${keycloak.version}</version>
-            <exclusions>
-                <!-- this are different version than used by spark-core -->
-                <exclusion>
-                    <groupId>jakarta.validation</groupId>
-                    <artifactId>jakarta.validation-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>jakarta.activation</groupId>
-                    <artifactId>jakarta.activation-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>jakarta.annotation</groupId>
-                    <artifactId>jakarta.annotation-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>jakarta.xml.bind</groupId>
-                    <artifactId>jakarta.xml.bind-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.fasterxml.jackson.module</groupId>
-                    <artifactId>jackson-module-jakarta-xmlbind-annotations</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <dependency>
             <groupId>io.monix</groupId>
             <artifactId>monix-eval_${scala.minor.version}</artifactId>
             <version>${monix.version}</version>
@@ -318,6 +277,13 @@
         <dependency>
             <groupId>org.scalacheck</groupId>
             <artifactId>scalacheck_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>3.5.15</version>
             <scope>test</scope>
         </dependency>
 
@@ -402,6 +368,12 @@
             <version>${jetty.version}</version>
         </dependency>
         <!--Jetty Websocket server dependencies end here -->
+
+        <dependency>
+            <groupId>com.softwaremill.sttp.client3</groupId>
+            <artifactId>core_${scala.minor.version}</artifactId>
+            <version>3.9.8</version>
+        </dependency>
     </dependencies>
 
     <build>

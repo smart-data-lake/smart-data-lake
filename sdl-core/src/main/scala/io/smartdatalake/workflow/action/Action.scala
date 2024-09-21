@@ -84,18 +84,37 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def outputs: Seq[DataObject]
 
   /**
-   * execution condition for this action.
+   * Optional execution condition for this action.
+   * By default, an Action is executed if all inputs are available, e.g. no input from a previous Action is skipped.
+   * Override the default behaviour by specifying an executionCondition in Spark SQL expression syntax.
+   * It is evaluated against the properties available in [[SubFeedsExpressionData]].
+   * If true, the Action is executed, otherwise it is skipped.
+   *
+   * Example:
+   * {{{
+   *     executionCondition = {
+   *       description = "execute if input stg-src1 is not skipped"
+   *       expression = "!inputSubFeeds.stg-src1.isSkipped"
+   *     }
+   * }}}
    */
   def executionCondition: Option[Condition]
 
   /**
-   * execution mode for this action.
+   * Optional execution mode for this action.
    */
   def executionMode: Option[ExecutionMode]
 
   /**
-   * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+   * Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.
    * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+   *
+   * To check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject.
+   *
+   * Example - fail an action writing to output int-tgt in case there are no records written:
+   * {{{
+   *   dataObjectId = 'int-tgt' and key = 'no_data' and value = true"
+   * }}}
    */
   def metricsFailCondition: Option[String]
 
@@ -239,9 +258,16 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   }
 
   /**
-   * Executes operations needed to cleanup after executing an action failed.
+   * Executes operations needed to cleanup after executing an action failed (this includes NoDataToProcessWarning).
    */
-  def postExecFailed(implicit context: ActionPipelineContext): Unit = ()
+  def postExecFailed(ex: Exception)(implicit context: ActionPipelineContext): Unit = {
+    ex match {
+      case ex: NoDataToProcessWarning if ex.results.isDefined =>
+        // evaluate metrics fail condition if defined
+        metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c, ex.results.get))
+      case _ => ()
+    }
+  }
 
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
@@ -261,9 +287,12 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
-    val metrics = subFeeds.map(subFeed => (subFeed.dataObjectId, subFeed.metrics)).flatMap {
-      case (dataObjectId, Some(metrics)) => metrics.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-      case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
+    val metrics = subFeeds.flatMap{ subFeed =>
+      val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric
+      metricsRaw.map{
+        case (k, v: Option[_]) => Metric(subFeed.dataObjectId.id, Option(k), v.map(_.toString))
+        case (k, v) => Metric(subFeed.dataObjectId.id, Option(k), Option(v).map(_.toString))
+      }.toSeq
     }
     metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
       .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched expression "$condition""""))

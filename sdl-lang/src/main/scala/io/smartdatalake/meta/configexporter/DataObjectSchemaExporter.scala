@@ -37,27 +37,21 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .action((value, c) => c.copy(configPaths = value.split(',')))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('p', "exportPath")
-      .optional()
       .action((value, c) => c.copy(target = "file:"+value))
       .text("Deprecated: Use target instead. Path to export schema and statistics to.")
     opt[String]('t', "target")
-      .optional()
       .action((value, c) => c.copy(target = value))
-      .text("Target URI to export configuration to. Can be a path like file:./schema, but also an API baseUrl like https://ui-demo.test.com/api/v1. Default: file:./schema")
+      .text("Target URI to export configuration to. Can be 'file:./xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: file:./exportedConfig.json")
     opt[String]('i', "includeRegex")
-      .optional()
       .action((value, c) => c.copy(includeRegex = value))
       .text("Regular expression used to include DataObjects in export, matching DataObject ids. Default: .*")
     opt[String]('e', "excludeRegex")
-      .optional()
       .action((value, c) => c.copy(excludeRegex = Some(value)))
       .text("Regular expression used to exclude DataObjects from export, matching DataObject ids. `excludeRegex` is applied after `includeRegex`. Default: no excludes")
     opt[String]('u', "updateStats")
-      .optional()
       .action((value, c) => c.copy(updateStats = value.toBoolean))
       .text("If true, more costly operations to update statistics such as \"analyze table\" are executed before returning statistics. Default: true")
     opt[String]('m', "master")
-      .optional()
       .action((value, c) => c.copy(master = value))
       .text("Spark session master configuration. As schemas might be inferred by Spark, there might be a need to tune this for some DataObjects. Default: local[2]")
     help("help").text("Export DataObject schemas and statistics as Json documents which can be used by the visualizer. Each Json document is identified by its type (schema or stats), the DataObject Id and the timestamp of creation.")
@@ -91,7 +85,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.target}")
 
     // create document writer depending on target uri scheme
-    val writer = ExportWriter.apply(config.target)
+    val writer = ExportWriter.apply(config.target, config.configPaths)
 
     // get and write Schemas
     val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>

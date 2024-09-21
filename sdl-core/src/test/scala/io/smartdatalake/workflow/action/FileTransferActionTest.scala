@@ -21,12 +21,13 @@ package io.smartdatalake.workflow.action
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, get, stubFor, urlEqualTo}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{BasicAuthMode, SDLSaveMode}
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.executionMode.FileIncrementalMoveMode
 import io.smartdatalake.workflow.connection.SFtpFileRefConnection
+import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.spark.sql.SparkSession

@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataobject.expectations
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.ExpectationScope
@@ -30,8 +30,6 @@ import io.smartdatalake.workflow.dataobject.expectation.{ExpectationScope, Expec
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
-
-import collection.immutable.Seq
 
 class ValidateOnReadTest extends FunSuite with BeforeAndAfter {
 
