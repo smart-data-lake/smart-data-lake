@@ -9,8 +9,8 @@ import TabItem from '@theme/TabItem';
 
 In this step, we will download plane departure data from the REST-Interface described in the previous step using Smart Data Lake Builder.
 
-:::info Smart Data Lake = SDL
-Throughout this documentation, we will mostly refer to *SDL* which is just short for *Smart Data Lake*. Further, we use **SDLB** as abbreviation for Smart Data Lake Builder, the automation tool.
+:::info Smart Data Lake Builder = SDLB
+Throughout this documentation, we will use **SDLB** as abbreviation for Smart Data Lake Builder, an automation tool for building smarter Data Lakes, Lakehouses, Data Migrations and more...
 :::
 
 ## Config File
@@ -18,8 +18,13 @@ Throughout this documentation, we will mostly refer to *SDL* which is just short
 With Smart Data Lake Builder, you describe your data pipelines in a config file using the [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) format.
 All HOCON features are supported so you could also split your configuration into several files. But for this first part, let's just use one file.
 
-The configuration is located in the downloaded code under config/application.conf.
-To walk through part-1 of this tutorial, please reset the existing application.conf to the config file available [here](../config-examples/application-part1-start.conf).
+The configuration is located in the downloaded code under the config folder. Configuration can be split across configuration files as you like.
+For this tutorial we will use departures.conf, airports.conf, btl.conf and a global.conf file.
+To walk through part-1 of this tutorial, please reset the existing departures/airports/btl.conf with the following cmd:
+
+```
+pushd config && cp config.template departures.conf && cp config.template airports.conf && cp config.template btl.conf && popd
+```
 
 A data pipeline is composed of at least two entities: *DataObjects* and *Actions*.
 
@@ -31,25 +36,31 @@ In our case, in order to get our departure data, we are going to build one actio
 Create a directory called config in your current working directory and an empty file called application.conf. This is where we will define our data pipeline.
 
 ## Define departures objects
-Add the following lines to your configuration file:
+Add the following lines to your departures.conf file:
 ```
     dataObjects {
+    
       ext-departures {
         type = WebserviceFileDataObject
         url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653"
-        readTimeoutMs=200000
+        timeouts {
+          connectionTimeoutMs = 3000
+          readTimeoutMs = 200000
+        }
       }
+      
       stg-departures {
         type = JsonFileDataObject
         path = "~{id}"
       }
+      
     }
 ```
 :::caution
 Note that the API Call **may freeze** as the timestamps provided under **begin=1696854853&end=1697027653** get older. When that's the case, simply replace them with more recent timestamps.
 You can go on https://www.epochconverter.com/ and set "end" to the current time in seconds and "begin" to the current time in seconds minus 2 days.
 At this stage in the guide, the capabilitites of our dataObject  ext-departures are somewhat limited as you need to provide to it the exact url of the data you want to download.
-In part 3 of this guide we will make our dataObject much smarter and these steps won't be needed anymore
+In part 3 of this guide we will make our DataObject much smarter and these steps won't be needed anymore.
 :::
 
 Here, we first created the DataObjects section. This section will contain our DataObjects of our pipeline.
@@ -57,17 +68,17 @@ Inside, we defined two DataObjects to start with.
 
 :::info
 The names *ext-departures* and *stg-departures* are called DataObject-ID.
-They uniquely define the data object and we will frequently refer to these IDs as does SDL, i.e. in error messages..
+They uniquely define the data object and we will frequently refer to these IDs as does SDLB, i.e. in error messages..
 
 You will see further down, that actions also have a name that uniquely identifies them, they are called Action-ID.
 :::
 
 - ext-departures:  
 This data object acts as a source in our action and defines where we get our departure information from.
-We set its type to WebserviceFileDataObject to tell SDL that this is a webservice call returning a file.
-SDL comes with a broad set of predefined data object types and can easily be extended. More on that later.
+We set its type to WebserviceFileDataObject to tell SDLB that this is a webservice call returning a file.
+SDLB comes with a broad set of predefined data object types and can easily be extended. More on that later.
 Each type of data object comes with its own set of parameters. For a WebserviceFileDataObject, the only mandatory one is the url, so we set that as well.
-We also set the option readTimeoutMs to a couple of seconds because the Rest-Service can be slow to respond.
+We also set the option readTimeoutMs (and connectionTimeoutMs) to a couple of seconds because the Rest-Service can be slow to respond.
 
 - stg-departures:  
 This data object acts as a target for our first action, so where and how to download the file to.
@@ -76,7 +87,7 @@ Path defines where the file will be stored. You could choose any name you want, 
 Instead of writing *stg-departures* again,
 we used the placeholder *~\{id}* which gets replaced by the DataObject-ID. Don't forget to surround that placeholder
 with double quotes so that it is interpreted as a string.
-We defined a relative path - it is relative to the working directory SDL is started in. 
+We defined a relative path - it is relative to the working directory SDLB is started in. 
 The working directory has been set to the *data* directory in the Dockerfile by setting the JVM Property 
 ```
 -Duser.dir=/mnt/data
@@ -104,6 +115,7 @@ In our case, we simply copy data exactly as is from an external source. Hence, o
 After the `dataObjects` section, add the following lines to your configuration file:
 ```
     actions {
+    
         download-departures {
           type = FileTransferAction
           inputId = ext-departures
@@ -112,15 +124,16 @@ After the `dataObjects` section, add the following lines to your configuration f
             feed = download
           }
         }
+        
     }
 ```
 We added another section called actions, in which, you guessed it, all actions reside.
 We defined our action and called it *download-departures*.
-- The type *FileTransferAction* tells SDL that it should transfer a file from one place to another without any transformation.
+- The type *FileTransferAction* tells SDLB that it should transfer a file from one place to another without any transformation.
 In our case, from a location on the web to a place on your machine.
 - With inputId and outputId, we wire this action and the two data objects together.
 - Finally, we added some metadata to our action. Metadata is used to select the right actions to run. 
-In our case, we defined a feed called "download". When starting SDL, we can tell it to execute only actions corresponding to certain feeds.
+In our case, we defined a feed called "download". When starting SDLB, we can tell it to execute only actions corresponding to certain feeds.
 Multiple actions can be associated with the same feed. 
 You can think of feeds as group of actions in your data pipeline, typically processing a data type through multiple layers.
 You can group actions together into the same feed if you want to execute them together. 
@@ -138,36 +151,18 @@ Let's execute our action. We now come back to a similar *docker run* command as 
 The only difference is that we mount 2 volumes instead of one and specify the path to your config file.
 Before, we only mounted the data folder so that you could see the results of the execution on your machine.
 The config file that was being used was located inside the docker image.
-This time, we add another volume with your config-file and tell SDL to use it with the *--config* option.
+This time, we add another volume with your config-file and tell SDLB to use it with the *--config* option.
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
 ```
-
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+./startJob.sh --config /mnt/config --feed-sel download
 ```
-
-</TabItem>
-</Tabs>
 
 After executing it, you will see the file *data/stg_departures/result.json* has been replaced with the output of your pipeline.
 
 :::caution
 Since both web servers are freely available on the internet, **a rate limiting applies**. https://opensky-network.org/ will stop responding if you make too many calls.
 If the download fails because of a timeout, wait a couple of minutes and try again. In the worst case, it should work again on the next day.
-If the download still won't work (or if you just get empty files), you can copy the contents of the folder *data-fallback-download*
+If the download still won't work (or if you just get empty files), you can copy the contents of the folder *data/stg-departures-fallback*
 into your data folder. This will allow you to execute all steps starting from [Select Columns](select-columns.md)
 :::
 

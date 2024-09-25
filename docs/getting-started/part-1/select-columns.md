@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 ## Goal
 
 In this step we write our first Action that modifies data.
-We will continue based upon the config file available [here](../config-examples/application-part1-download.conf).
+We will continue based upon the airports.conf file available [here](https://github.com/smart-data-lake/getting-started/tree/master/config/airports.conf.part-1a-solution).
 When you look at the data in the folder *data/stg-airports/result.csv*, you will notice that we
 don't need most of the columns. In this step, we will write a simple *CopyAction* that selects only the columns we
 are interested in.
@@ -27,16 +27,17 @@ You can also consult the [Configuration Schema Browser](https://smartdatalake.ch
 In a first step, we want to make the airport data more understandable by removing any columns we don't need. 
 Since we don't introduce any business logic into the transformation, 
 the resulting data object will reside in the integration layer and thus will be called *int-airports*.
-Put this in the existing `dataObjects` section:
+Put this in the existing `dataObjects` section of airports.conf:
 ```
   int-airports {
     type = CsvFileDataObject
     path = "~{id}"
   }
 ```
+
 ## Define select-airport-cols action
 
-Next, add these lines in the existing actions section:
+Next, add these lines in the actions section of airports.conf:
 ```
   select-airport-cols {
     type = CopyAction
@@ -51,6 +52,7 @@ Next, add these lines in the existing actions section:
     }
   }
 ```
+
 A couple of things to note here:
 
 - We just defined a new action called *select-airport-cols*. 
@@ -70,14 +72,13 @@ There are other transformer types such as *ScalaCodeSparkDfTransformer*, *Python
 Notice that we call our input DataObject stg-airports with a hyphen "-", but in the sql, we call it "stg\_airports" with an underscore "\_".
 This is due to the SQL standard not allowing "-" in unquoted identifiers (e.g. table names). 
 Under the hood, Apache Spark SQL is used to execute the query, which implements SQL standard.
-SDL works around this by replacing special chars in DataObject names used in SQL statements for you. 
-In this case, it automatically replaced `-` with `_`
+SDLB works around this by replacing special chars in DataObject names used in SQL statements for you. 
+In this case, it automatically replaced `-` with `_`.
+Alternatively you can use the token `%{inputViewName}` instead of the table name, and SDLB will replace it with the correct name at runtime.
 
 :::
 
 There are numerous other options available for the CopyAction, which you can view in the [Configuration Schema Browser](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=3-0).
-
-
 
 ## Try it out
 Note that we used a different feed this time, we called it *compute*. 
@@ -87,27 +88,9 @@ try out our new actions.
 
 To execute the pipeline, use the same command as before, but change the feed to compute:
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
 ```
-
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel compute
+./startJob.sh --config /mnt/config --feed-sel compute
 ```
-
-</TabItem>
-</Tabs>
 
 Now you should see multiple files in the folder *data/int-airports*. Why is it split accross multiple files?
 This is due to the fact that the query runs with Apache Spark under the hood which computes the query in parallel for different portions of the data.
@@ -115,56 +98,20 @@ We might work on a small data set for now, but keep in mind that this would scal
 
 ## More on Feeds
 
-SDL gives you precise control on which actions you want to execute. 
+SDLB gives you precise control on which actions you want to execute. 
 For instance if you only want to execute the action that we just wrote, you can type
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
 ```
-
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel ids:select-airport-cols
+./startJob.sh --config /mnt/config --feed-sel ids:select-airport-cols
 ```
-
-</TabItem>
-</Tabs>
 
 Of course, at this stage, the feed *compute* only contains this one action, so the result will be the same.
 
-SDL also allows you to use combinations of expressions to select the actions you want to execute. You can run
+SDLB also allows you to use combinations of expressions to select the actions you want to execute. You can run
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker run --rm sdl-spark:latest --help
 ```
-
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-podman run --rm sdl-spark:latest --help
+./startJob.sh --help
 ```
-
-</TabItem>
-</Tabs>
 
 to see all options that are available. For your convenience, here is the current output of the help command:
 ```
@@ -213,30 +160,12 @@ to see all options that are available. For your convenience, here is the current
 One popular option is to use regular expressions to execute multiple feeds together.
 In our case, we can run the entire data pipeline with the following command : 
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'
 ```
-
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel '.*'
+./startJob.sh --config /mnt/config --feed-sel '.*'
 ```
-
-</TabItem>
-</Tabs>
 
 :::warning
-Note the regex feed selection `.*` need to be specified in quotation marks (`'.*'` or `".*"`), otherwise our system would substitute the asterisk.
+Note the regex feed selection `.*` needs to be specified in quotation marks (`'.*'` or `".*"`), otherwise your shell might substitute the asterisk with files...
 :::
 
 
