@@ -39,15 +39,19 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit
 
-  private val pkConstraintName: String = table.primaryKeyConstraintName.getOrElse(f"sdlb_${table.name}")
+  private val pkConstraintName: String = table.primaryKeyConstraintName.getOrElse(f"sdlb_${table.name}_pk")
 
+  /**
+   * This method creates or replaces the primary key constraint. The replacement only takes place if the defined and the
+   * existing constraint are not equal.
+   */
   def createOrReplacePrimaryKeyConstraint(): Unit = {
     val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
     val existingPrimaryKeyOp: Option[PrimaryKeyDefinition] =  getExistingPKConstraint(table.catalog.getOrElse(""), table.db.getOrElse(""), table.name)
     (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
       case (None, _) => logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
       case (Some(pkcols), None) => createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
-      case (Some(definedPkCols), Some(existingPkCols)) if (definedPkCols.toSet.diff(existingPkCols.pkColumns.toSet).isEmpty) => {
+      case (Some(definedPkCols), Some(existingPkCols)) if (!definedPkCols.toSet.diff(existingPkCols.pkColumns.toSet).isEmpty) => {
         if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!")
         dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
         createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
