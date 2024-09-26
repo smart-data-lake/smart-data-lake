@@ -312,6 +312,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit =
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    createOrReplacePrimaryKeyConstraint()
+  }
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
