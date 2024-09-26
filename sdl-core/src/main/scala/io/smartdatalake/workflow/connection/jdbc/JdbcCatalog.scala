@@ -21,13 +21,14 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.{DataType, StructType}
 
-import java.sql.{Connection => SqlConnection}
-import java.sql.ResultSet
+import scala.collection.mutable.{Set => MutableSet}
+import java.sql.{ResultSet, SQLException, Connection => SqlConnection}
 
 /**
  * SQL JDBC Catalog query method definition.
@@ -89,6 +90,20 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
 
   def isDbExisting(db: String): Boolean
 
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String], logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt: String = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")})"
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String, logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt: String = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
   def isTableExisting(tableName: String): Boolean = {
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
     try {
@@ -133,6 +148,31 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
       s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where UPPER(TABLE_SCHEMA)=UPPER('$db')"
     }
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
+  }
+
+  def handlePrimaryKeyResultSet(resultSet: ResultSet): Option[PrimaryKeyDefinition] = {
+    var primaryKeyCols: MutableSet[String] = MutableSet()
+    var primaryKeyName: MutableSet[String] = MutableSet()
+    while (resultSet.next()) {
+      primaryKeyCols += resultSet.getString("COLUMN_NAME")
+      primaryKeyName += resultSet.getString("PK_NAME")
+    }
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection more than one Primary Key!")
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
+    }
+  }
+
+  //This method is not used in JdbcTableDataObject, but in other DataObjects.
+  // For this reason, it is not implemented in Oracle and SAP-HANA.
+  def getPrimaryKey(catalog: String, schema: String, tableName: String) = {
+    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '$catalog'"
+    val schemaConstraint =  if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '$schema'"
+    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
+    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString
+    connection.execJdbcQuery(query, handlePrimaryKeyResultSet)
   }
 }
 

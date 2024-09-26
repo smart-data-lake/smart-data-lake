@@ -554,9 +554,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     connection.getJdbcPrimaryKey(catalog, schema, tableName)
   }
 
-  override def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit = connection.dropPrimaryKeyConstraint(tableName, constraintName)
+  override def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit =
+    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
 
-  override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit = connection.createPrimaryKeyConstraint(tableName, constraintName, cols)
+  override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit =
+    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
 }
 
 private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {

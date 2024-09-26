@@ -85,7 +85,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation {
+  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
   private val connection = getConnection[SnowflakeConnection](connectionId)
 
@@ -299,6 +299,19 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     else if (SQLUtil.hasIdentifierSpecialChars(column)) Utils.quotedName(column)
     else column
   }
+
+  /**
+   * @param pkColumns List of columns in a primary key constraint
+   * @param pkName    Primary Key constraint name. It can be null, since some databases have constraints without names.
+   */
+  override def getExistingPKConstraint(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition] =
+    connection.catalog.getPrimaryKey(catalog, schema, tableName)
+
+  override def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit =
+    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
+
+  override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit =
+    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {

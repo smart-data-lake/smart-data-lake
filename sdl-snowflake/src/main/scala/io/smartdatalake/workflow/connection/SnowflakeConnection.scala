@@ -63,7 +63,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   // prepare JDBC catalog implementation
-  val catalog: JdbcCatalog = new DefaultJdbcCatalog(this)
+  val catalog: DefaultJdbcCatalog = new DefaultJdbcCatalog(this)
   // setup JDBC connection pool for metadata and ddl queries
   override val pool: GenericObjectPool[SqlConnection] = ConnectionPoolConfig().create(maxParallelConnections = 3, () => Utils.getJDBCConnection(getJdbcAuthOptions("")), initSql = None, autoCommit = false)
   // set autoCommit=false as recommended

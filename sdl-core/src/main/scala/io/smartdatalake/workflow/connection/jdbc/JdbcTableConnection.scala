@@ -155,6 +155,9 @@ case class JdbcTableConnection(override val id: ConnectionId,
   }
 
   private lazy val connectionMetadata: DatabaseMetaData = this.getConnection.getMetaData
+
+  //The implementation to get the PK is not in the Catalog in order to use the JDBC standard method getPrimaryKeys
+  // and not having to adapt the Query for different DBs.
   def getJdbcPrimaryKey(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition] = {
     var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
     var primaryKeyCols: MutableSet[String] = MutableSet()
@@ -168,20 +171,6 @@ case class JdbcTableConnection(override val id: ConnectionId,
       case (cols, List()) => Some(PrimaryKeyDefinition(cols))
       case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection for $tableName returns more than one Primary Key!")
       case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
-    }
-  }
-
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String], logging: Boolean = true): Unit = {
-    if (catalog.isTableExisting(tableName)) {
-      val stmt: String = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")})"
-      execJdbcStatement(stmt, logging = logging)
-    }
-  }
-
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String, logging: Boolean = true): Unit = {
-    if (catalog.isTableExisting(tableName)) {
-      val stmt: String = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
-      execJdbcStatement(stmt, logging = logging)
     }
   }
 
