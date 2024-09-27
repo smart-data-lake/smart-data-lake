@@ -120,7 +120,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -286,6 +286,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists(a => filesystem.getUri.toString.contains(a))) {
       require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
     }
+  }
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
@@ -619,6 +624,19 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     implicit val session: SparkSession = context.sparkSession
     sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
   }
+
+  def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
+    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '$catalog'"
+    val schemaConstraint = if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '$schema'"
+    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
+    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
+    val df = context.sparkSession.sql(query)
+  ???
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = ???
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = ???
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {

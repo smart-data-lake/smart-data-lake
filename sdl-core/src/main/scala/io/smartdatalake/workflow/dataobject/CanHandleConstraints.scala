@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 
 import java.sql.SQLException
 
@@ -35,9 +36,9 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
    * @param pkColumns List of columns in a primary key constraint
    * @param pkName Primary Key constraint name. It can be null, since some databases have constraints without names.
    */
-  def getExistingPKConstraint(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition]
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit
+  def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition]
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit
 
   private val pkConstraintName: String = table.primaryKeyConstraintName.getOrElse(f"sdlb_${table.name}_pk")
 
@@ -45,7 +46,7 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
    * This method creates or replaces the primary key constraint. The replacement only takes place if the defined and the
    * existing constraint are not equal.
    */
-  def createOrReplacePrimaryKeyConstraint(): Unit = {
+  def createOrReplacePrimaryKeyConstraint(implicit context: ActionPipelineContext): Unit = {
     val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
     val existingPrimaryKeyOp: Option[PrimaryKeyDefinition] =  getExistingPKConstraint(table.catalog.getOrElse(""), table.db.getOrElse(""), table.name)
     (definedPrimaryKeyOp, existingPrimaryKeyOp) match {

@@ -304,18 +304,18 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * @param pkColumns List of columns in a primary key constraint
    * @param pkName    Primary Key constraint name. It can be null, since some databases have constraints without names.
    */
-  override def getExistingPKConstraint(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition] =
+  def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
     connection.catalog.getPrimaryKey(catalog, schema, tableName)
 
-  override def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit =
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
     connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
 
-  override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit =
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit =
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    createOrReplacePrimaryKeyConstraint()
+    createOrReplacePrimaryKeyConstraint
   }
 }
 

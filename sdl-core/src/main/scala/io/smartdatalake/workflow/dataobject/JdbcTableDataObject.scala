@@ -163,7 +163,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
 
     //If enabled, create or replace the primary Key of the table
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint();
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint;
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
@@ -548,17 +548,18 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getExistingPKConstraint(catalog: String,
+  def getExistingPKConstraint(catalog: String,
                                        schema: String,
-                                       tableName: String): Option[PrimaryKeyDefinition] = {
+                                       tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
     connection.getJdbcPrimaryKey(catalog, schema, tableName)
   }
 
-  override def dropPrimaryKeyConstraint(tableName: String, constraintName: String): Unit =
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
     connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
 
-  override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String]): Unit =
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
+  }
 }
 
 private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {

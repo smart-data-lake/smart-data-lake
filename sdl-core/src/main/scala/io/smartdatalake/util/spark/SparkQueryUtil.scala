@@ -20,7 +20,7 @@
 package io.smartdatalake.util.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SparkSession, DataFrame}
 import io.smartdatalake.workflow.dataobject.Table
 
 object SparkQueryUtil extends SmartDataLakeLogger {
@@ -45,6 +45,21 @@ object SparkQueryUtil extends SmartDataLakeLogger {
       case e: Exception =>
         logger.warn(s"Error in SQL statement '$stmt':\n${e.getMessage}")
         throw e
+    }
+  }
+
+  def executeSqlQuery(session: SparkSession, query: String, abortRunIfException: Boolean = false): Option[DataFrame] = {
+    logger.info(s"Executing query $query")
+    try {
+      Some(session.sql(query))
+    }
+    catch {
+      case e: Exception if abortRunIfException =>
+        logger.error(f"Error in SQL statement '$query')")
+        throw e
+      case e: Exception =>
+        logger.warn(f"Error in SQL statement '$query'):\n${e.getMessage}")
+        None
     }
   }
 }
