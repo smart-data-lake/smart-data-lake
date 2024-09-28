@@ -12,6 +12,11 @@ In Part 2 we will cover the following two points:
 1. Using a better, transactional data format: Delta Lake
 2. Keeping historical data: Historization and Deduplication
 
-Additionally we will use Polynote-Notebook to easily interact with our data.
+Additionally we will use spark-shell to interact with our data.
 
-Part 2 is based on [this](../config-examples/application-part1-compute-final.conf) configuration file, **copy it to config/application.conf** to walk through the tutorial.
+Part 2 is based on departures/airports/btl.conf of Part 1, see files ending with `part-1-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
+Use the following cmd to reset your configuration files to the final solution of Part 1:
+
+```
+pushd config && cp departures.conf.part-1-solution departures.conf && cp airports.conf.part-1-solution airports.conf && cp btl.conf.part-1-solution btl.conf && popd
+```
