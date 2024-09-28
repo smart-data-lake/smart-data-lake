@@ -315,7 +315,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    createOrReplacePrimaryKeyConstraint
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
   }
 }
 
