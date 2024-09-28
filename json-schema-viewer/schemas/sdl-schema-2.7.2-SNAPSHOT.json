@@ -6801,20 +6801,20 @@
           },
           "rankingExpression" : {
             "type" : "string",
-            "description" : "Ranking expression to determine duplicates"
+            "description" : "Ranking expression to choose the record to keep if there are duplicates."
           },
           "primaryKeyColumns" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "Optional list of primary key columns"
+            "description" : "Optional list of primary key columns.\nIf left empty the primary key of the Actions output DataObject is used."
           }
         },
         "title" : "DeduplicateTransformer",
         "required" : [ "type", "rankingExpression" ],
         "additionalProperties" : false,
-        "description" : "Returns dataframe with only unique columns based on a primary key"
+        "description" : "Returns dataframe with only unique columns based on a primary key.\n\nIf primaryKeyColumns is left empty, the primaryKey of the Actions output DataObject must be defined."
       },
       "EncryptColumnsTransformer" : {
         "type" : "object",
