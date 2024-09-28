@@ -24,17 +24,21 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl}
+import io.smartdatalake.workflow.action.DataFrameActionImpl
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataobject.TableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Returns dataframe with only unique columns based on a primary key
+ * Returns dataframe with only unique columns based on a primary key.
+ *
+ * If primaryKeyColumns is left empty, the primaryKey of the Actions output DataObject must be defined.
+ *
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
- * @param rankingExpression Ranking expression to determine duplicates
- * @param primaryKeyColumns Optional list of primary key columns
+ * @param rankingExpression Ranking expression to choose the record to keep if there are duplicates.
+ * @param primaryKeyColumns Optional list of primary key columns.
+ *                          If left empty the primary key of the Actions output DataObject is used.
  */
 case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: String, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]]) extends GenericDfTransformer {
 
