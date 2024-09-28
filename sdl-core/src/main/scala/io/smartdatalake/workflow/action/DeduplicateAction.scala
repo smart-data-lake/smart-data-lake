@@ -49,6 +49,9 @@ import scala.reflect.runtime.universe.Type
  * DeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]]) as output with defined primary keys.
  * If output implements [[CanMergeDataFrame]], saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.
  *
+ * DeduplicateAction's input data must be unique across the primary key, otherwise the merge statement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same`.
+ * This can be achieved through adding a DeduplicateTransformer to transformers. Note that this is not included by default in DeduplicateAction, as it is a performance intensive operation.
+ *
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param transformer optional custom transformation to apply
