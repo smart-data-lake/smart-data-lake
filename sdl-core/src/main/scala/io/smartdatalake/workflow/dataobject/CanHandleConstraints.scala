@@ -25,6 +25,10 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import java.sql.SQLException
 
 
+/**
+ * @param pkColumns List of columns in a primary key constraint
+ * @param pkName    Primary Key constraint name. It can be null, since some databases have constraints without names.
+ */
 case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] = None)
 
 /**
@@ -32,10 +36,6 @@ case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] =
  * within a TransactionalTableDataObject.
  */
 trait CanHandleConstraints { self: TransactionalTableDataObject =>
-  /**
-   * @param pkColumns List of columns in a primary key constraint
-   * @param pkName Primary Key constraint name. It can be null, since some databases have constraints without names.
-   */
   def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition]
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit

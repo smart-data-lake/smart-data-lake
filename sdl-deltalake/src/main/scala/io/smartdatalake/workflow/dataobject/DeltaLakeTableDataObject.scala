@@ -45,6 +45,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import java.sql.SQLException
 
 import scala.util.Try
 
@@ -631,12 +632,24 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
     val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
     val df = context.sparkSession.sql(query)
-  ???
+    val (primaryKeyCols, primaryKeyName) = df.collect.foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The $tableName returns more than one Primary Key: ${pk.mkString}")
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
+    }
   }
 
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = ???
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
 
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = ???
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")})"
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
