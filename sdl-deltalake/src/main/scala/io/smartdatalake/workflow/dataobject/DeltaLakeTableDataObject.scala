@@ -292,6 +292,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
     if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
+    if (table.commentOnTable.isDefined) addTableComment(table.commentOnTable.get)
+
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
@@ -648,6 +650,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")})"
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
     SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
   }
 }
