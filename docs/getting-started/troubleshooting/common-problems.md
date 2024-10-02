@@ -53,7 +53,7 @@ SDLB will therefore read any `.conf` file in this directory and attempt to parse
 If you define an action in two different files, you will get this error as SDLB can not figure out, 
 which file takes precedence.
 
-To solve the problem, either rename or move one of the files.
+To solve the problem, either remove the `.conf` file extension or move one of the files.
 
 
 
