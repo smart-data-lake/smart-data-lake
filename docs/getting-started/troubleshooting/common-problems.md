@@ -38,6 +38,25 @@ If you encounter an error that looks like this:
 ```
 Since both web servers are freely available on the internet, they might be overloaded by traffic. If the download fails because of a timeout, either increase readTimeoutMs or wait a couple of minutes and try again. If the download still won't work (or if you just get empty files), you can copy the contents of the folder data-fallback-download into your data folder.
 
+## Configuration objects defined in multiple locations
+
+When executing SDLB, you might get the following exception:
+```
+Exception in thread "main" io.smartdatalake.config.ConfigurationException: 
+Configuration parsing failed because of configuration objects defined in multiple locations: 
+Action~download-departures=HadoopConfigFile;
+HadoopConfigFile DataObject~ext-departures=HadoopConfigFile;
+HadoopConfigFile DataObject~stg-departures=HadoopConfigFile;
+```
+Note that we are starting SDLB in this getting started guide with the option `--config /mnt/config ` which means the whole directory.
+SDLB will therefore read any `.conf` file in this directory and attempt to parse it.
+If you define an action in two different files, you will get this error as SDLB can not figure out, 
+which file takes precedence.
+
+To solve the problem, either rename or move one of the files.
+
+
+
 ## How to kill SDLB if it hangs
 
 In case you run into issues when executing your pipeline and you want to terminate the process
