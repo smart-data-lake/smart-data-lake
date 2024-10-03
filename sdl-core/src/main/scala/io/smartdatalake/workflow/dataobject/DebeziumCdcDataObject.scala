@@ -129,9 +129,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     val records = changeConsumer.records
     val sparkSchema = inferSparkSchema(records.head.valueSchema())
-    val rows = records.map{ record =>
-      Row(record.value())
-    }
+    val rows = records.map{DebeziumRowConverter.convert}
 
 
     val df = spark.createDataFrame(rows.asJava, sparkSchema)
@@ -203,4 +201,25 @@ private[smartdatalake] class DebeziumCompletionCallback(executorService: Executo
   }
 }
 
+private[smartdatalake] object DebeziumRowConverter {
+  def convert(record: SourceRecord): Row = {
 
+    val valueStruct = record.value().asInstanceOf[org.apache.kafka.connect.data.Struct]
+    structToRow(valueStruct)
+  }
+
+  // Helper function to extract data from a Struct
+  private def structToRow(struct: Struct): Row = {
+    val values = struct.schema().fields().asScala.map { field: Field =>
+      val fieldValue = struct.get(field)
+      fieldValue match {
+        case s: Struct => structToRow(s) // Recursively handle nested structs
+        case _ => fieldValue // Primitive types
+      }
+    }.toSeq
+
+    Row(values: _*)
+
+  }
+
+}
