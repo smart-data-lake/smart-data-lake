@@ -82,6 +82,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       "topic.prefix" -> table.fullName,
       "include.schema.changes" -> "false",
       "name" -> id.toString,
+      "tombstones.on.delete" -> "false"
     )
 
     // If duplicate default properties are set, prefer the ones the user has set in the config file
