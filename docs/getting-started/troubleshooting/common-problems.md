@@ -20,6 +20,7 @@ If you encounter an error that looks like this:
     [main]
     Exception in thread "main" io.smartdatalake.util.dag.TaskFailedException: Task download-departures failed. Root cause is 'WebserviceException: Read timed out'
 ```
+
 Since both web servers are freely available on the internet, they might be overloaded by traffic. If the download fails because of a timeout, either increase readTimeoutMs or wait a couple of minutes and try again. If the download still won't work (or if you just get empty files), you can copy the contents of the folder data-fallback-download into your data folder.
 
 ## How to kill SDLB if it hangs

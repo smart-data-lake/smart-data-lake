@@ -20,7 +20,7 @@ since this is what the second webservice answers with.
 Note that you would not get an error at this point if you had chosen another file format. 
 Since we use *FileTransferAction* in both cases, the files are copied without the content being interpreted yet.
 
-You can start the same `./startJob.sh` command as before and you should see that both directories
+You can start the same `./startJob.sh` command as before, and you should see that both directories
 *stg-airports* and *stg-departures* have new files now.
 Notice that since both actions have the same feed, the option `--feed-sel download` executes both of them.
 
@@ -30,26 +30,26 @@ For that, replace your config file with the contents of [this](https://github.co
 When you start the `docker run` command again, you will see two errors:
 
 1. The name of the DataObject "NOPEext-departures" does not match with the inputId of the action download-departures.
-This is a very common error and the stacktrace should help you to quickly find and correct it
-```
-    Exception in thread "main" io.smartdatalake.config.ConfigurationException: (Action~download-departures) [] key not found: DataObject~ext-departures
-```
-As noted before, SDLB will normally use Action-IDs and DataObject-IDs to communicate where to look in your configuration files.
+   This is a very common error and the stacktrace should help you to quickly find and correct it
+   ```
+       Exception in thread "main" io.smartdatalake.config.ConfigurationException: (Action~download-departures) [] key not found: DataObject~ext-departures
+   ```
+   As noted before, SDLB will normally use Action-IDs and DataObject-IDs to communicate where to look in your configuration files.
 
 2. An unknown DataObject type was used. In this example, stg-airports was assigned the type UnicornFileDataObject, which does not exist.
-```
-    Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: io.smartdatalake.workflow.dataobject.UnicornFileDataObject
-```
-Internally, the types you choose are represented by Scala Classes.
-These classes define all characteristics of a DataObject and all it's parameters, i.e. the url we defined in our WebserviceFileDataObject.
-This also explains why you get a *ClassNotFoundException* in this case.
+   ```
+       Exception in thread "main" io.smartdatalake.config.ConfigurationException: (DataObject~stg-airports) ClassNotFoundException: io.smartdatalake.workflow.dataobject.UnicornFileDataObject
+   ```
+   Internally, the types you choose are represented by Scala Classes.
+   These classes define all characteristics of a DataObject and all it's parameters, i.e. the url we defined in our WebserviceFileDataObject.
+   This also explains why you get a *ClassNotFoundException* in this case.
 
 ## Try fixing it
 
 Try to fix one of the errors and keep the other one to see what happens: Nothing.
 Why is that? 
 
-SDLB validates your configuration file(s) before executing it's contents.
+SDLB validates your configuration file(s) before executing its contents.
 If the configuration does not make sense, it will abort before executing anything to minimize the chance that you'll end up in an inconsistent state.
 
 :::tip
@@ -70,8 +70,7 @@ by just looking at the config file. For example a column which doesn't exist but
 only if all previous phases have been passed successfully, execution is started.
 
 When running SDLB, you can clearly find "prepare", "init" and "exec" steps for every Action in the logs.
-
-See [this page](/docs/reference/executionPhases) for a detailed description on the execution phases of SDLB.
+See [Execution Phases](/docs/reference/executionPhases) for a detailed description.
 
 Now is a good time to fix both errors in your configuration file and execute the action again.
 

@@ -67,7 +67,7 @@ but this would have resulted in more complex code working with lists of inputs, 
 [This](https://github.com/smart-data-lake/getting-started/tree/master/config/btl.conf.part-1-solution) is how the final btl.conf file should look like.
 
 To use the Java Code in our sdl-spark docker image, we have to compile it. 
-You have already done this in the [setup](../setup.md), but lets review this step again. It can be done by using a maven docker image as follows.
+You have already done this in the [setup](../setup.md), but let's review this step again. It can be done by using a maven docker image as follows.
 
 ```
 mkdir .mvnrepo
@@ -125,7 +125,7 @@ If you don't get the results you expect, it's good to check if the DAG looks cor
 At the end you will also see the graph again with status indicators (SUCCEEDED, CANCELLED, ...) and the duration it took to execute the action.
 
 :::tip Hold on
-It's worth pausing at this point to appreciate this fact:  
+Its worth pausing at this point to appreciate this fact:  
 You didn't have to explicitly tell SDLB how to execute your actions.
 You also didn't have to define the dependencies between your actions.
 Just from the definitions of DataObjects and Actions alone, SDLB builds a DAG and knows what needs to be executed and how.
@@ -167,7 +167,7 @@ The successful execution DAG looks like this
                            └───────────────────────────────────────┘
 ```
 SDLB was able to determine that download-airports and download-departures can be executed in parallel,
-independently from each other. It's only at join-departures-airports and beyond that both Data Sources are needed.
+independently of each other. It's only at join-departures-airports and beyond that both Data Sources are needed.
 
 SDLB has command-line option called --parallelism which allows you to set the degree of parallelism used when executing the DAG run.
 Per default, it's set to 1.

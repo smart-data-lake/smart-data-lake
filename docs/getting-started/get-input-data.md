@@ -4,7 +4,7 @@ title: Inputs
 
 ## Goal
 
-Let's say your friend Tom is a fan of railways and he lives next to an airport.
+Let's say your friend Tom is a fan of railways, and he lives next to an airport.
 He wonders how many flights that start from his neighborhood could be replaced by rail traffic.
 For that he would need to find out which flights depart from his airport, as well as how far they are flying.
 If they fly less than, say 500 km, then that would be a journey that could be done by rail.
@@ -19,7 +19,7 @@ After browsing the web a bit, you end up finding a website that looks promising.
 
 ### departures
 
-The site is called [openskynetwork](https://openskynetwork.github.io/opensky-api/rest.html#id17) 
+The site is called [openskynetwork](https://openskynetwork.github.io/opensky-api/rest.html#id17),
 and it provides you with a free REST-Interface for getting departures by airport.
 Notice that you need the ICAO identifier of Tom's airport to get the right parameters.
 You know that Tom lives near Bern, Switzerland. A quick web search shows you that the identifier is

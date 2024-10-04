@@ -58,7 +58,7 @@ In our case, there is only one output DataObject: *btl-connected-airports*.
 The SQL-Code itself is just a join between the two input Data Objects on the ICAO identifier.
 Note that we can just select all columns from airports, since we selected the ones that interest us in the previous step.
 
-:::tip Tip: Use only one output
+:::tip Use only one output
 As you can see, with CustomDataFrameAction it's possible to read from multiple inputs and write to multiple outputs.
 We usually discourage writing to multiple Data Objects in one action though. 
 At some point, you will want to use the metadata from SDLB to analyze your data lineage. If you have a CustomDataFrameAction

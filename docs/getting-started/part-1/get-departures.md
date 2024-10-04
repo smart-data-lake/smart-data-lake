@@ -15,8 +15,8 @@ Throughout this documentation, we will use **SDLB** as abbreviation for Smart Da
 
 ## Config File
 
-With Smart Data Lake Builder, you describe your data pipelines in a config file using the [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) format.
-All HOCON features are supported so you could also split your configuration into several files. But for this first part, let's just use one file.
+With Smart Data Lake Builder, you describe your data pipelines in configuration files using the [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) format.
+All HOCON features are supported, as SDLB uses the original HOCON parser from lightbend.
 
 The configuration is located in the downloaded code under the config folder. Configuration can be split across configuration files as you like.
 For this tutorial we will use departures.conf, airports.conf, btl.conf and a global.conf file.
@@ -59,7 +59,7 @@ Add the following lines to your departures.conf file:
 :::caution
 Note that the API Call **may freeze** as the timestamps provided under **begin=1696854853&end=1697027653** get older. When that's the case, simply replace them with more recent timestamps.
 You can go on https://www.epochconverter.com/ and set "end" to the current time in seconds and "begin" to the current time in seconds minus 2 days.
-At this stage in the guide, the capabilitites of our dataObject  ext-departures are somewhat limited as you need to provide to it the exact url of the data you want to download.
+At this stage in the guide, the capabilities of our dataObject  ext-departures are somewhat limited as you need to provide to it the exact url of the data you want to download.
 In part 3 of this guide we will make our DataObject much smarter and these steps won't be needed anymore.
 :::
 
@@ -68,7 +68,7 @@ Inside, we defined two DataObjects to start with.
 
 :::info
 The names *ext-departures* and *stg-departures* are called DataObject-ID.
-They uniquely define the data object and we will frequently refer to these IDs as does SDLB, i.e. in error messages..
+They uniquely define the data object, and we will frequently refer to these IDs as does SDLB, i.e. in error messages.
 
 You will see further down, that actions also have a name that uniquely identifies them, they are called Action-ID.
 :::
@@ -104,7 +104,7 @@ DataObjects of the staging layer are prefixed with "stg".
 - When applying some basic transformation to your data that does not require any specific business logic, you store the result in the *Integration Layer*. 
 Some of these transformations are data deduplication, historization and format standardization.
 DataObjects of the Integration Layer are prefixed with "int".
-- When applying business logic to your data, you store the result in the *Business Tranformation Layer* or *BTL* for short.
+- When applying business logic to your data, you store the result in the *Business Transformation Layer* or *BTL* for short.
 DataObjects of the Business Transformation Layer are prefixed with "btl".
 
 You are of course free to use any other naming conventions, but it's worth to think about one at the beginning of your project.

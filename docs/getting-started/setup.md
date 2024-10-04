@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 To run this tutorial you just need two things:
 
-- [Podman](https://podman.io/get-started), a free Docker alternative on Linux. On Windows you might use it through WSL2, see also [podman as an alternative to docker](troubleshooting/docker-on-windows.md).
+- [Podman](https://podman.io/get-started), a free Docker alternative on Linux. On Windows you might use it through WSL2, see also [Podman as an alternative to docker](troubleshooting/docker-on-windows.md).
 - The [source code of the example](https://github.com/smart-data-lake/getting-started).
 
 ## Build Spark docker image
@@ -54,11 +54,12 @@ When the execution is complete, you should see the two new directories in the *d
 Wonder what happened ? You will create the data pipeline that does just this in the first steps of this guide.
 
 If you wish, you can start with [part 1](get-input-data) right away.
-For [part 2](part-2/industrializing.md) and [part 3](part-3/custom-webservice.md), it is recommended to setup a Development Environment.
+For [part 2](part-2/industrializing.md) and [part 3](part-3/custom-webservice.md), it is recommended to set up a Development Environment.
 
 ## Development Environment
-For some parts of this tutorial it is beneficial to have a working development environment ready. In the following we will mainly explain how one can configure a working evironment for 
-Windows or Linux. We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system. 
+For some parts of this tutorial it is beneficial to have a working development environment ready. In the following we will mainly explain how one can configure a working environment for 
+Windows or Linux. We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
+
 ### Hadoop Setup (Needed for Windows only)
 Windows Users need to follow the steps below to have a working Hadoop Installation :
 1. First download the Windows binaries for Hadoop [here](https://github.com/cdarlint/winutils/archive/refs/heads/master.zip)

@@ -42,8 +42,8 @@ Add a primary key to the table definition of `int-airports`:
 ```
 Note, that a primary key can be a composite primary key, therefore you need to define an array of columns `[ident]`.
 
-For the action `select-airport-cols`, change it's type from `CopyAction` to `HistorizeAction`.  
-While you're at it, rename it to `historize-airports` to reflect it's new function.
+For the action `select-airport-cols`, change its type from `CopyAction` to `HistorizeAction`.  
+While you're at it, rename it to `historize-airports` to reflect its new function.
 ```
   historize-airports {
     type = HistorizeAction
@@ -53,7 +53,7 @@ While you're at it, rename it to `historize-airports` to reflect it's new functi
 
 With historization, this table will now get two additional columns called `dl_ts_captured` and `dl_ts_delimited`.
 Schema evolution of existing tables will be explained later, so for now, just delete the table and it's data for the DataObject `int-airports` through spark-shell and SDLB's scala interface.
-See previous chapter for detailled instructions. 
+See previous chapter for detailed instructions. 
 ```
 sdlb.dataObjects.intAirports.dataObject.dropTable
 ```
@@ -62,12 +62,12 @@ Then start Action `historize-airports`.
 You may have seen that the `--feed-sel` parameter of SDLB command line supports more options to select actions to execute (see command line help). 
 We will now only execute this single action by changing this parameter to `--feed-sel ids:historize-airports`:
 
-```jsx
+```
 ./startJob.sh -c /mnt/config --feed-sel ids:historize-airports
 ```
 
 Getting error `javax.jdo.JDOFatalDataStoreException: Unable to open a test connection to the given database` and `Another instance of Derby may have already booted the database /mnt/data/metastore_db`?
-This is due to the fact that we are using a filebased Derby database as metastore, which can be only opened by one process at a time.
+This is due to the fact that we are using a file-based Derby database as metastore, which can be only opened by one process at a time.
 Solution: close spark-shell (Ctrl-D) before running startJob.sh. 
 
 After successful execution you can check the schema and data of our table in spark-shell. 
@@ -109,12 +109,12 @@ Then, delete all files in `data/stg-airport` and copy the historical `result.csv
 
 Now start the action `historize-airports` (and only historize-airports) again to do an "initial load".
 Remember how you do that? That's right, you can define a single action with `--feed-sel ids:historize-airports`.  
-Afterwards, start actions `download-airports` and `historize-airports` by using the parameter `--feed-sel 'ids:(download|historize)-airports'` to download fresh data and build up the airport history.
+Afterward, start actions `download-airports` and `historize-airports` by using the parameter `--feed-sel 'ids:(download|historize)-airports'` to download fresh data and build up the airport history.
 
 Uff, getting error `AnalysisException: [UNSUPPORTED_OVERWRITE.TABLE] Can't overwrite the target that is also being read from`.
-Recent versions of Delta Lake dont like if we overwrite a table "also being read from". Unfortunately this is what HistoryAction does.
+Recent versions of Delta Lake don't like if we overwrite a table "also being read from". Unfortunately this is what HistoryAction does.
 It reads the historical data from the table, and adds new records for data changed in the current snapshot.
-By default this happens by overwriting the whole table. This is not optimal from a performance point of view, but there was no other way to change data with Hive tables.
+By default, this happens by overwriting the whole table. This is not optimal from a performance point of view, but there was no other way to change data with Hive tables.
 As Delta Lake supports merge statement, we can add `mergeModeEnable = true` to our HistorizeAction configuration as follows:
 ```
   historize-airports {
@@ -126,11 +126,18 @@ As Delta Lake supports merge statement, we can add `mergeModeEnable = true` to o
   }
 ```
 
+:::info Merge Mode
+`mergeModeEnable = true` tells Deduplicate/HistorizeAction to merge changed data into the output DataObject, instead of overwriting the whole DataObject.
+The output DataObject must implement CanMergeDataFrame interface (also called trait in Scala) for this. 
+DeltaLakeTableDataObject will then create a complex SQL-Upsert statement to merge new and changed data into existing output data.
+:::
+
+
 Uff, getting error `'SchemaViolationException: (DataObject~int-airports) Schema does not match schema defined on write:` with `superfluousCols=dl_hash`?
 This is due to merge mode needing an additional column `dl_hash` to efficiently check for changed data.
-Drop table `int-airports` again, then startJob `--feed-sel ids:historize-airports` and afterwards `--feed-sel 'ids:(download|historize)-airports'`.
+Drop table `int-airports` again, then startJob `--feed-sel ids:historize-airports` and afterward `--feed-sel 'ids:(download|historize)-airports'`.
 
-Now check in spark-shell again and you'll find several airports that have changed between the intitial and the current state:
+Now check in spark-shell again, and you'll find several airports that have changed between the initial and the current state:
 ```
   sdlb.dataObjects.intAirports.get
   .groupBy($"ident").count
@@ -150,7 +157,7 @@ Now check in spark-shell again and you'll find several airports that have change
 
 :::tip paste multi-line text into spark-shell
 You may have noticed that pasting multi-line text into spark-shell executes every line separately.
-This works in the example above, but does not work with every scala code. Also it doesn't look that nice to see all intermediate results.
+This works in the example above, but does not work with every scala code. Also, it doesn't look that nice to see all intermediate results.
 
 Enter `:paste` in spark-shell before pasting multi-line text for a better experience.
 :::
@@ -203,13 +210,16 @@ Add a primary key to the table definition of `int-departures`:
 
 Change the type of action `prepare-departures` from `CopyAction`, this time to `DeduplicateAction` and rename it to `deduplicate-departures`, again to reflect its new type.
 It also needs an additional transformers to calculate the new primary key column `dt` derived from the column `firstseen`, and to make sure input data is unique across the primary key of the output DataObject.
-So make sure to add these lines too: 
+Finally, we need to set `mergeModeEnabled = true` and `updateCapturedColumnOnlyWhenChanged = true`.
+
+The `deduplicate-departures` Action definition should then look as follows: 
 ```
   deduplicate-departures {
     type = DeduplicateAction
     inputId = stg-departures
     outputId = int-departures
-    mergeModeEnabled=true
+    mergeModeEnabled = true
+    updateCapturedColumnOnlyWhenChanged = true
     transformers = [{
       type = SQLDfTransformer
       code = "select stg_departures.*, date_format(from_unixtime(firstseen),'yyyyMMdd') dt from stg_departures"
@@ -219,6 +229,11 @@ So make sure to add these lines too:
     }]
   }
 ```
+
+:::hint Effect of updateCapturedColumnOnlyWhenChanged
+By default DeduplicateAction updates column dl_captured in the output for every record it receives. To reduce the number of updated records, `updateCapturedColumnOnlyWhenChanged = true` can be set. 
+In this case column dl_captured is only updated in the output, when some attribute of the record changed.
+:::
 
 Now, delete the table and data of the DataObject `int-departures` in spark-shell, to prepare it for the new columns `dt` and `dl_ts_captured`.
 ```
@@ -281,6 +296,7 @@ DeduplicateAction doesn't deduplicate your input data by default, because dedupl
 In our example we have duplicates in the input data set, and added the DeduplicateTransformer to our input data.
 Instead of using DeduplicateTransformer, we could also implement our own deduplicate logic using the Scala Spark API with ScalaCodeSparkDfTransformer as follows:
 
+```
     transformers = [{
       type = ScalaCodeSparkDfTransformer
       code = """
@@ -293,6 +309,7 @@ Instead of using DeduplicateTransformer, we could also implement our own dedupli
         transform _
       """
     }]
+```
 
 :::info
 Note how we have used a third way of defining transformation logic now:  
@@ -313,12 +330,6 @@ With Scala, you can compile code on the fly. This is actually what the Scala She
 The Scala code in the configuration above gets compiled when ScalaCodeSparkDfTransformer is instantiated during startup of SDLB.
 :::
 
-## Summary
+Your departures/airports.conf should now look like the files ending with `part-2b-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
 
-You have now seen different parts of industrializing a data pipeline like robust data formats and caring about historical data.
-Further, you have explored data interactively with spark-shell. 
-
-The final solution for departures/airports/btl.conf should look like the files ending with `part-2-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
-
-In part 3 we will see how to incrementally load fresh flight data.
-See you!
+In the next step we are going to configure the pipeline for different environments like development, integration and production.

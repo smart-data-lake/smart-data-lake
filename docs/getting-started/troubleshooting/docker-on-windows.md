@@ -18,19 +18,20 @@ Install podman on WSL2 Ubuntu:
     sudo apt-get -y upgrade
     sudo apt-get -y install podman
 ```
+
 ## Using podman build and podman run
 
-Throughout this tutorial, we often refer to the commands `docker build` and `docker run`.
-Podman has identically named commands, which, for the purpose of this tutorial, do exactly the same thing.
-So with podman you can just type `podman build` and `podman run` instead.
-The podman commands that we provide in our tutorials all assume that they are executed either from a unix environment or from the WSL.
+Throughout this tutorial, we use the commands `podman build` and `podman run` under the hood, which is fully compatible with `docker build/run`
+The podman commands that we provide in our tutorials all assume that they are executed either from a unix environment or from WSL2.
 
 ## Equivalent of docker-compose
-For [part 2 of this guide](../part-2/delta-lake-format.md), you need docker-compose.
-For composing multiple podman containers, you can just execute our custom script podman-compose.sh from the getting-started base directory.
 
-After running the script in the getting-started folder you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
-If the port is not accessible, you can use `wsl hostname -I` on Windows command line to get the IP adress of WSL, and then access Polynote over \{ip-address}:8192.
+For [Polynote-lab](https://github.com/smart-data-lake/polynote-lab), you need something like docker-compose to easily coordinate multiple containers. 
+Podman-compose exists but is not maintained for the latest podman versions. There are problems regarding networking.
+Instead, we created [run.sh](https://github.com/smart-data-lake/polynote-lab/blob/develop/run.sh) script create the network and startup the containers.
+
+After running `./run.sh` you should now be able to open Polynote on port localhost:8192, as WSL2 automatically publishes all ports on Windows.
+If the port is not accessible, you can use `wsl hostname -I` on Windows command line to get the IP address of WSL, and then access Polynote over \{ip-address}:8192.
 
 ## Known Issue with podman on WSL2 on Windows
 
@@ -43,6 +44,6 @@ Then you may be experiencing a known problem with podman on WSL2 on windows afte
 
 If you encounter this error, there are two quick workarounds:
 1. Delete the tmp dir of your WSL2 installation and restart WSL2
-2. The podman commands with sudo may still work, eg. `sudo podman ps` will work even if `podman ps` wont
+2. The podman commands with sudo may still work, e.g. `sudo podman ps` will work even if `podman ps` wont
 
 See https://github.com/containers/podman/issues/12236 for more information.

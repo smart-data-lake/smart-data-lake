@@ -63,7 +63,7 @@ with some optional transformations of the data along the way.
 HOCON-Objects are just like JSON-Objects (with a few added features, but more on that later).
 - Instead of allowing for just one transformer, we could potentially have multiple transformers within the same action that
   get executed one after the other. That's why we have the bracket followed by the curly brace `[{` :
-  the CustomDataFrameAction expects it's field *transformers* to be a list of HOCON Objects.
+  the CustomDataFrameAction expects its field *transformers* to be a list of HOCON Objects.
 - There's different kinds of transformers, in this case we defined a *SQLDfTransformer* and provided it with a custom SQL-Code.
 There are other transformer types such as *ScalaCodeSparkDfTransformer*, *PythonCodeDfTransformer*... More on that later.
 
@@ -92,7 +92,7 @@ To execute the pipeline, use the same command as before, but change the feed to 
 ./startJob.sh --config /mnt/config --feed-sel compute
 ```
 
-Now you should see multiple files in the folder *data/int-airports*. Why is it split accross multiple files?
+Now you should see multiple files in the folder *data/int-airports*. Why is it split across multiple files?
 This is due to the fact that the query runs with Apache Spark under the hood which computes the query in parallel for different portions of the data.
 We might work on a small data set for now, but keep in mind that this would scale up horizontally for large amounts of data.
 
@@ -115,51 +115,50 @@ SDLB also allows you to use combinations of expressions to select the actions yo
 
 to see all options that are available. For your convenience, here is the current output of the help command:
 ```
-      -f, --feed-sel <operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]
-                               Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
-                               Operations:
-                               - pipe symbol (|): the two sets are combined by union operation (default)
-                               - ampersand symbol (&): the two sets are combined by intersection operation
-                               - minus symbol (-): the second set is subtracted from the first set
-                               Prefixes:
-                               - 'feeds': select actions where metadata.feed is matched by regex pattern (default)
-                               - 'names': select actions where metadata.name is matched by regex pattern
-                               - 'ids': select actions where id is matched by regex pattern
-                               - 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
-                               - 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
-                               - 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
-                               - 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
-                               - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
-                               All matching is done case-insensitive.
-                               Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"
-      -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
-      -c, --config <file1>[,<file2>...]
-                               One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
-      --partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
-                               Partition values to process for one single partition column.
-      --multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
-                               Partition values to process for multiple partitoin columns.
-      -s, --streaming          Enable streaming mode for continuous processing.
-      --parallelism <int>      Parallelism for DAG run.
-      --state-path <path>      Path to save run state files. Must be set to enable recovery in case of failures.
-      --override-jars <jar1>[,<jar2>...]
-                               Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.
-      --test <config|dry-run>  Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
-      --help                   Display the help text.
-      --version                Display version information.
-      -m, --master <value>     The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).
-      -x, --deploy-mode <value>
-                               The Spark deploy mode passed to SparkContext (default=client, cluster).
-      -d, --kerberos-domain <value>
-                               Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
-      -u, --username <value>   Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
-      -k, --keytab-path <value>
-                               Path to the Kerberos keytab file for authentication in local mode.
+-f, --feed-sel <operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]
+                         Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
+                         Operations:
+                         - pipe symbol (|): the two sets are combined by union operation (default)
+                         - ampersand symbol (&): the two sets are combined by intersection operation
+                         - minus symbol (-): the second set is subtracted from the first set
+                         Prefixes:
+                         - 'feeds': select actions where metadata.feed is matched by regex pattern (default)
+                         - 'names': select actions where metadata.name is matched by regex pattern
+                         - 'ids': select actions where id is matched by regex pattern
+                         - 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
+                         - 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
+                         - 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
+                         - 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
+                         - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
+                         All matching is done case-insensitive.
+                         Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"
+-n, --name <value>       Optional name of the application. If not specified feed-sel is used.
+-c, --config <file1>[,<file2>...]
+                         One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
+--partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
+                         Partition values to process for one single partition column.
+--multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
+                         Partition values to process for multiple partitoin columns.
+-s, --streaming          Enable streaming mode for continuous processing.
+--parallelism <int>      Parallelism for DAG run.
+--state-path <path>      Path to save run state files. Must be set to enable recovery in case of failures.
+--override-jars <jar1>[,<jar2>...]
+                         Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.
+--test <config|dry-run>  Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
+--help                   Display the help text.
+--version                Display version information.
+-m, --master <value>     The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).
+-x, --deploy-mode <value>
+                         The Spark deploy mode passed to SparkContext (default=client, cluster).
+-d, --kerberos-domain <value>
+                         Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
+-u, --username <value>   Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
+-k, --keytab-path <value>
+                         Path to the Kerberos keytab file for authentication in local mode.
 ```
 
 One popular option is to use regular expressions to execute multiple feeds together.
 In our case, we can run the entire data pipeline with the following command : 
-
 ```
 ./startJob.sh --config /mnt/config --feed-sel '.*'
 ```
@@ -197,6 +196,7 @@ In our case, we would end up with a faulty DataObject that looks like this:
     }
   }
 ```
+
 This time, it will fail with this error message:
 
     Exception in thread "main" io.smartdatalake.workflow.TaskFailedException: Task select-airport-cols failed. 

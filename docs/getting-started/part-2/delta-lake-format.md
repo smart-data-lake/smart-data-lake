@@ -29,7 +29,7 @@ Hive is a Metadata layer and SQL engine on top of a Hadoop filesystem. Spark use
 
 Hive tables with Parquet format are lacking transactions. This means for example that writing and reading the table at the same time could result in failure or empty results. 
 In consequence 
-* consecutive jobs need to by synchronized
+* consecutive jobs need to be synchronized
 * it's not recommended having end-user accessing the table while data processing jobs are running
 * update and deletes are not supported
 
@@ -38,7 +38,7 @@ Nevertheless, SDLB supports classical databases through the JdbcTableDataObject.
 Fortunately there is a new technology called *Open Table Formats* with implementations like Delta Lake (see also [delta.io](https://delta.io/)), Iceberg or Hudi. 
 They integrate tables into a Hive metastore, supports transactions and store Parquet files and a transaction log on hadoop filesystems.
 SDLB supports provides a DeltaLakeTableDataObject and IcebergTableDataObject.
-We are going to use DeltaLakeTableDataOBject for our airport and departure data now.
+We are going to use DeltaLakeTableDataObject for our airport and departure data now.
 
 ## DeltaLakeTableDataObject
 
@@ -186,7 +186,7 @@ should look similar to
     |               LSZB|             LGRP|    Diagoras Airport|       36.405399|        28.086201|Bern Airport|       46.912868|         7.498512| 2061.217367266584|                false|
     +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
 
-You can also use SDLB's scala interface to access DataObjects and Actions in the spark-shell. The interfaces is generated through `./buildJob.sh` and it is important to re-execute buildJob.sh after changes on configurations files before starting the spark-shell.
+You can also use SDLB's scala interface to access DataObjects and Actions in the spark-shell. The interface is generated through `./buildJob.sh` and it is important to re-execute buildJob.sh after changes on configurations files before starting the spark-shell.
 Then execute the following command in spark-shell to initialize the SDLB interface: 
 
 ```
@@ -196,7 +196,7 @@ val sdlb = SmartDataLakeBuilderLab[DataObjectCatalog, ActionCatalog](spark,Seq("
 implicit val context = sdlb.context
 ```
 
-Now you can show or drop DataObjects as follows. Note that DataObject Id is converted from hyphen separated to camelCase style for Java/Scala compatibility.
+Now you can show or drop DataObjects as follows. Note that DataObjectId is converted from hyphen separated to camelCase style for Java/Scala compatibility.
 
 ```
 sdlb.dataObjects.intDepartures.printSchema
@@ -204,13 +204,13 @@ sdlb.dataObjects.intDepartures.get.limit(5).show
 sdlb.dataObjects.intDepartures.dataObject.dropTable
 ```
 
-You can find a detailled description of SDLB's scala interface [here](../../reference/notebookCatalog)
+You can find a detailed description of SDLB's scala interface [here](../../reference/notebookCatalog)
 
 To automatically initialize SDLB's scala interface on spark-shell startup, uncomment the corresponding code in `shell.scala`.
 
 :::tip Delta Lake tuning
 You might have seen that our data pipeline with DeltaTableDataObject runs a Spark stage with 50 tasks several times.
-This is delta lake reading it's transaction log with Spark. For our data volume, 50 tasks are way too much.
+This is delta lake reading its transaction log with Spark. For our data volume, 50 tasks are way too much.
 You can reduce the number of snapshot partitions to speed up the execution by setting the following Spark property in your `global.conf` under `global.spark-options`:
 
     "spark.databricks.delta.snapshotPartitions" = 2
@@ -222,7 +222,7 @@ Note that SDLB config files can be split arbitrarily. They will be merged by the
 An SDLB best practice is to use a separate global.conf file for the global configuration.
 :::
 
-The final solution for departures/airports/btl.conf should look like the files ending with `part-2a-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
+Your departures/airports/btl.conf should now look like the files ending with `part-2a-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
 Feel free to play around.
 
 In the next step, we are going to take a look at keeping historical data...
