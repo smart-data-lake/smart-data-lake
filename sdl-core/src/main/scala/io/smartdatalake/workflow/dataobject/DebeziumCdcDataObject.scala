@@ -32,6 +32,7 @@ import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.source.SourceRecord
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions._
 
 import java.util
 import java.util.Properties
@@ -135,7 +136,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     val df = spark.createDataFrame(rows.asJava, sparkSchema)
 
-    df
+    extractCdcEvents(df)
 
   }
 
@@ -161,6 +162,68 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     StructType(fields.toArray)
   }
+
+  private val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
+  private val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  private def extractCdcEvents(df: DataFrame): DataFrame = {
+
+    val updateBeforeDf = df.filter(col("op") === "u")
+      .withColumn("event_data", col("before"))
+      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_preimage"))
+
+    val updateAfterDf = df.filter(col("op") === "u")
+      .withColumn("event_data", col("after"))
+      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_postimage"))
+
+    val otherOperationsDf = df.filter(col("op") =!= "u")
+      .withColumn("event_data", coalesce(col("after"), col("before")))
+      .withColumn(COMMIT_TYPE_COLUMN_NAME,
+        when(col("op") === "c", lit("create"))
+        .when(col("op") === "d", lit("delete"))
+          .otherwise(lit("read")))
+
+    val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
+      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000))
+      .drop("before", "after", "source", "op", "ts_ms", "transaction")
+      .orderBy(col(COMMIT_TIMESTAMP_COLUMN_NAME).desc)
+
+    reorderCdcColumns(flattenDf(unionDf))
+
+  }
+
+  private def flattenDf(df: DataFrame): DataFrame = {
+    var newDF = df
+    for (colName <- df.columns) {
+      val colType = df.schema(colName).dataType
+      colType match {
+        case structType: StructType =>
+          for (fieldName <- structType.fieldNames) {
+            newDF = newDF.withColumn(fieldName, col(s"$colName.$fieldName"))
+          }
+          newDF = newDF.drop(colName)
+        case _ =>
+      }
+    }
+    newDF
+  }
+
+  private def reorderCdcColumns(df: DataFrame): DataFrame = {
+
+    val colsToMove = Seq(COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME)
+
+    val allColumns = df.columns
+
+    val remainingColumns = allColumns.filterNot(colsToMove.contains)
+
+    // Create the new order: remaining columns + colsToMove at the end
+    val newColumnOrder = remainingColumns ++ colsToMove
+
+    // Reorder DataFrame by selecting columns in the new order
+    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail: _*)
+
+    reorderedDF
+  }
+
 }
 
 object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
