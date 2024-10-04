@@ -5948,7 +5948,7 @@
         "title" : "DeduplicateAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This [[Action]] copies and deduplicates data between an input and output DataObject using DataFrames.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]] . It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]] ) as output with defined primary keys.\nIf output implements [[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance."
+        "description" : "This [[Action]] copies and deduplicates data between an input and output DataObject using DataFrames.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]] . It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]] ) as output with defined primary keys.\nIf output implements [[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.\n\nDeduplicateAction's input data must be unique across the primary key, otherwise the merge statement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .\nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is not included by default in DeduplicateAction, as it is a performance intensive operation."
       },
       "FileTransferAction" : {
         "type" : "object",
@@ -6801,20 +6801,20 @@
           },
           "rankingExpression" : {
             "type" : "string",
-            "description" : "Ranking expression to determine duplicates"
+            "description" : "Ranking expression to choose the record to keep if there are duplicates."
           },
           "primaryKeyColumns" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             },
-            "description" : "Optional list of primary key columns"
+            "description" : "Optional list of primary key columns.\nIf left empty the primary key of the Actions output DataObject is used."
           }
         },
         "title" : "DeduplicateTransformer",
         "required" : [ "type", "rankingExpression" ],
         "additionalProperties" : false,
-        "description" : "Returns dataframe with only unique columns based on a primary key"
+        "description" : "Returns dataframe with only unique columns based on a primary key.\n\nIf primaryKeyColumns is left empty, the primaryKey of the Actions output DataObject must be defined."
       },
       "EncryptColumnsTransformer" : {
         "type" : "object",
