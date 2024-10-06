@@ -4,7 +4,7 @@ title: Get Airports
 
 ## Goal
 
-In this step, we will download airports master data from the website described in [Inputs](../get-input-data) using Smart Data Lake Builder.
+In this step, we will download airports master data from the website described in [Inputs](../get-input-data) using SDLB.
 Because this step is very similar to the previous one, we will make some "mistake" on purpose to demonstrate how to deal with config errors.
 
 Just like in the previous step, we need one action and two DataObjects.

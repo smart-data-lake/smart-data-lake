@@ -66,9 +66,11 @@ We will now only execute this single action by changing this parameter to `--fee
 ./startJob.sh -c /mnt/config --feed-sel ids:historize-airports
 ```
 
+:::tip JDOFatalDataStoreException
 Getting error `javax.jdo.JDOFatalDataStoreException: Unable to open a test connection to the given database` and `Another instance of Derby may have already booted the database /mnt/data/metastore_db`?
 This is due to the fact that we are using a file-based Derby database as metastore, which can be only opened by one process at a time.
 Solution: close spark-shell (Ctrl-D) before running startJob.sh. 
+:::
 
 After successful execution you can check the schema and data of our table in spark-shell. 
 It now has a time dimension through the two new columns `dl_ts_captured` and `dl_ts_delimited`.
@@ -132,7 +134,6 @@ The output DataObject must implement CanMergeDataFrame interface (also called tr
 DeltaLakeTableDataObject will then create a complex SQL-Upsert statement to merge new and changed data into existing output data.
 :::
 
-
 Uff, getting error `'SchemaViolationException: (DataObject~int-airports) Schema does not match schema defined on write:` with `superfluousCols=dl_hash`?
 This is due to merge mode needing an additional column `dl_hash` to efficiently check for changed data.
 Drop table `int-airports` again, then startJob `--feed-sel ids:historize-airports` and afterward `--feed-sel 'ids:(download|historize)-airports'`.
@@ -182,6 +183,18 @@ When checking the details it seems that for many airports the number of signific
 Values for `dl_ts_capture` and `dl_ts_delimited` respectively were set to the current time of our data pipeline run. 
 For an initial load, this should be set to the time of the historical data set. 
 Currently, this is not possible in SDLB, but there are plans to implement this, see issue [#427](https://github.com/smart-data-lake/smart-data-lake/issues/427).
+
+If you would try to run `download-airports` and `historize-airports` Action in a fresh environment (data/stg-airports directory removed),
+the job would fail with `requirement failed: (DataObject~stg-airports) DataObject schema is undefined.` in prepare phase.
+This is bug [#900](https://github.com/smart-data-lake/smart-data-lake/issues/900).
+For now lets make it more stable by adding a fixed schema to `stg-airports` DataObject as follows:
+```
+  stg-airports {
+    type = CsvFileDataObject
+    path = ${env.basePath}"~{id}"
+    schema = "id string, ident string, type string, name string, latitude_deg string, longitude_deg string, elevation_ft string, continent string, iso_country string, iso_region string, municipality string, scheduled_service string, gps_code string, iata_code string, local_code string, home_link string, wikipedia_link string, keywords string"
+  }
+```
 
 Now let's continue with flight data.
 
@@ -295,7 +308,7 @@ sdlb.dataObjects.intDepartures.get
     |4b43ab|               LSZB|20210830|    1|
     ...
 
-Note that DeduplicateAction assumes that input data is already unique across the given primary key. With `mergeModeEnable=true` we even get errors otherwise.
+Note that DeduplicateAction assumes that input data is already unique across the given primary key. With `mergeModeEnable = true` we even get errors otherwise.
 DeduplicateAction doesn't deduplicate your input data by default, because deduplication is costly and data often is already unique.
 In our example we have duplicates in the input data set, and added the DeduplicateTransformer to our input data.
 Instead of using DeduplicateTransformer, we could also implement our own deduplicate logic using the Scala Spark API with ScalaCodeSparkDfTransformer as follows:
