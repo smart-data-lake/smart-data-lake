@@ -150,10 +150,19 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         .mode(SparkSaveMode.from(finalSaveMode))
         .save()
     )
+
+    //table comment
     (table.commentOnTable.isDefined, comment.isDefined) match {
       case (true, _) => connection.execJdbcStatement(s"comment on table ${table.fullName} is '${table.commentOnTable.get}';")
       case (false, true) => connection.execJdbcStatement(s"comment on table ${table.fullName} is '${comment.get}';")
     }
+
+    //columns comment
+    if (table.commentsOnColumns.isDefined) {
+      table.commentsOnColumns.get.foreach(comment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${comment._1} is '${comment._2}';"))
+    }
+
+
 
     // return
     metrics
@@ -301,10 +310,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     else column
   }
 
-  /**
-   * @param pkColumns List of columns in a primary key constraint
-   * @param pkName    Primary Key constraint name. It can be null, since some databases have constraints without names.
-   */
   def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
     connection.catalog.getPrimaryKey(catalog, schema, tableName)
 

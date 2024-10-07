@@ -293,6 +293,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     super.postWrite(partitionValues)
     if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
     if (table.commentOnTable.isDefined) addTableComment(table.commentOnTable.get)
+    if (table.commentsOnColumns.isDefined) addColumnComments(table.commentsOnColumns.get)
 
   }
 
@@ -649,13 +650,21 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
-    val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")})"
+    val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
     SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
   }
 
   def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
     SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def addColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
+    comments.foreach( comment => {
+      val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
+      SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+    }
+    )
   }
 }
 
