@@ -36,6 +36,7 @@ import org.apache.spark.sql.catalyst.TableIdentifier
  *                            colname1 = "Comment or description for column colname1"
  *                            colname2 = "Comment or descrpition for column colname2"
  *                          }
+ *                          As of now, this is only possible for Delta Lake and Snowflake tables.
  * @param primaryKey  optional sequence of primary key columns
  * @param createAndReplacePrimaryKey Parameter to define if the primary key should be created and updated
  *                                   according to the SDLB configuration (=TRUE), or if they are configured just
