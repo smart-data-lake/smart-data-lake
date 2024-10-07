@@ -110,7 +110,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
-    with CanCreateIncrementalOutput with ExpectationValidation {
+    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleConstraints {
 
   /**
    * Connection defines driver, url and db in central location
@@ -161,6 +161,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         connection.execJdbcStatement(sql)
       }
     }
+
+    //If enabled, create or replace the primary Key of the table
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint;
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
@@ -543,6 +546,19 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         else column
       }
     }
+  }
+
+  def getExistingPKConstraint(catalog: String,
+                                       schema: String,
+                                       tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
+    connection.getJdbcPrimaryKey(catalog, schema, tableName)
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
+    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
+    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
   }
 }
 
