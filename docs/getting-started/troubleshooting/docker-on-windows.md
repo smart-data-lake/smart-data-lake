@@ -9,14 +9,10 @@ beginning of 2022.
 
 There is a free alternative for Linux or WSL2 called podman from Redhat, which has a compatible command line and also the Dockerfiles are compatible, see [podman.io](https://podman.io/).
 Further advantages are that podman is more lightweight - it doesn't need a service and root privileges to run containers.
-Install podman on WSL2 Ubuntu:
+Install podman on WSL2 Ubuntu 24.04:
 ```
-    . /etc/os-release
-    echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
-    curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
-    sudo apt-get update
-    sudo apt-get -y upgrade
-    sudo apt-get -y install podman
+sudo apt-get update
+sudo apt-get -y install podman
 ```
 
 ## Using podman build and podman run

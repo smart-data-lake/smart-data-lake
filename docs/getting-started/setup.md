@@ -50,7 +50,7 @@ Now let's see Smart Data Lake in action!
 
 ```
 pushd config && cp departures.conf.part-1-solution departures.conf && cp airports.conf.part-1-solution airports.conf && cp btl.conf.part-1-solution btl.conf && popd
-./startJob.sh --config /mnt/config,/mnt/envConfig/lab.conf --feed-sel download
+./startJob.sh --config /mnt/config,/mnt/envConfig/dev.conf --feed-sel download
 ```
 
 This executes a simple data pipeline that downloads two files from two different websites into the *data* folder.
