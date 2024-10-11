@@ -27,7 +27,7 @@ Notice that since both actions have the same feed, the option `--feed-sel downlo
 ## Mess Up the Solution
 Now let's see what happens when things don't go as planned. 
 For that, replace your config file with the contents of [this](https://github.com/smart-data-lake/getting-started/tree/master/config/airports.conf.part-1b-solution) file.
-When you start the `docker run` command again, you will see two errors:
+When you start the `./startJob.sh` command again, you will see two errors:
 
 1. The name of the DataObject "NOPEext-departures" does not match with the inputId of the action download-departures.
    This is a very common error and the stacktrace should help you to quickly find and correct it

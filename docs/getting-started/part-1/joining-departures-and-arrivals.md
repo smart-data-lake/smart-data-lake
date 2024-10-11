@@ -71,7 +71,7 @@ Another difference is that you cannot run an individual transformation alone, yo
 
 ## Try it out
 
-[This](https://github.com/smart-data-lake/getting-started/tree/master/config/btl.conf.part-1a-solution) is how your btl.conf should look like by now.
+[This](https://github.com/smart-data-lake/getting-started/tree/master/config/btl.conf.part-1b-solution) is how your btl.conf should look like by now.
 
 When running the example, you should see a CSV file with departure and arrival airport names and coordinates.
 

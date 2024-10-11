@@ -147,7 +147,7 @@ Metadata can also help a lot in documenting your data pipelines and making its d
 
 ## Try it out
 
-Let's execute our action. We now come back to a similar *docker run* command as in the [setup step](../setup.md) of our guide.
+Let's execute our action. We now come back to a similar `./startJob.sh` command as in the [setup step](../setup.md) of our guide.
 The only difference is that we mount 2 volumes instead of one and specify the path to your config file.
 Before, we only mounted the data folder so that you could see the results of the execution on your machine.
 The config file that was being used was located inside the docker image.

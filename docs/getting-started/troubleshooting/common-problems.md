@@ -55,4 +55,12 @@ Use the container id to stop the container by typing:
 ```
 docker containter stop <container id>
 ```
-## ERROR 08001: java.net.ConnectException : Error connecting to server localhost on port 1527
+## Certificate of  ourairports.com expired
+If you get this error
+```
+Caused by: sun.security.validator.ValidatorException: PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
+Caused by: java.security.cert.CertificateExpiredException: NotAfter: Wed Oct 09 20:03:30 UTC 2024
+```
+this means that the certificate of the website behind the URL https://ourairports.com/data/airports.csv has expired.
+We need this site for the dataobject ext-airports.
+If that is the case you can switch to the other url that is commented out, https://davidmegginson.github.io/ourairports-data/airports.csv"
