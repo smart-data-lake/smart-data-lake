@@ -187,14 +187,6 @@ should look similar to
     +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
 
 You can also use SDLB's scala interface to access DataObjects and Actions in the spark-shell. The interface is generated through `./buildJob.sh` and it is important to re-execute buildJob.sh after changes on configurations files before starting the spark-shell.
-Then execute the following command in spark-shell to initialize the SDLB interface: 
-
-```
-import io.smartdatalake.generated._
-import io.smartdatalake.lab.SmartDataLakeBuilderLab
-val sdlb = SmartDataLakeBuilderLab[DataObjectCatalog, ActionCatalog](spark,Seq("/mnt/config"), DataObjectCatalog(_, _), ActionCatalog(_, _))
-implicit val context = sdlb.context
-```
 
 Now you can show or drop DataObjects as follows. Note that DataObjectId is converted from hyphen separated to camelCase style for Java/Scala compatibility.
 

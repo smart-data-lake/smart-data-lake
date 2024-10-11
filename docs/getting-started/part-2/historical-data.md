@@ -52,11 +52,11 @@ While you're at it, rename it to `historize-airports` to reflect its new functio
 ```
 
 With historization, this table will now get two additional columns called `dl_ts_captured` and `dl_ts_delimited`.
-Schema evolution of existing tables will be explained later, so for now, just delete the table and it's data for the DataObject `int-airports` through spark-shell and SDLB's scala interface.
-See previous chapter for detailed instructions. 
+Schema evolution of existing tables will be explained later, so for now, just delete the table and it's data for the DataObject `int-airports` through spark-shell and SDLB's scala interface :
 ```
 sdlb.dataObjects.intAirports.dataObject.dropTable
 ```
+See previous chapter for more details.
 
 Then start Action `historize-airports`. 
 You may have seen that the `--feed-sel` parameter of SDLB command line supports more options to select actions to execute (see command line help). 
@@ -90,7 +90,7 @@ sdlb.dataObjects.intAirports.printSchema
 
 If you look at the data, there should be only one record per object for now, as we didn't run our data pipeline with historical data yet.
 ```
-  dataIntAirports.getSparkDataFrame().orderBy($"ident",$"dl_ts_captured").show
+  dataIntAirports.get.orderBy($"ident",$"dl_ts_captured").show
 ```
 
     +-----+--------------------+------------------+-------------------+--------------------+-------------------+
@@ -155,11 +155,13 @@ Now check in spark-shell again, and you'll find several airports that have chang
     |   CDV3|    2|
     ...
 
-:::tip paste multi-line text into spark-shell
+:::tip Tips for spark-shell
 You may have noticed that pasting multi-line text into spark-shell executes every line separately.
 This works in the example above, but does not work with every scala code. Also, it doesn't look that nice to see all intermediate results.
 
 Enter `:paste` in spark-shell before pasting multi-line text for a better experience.
+
+Also, keep in mind you can autocomplete commands with the tab key. This allows you for instance to autocomplete the commands of the SDLB Interface.
 :::
 
 When checking the details it seems that for many airports the number of significant digits was reduced for the position:
@@ -210,7 +212,7 @@ Add a primary key to the table definition of `int-departures`:
 
 Change the type of action `prepare-departures` from `CopyAction`, this time to `DeduplicateAction` and rename it to `deduplicate-departures`, again to reflect its new type.
 It also needs an additional transformers to calculate the new primary key column `dt` derived from the column `firstseen`, and to make sure input data is unique across the primary key of the output DataObject.
-Finally, we need to set `mergeModeEnabled = true` and `updateCapturedColumnOnlyWhenChanged = true`.
+Finally, we need to set `mergeModeEnable = true` and `updateCapturedColumnOnlyWhenChanged = true`.
 
 The `deduplicate-departures` Action definition should then look as follows: 
 ```
@@ -218,7 +220,7 @@ The `deduplicate-departures` Action definition should then look as follows:
     type = DeduplicateAction
     inputId = stg-departures
     outputId = int-departures
-    mergeModeEnabled = true
+    mergeModeEnable = true
     updateCapturedColumnOnlyWhenChanged = true
     transformers = [{
       type = SQLDfTransformer
@@ -230,7 +232,7 @@ The `deduplicate-departures` Action definition should then look as follows:
   }
 ```
 
-:::hint Effect of updateCapturedColumnOnlyWhenChanged
+:::tip Effect of updateCapturedColumnOnlyWhenChanged
 By default DeduplicateAction updates column dl_captured in the output for every record it receives. To reduce the number of updated records, `updateCapturedColumnOnlyWhenChanged = true` can be set. 
 In this case column dl_captured is only updated in the output, when some attribute of the record changed.
 :::
@@ -249,7 +251,9 @@ After successful execution you can check the schema and data of our table in spa
 The new column `dl_ts_captured` shows the current time of the data pipeline run when this object first occurred in the input data. 
 ```
   sdlb.dataObjects.intDepartures.printSchema
-
+```  
+prints:
+```
   root
   |-- arrivalairportcandidatescount: long (nullable = true)
   |-- callsign: string (nullable = true)
