@@ -13,6 +13,11 @@ To run this tutorial you just need two things:
 - [Podman](https://podman.io/get-started), a free Docker alternative on Linux. On Windows you might use it through WSL2, see also [Podman as an alternative to docker](troubleshooting/docker-on-windows.md).
 - The [source code of the example](https://github.com/smart-data-lake/getting-started).
 
+:::caution
+Note for Windows Users (this includes WSL!). Deactivate the autocrlf function of git before cloning, otherwise it will break some podman scripts.
+To do this, run `git config --global core.autocrlf false` in your terminal before cloning the repository.
+:::
+
 ## Build Spark docker image
 
 - Download the source code of the example either via git or by [downloading the zip](https://github.com/smart-data-lake/getting-started/archive/refs/heads/master.zip) and extracting it.
