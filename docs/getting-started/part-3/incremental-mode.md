@@ -12,7 +12,7 @@ In a more real-world example, we would want a delta load mechanism that loads an
 To demonstrate these incremental queries based on previous state we will start by rewriting our configuration file.
 
 ## Adapt Action
-We only have to make a minor change in `departure.conf` file to Action `download-deduplicate-departures`.
+We only have to make a minor change in `departures.conf` file to Action `download-deduplicate-departures`.
 Adding the executionMode `DataObjectStateIncrementalMode` will enable DataObject incremental mode. With every run the input DataObject will only return new data in this mode.
 The DataObject saves its state in the state file that is written after each run of the SDLB. You haven't worked with this state file before, more on that later.
 ```
@@ -32,7 +32,7 @@ See [Execution Modes](/docs/reference/executionModes) for detailed documentation
 :::
 
 :::caution
-Remember that the time interval in `ext-departures` should not be larger than a week. As mentioned, we will implement a simple incremental query logic that always queries from the last execution time until the current execution.
+Due to load limits of the departures web service, the time interval in `ext-departures` should not be larger than a week. As mentioned, we will implement a simple incremental query logic that always queries from the last execution time until the current execution.
 If the time difference between the last execution and the current execution time is larger than a week, we will query the next four days since the last execution time. Otherwise, we query the data from the last execution until now.
 :::
 

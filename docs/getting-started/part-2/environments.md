@@ -26,7 +26,7 @@ To start our SDLB job with for a specific environment, we can just add the corre
 
 ## Creating DEV configuration file
 
-The command above doesn't work yet, as we first need to create the `envConfig/dev.conf` file.
+The command above do anything new yet, as we first need to create the `envConfig/dev.conf` file.
 
 As part of this tutorial, let's make the following configurations customizable per environment:
 - database: The database name to be used in DeltaLakeTableDataObjects
@@ -66,7 +66,7 @@ It is the easiest CI pipeline and recommended for every project. See also [Testi
 
 ## Configuring other environments
 
-Apparently, to configure other environments like PROD (Production), a `envConfig/prd.conf` file is created and the relevant configurations adapted.
+To configure other environments like PROD (Production), a `envConfig/prd.conf` file is created and the relevant configurations adapted.
 Then `dev.conf` in `startJob.sh` command is replaced with `prd.conf`.
 
 A special case is managing secrets for different environments, e.g. passwords.
