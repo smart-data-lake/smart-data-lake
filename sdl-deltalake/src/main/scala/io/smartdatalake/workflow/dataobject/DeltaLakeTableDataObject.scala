@@ -44,7 +44,7 @@ import org.apache.spark.sql.delta.DeltaLog
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 import scala.util.Try
 
@@ -561,22 +561,45 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
       val snapshot = deltaLog.unsafeVolatileSnapshot
       val columns = snapshot.schema.fieldNames
-      def getAgg(col: String) = struct(
-        min($"stats.minValues"(col)).as("minValue"),
-        max($"stats.maxValues"(col)).as("maxValue"),
-        sum($"stats.nullCount"(col)).as("nullCount")
+
+      def colExists(schema: StructType, nestedCol: Seq[String]): Boolean = {
+        nestedCol match {
+          case c :: Nil => schema.fieldNames.contains(c)
+          case c :: tail => schema.find(_.name == c)
+            .map(_.dataType).collect { case dataType: StructType => colExists(dataType, tail) }
+            .getOrElse(false)
+        }
+      }
+
+      def statsColIfExists(statsCol: String, dataCol: String): Option[Column] = {
+        val exists = colExists(snapshot.statsSchema, Seq(statsCol, dataCol))
+        if (exists) Some($"stats"(statsCol)(dataCol))
+        else None
+      }
+
+      def getAgg(col: String): Column = struct(
+        Seq(
+          statsColIfExists("minValues", col).map(min(_).as("minValue")),
+          statsColIfExists("maxValues", col).map(max(_).as("maxValue")),
+          statsColIfExists("nullCount", col).map(sum(_).as("nullCount"))
+        ).flatten: _*
       ).as(col)
       val metricsRow = snapshot.allFiles
         .select(from_json($"stats", snapshot.statsSchema).as("stats"))
         .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg):_*).head()
+
+      def getAsOption[T](row: Row, col: String): Option[T] = {
+        if (row.schema.fieldNames.contains(col) && !row.isNullAt(row.fieldIndex(col))) Some(row.getAs[T](col))
+        else None
+      }
       columns.map {
         c =>
           val struct = metricsRow.getStruct(metricsRow.fieldIndex(c))
-          c -> Map(
-            ColumnStatsType.NullCount.toString -> struct.getAs[Long]("nullCount"),
-            ColumnStatsType.Min.toString -> struct.getAs[Any]("minValue"),
-            ColumnStatsType.Max.toString -> struct.getAs[Any]("maxValue")
-          )
+          c -> Seq(
+            getAsOption[Long](struct, "nullCount").map(ColumnStatsType.NullCount.toString -> _),
+            getAsOption[Any](struct, "minValue").map(ColumnStatsType.Min.toString -> _),
+            getAsOption[Any](struct, "maxValue").map(ColumnStatsType.Max.toString -> _)
+          ).flatten.toMap
       }.toMap
     } catch {
       case e: Exception =>
