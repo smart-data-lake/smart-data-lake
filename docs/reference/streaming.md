@@ -4,10 +4,9 @@ title: Streaming
 ---
 
 :::warning
-This page is under review and currently not visible in the menu.
+This page is under review.
 :::
 
-## Streaming
 You can execute any DAG in streaming mode by using commandline option `--streaming`.
 In streaming mode SDL executes the Exec-phase of the same DAG continuously, processing your data incrementally.
 SDL discerns between synchronous and asynchronous actions:

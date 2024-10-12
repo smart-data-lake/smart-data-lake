@@ -2,9 +2,6 @@
 title: Delta Lake - a better data format
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 ## Goal
 
 Up to now we have used CSV with CsvFileDataObject as file format. We will switch to a more modern data format in this step which supports a catalog, compression and even transactions.
@@ -22,7 +19,7 @@ Just storing files on Hadoop filesystem makes it difficult to use them in a SQL 
 If you start a Spark session, a configuration to connect to an external catalog can be set, or otherwise Spark creates an internal catalog for the session.
 We could register our CSV files in this catalog by creating a table via a DDL-statement, including the definition of all columns, a path and the format of our data.
 But you could also directly create and write into a table by using Spark Hive tables. 
-Smart Data Lake Builder supports this by the HiveTableDataObject. It always uses Parquet file format in the background as a best practice, although Hive tables could also be created on top of CSV files.
+SDLB supports this by the HiveTableDataObject. It always uses Parquet file format in the background as a best practice, although Hive tables could also be created on top of CSV files.
 
 :::info
 Hive is a Metadata layer and SQL engine on top of a Hadoop filesystem. Spark uses the metadata layer of Hive, but implements its own SQL engine.
@@ -32,224 +29,192 @@ Hive is a Metadata layer and SQL engine on top of a Hadoop filesystem. Spark use
 
 Hive tables with Parquet format are lacking transactions. This means for example that writing and reading the table at the same time could result in failure or empty results. 
 In consequence 
-* consecutive jobs need to by synchronized
+* consecutive jobs need to be synchronized
 * it's not recommended having end-user accessing the table while data processing jobs are running
 * update and deletes are not supported
 
 There are other options like classical databases which always had a metadata layer, offer transactions but don't integrate easily with Hive metastore and cheap, scalable Hadoop file storage.
-Nevertheless, Smart Data Lake Builder supports classical databases through the JdbcTableDataObject.
-Fortunately there is a new technology called Delta Lake, see also [delta.io](https://delta.io/). It integrates into a Hive metastore, supports transactions and stores Parquet files and a transaction log on hadoop filesystems.
-Smart Data Lake Builder supports this by the DeltaLakeTableDataObject, and this is what we are going to use for our airport and departure data now.
+Nevertheless, SDLB supports classical databases through the JdbcTableDataObject.
+Fortunately there is a new technology called *Open Table Formats* with implementations like Delta Lake (see also [delta.io](https://delta.io/)), Iceberg or Hudi. 
+They integrate tables into a Hive metastore, supports transactions and store Parquet files and a transaction log on hadoop filesystems.
+SDLB supports provides a DeltaLakeTableDataObject and IcebergTableDataObject.
+We are going to use DeltaLakeTableDataObject for our airport and departure data now.
 
 ## DeltaLakeTableDataObject
 
-Switching to Delta Lake format is easy with Smart Data Lake Builder, just replace `CsvFileDataObject` with `DeltaLakeTableDataObject` and define the table's db and name.
-Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`:
-```
-    int-airports {
-        type = DeltaLakeTableDataObject
-        path = "~{id}"
-        table = {
-            db = "default"
-            name = "int_airports"
-        }
-    }
+Switching to Delta Lake format is easy with SDLB, just replace `CsvFileDataObject` with `DeltaLakeTableDataObject` and define the table's db and name.
+Let's start by changing the existing definitions for `int-airports`, `btl-departures-arrivals-airports` and `btl-distances`.
 
-    btl-departures-arrivals-airports {
-        type = DeltaLakeTableDataObject
-        path = "~{id}"
-        table {
-            db = "default"
-            name = "btl_departures_arrivals_airports"
-        }
+Update DataObject `int-airports` in airports.conf:
+```
+  int-airports {
+    type = DeltaLakeTableDataObject
+    path = "~{id}"
+    table = {
+      db = "default"
+      name = "int_airports"
     }
-    
-    btl-distances {
-        type = DeltaLakeTableDataObject
-        path = "~{id}"
-        table {
-            db = "default"
-            name = "btl_distances"
-        }
+  }
+```
+
+Update DataObjects `btl-departures-arrivals-airports` and `btl-distances` in btl.conf:
+```
+  btl-departures-arrivals-airports {
+    type = DeltaLakeTableDataObject
+    path = "~{id}"
+    table {
+      db = "default"
+      name = "btl_departures_arrivals_airports"
     }
-```
-Then create a new, similar data object `int-departures`: 
-```
-    int-departures {
-        type = DeltaLakeTableDataObject
-        path = "~{id}"
-        table = {
-            db = default
-            name = int_departures
-        }
+  }
+  
+  btl-distances {
+    type = DeltaLakeTableDataObject
+    path = "~{id}"
+    table {
+      db = "default"
+      name = "btl_distances"
     }
+  }
 ```
-Next, create a new action `prepare-departures` in the `actions` section to fill the new table with the data:
+
+Then create a new, similar data object `int-departures` in departures.conf: 
 ```
-    prepare-departures {
-        type = CopyAction
-        inputId = stg-departures
-        outputId = int-departures
-        metadata {
-            feed = compute
-        }
+  int-departures {
+    type = DeltaLakeTableDataObject
+    path = "~{id}"
+    table = {
+      db = default
+      name = int_departures
     }
+  }
 ```
-Finally, adapt the action definition for `join-departures-airports`:
+
+Next, create a new action `prepare-departures` in the `actions` section of departures.conf to fill the new table with the data:
+```
+  prepare-departures {
+    type = CopyAction
+    inputId = stg-departures
+    outputId = int-departures
+    metadata {
+      feed = compute
+    }
+  }
+```
+
+Finally, adapt the action definition for `join-departures-airports` in btl.conf:
 * change `stg-departures` to `int-departures` in inputIds
 * change `stg_departures` to `int_departures` in the first SQLDfsTransformer (watch out, you need to replace the string 4 times)
 
 :::info Explanation
 - We changed `int-airports`, `btl-departures-arrivals-airports` and `btl-distances` from CSV to Delta Lake format
 - Created an additional table `int-departures`
-- Created an action `prepare-departures`  to fill the new integration layer table `int-departures`
+- Created an action `prepare-departures` to fill the new integration layer table `int-departures`
 - Adapted the existing action `join-departures-airports` to use the new table `int-departures`
 :::
 
-To run our data pipeline, first make sure data directory is empty - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
-Then you can execute the usual *docker run* command for all feeds:
+To run our data pipeline, first delete `data/int-*` and `data/btl-*` - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
+Then you can execute the usual *./startJob.sh* command for `compute` feed:
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-mkdir data
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
-docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
 ```
-
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-mkdir data
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel 'download*'
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest -c /mnt/config --feed-sel '^(?!download).*'
+./startJob.sh -c /mnt/config --feed-sel 'compute'
 ```
-
-</TabItem>
-</Tabs>
-
-:::info
-Why two separate commands?   
-Because you deleted all data first.   
-
-Remember from part 1 that we either need to define a schema for our downloaded files or we need to execute the download steps separately on the first run.
-The first command only executes the download steps, the second command executes everything but the download steps (regex with negative lookahead).
-See [Common Problems](../troubleshooting/common-problems.md) for more Info.
-:::
-
 
 Getting an error like `io.smartdatalake.util.webservice.WebserviceException: Read timed out`? Check the list of [Common Problems](../troubleshooting/common-problems) for a workaround.
+
+Getting an error like `DeltaAnalysisException: [DELTA_TABLE_NOT_FOUND] Delta table default.int_departures doesn't exist.`?
+This happens when you delete the files of a Delta Table on the filesystem, but the table is still registered in the metastore.
+Solution: delete data/metastore_db directory to reset the metastore completely, or issue a `spark.sql("DROP TABLE default.int_departures")` in spark-shell. See below on how to start spark-shell. 
 
 ## Reading Delta Lake Format with Spark
 
 Checking our results gets more complicated now - we can't just open delta lake format in a text editor like we used to do for CSV files.
-We could now use SQL to query our results, that would be even better. 
-One option is to use a Spark session, i.e. by starting a spark-shell.
-But state-of-the-art is to use notebooks like Jupyter for this.
-One of the most advanced notebooks for Scala code we found is Polynote, see [polynote.org](https://polynote.org/).
+But we can now use SQL to query our results, that is even better. 
+We will use a Spark session for this, i.e. by starting a spark-shell.
+Alternatively one could use notebooks like Jupyter, Polynote or Databricks for this.
+See our [Polynote-lab](https://github.com/smart-data-lake/polynote-lab) for a local solution.
 
-We will now start Polynote in a docker container, and an external Metastore (Derby database) in another container to share the catalog between our experiments and the notebook.
-To do so, we will use the additional files in the subfolder `part2`. 
-Execute these commands:
+Execute the following command to start a spark-shell. Note that his starts a spark-shell having SDLB and your Apps code in the class-path, using the same data/metastore_db as metastore like ./startJob.sh.
 
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker-compose -f part2/docker-compose.yml -p getting-started build
-mkdir -p data/_metastore
-docker-compose -f part2/docker-compose.yml -p getting-started up
+```
+./sparkShell.sh
 ```
 
-</TabItem>
-<TabItem value="podman">
-
-```jsx
-mkdir -p data/_metastore
-./part2/podman-compose.sh 
+List existing tables in schema "default": 
+```
+spark.catalog.listTables("default").show(false)
 ```
 
-</TabItem>
-</Tabs>
+should show
 
-This might take multiple minutes.
-You should now be able to access Polynote at `localhost:8192`. 
+    +--------------------------------+-------------+---------+-----------+---------+-----------+
+    |name                            |catalog      |namespace|description|tableType|isTemporary|
+    +--------------------------------+-------------+---------+-----------+---------+-----------+
+    |btl_departures_arrivals_airports|spark_catalog|[default]|NULL       |EXTERNAL |false      |
+    |btl_distances                   |spark_catalog|[default]|NULL       |EXTERNAL |false      |
+    |int_airports                    |spark_catalog|[default]|NULL       |EXTERNAL |false      |
+    |int_departures                  |spark_catalog|[default]|NULL       |EXTERNAL |false      |
+    +--------------------------------+-------------+---------+-----------+---------+-----------+
 
-:::info Docker on Windows
-If you use Windows, please read our note on [Docker for Windows](../troubleshooting/docker-on-windows).
-You might notice that the commands for docker and podman differ at this point. 
-The latest version of podman-compose changed the behavior of creating pods, 
-which is why we have implemented a script `podman-compose.sh` to emulate podman-compose.
-:::
-
-But when you walk through the prepared notebook "SelectingData", you won't see any tables and data yet. 
-Can you guess why?  
-This is because your last pipeline run used an internal metastore, and not the external metastore we started with docker-compose yet.
-To configure Spark to use our external metastore, add the following spark properties to the application.conf under global.spark-options. 
-You probably don't have a global section in your application.conf yet, so here is the full block you need to add at the top of the file:
+List schema and data of table btl_distances:
 ```
-    global {
-      spark-options {
-        "spark.hadoop.javax.jdo.option.ConnectionURL" = "jdbc:derby://metastore:1527/db;create=true"
-        "spark.hadoop.javax.jdo.option.ConnectionDriverName" = "org.apache.derby.jdbc.ClientDriver"
-        "spark.hadoop.javax.jdo.option.ConnectionUserName" = "sa"
-        "spark.hadoop.javax.jdo.option.ConnectionPassword" = "1234"
-      }
-    }
-```
-This instructs Spark to use the external metastore you started with docker-compose. 
-Your Smart Data Lake container doesn't have access to the other containers just yet. 
-So when you run your data pipeline again, you need to add a parameter `--network`/`--pod` to join the virtual network where the metastore is located:
-
-<Tabs groupId = "docker-podman-switch"
-defaultValue="docker"
-values={[
-{label: 'Docker', value: 'docker'},
-{label: 'Podman', value: 'podman'},
-]}>
-<TabItem value="docker">
-
-```jsx
-docker run --hostname localhost --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --network getting-started_default sdl-spark:latest -c /mnt/config --feed-sel '.*'
+spark.table("default.btl_distances").printSchema
+spark.table("default.btl_distances").limit(5).show
 ```
 
-</TabItem>
-<TabItem value="podman">
+should look similar to 
 
-```jsx
-podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config --pod getting-started sdl-spark:latest -c /mnt/config --feed-sel '.*'
+    root
+    |-- estdepartureairport: string (nullable = true)
+    |-- estarrivalairport: string (nullable = true)
+    |-- arr_name: string (nullable = true)
+    |-- arr_latitude_deg: string (nullable = true)
+    |-- arr_longitude_deg: string (nullable = true)
+    |-- dep_name: string (nullable = true)
+    |-- dep_latitude_deg: string (nullable = true)
+    |-- dep_longitude_deg: string (nullable = true)
+    |-- distance: double (nullable = true)
+    |-- could_be_done_by_rail: boolean (nullable = true)
+
+    +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
+    |estdepartureairport|estarrivalairport|            arr_name|arr_latitude_deg|arr_longitude_deg|    dep_name|dep_latitude_deg|dep_longitude_deg|          distance|could_be_done_by_rail|
+    +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
+    |               LSZB|             LEAL|Alicante-Elche Mi...|         38.2822|        -0.558156|Bern Airport|       46.912868|         7.498512|1163.0363811380448|                false|
+    |               LSZB|             LFLY|   Lyon Bron Airport|       45.727947|         4.943991|Bern Airport|       46.912868|         7.498512|236.29247119523134|                 true|
+    |               LSZB|             LFMD|Cannes-Mandelieu ...|       43.547998|         6.955176|Bern Airport|       46.912868|         7.498512|376.56517532159864|                 true|
+    |               LSZB|             LFMN|Nice-Côte d'Azur ...|       43.658401|          7.21587|Bern Airport|       46.912868|         7.498512|362.55441725133795|                 true|
+    |               LSZB|             LGRP|    Diagoras Airport|       36.405399|        28.086201|Bern Airport|       46.912868|         7.498512| 2061.217367266584|                false|
+    +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
+
+You can also use SDLB's scala interface to access DataObjects and Actions in the spark-shell. The interface is generated through `./buildJob.sh` and it is important to re-execute buildJob.sh after changes on configurations files before starting the spark-shell.
+
+Now you can show or drop DataObjects as follows. Note that DataObjectId is converted from hyphen separated to camelCase style for Java/Scala compatibility.
+
+```
+sdlb.dataObjects.intDepartures.printSchema
+sdlb.dataObjects.intDepartures.get.limit(5).show
+sdlb.dataObjects.intDepartures.dataObject.dropTable
 ```
 
-</TabItem>
-</Tabs>
+You can find a detailed description of SDLB's scala interface [here](../../reference/notebookCatalog)
 
-After you run your data pipeline again, you should now be able to see our DataObjects data in Polynote.
-No need to restart Polynote, just open it again and run all cells.
-[This](../config-examples/application-part2-deltalake.conf) is how the final configuration file should look like. Feel free to play around.
+To automatically initialize SDLB's scala interface on spark-shell startup, uncomment the corresponding code in `shell.scala`.
 
 :::tip Delta Lake tuning
 You might have seen that our data pipeline with DeltaTableDataObject runs a Spark stage with 50 tasks several times.
-This is delta lake reading it's transaction log with Spark. For our data volume, 50 tasks are way too much.
-You can reduce the number of snapshot partitions to speed up the execution by setting the following Spark property in your `application.conf` under `global.spark-options`:
+This is delta lake reading its transaction log with Spark. For our data volume, 50 tasks are way too much.
+You can reduce the number of snapshot partitions to speed up the execution by setting the following Spark property in your `global.conf` under `global.spark-options`:
 
     "spark.databricks.delta.snapshotPartitions" = 2
+
 :::
 
-:::tip Spark UI from Polynote
-On the right side of Polynote you find a link to the Spark UI for the current notebooks Spark session. 
-If it doesn't work, try to replace 127.0.0.1 with localhost. If it still doesn't work, replace with IP address of WSL (`wsl hostname -I`). 
+:::tip Hocon file splitting - global.conf
+Note that SDLB config files can be split arbitrarily. They will be merged by the Hocon parser.
+An SDLB best practice is to use a separate global.conf file for the global configuration.
 :::
+
+Your departures/airports/btl.conf should now look like the files ending with `part-2a-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
+Feel free to play around.
 
 In the next step, we are going to take a look at keeping historical data...

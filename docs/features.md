@@ -12,16 +12,16 @@ More details on the roadmap will follow shortly.
 * Flexible structure by splitting over multiple files and subdirectories
 * Easy to generate from third party metadata (e.g. source system table catalog) to automate transformation of large number of DataObjects
 
-## Support for complex workflows & streaming
+## Support for [complex workflows](reference/dag) & [streaming](reference/streaming)
 * Fork, join, parallel execution, multiple start- & end-nodes possible
 * Recovery of failed runs
 * Switch a workflow between batch or streaming execution by using just a command line switch
 
-## Execution Engines
+## Multi-Engine
 * Spark (DataFrames)
 * Snowflake (DataFrames)
 * File (Input&OutputStream)
-* Future: Kafka Streams, Flink, …
+* Future: SQL, Kafka Streams, Flink, …
 
 ## Connectivity
 * Spark: diverse connectors (HadoopFS, Hive, DeltaLake, JDBC, Kafka, Splunk, Webservice, JMS) and formats (CSV, JSON, XML, Avro, Parquet, Excel, Access …)
@@ -37,7 +37,7 @@ More details on the roadmap will follow shortly.
 * Easy to extend by implementing predefined scala traits
 * Future: applying MLFlow machine learning models
 
-## Customizable Transformations
+## Customizable [Transformations](reference/transformations)
 * Spark Transformations:
     * Chain predefined standard transformations (e.g. filter, row level data validation and more) and custom transformations within the same action
     * Custom Transformation Languages: SQL, Scala (Class, compile from config), Python
@@ -48,14 +48,15 @@ More details on the roadmap will follow shortly.
     * Only one to one (one InputStream to one OutputStream)
 
 ## Early Validation
-(see [execution phases](reference/executionPhases.md) for details)
-* Execution in 3 phases before execution
-    * Load Config: validate configuration
-    * Prepare: validate connections
-    * Init: validate Spark DataFrame Lineage (missing columns in transformations of later actions will stop the execution)
+Execution in 3 phases before execution
+* Load Config: validate configuration
+* Prepare: validate connections
+* Init: validate Spark DataFrame Lineage (missing columns in transformations of later actions will stop the execution)
 
-## Execution Modes
-(see [execution Modes](reference/executionModes.md) for details)
+see [execution phases](reference/executionPhases) for details
+
+## [Execution Modes](reference/executionModes)
+Select data to process, e.g.
 * Process all data
 * Partition parameters: give partition values to process for start nodes as parameter
 * Partition Diff: search missing partitions and use as parameter
@@ -63,7 +64,7 @@ More details on the roadmap will follow shortly.
 * Spark Streaming: asynchronous incremental processing by using Spark Structured Streaming
 * Spark Streaming Once: synchronous incremental processing by using Spark Structured Streaming with Trigger=Once mode
 
-## Schema Evolution
+## [Schema Evolution](reference/schema#schema-evolution)
 * Automatic evolution of data schemas (new column, removed column, changed datatype)
 * Support for changes in complex datatypes (e.g. new column in array of struct)
 * Automatic adaption of DataObjects with fixed schema (Jdbc, DeltaLake)
@@ -83,14 +84,14 @@ More details on the roadmap will follow shortly.
 ## Lineage
 * Report all dependencies between DataObjects for visualisation of lineage in BI tool
 
-## Data Quality
+## [Data Quality](reference/dataQuality)
 * Metadata support for primary & foreign keys
 * Check & report primary key violations by executing primary key checker action
 * Define and validate row-level Constraints before writing DataObject
 * Define and evaluate Expectations when writing DataObject, trigger warning or error, collect result as custom metric
 * Future: Report data quality (foreign key matching & expectations) by executing data quality reporter action
 
-## Testing
+## [Testing](reference/testing)
 * Support for CI
     * Config validation
     * Custom transformation unit tests

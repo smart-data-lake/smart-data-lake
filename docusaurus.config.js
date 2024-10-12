@@ -5,7 +5,7 @@ import { Highlight, themes } from "prism-react-renderer"
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Smart Data Lake Builder',
-  tagline: 'A smart Automation Tool for building modern Data Lakes and Data Pipelines',
+  tagline: 'A smart Automation Tool for building modern Data Pipelines',
   url: 'https://www.smartdatalake.ch',
   baseUrl: '/',
   onBrokenLinks: 'throw',
@@ -68,7 +68,7 @@ const config = {
               title: 'Docs',
               items: [
                 {
-                  label: 'Getting started',
+                  label: 'Get started',
                   to: 'docs/',
                 },
               ],

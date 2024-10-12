@@ -4,8 +4,8 @@ title: Get Departure Coordinates
 
 ## Goal
 
-In this step we will extend the [configuration file](../config-examples/application-part1-compute-join.conf) of the previous step
-so that we get the coordinates and the readable name of Bern Airport in our final data.
+In this step we will extend the [btl.conf](https://github.com/smart-data-lake/getting-started/tree/master/config/btl.conf.part-1a-solution)
+file of the previous step, so that we get the coordinates and the readable name of Bern Airport in our final data.
 Since we are dealing with just one record, we could manually add it to the data set.
 But what if we wanted to extend our project to other departure airports in the future?
 We'll do it in a generic way by adding another transformer into the action *join_departures_airports*
@@ -22,12 +22,11 @@ Let's start in an unusual way by first changing the action. You'll see why short
       type = SQLDfsTransformer
       code = {
         btl-connected-airports = """
-          select stg_departures.estdepartureairport, stg_departures.estarrivalairport, 
-            airports.*
+          select stg_departures.estdepartureairport, stg_departures.estarrivalairport, airports.*
           from stg_departures join int_airports airports on stg_departures.estArrivalAirport = airports.ident
         """
-      }},
-    {
+      }
+    },{
       type = SQLDfsTransformer
       code = {
         btl-departures-arrivals-airports = """
@@ -37,19 +36,21 @@ Let's start in an unusual way by first changing the action. You'll see why short
           from btl_connected_airports join int_airports airports on btl_connected_airports.estdepartureairport = airports.ident
         """
       }
-    }    
-    ]
+      description = "Get the name and coordinates of the departures airport"
+    }]
     metadata {
       feed = compute
     }
   }
 ```
+
 We added a second transformer of the type SQLDfsTransformer.
 It's SQL Code references the result of the first transformer: *btl-connected-airports* (remember the underscores, so *btl_connected_airports* in SparkSQL).
-SDL will execute these transformations in the order you defined them, which allows you to chain them together, like we have done.
+SDLB will execute these transformations in the order you defined them, which allows you to chain them together, like we have done.
 
 In the second SQL-Code, we join the result of the first SQL again with int_airports, but this time using *estdepartureairport* as key
-to get the name and coordinates of the departures airport, Bern Airport.
+to get the name and coordinates of the departures airport, Bern Airport. We can this as a description of the transformer, so it is available as metadata later. 
+
 We also renamed these columns so that they are distinguishable from the names and coordinates of the arrival airports.
 Finally, we put the result into a DataObject called *btl-departures-arrivals-airports*.
 
@@ -70,7 +71,7 @@ Another difference is that you cannot run an individual transformation alone, yo
 
 ## Try it out
 
-[This](../config-examples/application-part1-compute-dep-arr.conf) is how your config should look like by now.
+[This](https://github.com/smart-data-lake/getting-started/tree/master/config/btl.conf.part-1b-solution) is how your btl.conf should look like by now.
 
 When running the example, you should see a CSV file with departure and arrival airport names and coordinates.
 

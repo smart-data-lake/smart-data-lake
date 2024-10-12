@@ -38,7 +38,8 @@ const sidebars = {
         'Part 2': [
             'getting-started/part-2/industrializing',
             'getting-started/part-2/delta-lake-format',
-            'getting-started/part-2/historical-data'
+            'getting-started/part-2/historical-data',
+            'getting-started/part-2/environments'
         ],
         'Part 3': [
           'getting-started/part-3/custom-webservice',

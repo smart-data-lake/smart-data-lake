@@ -65,7 +65,7 @@ function Home() {
       <header className={clsx('hero hero--primary', styles.heroBanner)}>
         <div className="container">
           <h1 className="hero__title">{siteConfig.title}</h1>
-          <p className="hero__subtitle">{siteConfig.tagline}</p>
+          <p className="hero__subtitle" style={{lineHeight: '1.8rem', paddingBottom: '0.8rem'}}>A smart Automation Tool to build modern Data Pipelines<br/>for Lakehouse architecture and Data Mesh.</p>
           <div className={styles.buttons}>
             <Link
               className={clsx(
