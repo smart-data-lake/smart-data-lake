@@ -5,20 +5,14 @@ sidebar_label: Introduction
 slug: /
 ---
 
-Smart Data Lake Builder (SDL for short) is a data lake automation framework that makes loading and transforming data a breeze.
-It is implemented in Scala and builds on top of open-source big data technologies like [Apache Hadoop](https://hadoop.apache.org/) and [Apache Spark](https://spark.apache.org/), including connectors for diverse data sources (HadoopFS, Hive, DeltaLake, JDBC, Splunk,  Webservice, SFTP, JMS, Excel, Access) and file formats.
+Smart Data Lake Builder (SDLB for short) is an automation framework that makes loading and transforming data a breeze.
+It can be used to create data pipelines for a wide range of use cases such as [Lakehouse](https://www.databricks.com/blog/2020/01/30/what-is-a-data-lakehouse.html), Data Products and [Data Mesh](/blog/sdl-data-mesh).  
 
-### A Data Lake
-* is a central raw data store for analytics
-* facilitates cheap raw storage to handle growing volumes of data
-* enables topnotch artificial intelligence (AI) and machine learning (ML) technologies for data-driven enterprises
-
-### The Smart Data Lake adds
-* a layered data architecture to provide not only raw data, but prepared, secured, high quality data according to business entities, ready to use for analytical use cases, also called «Smart Data». This is comparable to Databricks Lake House architecture, in fact Smart Data Lake Builder is a very good choice to automate a Lake House, also on Databricks.
-* a declarative, configuration-driven approach to creating data pipelines. Metadata about data pipelines allows for efficient operations, maintenance and more business self-service.
+SDLB is implemented in Java/Scala and builds on top of open-source big data technologies like [Apache Hadoop](https://hadoop.apache.org/) and [Apache Spark](https://spark.apache.org/), 
+including connectors for diverse data sources (HadoopFS, Hive, DeltaLake, JDBC, Splunk, Webservice, SFTP, Kafka, JMS, Excel, Access) and file formats.
 
 ### Benefits of Smart Data Lake Builder
-* Cheaper implementation of data lakes
+* Cheaper implementation of data pipelines
 * Increased productivity of data scientists
 * Higher level of self-service
 * Decreased operations and maintenance costs
@@ -26,13 +20,13 @@ It is implemented in Scala and builds on top of open-source big data technologie
 
 ### When should you consider using Smart Data Lake Builder ?
 Some common use cases include:
-* Building Data Lakes, drastically increasing productivity and usability
-* Data Apps - building complex data processing apps
+* Building Lakehouse architectur - drastically increasing productivity and usability
+* Implementing Data Products - building simple and complex data apps in a Data Mesh approach
 * DWH automation - reading and writing to relational databases via SQL
-* Data migration - Efficiently create one-time data pipelines
-* Data Catalog / Data Lineage - Generated automatically from metadata
+* Data migration - efficiently create one-time data pipelines
+* Data Catalog / Data Lineage - generated automatically from metadata and code
 
-See (docs/Features.md) for a comprehensive list of Smart Data Lake Builder features.
+See [Features](features) for a comprehensive list of SDLB features.
 
 ## How it works
 The following diagram shows the core concepts:
@@ -58,10 +52,13 @@ All metadata i.e. connections, data objects and actions are defined in a central
 The file format used is [HOCON](https://github.com/lightbend/config/blob/master/HOCON.md) which makes it easy to edit.
 
 ### Getting Started
-To see how all this works in action, head over to the [Getting Started Guide](getting-started/setup.md) page.
+To see how all this works in action, head over to the [Getting Started Guide](getting-started/setup) page.
 
 ### Get in touch
-If you have issues, comments or feedback, please see [Contributing](contribution.md) on how to get in touch.
+If you have issues, comments or feedback, please see [Contributing](contribution) on how to get in touch.
+
+### Commercial Support
+If you are looking for commercial support, please contact us at smartdatalake@elca.ch to receive further information about subscription models.
 
 # Major Contributors
 ![SBB](images/SBB_logo.png)  
