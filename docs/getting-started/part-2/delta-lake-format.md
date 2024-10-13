@@ -147,6 +147,7 @@ spark.catalog.listTables("default").show(false)
 
 should show
 
+```
     +--------------------------------+-------------+---------+-----------+---------+-----------+
     |name                            |catalog      |namespace|description|tableType|isTemporary|
     +--------------------------------+-------------+---------+-----------+---------+-----------+
@@ -155,6 +156,7 @@ should show
     |int_airports                    |spark_catalog|[default]|NULL       |EXTERNAL |false      |
     |int_departures                  |spark_catalog|[default]|NULL       |EXTERNAL |false      |
     +--------------------------------+-------------+---------+-----------+---------+-----------+
+```
 
 List schema and data of table btl_distances:
 ```
@@ -164,6 +166,7 @@ spark.table("default.btl_distances").limit(5).show
 
 should look similar to 
 
+```
     root
     |-- estdepartureairport: string (nullable = true)
     |-- estarrivalairport: string (nullable = true)
@@ -175,7 +178,9 @@ should look similar to
     |-- dep_longitude_deg: string (nullable = true)
     |-- distance: double (nullable = true)
     |-- could_be_done_by_rail: boolean (nullable = true)
+```
 
+```
     +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
     |estdepartureairport|estarrivalairport|            arr_name|arr_latitude_deg|arr_longitude_deg|    dep_name|dep_latitude_deg|dep_longitude_deg|          distance|could_be_done_by_rail|
     +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
@@ -185,6 +190,7 @@ should look similar to
     |               LSZB|             LFMN|Nice-Côte d'Azur ...|       43.658401|          7.21587|Bern Airport|       46.912868|         7.498512|362.55441725133795|                 true|
     |               LSZB|             LGRP|    Diagoras Airport|       36.405399|        28.086201|Bern Airport|       46.912868|         7.498512| 2061.217367266584|                false|
     +-------------------+-----------------+--------------------+----------------+-----------------+------------+----------------+-----------------+------------------+---------------------+
+```
 
 You can also use SDLB's scala interface to access DataObjects and Actions in the spark-shell. The interface is generated through `./buildJob.sh` and it is important to re-execute buildJob.sh after changes on configurations files before starting the spark-shell.
 
@@ -205,7 +211,9 @@ You might have seen that our data pipeline with DeltaTableDataObject runs a Spar
 This is delta lake reading its transaction log with Spark. For our data volume, 50 tasks are way too much.
 You can reduce the number of snapshot partitions to speed up the execution by setting the following Spark property in your `global.conf` under `global.spark-options`:
 
+```
     "spark.databricks.delta.snapshotPartitions" = 2
+```
 
 :::
 

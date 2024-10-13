@@ -257,8 +257,10 @@ Now you can start another job:
 Uff, getting error `SchemaViolationException: (DataObject~int-departures) Schema does not match schema defined on write:`?
 The error message gives detailed information about columns that are missing or superfluous (comparison includes type):
 
+```
     - missingCols=
     - superfluousCols=created_at
+```
 
 We have created an additional column `created_at`, which doesn't yet exist in the current table.
 SDLB supports schema evolution for DataObjects like DeltaLakeTableDataObject.

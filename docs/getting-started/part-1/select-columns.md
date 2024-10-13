@@ -174,7 +174,9 @@ One common mistake is mixing up the types of Data Objects.
 To give you some experience on how to debug your config, you can also try out what happens if you change the type of *stg-airports* to JsonFileDataObject.
 You will get an error message which indicates that there might be some format problem, but it is hard to spot :
 
+```
      Error: cannot resolve '`ident`' given input columns: [stg_airports._corrupt_record]; line 1 pos 7;
+```
 
 The FileTransferAction will save the result from the Webservice with the JsonFileDataObject as file with filetype \*.json. 
 Then Spark tries to parse the CSV-records in the \*.json file with a JSON-Parser. It is unable to properly read the data.
@@ -199,7 +201,9 @@ In our case, we would end up with a faulty DataObject that looks like this:
 
 This time, it will fail with this error message:
 
+```
     Exception in thread "main" io.smartdatalake.workflow.TaskFailedException: Task select-airport-cols failed. 
     Root cause is 'SparkException: Malformed records are detected in schema inference. 
     Parse Mode: FAILFAST. Reasons: Failed to infer a common schema. Struct types are expected, but `string` was found.'
+```
 

@@ -82,6 +82,7 @@ The sampling rate is given by the frequency that our data pipeline is scheduled.
 sdlb.dataObjects.intAirports.printSchema
 ```
 
+```
     root
     |-- ident: string (nullable = true)
     |-- name: string (nullable = true)
@@ -89,12 +90,14 @@ sdlb.dataObjects.intAirports.printSchema
     |-- longitude_deg: string (nullable = true)
     |-- dl_ts_captured: timestamp (nullable = true)
     |-- dl_ts_delimited: timestamp (nullable = true)
+```
 
 If you look at the data, there should be only one record per object for now, as we didn't run our data pipeline with historical data yet.
 ```
   dataIntAirports.get.orderBy($"ident",$"dl_ts_captured").show
 ```
 
+```
     +-----+--------------------+------------------+-------------------+--------------------+-------------------+
     |ident|                name|      latitude_deg|      longitude_deg|      dl_ts_captured|    dl_ts_delimited|
     +-----+--------------------+------------------+-------------------+--------------------+-------------------+
@@ -104,6 +107,7 @@ If you look at the data, there should be only one record per object for now, as 
     | 00AL|        Epps Airpark| 34.86479949951172| -86.77030181884766|2021-12-05 13:23:...|9999-12-31 00:00:00|
     | 00AR|Newport Hospital ...|           35.6087|         -91.254898|2021-12-05 13:23:...|9999-12-31 00:00:00|
     ...
+```
 
 Let's try to simulate the historization process by loading a historical state of the data and see if any of the airports have changed since then.
 For this, drop table `int-airports` again.
@@ -146,6 +150,7 @@ Now check in spark-shell again, and you'll find several airports that have chang
   .show
 ```
 
+```
     +-------+-----+
     |  ident|count|
     +-------+-----+
@@ -155,6 +160,7 @@ Now check in spark-shell again, and you'll find several airports that have chang
     |CA-0120|    2|
     |   CDV3|    2|
     ...
+```
 
 :::tip Tips for spark-shell
 You may have noticed that pasting multi-line text into spark-shell executes every line separately.
@@ -172,13 +178,15 @@ When checking the details it seems that for many airports the number of signific
   .drop("dl_hash")
   .show(false)
 ```
- 
+
+```
     +-----+-------------------------------------------------+-------------+--------------+--------------------------+--------------------------+
     |ident|name                                             |latitude_deg |longitude_deg |dl_ts_captured            |dl_ts_delimited           |
     +-----+-------------------------------------------------+-------------+--------------+--------------------------+--------------------------+
     |CDV3 |Charlottetown (Queen Elizabeth Hospital) Heliport|46.255493    |-63.098887    |2021-12-05 20:52:58.800645|9999-12-31 00:00:00       |
     |CDV3 |Charlottetown (Queen Elizabeth Hospital) Heliport|46.2554925916|-63.0988866091|2021-12-05 20:40:31.629764|2021-12-05 20:52:58.799645|
     +-----+-------------------------------------------------+-------------+--------------+--------------------------+--------------------------+
+```
 
 Values for `dl_ts_capture` and `dl_ts_delimited` respectively were set to the current time of our data pipeline run. 
 For an initial load, this should be set to the time of the historical data set. 
@@ -205,8 +213,9 @@ If Spark joins data, it needs two processing stages and a shuffle in between to 
 There is a Spark property we can tune for small datasets to reduce the number of tasks created.
 The default value is to create 200 tasks in each shuffle. With our dataset, 2 tasks should be enough already.
 You can tune this by setting the following property in global.spark-options of global.conf configuration file:
-
+```
     "spark.sql.shuffle.partitions" = 2
+```
 
 :::
 
@@ -293,6 +302,7 @@ sdlb.dataObjects.intDepartures.get
 .show
 ```
 
+```
     +------+-------------------+--------+-----+
     |icao24|estdepartureairport|      dt|count|
     +------+-------------------+--------+-----+
@@ -307,6 +317,7 @@ sdlb.dataObjects.intDepartures.get
     |4d02d7|               LSZB|20210829|    1|
     |4b43ab|               LSZB|20210830|    1|
     ...
+```
 
 Note that DeduplicateAction assumes that input data is already unique across the given primary key. With `mergeModeEnable = true` we even get errors otherwise.
 DeduplicateAction doesn't deduplicate your input data by default, because deduplication is costly and data often is already unique.
