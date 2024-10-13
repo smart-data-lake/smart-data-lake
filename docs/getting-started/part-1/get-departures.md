@@ -140,8 +140,7 @@ You can group actions together into the same feed if you want to execute them to
 We will come back to the concept of feeds as our pipeline gets more complex.
 
 :::info
-Metadata is not just used to select the right feeds.
-Metadata can also help a lot in documenting your data pipelines and making its data lineage understandable and discoverable. 
+[Metadata](../part-3/metadata) is not just used to select the right feeds. Metadata can also help a lot in documenting your data pipelines and making its data lineage understandable and discoverable.
 :::
 
 

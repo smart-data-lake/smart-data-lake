@@ -7,10 +7,11 @@ Smart Data Lake Builder is still under heavy development so new features are add
 The following list will give you a rough overview of current and planned features.
 More details on the roadmap will follow shortly.
 
-## Filebased metadata
+## Declarative approach, file based metadata
 * Easy to version with a VCS for DevOps
 * Flexible structure by splitting over multiple files and subdirectories
 * Easy to generate from third party metadata (e.g. source system table catalog) to automate transformation of large number of DataObjects
+* Support to handle multiple environments
 
 ## Support for [complex workflows](reference/dag) & [streaming](reference/streaming)
 * Fork, join, parallel execution, multiple start- & end-nodes possible
@@ -82,7 +83,8 @@ Select data to process, e.g.
 * Custom metadata attributes
 
 ## Lineage
-* Report all dependencies between DataObjects for visualisation of lineage in BI tool
+* Browse lineage of DataObjects and Actions in the UI
+* 
 
 ## [Data Quality](reference/dataQuality)
 * Metadata support for primary & foreign keys
@@ -103,6 +105,14 @@ Select data to process, e.g.
 * Execute multiple Spark jobs in parallel within the same Spark Session to save resources
 * Automatically cache and release intermediate results (DataFrames)
 
-## Housekeeping
+## [Housekeeping](/blog/sdl-housekeeping)
 * Delete, or archive & compact partitions according to configurable expressions
 * Extend with custom housekeeping logic
+
+## [User Interface](/blog/sdl-uidemo)
+* Configuration viewer with catalog and lineage view
+* Comprehensive workflow visualization
+* Documentation from metadata and code approach - all configuration elements can be described in the metadata, and are enriched with documentation from code where possible.
+
+see also [UI Demo](https://ui-demo.smartdatalake.ch/) visualizing [Getting Started](getting-started/setup) data pipeline.
+

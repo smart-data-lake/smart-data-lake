@@ -43,7 +43,8 @@ const sidebars = {
         ],
         'Part 3': [
           'getting-started/part-3/custom-webservice',
-          'getting-started/part-3/incremental-mode'
+          'getting-started/part-3/incremental-mode',
+          'getting-started/part-3/metadata'
         ],
         'Troubleshooting': [
           'getting-started/troubleshooting/common-problems',
