@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[3413],{1631:a=>{a.exports=JSON.parse('{"label":"data catalog","permalink":"/blog/tags/data-catalog","allTagsPath":"/blog/tags","count":1,"unlisted":false}')}}]);

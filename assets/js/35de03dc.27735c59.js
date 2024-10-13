@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksmart_data_lake=self.webpackChunksmart_data_lake||[]).push([[1090],{1459:a=>{a.exports=JSON.parse('{"label":"lineage","permalink":"/blog/tags/lineage","allTagsPath":"/blog/tags","count":1,"unlisted":false}')}}]);

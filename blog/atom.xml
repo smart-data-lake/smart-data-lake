@@ -2,11 +2,83 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://www.smartdatalake.ch/blog</id>
     <title>Smart Data Lake Builder Blog</title>
-    <updated>2023-09-17T00:00:00.000Z</updated>
+    <updated>2023-11-09T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://www.smartdatalake.ch/blog"/>
     <subtitle>Smart Data Lake Builder Blog</subtitle>
     <icon>https://www.smartdatalake.ch/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[SDLB UI Updated!]]></title>
+        <id>https://www.smartdatalake.ch/blog/sdl-uidemo</id>
+        <link href="https://www.smartdatalake.ch/blog/sdl-uidemo"/>
+        <updated>2023-11-09T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Data Pipeline Visualization Tool]]></summary>
+        <content type="html"><![CDATA[<p>We are thrilled to announce a major overhaul of the <strong>SDLB UI</strong> designed to revolutionize the way we visualize, track, and manage data pipelines!
+This addition to SDLB acts as a user-friendly technical data catalog that showcases dependencies through a lineage graph, along with metadata about data pipeline execution (workflows).</p>
+<p>SDLBs UI tool is a step forward in data pipeline management, providing enhanced visibility and control.
+Whether you are a data engineer, analyst, or scientist, this tool will enhance your abilities to manage data pipelines,
+allowing you to be more productive and achieve exceptional results.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="-see-it-in-action">🌟 See it in action<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#-see-it-in-action" class="hash-link" aria-label="Direct link to 🌟 See it in action" title="Direct link to 🌟 See it in action">​</a></h2>
+<p>Check out the new <a href="https://ui-demo.smartdatalake.ch/" target="_blank" rel="noopener noreferrer">UI-Demo</a>, where the final data pipeline of our <a href="https://www.smartdatalake.ch/docs/getting-started/setup">Getting Started Guide</a> is used as an example for our UI tool.
+Witness firsthand how our tool simplifies data pipeline management and enhances your workflow efficiency.</p>
+<p><img loading="lazy" alt="home" src="https://www.smartdatalake.ch/assets/images/home-758fa247e165d33815b7fd45edbc9361.png" width="684" height="477" class="img_ev3q"></p>
+<p>Thanks to its user-friendly interface and powerful features, managing complex workflows has never been easier.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="-comprehensive-workflow-dashboard">📊 Comprehensive Workflow Dashboard<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#-comprehensive-workflow-dashboard" class="hash-link" aria-label="Direct link to 📊 Comprehensive Workflow Dashboard" title="Direct link to 📊 Comprehensive Workflow Dashboard">​</a></h2>
+<p>Get a bird's eye view of your data pipelines! Our new intuitive dashboard visualizes intricate details for each run,
+including execution time, duration, and the feed configuration used.
+Deep dive into the timeline of involved actions, with the ability to access detailed execution metrics by simply clicking on each action.
+<img loading="lazy" alt="Timeline of Action" src="https://www.smartdatalake.ch/assets/images/timeline-cbf74778683a66781c724b01677cad0a.png" width="1237" height="481" class="img_ev3q"></p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="-configuration-viewer-with-rich-content">🔍 Configuration Viewer with Rich Content<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#-configuration-viewer-with-rich-content" class="hash-link" aria-label="Direct link to 🔍 Configuration Viewer with Rich Content" title="Direct link to 🔍 Configuration Viewer with Rich Content">​</a></h2>
+<p>Explore your configuration using the Configuration Viewer that contains all the information from your config file,
+and extra information you provide as documentation. You can find:</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="configuration-details">Configuration Details<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#configuration-details" class="hash-link" aria-label="Direct link to Configuration Details" title="Direct link to Configuration Details">​</a></h3>
+<p>View all the details of your SDLB configuration in an appealing UI.
+For DataObjects the page is enriched with a list of the last SDLB Runs that modified the corresponding data, and some table statistics:</p>
+<p><img loading="lazy" alt="configuration" src="https://www.smartdatalake.ch/assets/images/btl-distance-config-d71d6d76e17880996951fd66e1ab76ff.png" width="1069" height="717" class="img_ev3q"></p>
+<p>Tags help to organize configuration objects and find related items.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="markdown-descriptions">Markdown Descriptions<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#markdown-descriptions" class="hash-link" aria-label="Direct link to Markdown Descriptions" title="Direct link to Markdown Descriptions">​</a></h3>
+<p>SDLB supports creating descriptions as markdown files, enabling you to provide comprehensive documentation about DataObjects and Actions.
+Markdown description files can include images, hyperlinks, and other formatting options:</p>
+<p><img loading="lazy" alt="description" src="https://www.smartdatalake.ch/assets/images/btl-distance-des-2c1ec076e8555c583b1260f9d71270e8.png" width="1069" height="682" class="img_ev3q"></p>
+<p>Good documentation is very important for long-term maintenance of data pipelines.
+The benefit of this documentation is that it's versioned together with your code and can be part of your code reviews.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="schema-and-column-statistics">Schema and Column Statistics<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#schema-and-column-statistics" class="hash-link" aria-label="Direct link to Schema and Column Statistics" title="Direct link to Schema and Column Statistics">​</a></h3>
+<p>The UI can now also show the schema of DataObjects, including column statistics:</p>
+<p><img loading="lazy" alt="schemas" src="https://www.smartdatalake.ch/assets/images/btl-distance-schema-22ec2f776a0332fc388c9d127b53a2a6.png" width="1069" height="535" class="img_ev3q"></p>
+<p>This helps a lot to get a better first impression of the content of a DataObject.
+Schema and Statistics must be exported regularly using a Command Line Tool.
+Best practice is to make this part of your release pipeline.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="transformation-documentation">Transformation Documentation<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#transformation-documentation" class="hash-link" aria-label="Direct link to Transformation Documentation" title="Direct link to Transformation Documentation">​</a></h3>
+<p>For Actions the UI provides clear visualizations of the transformers applied.
+For Custom transformers implemented as Scala classes the view is enriched with source code documentation:</p>
+<p><img loading="lazy" alt="transformers" src="https://www.smartdatalake.ch/assets/images/compute-distance-config-e5ec4c87c106938533e0c811e015387e.png" width="1069" height="656" class="img_ev3q"></p>
+<p>This feature simplifies the understanding of complex data transformations, and again encourages to version documentation and code together, following the "documentation as code" approach.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="lineage-graph">Lineage Graph<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#lineage-graph" class="hash-link" aria-label="Direct link to Lineage Graph" title="Direct link to Lineage Graph">​</a></h3>
+<p>Track and understand the flow of data across various processing stages with lineage graph visualization.
+Visualize the dependencies between data objects and actions involved in your data pipeline, empowering you to monitor the data flow and answer questions about the impact of changes.</p>
+<p><img loading="lazy" alt="lineage" src="https://www.smartdatalake.ch/assets/images/compute-distance-lineage-ac47d1783841becbacb4988ea536176e.png" width="364" height="839" class="img_ev3q"></p>
+<p>The visualization supports switching between the graph of Actions (control flow), the graph of DataObjects (data flow), and a complete flow of Actions and DataObjects as shown in the screenshot above.
+You can expand/collapse all up- and downstream nodes at once, or just individual edges one-by-one. And you can switch between vertical and horizontal layout.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="summary-and-outlook">Summary and Outlook<a href="https://www.smartdatalake.ch/blog/sdl-uidemo#summary-and-outlook" class="hash-link" aria-label="Direct link to Summary and Outlook" title="Direct link to Summary and Outlook">​</a></h2>
+<p>The SDLB UI is game-changing tool to maintain and operate data pipelines more efficiently!
+Get started today using the installation guide on the <a href="https://github.com/smart-data-lake/sdl-visualization" target="_blank" rel="noopener noreferrer">sdl-visualization</a> GitHub repository.
+Or try out our <a href="https://www.smartdatalake.ch/docs/getting-started/setup">Getting Started Guide</a>, where you learn more about descriptive metadata and the UI in <a href="http://localhost:3000/docs/getting-started/part-3/metadata" target="_blank" rel="noopener noreferrer">part 3</a>.</p>
+<p>For sure we will further invest to advance the UI. Features on the roadmap are real-time workflow run updates, improved metrics statistics and grouping in the lineage graph.
+Should you have suggestions for improvements or bug reports, feel free to create an <a href="https://github.com/smart-data-lake/sdl-visualization/issues" target="_blank" rel="noopener noreferrer">issue</a>.</p>
+<p>Soon, we also plan to release the UI "as-a-service". This will further simplify its usage for projects and production use.
+Stay tuned!</p>]]></content>
+        <author>
+            <name>Shasha Jiang</name>
+            <uri>https://github.com/dust629</uri>
+        </author>
+        <author>
+            <name>Zacharias Kull</name>
+            <uri>https://github.com/zzeekk</uri>
+        </author>
+        <category label="ui" term="ui"/>
+        <category label="data catalog" term="data catalog"/>
+        <category label="lineage" term="lineage"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Data Mesh with SDL]]></title>
         <id>https://www.smartdatalake.ch/blog/sdl-data-mesh</id>
