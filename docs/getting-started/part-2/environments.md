@@ -31,11 +31,17 @@ The command above do anything new yet, as we first need to create the `envConfig
 As part of this tutorial, let's make the following configurations customizable per environment:
 - database: The database name to be used in DeltaLakeTableDataObjects
 - basePath: The root path where data files are stored
+- basePathWithId: Helper variable to be used as path with DataObjectId appended
+- tablePathWithId: Helper variable to be used as path with DataObjectId appended for table DataObjects.
+  Separating this into a another variable allows us to switch to managed tables for corresponding environments by setting it to `null`.  
+
 For this create an environment file `envConfig/dev.conf` with the following content, if it doesn't yet exist:
 ```
 env {
   database = default
   basePath = "./"
+  basePathWithId = ${env.basePath}"~{id}"
+  tablePathWithId = ${env.basePathWithId}  
 }
 ```
 
@@ -43,7 +49,7 @@ Then lets replace all `table.database` and `path` configuration entries with a H
 ```
   int-departures {
     type = DeltaLakeTableDataObject
-    path = ${env.basePath}"~{id}"
+    path = ${env.tablePathWithId}
     table = {
       db = ${env.database}
       name = int_departures
