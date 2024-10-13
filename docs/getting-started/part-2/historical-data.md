@@ -358,6 +358,56 @@ With Scala, you can compile code on the fly. This is actually what the Scala She
 The Scala code in the configuration above gets compiled when ScalaCodeSparkDfTransformer is instantiated during startup of SDLB.
 :::
 
-Your departures/airports.conf should now look like the files ending with `part-2b-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
+## Adapt downstream Action
+
+Having historized data in `int-airports` means we can have serveral records over time for the same Airport.
+This will create duplicates when joining with departures!
+We therefore need to adapt Action `join-departures-airports` to use only the current version of Airports in the join with departures.
+This can be achieved by adding a join condition `and current_timestamp between airports.dl_ts_captured and airports.dl_ts_delimited` when joining arrival and departure airport.
+
+Further we need to tell SDLB to use all data from Airports, and not only the new and updated records, as per default SDLB forwards the DataFrame that the previous Action sent to the corresponding output. This can be achieved by adding `breakDataFrameLineage = true`.
+
+The updated `join-departures-airports` Action should look as follows:
+```
+  join-departures-airports {
+    type = CustomDataFrameAction
+    inputIds = [int-departures, int-airports]
+    outputIds = [btl-departures-arrivals-airports]
+    breakDataFrameLineage = true
+    transformers = [{
+      type = SQLDfsTransformer
+      code = {
+        btl-connected-airports = """
+          select int_departures.estdepartureairport, int_departures.estarrivalairport, airports.*
+          from int_departures join int_airports airports on int_departures.estArrivalAirport = airports.ident and current_timestamp between airports.dl_ts_captured and airports.dl_ts_delimited
+        """
+      }
+    },{
+      type = SQLDfsTransformer
+      code = {
+        btl-departures-arrivals-airports = """
+          select btl_connected_airports.estdepartureairport, btl_connected_airports.estarrivalairport,
+            btl_connected_airports.name as arr_name, btl_connected_airports.latitude_deg as arr_latitude_deg, btl_connected_airports.longitude_deg as arr_longitude_deg,
+            airports.name as dep_name, airports.latitude_deg as dep_latitude_deg, airports.longitude_deg as dep_longitude_deg
+          from btl_connected_airports join int_airports airports on btl_connected_airports.estdepartureairport = airports.ident and current_timestamp between airports.dl_ts_captured and airports.dl_ts_delimited
+        """
+      }
+      description = "Get the name and coordinates of the departures airport"
+    }]
+    metadata {
+      feed = compute
+    }
+  }    
+```
+
+With this configuration Action `join-departures-airports` will join all departures with the current version of airports,
+and overwrite the whole `btl-departures-arrivals-airports` table in every run. As it is an inner join, records without matching airport will be filtered out.
+
+It could also make sense to join each departure with the airport record that was valid at the time of the departure, 
+or join it with the latest record available for each airport. For now we assume that our implementation fullfills the requirements of our friend Tom.
+
+## Summary
+
+Your departures/airports/btl.conf should now look like the files ending with `part-2b-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
 
 In the next step we are going to configure the pipeline for different environments like development, integration and production.
