@@ -5,15 +5,16 @@ title: Metadata and SDLB UI
 
 ## Goal
 
+SDLB is following a _documentation from metadata and code_ approach. 
 In this part, we are going to dive into the role of descriptive metadata in SDLB, and demonstrate how to create this additional metadata and its benefits.
 Again it is based on the departures/airports/btl.conf configuration files from the previous steps.
 
-Descriptive metadata, in the context of SDLB, refers to additional configuration attributes, markdown files and generated json files, that go beyond the basic "id" of DataObjects and Actions.
+Descriptive metadata, in the context of SDLB, refers to additional configuration attributes, markdown files and generated json files, that go beyond the basic _id_ of DataObjects and Actions.
 It is mainly about adding information to document, manage and explore data pipelines effectively in the SDLB UI.
 
 Of course descriptive metadata is not needed to run your data pipeline, but you will see how it will create a nice, up-to-date documentation in the SDLB UI   
 
-## Add metadata for Actions, DataObjects and Connections
+## Add metadata for Actions, DataObjects and Transformations
 
 One part of metadata is additional informations for DataObjects, Actions and Transformations. 
 
