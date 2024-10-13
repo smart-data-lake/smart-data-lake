@@ -9,7 +9,7 @@
 
 
 <link rel="search" type="application/opensearchdescription+xml" title="Smart Data Lake Builder" href="/opensearch.xml"><link rel="stylesheet" href="/assets/css/styles.882ac319.css">
-<script src="/assets/js/runtime~main.12f80229.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.528bec38.js" defer="defer"></script>
 <script src="/assets/js/main.cfad824e.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -30,7 +30,7 @@ Notice that you need the ICAO identifier of Tom&#x27;s airport to get the right 
 You know that Tom lives near Bern, Switzerland. A quick web search shows you that the identifier is
 <em>LSZB</em>. Let&#x27;s focus on some specific time period for now to have reproducible results.
 You end up with the following REST-URL:</p>
-<p><a href="https://opensky-network.org/api/flights/departure?airport=LSZB&amp;begin=1696854853&amp;end=1697027653" target="_blank" rel="noopener noreferrer">https://opensky-network.org/api/flights/departure?airport=LSZB&amp;begin=1696854853&amp;end=1697027653</a></p>
+<div class="codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#000000;--prism-background-color:#ffffff"><div class="codeBlockContent_biex"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#000000;background-color:#ffffff"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#000000"><span class="token plain">    https://opensky-network.org/api/flights/departure?airport=LSZB&amp;begin=1696854853&amp;end=1697027653</span><br></span></code></pre><div class="buttonGroup__atx"><button type="button" aria-label="Copy code to clipboard" title="Copy" class="clean-btn"><span class="copyButtonIcons_eSgA" aria-hidden="true"><svg viewBox="0 0 24 24" class="copyButtonIcon_y97N"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"></path></svg><svg viewBox="0 0 24 24" class="copyButtonSuccessIcon_LjdS"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"></path></svg></span></button></div></div></div>
 <p>When you run this in your web-browser, you will get a response in the JSON Format.
 For each record, it contains the ICAO identifier of the airport where the plane is flying to in the field
 <em>estArrivalAirport</em>. That&#x27;s a good start!</p>
