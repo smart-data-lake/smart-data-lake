@@ -35,7 +35,7 @@
         <module>sdl-snowflake</module>
         <module>sdl-azure</module>
         <module>sdl-lang</module>
-        <module>sdl-googlecloud</module>
+        <module>sdl-gcp</module>
     </modules>
 
     <licenses>
@@ -437,7 +437,7 @@
         <keycloak.version>20.0.1</keycloak.version>
         <delta.version>2.2.0</delta.version>
         <iceberg.version>1.1.0</iceberg.version>
-        <bigquery.version>0.31.1</bigquery.version>
+        <bigquery.version>0.41.0</bigquery.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
