@@ -38,6 +38,7 @@ As part of this tutorial, let's make the following configurations customizable p
 For this create an environment file `envConfig/dev.conf` with the following content, if it doesn't yet exist:
 ```
 env {
+  catalog = null # no catalog needed for local execution
   database = default
   basePath = "./"
   basePathWithId = ${env.basePath}"~{id}"
@@ -45,12 +46,13 @@ env {
 }
 ```
 
-Then lets replace all `table.database` and `path` configuration entries with a HOCON substitution as follows:
+Then lets replace all `table.database` and `path` configuration entries with a HOCON substitution as follows, and add `table.catalog`:
 ```
   int-departures {
     type = DeltaLakeTableDataObject
     path = ${env.tablePathWithId}
     table = {
+      catalog = ${env.catalog}
       db = ${env.database}
       name = int_departures
       primaryKey = [icao24, estdepartureairport, dt]
