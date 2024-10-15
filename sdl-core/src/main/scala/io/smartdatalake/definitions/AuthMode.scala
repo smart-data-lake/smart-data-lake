@@ -22,6 +22,8 @@ import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 import io.smartdatalake.util.webservice.KeycloakUtil
 import org.keycloak.admin.client.{Keycloak, KeycloakBuilder}
+import io.smartdatalake.config.ConfigurationException
+
 
 /**
  * Authentication modes define how an application authenticates itself
@@ -163,6 +165,7 @@ case class PublicKeyAuthMode(@Deprecated @deprecated("Use `user` instead", "2.5.
   private[smartdatalake] val userSecret: StringOrSecret = _user
 }
 
+
 /**
  * Validate by SSL Certificates : Only location an credentials. Additional attributes should be
  * supplied via options map
@@ -204,6 +207,27 @@ case class SASLSCRAMAuthMode (
   private[smartdatalake] val truststorePassSecret: StringOrSecret  = _truststorePass
 }
 
+/**
+ * Authorization parameters to access a GCP-ressource using Service Account Keys.
+ * A Service Account Key can be either read as Base64-encoded JSON file (String),
+ * or as a path containing the JSON-File with the key, as described by Google. Only one of the options should be provided.
+ * @param serviceAccountKey A String that represents the Service Account Key encoded in Base64.
+ * @param serviceAccountKeyFile A path that represents the location of the JSON-file with the service account key.
+ */
+case class GCPCredentialsKeyAuth(private val serviceAccountKey: Option[StringOrSecret],
+                                 private val serviceAccountKeyFile: Option[StringOrSecret]) extends AuthMode {
+  override def prepare(): Unit = {
+    (serviceAccountKey, serviceAccountKeyFile) match {
+      case (None, None) => throw ConfigurationException("Either a serviceAccountKey or a serviceAccountKeyFile must be defined for the GCP-authorization")
+      case (Some(_), Some(_)) => throw ConfigurationException("Either a serviceAccountKey or a serviceAccountKeyFile must be defined for the GCP-authorization, but not both!")
+      case _ =>
+    }
+  }
+
+  private[smartdatalake] def getAuthCredentials(): (String, String) = {
+    if (serviceAccountKey.isDefined) ("SERVICE_ACCOUNT_KEY", serviceAccountKey.get.resolve()) else ("SERVICE_ACCOUNT_KEY_FILE", serviceAccountKeyFile.get.resolve())
+  }
+}
 
 /**
  * Interface to generalize authentication for HTTP requests
