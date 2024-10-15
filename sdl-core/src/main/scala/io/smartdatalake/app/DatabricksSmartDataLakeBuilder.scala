@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ import scopt.OParser
  *
  * As there is an old version of config-*.jar deployed on Databricks, this special App uses a ChildFirstClassLoader to override it in the classpath.
  */
+@deprecated("Use Init Scripts in your Databricks Environment instead")
 object DatabricksSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   /**

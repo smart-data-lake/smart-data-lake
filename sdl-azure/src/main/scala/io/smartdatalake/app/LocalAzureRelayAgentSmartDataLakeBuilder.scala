@@ -31,23 +31,19 @@ import java.io.File
  * Sets master to local[*] and deployMode to client by default.
  */
 
-case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
-                                                          override val applicationName: Option[String] = Some("AgentApp"),
-                                                          override val configuration: Option[Seq[String]] = None,
-                                                          override val master: Option[String] = Some("local[*]"),
-                                                          override val deployMode: Option[String] = None,
-                                                          override val username: Option[String] = None,
-                                                          override val kerberosDomain: Option[String] = None,
-                                                          override val keytabPath: Option[File] = None,
-                                                          override val partitionValues: Option[Seq[PartitionValues]] = None,
-                                                          override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                                          override val parallelism: Int = 1,
-                                                          override val statePath: Option[String] = None,
-                                                          override val overrideJars: Option[Seq[String]] = None,
-                                                          override val test: Option[TestMode.Value] = None,
-                                                          override val streaming: Boolean = false,
+case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel: String = null,
+                                                          applicationName: Option[String] = Some("AgentApp"),
+                                                          configuration: Option[Seq[String]] = None,
+                                                          master: Option[String] = Some("local[*]"),
+                                                          deployMode: Option[String] = None, partitionValues: Option[Seq[PartitionValues]] = None,
+                                                          multiPartitionValues: Option[Seq[PartitionValues]] = None,
+                                                          parallelism: Int = 1,
+                                                          statePath: Option[String] = None,
+                                                          overrideJars: Option[Seq[String]] = None,
+                                                          test: Option[TestMode.Value] = None,
+                                                          streaming: Boolean = false,
                                                           azureRelayURL: Option[String] = None)
-  extends SmartDataLakeBuilderConfigTrait[LocalAzureRelayAgentSmartDataLakeBuilderConfig] {
+  extends CanBuildSmartDataLakeBuilderConfig[LocalAzureRelayAgentSmartDataLakeBuilderConfig] {
   override def withfeedSel(value: String): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
 
   override def withapplicationName(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
@@ -57,12 +53,6 @@ case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: 
   override def withmaster(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(master = value)
 
   override def withdeployMode(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
 
   override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
 

@@ -26,6 +26,7 @@ import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUt
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -49,6 +50,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
   private val connectionsKey = "connections"
   private val dataObjectsKey = "dataObjects"
   private val actionsKey = "actions"
+  private val agentsKey = "agents"
 
   /**
    * create generic type definitions and convert to json schema elements.
@@ -91,6 +93,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map Connection name : definition"))),
         dataObjectsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[DataObject]), Some("Map of DataObject name and definition"))),
         actionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Action]), Some("Map of Action name and definition"))),
+        agentsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Agent]), Some("Map of Action name and definition"))),
       ),
       required = Seq(dataObjectsKey, actionsKey),
       additionalProperties = true,

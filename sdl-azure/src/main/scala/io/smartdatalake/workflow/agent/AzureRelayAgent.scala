@@ -23,7 +23,16 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.Connection
-
+/**
+ *  [[Agent]] that communicates via a Azure Relay Service.
+ * See the class SmartDataLakeBuilderAzureRelayAgentIT for an example.
+ *
+ * @param url         Connection URL on how the agent can be reached. See io.smartdatalake.app.SmartDataLakeBuilderAzureRelayAgentIT#azureRelayUrl for an example.
+ * @param connections : Map of private connections that this agent has access to.
+ *                    Connections defined in the agents section override connections defined in the global connections section when they are executed on the Agent.
+ *                    This allows the Agent to use some connections that are only accessible in the Agent's environment and not on the Remote Instance.
+ *                    When the Agent is deployed, it gets the necessary authentication information for these agent connections on startup and then just waits for instructions.
+ */
 case class AzureRelayAgent(override val id: AgentId, override val url: String, override val connections: Map[String, Connection]) extends Agent {
 
   override def factory: FromConfigFactory[Agent] = AzureRelayAgent

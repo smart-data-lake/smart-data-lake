@@ -20,7 +20,7 @@
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.app.{SmartDataLakeBuilder, SmartDataLakeBuilderConfig, SmartDataLakeBuilderConfigTrait}
+import io.smartdatalake.app.{ SmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.communication.message.{AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
@@ -35,7 +35,7 @@ case class AgentServerController(
                                   instanceRegistry: InstanceRegistry,
                                   sdlb: SmartDataLakeBuilder
                                 ) extends SmartDataLakeLogger {
-  def handle[SmartDataLakeBuilderConfigImpl <: SmartDataLakeBuilderConfigTrait[_]](message: SDLMessage, agentServerSDLBConfig: SmartDataLakeBuilderConfigImpl): Option[SDLMessage] = {
+  def handle(message: SDLMessage, agentServerSDLBConfig: SmartDataLakeBuilderConfig): Option[SDLMessage] = {
     message match {
       case SDLMessage(SDLMessageType.AgentInstruction, None, None, None, agentInstructionOpt, None) => agentInstructionOpt match {
         case Some(agentInstruction) =>
@@ -57,11 +57,7 @@ case class AgentServerController(
 
             instanceRegistryImplicit.register(actions)
 
-            val sdlConfig = SmartDataLakeBuilderConfig(agentServerSDLBConfig.feedSel, applicationName = agentServerSDLBConfig.applicationName, configuration = agentServerSDLBConfig.configuration, master = agentServerSDLBConfig.master,
-              deployMode = agentServerSDLBConfig.deployMode, username = agentServerSDLBConfig.username, kerberosDomain = agentServerSDLBConfig.kerberosDomain,
-              keytabPath = agentServerSDLBConfig.keytabPath, partitionValues = agentServerSDLBConfig.partitionValues, multiPartitionValues = agentServerSDLBConfig.multiPartitionValues,
-              parallelism = agentServerSDLBConfig.parallelism, statePath = agentServerSDLBConfig.statePath, overrideJars = agentServerSDLBConfig.overrideJars
-              , test = agentServerSDLBConfig.test, streaming = agentServerSDLBConfig.streaming)
+            val sdlConfig = agentServerSDLBConfig
 
             val resultingSubfeeds = sdlb.agentExec(appConfig = sdlConfig, phase = agentInstruction.phase)(instanceRegistryImplicit)
 

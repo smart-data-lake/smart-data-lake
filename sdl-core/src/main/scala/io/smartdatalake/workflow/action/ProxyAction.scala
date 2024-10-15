@@ -36,9 +36,10 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.StructType
 
 /**
- * Allows to execute the action defined by @wrappedAction on a remote agent defined by @agent.
- * If the execution of @wrappedAction is successful, the ProxyAction will return an empty SparkSubFeed by the correct schema.
- *
+ * This[[Action]] executes the action defined by [[wrappedAction]] on a remote agent defined by [[agent]].
+ * If the execution of [[wrappedAction]] is successful, the ProxyAction will return an empty [[SparkSubFeed]] with the schema of the action's result.
+ * @param wrappedAction: the action to execute on the agent
+ * @param agent: the agent on which the action should be executed
  */
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action with ExcludeFromSchemaExport {
 
