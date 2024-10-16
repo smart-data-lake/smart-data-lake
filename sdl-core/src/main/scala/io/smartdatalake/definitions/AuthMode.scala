@@ -225,7 +225,7 @@ case class GCPCredentialsKeyAuth(private val serviceAccountKey: Option[StringOrS
   }
 
   private[smartdatalake] def getAuthCredentials(): (String, String) = {
-    if (serviceAccountKey.isDefined) ("SERVICE_ACCOUNT_KEY", serviceAccountKey.get.resolve()) else ("SERVICE_ACCOUNT_KEY_FILE", serviceAccountKeyFile.get.resolve())
+    if (serviceAccountKey.isDefined) ("credentials", serviceAccountKey.get.resolve()) else ("credentialsFile", serviceAccountKeyFile.get.resolve())
   }
 }
 

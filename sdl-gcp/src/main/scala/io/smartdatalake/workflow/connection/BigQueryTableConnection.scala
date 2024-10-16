@@ -21,28 +21,44 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.definitions.{AuthMode, GCPCredentialsKeyAuth}
+import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
 
 /**
- * Connection information for DeltaLake tables
+ * Connection information for GCP BigQuery Tables
  *
  * @param id unique id of this connection
- * @param catalog optional catalog to be used for this connection
- * @param db hive db
- * @param pathPrefix schema, authority and base path for tables directory on hadoop
- * @param acl permissions for files created with this connection
+ * @param parentProject project used for this connection. It is defined as the GCP Project ID of the table
+ *                      to bull for the export. It defaults to the project of the Service Account being used
+ *                      in the credentials.
+ * @param authMode Credentials to be used for this connection using [[GCPCredentialsKeyAuth]]
+ *                 As of now, only Service Account keys (either as encoded Strings or as json-files)
+ *                 are supported as an authentication method.
  * @param metadata
  */
 case class BigQueryTableConnection(override val id: ConnectionId,
-                                    catalog: Option[String] = None,
-                                    db: String,
-                                    pathPrefix: String,
-                                    acl: Option[AclDef] = None,
-                                    checkDeltaLakeSparkOptions: Boolean = true,
-                                    override val metadata: Option[ConnectionMetadata] = None
-                                   ) extends Connection {
+                                   authMode: AuthMode,
+                                   parentProject: Option[String],
+                                   override val metadata: Option[ConnectionMetadata] = None
+                                   ) extends Connection with SmartDataLakeLogger {
+
+  private val supportedAuths = Seq(classOf[GCPCredentialsKeyAuth])
+  require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
+  def getCredentialsOptions(): (String, String) = {
+    authMode match {
+      case g: GCPCredentialsKeyAuth => g.getAuthCredentials()
+      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
+    }
+  }
+
+  def getBigQueryConnectionOptions(): Map[String, String] = {
+    val projectOptions =  if (parentProject.isDefined) Map("parentProject" -> parentProject.get) else Map()
+    Map(getCredentialsOptions) ++ projectOptions
+  }
+
 
   override def factory: FromConfigFactory[Connection] = BigQueryTableConnection
+
 }
 
 object BigQueryTableConnection extends FromConfigFactory[Connection] {
