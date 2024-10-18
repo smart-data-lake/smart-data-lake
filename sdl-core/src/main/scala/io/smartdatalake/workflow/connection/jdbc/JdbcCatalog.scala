@@ -125,6 +125,21 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
     rs.next
     rs.getInt(1) == 1
   }
+
+  def handlePrimaryKeyResultSet(resultSet: ResultSet): Option[PrimaryKeyDefinition] = {
+    var primaryKeyCols: MutableSet[String] = MutableSet()
+    var primaryKeyName: MutableSet[String] = MutableSet()
+    while (resultSet.next()) {
+      primaryKeyCols += resultSet.getString("COLUMN_NAME")
+      primaryKeyName += resultSet.getString("PK_NAME")
+    }
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection more than one Primary Key!")
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
+    }
+  }
 }
 private[smartdatalake] object JdbcCatalog {
   def fromJdbcDriver(driver: String, connection: JdbcTableConnection): JdbcCatalog = {
@@ -148,21 +163,6 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
       s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where UPPER(TABLE_SCHEMA)=UPPER('$db')"
     }
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
-  }
-
-  def handlePrimaryKeyResultSet(resultSet: ResultSet): Option[PrimaryKeyDefinition] = {
-    var primaryKeyCols: MutableSet[String] = MutableSet()
-    var primaryKeyName: MutableSet[String] = MutableSet()
-    while (resultSet.next()) {
-      primaryKeyCols += resultSet.getString("COLUMN_NAME")
-      primaryKeyName += resultSet.getString("PK_NAME")
-    }
-    (primaryKeyCols.toList, primaryKeyName.toList) match {
-      case (List(), _) => None
-      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
-      case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection more than one Primary Key!")
-      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
-    }
   }
 
   //This method is not used in JdbcTableDataObject, but in other DataObjects.
