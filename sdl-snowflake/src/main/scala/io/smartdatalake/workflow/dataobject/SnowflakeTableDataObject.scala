@@ -310,7 +310,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     else column
   }
 
-  def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
+  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
     connection.catalog.getPrimaryKey(catalog, schema, tableName)
 
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =

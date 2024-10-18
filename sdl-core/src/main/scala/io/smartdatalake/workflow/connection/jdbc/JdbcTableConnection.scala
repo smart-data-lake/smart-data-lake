@@ -158,7 +158,8 @@ case class JdbcTableConnection(override val id: ConnectionId,
 
   //The implementation to get the PK is not in the Catalog in order to use the JDBC standard method getPrimaryKeys
   // and not having to adapt the Query for different DBs.
-  def getJdbcPrimaryKey(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition] = {
+  def getJdbcPrimaryKey(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
+    val (catalog, schema) = (catalogOption.getOrElse(""), schemaOption.getOrElse(""))
     var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
     var primaryKeyCols: MutableSet[String] = MutableSet()
     var primaryKeyName: MutableSet[String] = MutableSet()

@@ -167,9 +167,9 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
 
   //This method is not used in JdbcTableDataObject, but in other DataObjects.
   // For this reason, it is not implemented in Oracle and SAP-HANA.
-  def getPrimaryKey(catalog: String, schema: String, tableName: String) = {
-    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '$catalog'"
-    val schemaConstraint =  if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '$schema'"
+  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String) = {
+    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '${catalog.get}'"
+    val schemaConstraint =  if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '${schema.get}'"
     val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
     val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString
     connection.execJdbcQuery(query, handlePrimaryKeyResultSet)

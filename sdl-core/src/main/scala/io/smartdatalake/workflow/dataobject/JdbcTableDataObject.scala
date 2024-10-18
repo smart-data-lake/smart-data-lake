@@ -548,8 +548,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  def getExistingPKConstraint(catalog: String,
-                                       schema: String,
+  def getExistingPKConstraint(catalog: Option[String],
+                                       schema: Option[String],
                                        tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
     connection.getJdbcPrimaryKey(catalog, schema, tableName)
   }

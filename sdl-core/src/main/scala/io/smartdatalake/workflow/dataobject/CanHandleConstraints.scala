@@ -36,7 +36,7 @@ case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] =
  * within a TransactionalTableDataObject.
  */
 trait CanHandleConstraints { self: TransactionalTableDataObject =>
-  def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition]
+  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition]
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit
 
@@ -48,7 +48,7 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
    */
   def createOrReplacePrimaryKeyConstraint(implicit context: ActionPipelineContext): Unit = {
     val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
-    val existingPrimaryKeyOp: Option[PrimaryKeyDefinition] =  getExistingPKConstraint(table.catalog.getOrElse(""), table.db.getOrElse(""), table.name)
+    val existingPrimaryKeyOp: Option[PrimaryKeyDefinition] =  getExistingPKConstraint(table.catalog, table.db, table.name)
     (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
       case (None, _) => logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
       case (Some(pkcols), None) => createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
