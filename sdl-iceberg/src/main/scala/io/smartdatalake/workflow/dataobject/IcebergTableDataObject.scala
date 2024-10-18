@@ -38,18 +38,21 @@ import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.iceberg.catalog.{Catalog, Namespace, TableIdentifier}
+import org.apache.iceberg.hadoop.HadoopCatalog
 import org.apache.iceberg.spark.Spark3Util.{CatalogAndIdentifier, identifierToTableIdentifier}
 import org.apache.iceberg.spark.actions.SparkActions
 import org.apache.iceberg.spark.source.HasIcebergCatalog
 import org.apache.iceberg.spark.{Spark3Util, SparkSchemaUtil, SparkWriteOptions}
 import org.apache.iceberg.types.TypeUtil
-import org.apache.iceberg.{PartitionSpec, TableProperties}
+import org.apache.iceberg.{CachingCatalog, PartitionSpec, TableProperties}
 import org.apache.spark.sql.connector.catalog.{Identifier, SupportsNamespaces, TableCatalog}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, expr, rank}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.lang.reflect.Field
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
@@ -75,25 +78,15 @@ import scala.util.Try
  * - [[CanEvolveSchema]] by using internal Iceberg API.
  * - Overwriting partitions is implemented by using DataFrameWriterV2.overwrite(condition) API in one transaction.
  *
- * @param id unique name of this data object
  * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
- * @param partitions partition columns for this data object
+ *             If Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure.
  * @param options Options for Iceberg tables see: [[https://iceberg.apache.org/docs/latest/configuration/]]
- * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
- *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table Iceberg table to be written by this output
- * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
- * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param historyRetentionPeriod Optional Iceberg retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
  * @param acl override connection permissions for files created tables hadoop directory with this connection
- * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
- *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
- *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
- *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata meta data
  * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
@@ -106,7 +99,7 @@ import scala.util.Try
  *                   explicitly defined, the ones present in the configured "table" object are used.
  */
 case class IcebergTableDataObject(override val id: DataObjectId,
-                                  path: Option[String],
+                                  path: Option[String] = None,
                                   override val partitions: Seq[String] = Seq(),
                                   override val options: Map[String,String] = Map(),
                                   override val schemaMin: Option[GenericSchema] = None,
@@ -141,10 +134,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = context.sparkSession
     val thisIsTableExisting = isTableExisting
-    require(thisIsTableExisting || path.isDefined, s"($id) Iceberg table ${table.fullName} does not exist, so path must be set.")
+    val thisIsPathBasedCatalog = isPathBasedCatalog(getIcebergCatalog)
+    require(thisIsTableExisting || thisIsPathBasedCatalog || path.isDefined, s"($id) Iceberg table ${table.fullName} does not exist, so path must be set.")
 
     if (hadoopPathHolder == null) {
-      hadoopPathHolder = if (thisIsTableExisting) {
+      hadoopPathHolder = if (thisIsPathBasedCatalog) {
+        val hadoopCatalog = getHadoopCatalog(getIcebergCatalog).get
+        new Path(getHadoopCatalogDefaultPath(hadoopCatalog, getTableIdentifier))
+      } else if (thisIsTableExisting) {
         new Path(getIcebergTable.location)
       } else getAbsolutePath
 
@@ -182,6 +179,28 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       .getOrElse(new Path(hadoopPath,"metadata"))
   }
 
+  @tailrec
+  private def getHadoopCatalog(catalog: Catalog): Option[HadoopCatalog] = {
+    catalog match {
+      case c: HadoopCatalog => Some(c)
+      case c: CachingCatalog =>
+        val getWrappedCatalog: Field = c.getClass.getDeclaredField("catalog")
+        getWrappedCatalog.setAccessible(true)
+        getHadoopCatalog(getWrappedCatalog.get(c).asInstanceOf[Catalog])
+      case _ => None
+    }
+  }
+
+  private def isPathBasedCatalog(catalog: Catalog): Boolean = {
+    getHadoopCatalog(catalog).isDefined
+  }
+
+  private def getHadoopCatalogDefaultPath(catalog: HadoopCatalog, tableIdentifier: TableIdentifier): String = {
+    val getDefaultWarehouseLocation = catalog.getClass.getDeclaredMethod("defaultWarehouseLocation", classOf[TableIdentifier])
+    getDefaultWarehouseLocation.setAccessible(true)
+    getDefaultWarehouseLocation.invoke(catalog, tableIdentifier).asInstanceOf[String]
+  }
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     super.prepare
@@ -189,12 +208,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"),
         s"($id) Iceberg spark properties are missing. Please set spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions and org.apache.iceberg.spark.SparkSessionCatalog")
     }
-    if(!isDbExisting) {
+    val thisIsPathBasedCatalog = isPathBasedCatalog(getIcebergCatalog)
+    if (thisIsPathBasedCatalog && path.nonEmpty) logger.warn(s"($id) path is ignored for path based catalogs like HadoopCatalog.")
+    if (!isDbExisting) {
       // DB (schema) is created automatically by iceberg when creating tables. But we would like to keep the same behaviour as done by spark_catalog, where only default DB is existing, and others must be created manually.
       require(table.db.contains("default"), s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
     }
     if (!isTableExisting) {
-      require(path.isDefined, s"($id) If Iceberg table does not exist yet, path must be set.")
+      require(path.isDefined || thisIsPathBasedCatalog, s"($id) If Iceberg table does not exist yet, path must be set.")
       if (filesystem.exists(hadoopPath)) {
         if (filesystem.exists(getMetadataPath)) {
           // define an iceberg table, metadata can be read from files.
@@ -231,13 +252,32 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * converts an existing path with parquet files to an iceberg table
    */
   private[smartdatalake] def convertPathToIceberg(implicit context: ActionPipelineContext): Unit = {
-    val existingDf = context.sparkSession.read.parquet(hadoopPath.toString)
-    val schema = SparkSchemaUtil.convert(existingDf.schema)
+    // get schema by using Parquet DataObject
+    val parquetDataObject = ParquetFileDataObject(id.id + "-convertion", hadoopPath.toString)
+    val sparkSchema = parquetDataObject.schema.map(_.asInstanceOf[SparkSchema].inner)
+      .getOrElse(parquetDataObject.getSparkDataFrame().schema)
+    val schema = SparkSchemaUtil.convert(sparkSchema)
+    // move parquet files and partitions from table root folder to data subfolder (Iceberg standard)
+    val filesToMove = filesystem.listStatus(hadoopPath)
+      .filter(f => (f.isFile && f.getPath.getName.endsWith(filetype)) || (f.isDirectory && f.getPath.getName.contains("=")))
+    logger.info(s"($id) convertPathToIceberg: moving ${filesToMove.length} files to ./data subdirectory")
+    filesToMove.foreach { f =>
+      val newPath = new Path(new Path(hadoopPath, "data"), f.getPath.getName)
+      filesystem.rename(f.getPath, newPath)
+    }
+    // create table
+    logger.info(s"($id) convertPathToIceberg: creating iceberg table")
     val partitionSpec = partitions.foldLeft(PartitionSpec.builderFor(schema)){
       case (partitionSpec, colName) => partitionSpec.identity(colName)
     }.build
     getIcebergCatalog.createTable(getTableIdentifier, schema, partitionSpec, hadoopPath.toString, options.asJava)
-    context.sparkSession.sql(s"CALL ${getIcebergCatalog.name}.system.add_files(table => '${getIdentifier.toString}', source_table => '`parquet`.`$hadoopPath`')")
+    // add files
+    logger.info(s"($id) convertPathToIceberg: add_files")
+    val parallelismStr = connection.flatMap(_.addFilesParallelism.map(", parallelism => " + _)).getOrElse("")
+    context.sparkSession.sql(s"CALL ${getIcebergCatalog.name}.system.add_files(table => '${getIdentifier.toString}', source_table => '`parquet`.`$hadoopPath/data`'$parallelismStr)")
+    // cleanup potential SDLB .schema directory
+    HdfsUtil.deletePath(new Path(hadoopPath, ".schema"), doWarn = false)(filesystem)
+    logger.info(s"($id) convertPathToIceberg: succeeded")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -320,12 +360,13 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
     // remember previous snapshot timestamp
-    val previousSnapshotId: Option[Long] = if (isTableExisting) Some(getIcebergTable.currentSnapshot().snapshotId()) else None
+    val previousSnapshotId: Option[Long] = if (isTableExisting) Option(getIcebergTable.currentSnapshot()).map(_.snapshotId()) else None
     // V1 writer is needed to create external table
-    val dfWriter = saveModeTargetDf.write
+    var dfWriter = saveModeTargetDf.write
       .format("iceberg")
       .options(options)
-      .option("path", hadoopPath.toString)
+    if (isPathBasedCatalog(getIcebergCatalog)) dfWriter = dfWriter.option("location", hadoopPath.toString)
+    else dfWriter = dfWriter.option("path", hadoopPath.toString)
     val sparkMetrics = if (isTableExisting) {
       // check scheme
       if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
@@ -531,7 +572,12 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
-    getSparkCatalog.namespaceExists(table.nameParts.init.toArray)
+    if (isPathBasedCatalog(getIcebergCatalog)) {
+      // for hadoop catalog only table.db is relevant, table.catalog must be omitted
+      getSparkCatalog.namespaceExists(Array(table.db.get))
+    } else {
+      getSparkCatalog.namespaceExists(table.nameParts.init.toArray)
+    }
   }
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
@@ -565,9 +611,17 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   protected val separator: Char = Path.SEPARATOR_CHAR
 
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    val partitionsDf = context.sparkSession.sql(s"select partition.* from ${table.toString}.partitions")
-    val partitions = partitionsDf.collect().toSeq.map(r => r.getValuesMap[Any](partitionsDf.columns).mapValues(_.toString).toMap)
-    partitions.map(PartitionValues(_))
+    if (isTableExisting) {
+      val dfPartitions = context.sparkSession.table(s"${table.fullName}.partitions")
+      val isPartitioned = dfPartitions.columns.contains("partition")
+      if (partitions.nonEmpty && !isPartitioned) logger.warn(s"($id) partitions are defined but Iceberg table is not partitioned.")
+      if (partitions.isEmpty && isPartitioned) logger.warn(s"($id) partitions are not defined but Iceberg table is partitioned.")
+      if (partitions.nonEmpty && isPartitioned) {
+        val dfPartitionsPartition = dfPartitions.select(col("partition.*"))
+        val partitions = dfPartitionsPartition.collect().toSeq.map(r => r.getValuesMap[Any](dfPartitionsPartition.columns).mapValues(_.toString).toMap)
+        partitions.map(PartitionValues(_))
+      } else Seq()
+    } else Seq()
   }
 
   /**
@@ -606,7 +660,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     try {
       val session = context.sparkSession
       import session.implicits._
-      val filesDf = context.sparkSession.table(s"${table.toString}.files")
+      val filesDf = context.sparkSession.table(s"${table.fullName}.files")
       val metricsRow = filesDf.select($"readable_metrics.*").head()
       val columns = metricsRow.schema.fieldNames
       columns.map {

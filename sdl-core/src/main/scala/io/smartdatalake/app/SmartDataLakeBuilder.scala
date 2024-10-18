@@ -275,7 +275,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       opt[Int]("parallelism")
         .action((arg, config) => config.withparallelism(arg))
         .valueName("<int>")
-        .text(s"Parallelism for DAG run."),
+        .text(s"Max number of parallel executed SDLB actions"),
       opt[String]("state-path")
         .action((arg, config) => config.withstatePath(Some(arg)))
         .valueName("<path>")
