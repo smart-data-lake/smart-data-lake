@@ -71,8 +71,8 @@ case class Table(
                   createAndReplacePrimaryKey: Boolean = false,
                   primaryKeyConstraintName: Option[String] = None,
                   foreignKeys: Option[Seq[ForeignKey]] = None,
-                  commentOnTable: Option[String],
-                  commentsOnColumns: Option[Map[String, String]],
+                  commentOnTable: Option[String] = None,
+                  commentsOnColumns: Option[Map[String, String]] = None,
                   catalog: Option[String] = None
                 ) {
   override def toString: String = s"""$fullName${primaryKey.map(pks => "("+pks.mkString(",")+")").getOrElse("")}"""
