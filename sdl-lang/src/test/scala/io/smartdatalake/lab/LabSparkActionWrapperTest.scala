@@ -54,6 +54,9 @@ class LabSparkActionWrapperTest extends FunSuite {
     val customTransformerConfig3 = ScalaClassSparkDfsTransformer(
       className = classOf[Tgt3DfsTransformer].getName
     )
+    val customTransformerConfig4 = ScalaClassSparkDfsTransformer(
+      className = classOf[Tgt4DfsTransformer].getName
+    )
 
     val action1 = CustomDataFrameAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     instanceRegistry.register(action1)
@@ -75,6 +78,13 @@ class LabSparkActionWrapperTest extends FunSuite {
 
     {
       val dfs = action1wrapper.buildDataFrames.withReplacedTransformer(0, customTransformerConfig3).get
+      assert(dfs.keys == Set("src1", "src2", "tgt2", "tgt3"))
+    }
+
+    {
+      val dfs = action1wrapper.buildDataFrames
+        .withReplacedTransformer(0, customTransformerConfig4)
+        .withAdditionalTransformerOptions(0, Map("option1" -> "test")).get
       assert(dfs.keys == Set("src1", "src2", "tgt2", "tgt3"))
     }
   }
@@ -100,6 +110,14 @@ class Tgt2DfsTransformer extends CustomDfsTransformer {
 
 class Tgt3DfsTransformer extends CustomDfsTransformer {
   def transform(session: SparkSession, dfSrc1: DataFrame, dfSrc2: DataFrame): Map[String,DataFrame] = {
+    Map(
+      "tgt3" -> dfSrc2
+    )
+  }
+}
+
+class Tgt4DfsTransformer extends CustomDfsTransformer {
+  def transform(session: SparkSession, dfSrc1: DataFrame, dfSrc2: DataFrame, option1: String): Map[String, DataFrame] = {
     Map(
       "tgt3" -> dfSrc2
     )

@@ -22,6 +22,7 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport, FromConfigFactory}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}
@@ -33,13 +34,22 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitS
 import org.apache.spark.sql.{Column, DataFrame}
 
 case class LabSparkDfsActionWrapper[A <: CustomDataFrameAction](action: A, context: ActionPipelineContext) extends LabSparkActionWrapper[A, GenericDfsTransformerDef, CustomDfsTransformer](action, context) {
-  override private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[GenericDfsTransformerDef], replacedTransformers: Map[Int,GenericDfsTransformerDef]): Map[String,GenericDataFrame] = {
+  override private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[GenericDfsTransformerDef], replacedTransformers: Map[Int, GenericDfsTransformerDef], additionalTransformerOptions: Map[Int, Map[String, String]]): Map[String, GenericDataFrame] = {
     val mainPartitionValues = action.getMainPartitionValues(inputSubFeeds)(context)
     val transformers = action.getTransformers(context)
     val selectedTransformerIndexesPrep = selectedTransformerIndexes.map(_.filter(_ < transformers.size)).getOrElse(transformers.indices).toSet
     val transformersToApply = transformers.zipWithIndex
       .filter {case (t,idx) => selectedTransformerIndexesPrep.contains(idx)}
-      .map {case (t,idx) => replacedTransformers.getOrElse(idx,t)} ++ additionalTransformers
+      .map { case (t, idx) =>
+        replacedTransformers.getOrElse(idx, t) match {
+          case t: OptionsGenericDfsTransformer if additionalTransformerOptions.isDefinedAt(idx) =>
+            val configuredOptions = ProductUtil.getFieldData[Map[String, String]](t.asInstanceOf[Product], "options").getOrElse(Map())
+            ProductUtil.dynamicCopy(t, "options", configuredOptions ++ additionalTransformerOptions(idx))
+          case t if additionalTransformerOptions.isDefinedAt(idx) =>
+            throw new IllegalStateException(s"additionalTransformerOptions defined for idx $idx but transformer of type ${t.getClass.getSimpleName} can not handle options")
+          case t => t
+        }
+      } ++ additionalTransformers
     println(s"Transformers applied: ${transformersToApply.map(_.name).mkString(", ")}")
     // apply transformers
     action.applyTransformers(transformersToApply, mainPartitionValues, inputSubFeeds)(context)
@@ -50,12 +60,21 @@ case class LabSparkDfsActionWrapper[A <: CustomDataFrameAction](action: A, conte
 }
 
 case class LabSparkDfActionWrapper[A <: DataFrameOneToOneActionImpl](action: A, context: ActionPipelineContext) extends LabSparkActionWrapper[A, GenericDfTransformerDef, CustomDfTransformer](action, context) {
-  override private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[GenericDfTransformerDef], replacedTransformers: Map[Int,GenericDfTransformerDef]): Map[String,GenericDataFrame] = {
+  override private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[GenericDfTransformerDef], replacedTransformers: Map[Int, GenericDfTransformerDef], additionalTransformerOptions: Map[Int, Map[String, String]]): Map[String, GenericDataFrame] = {
     val transformers = action.getTransformers(context)
     val selectedTransformerIndexesPrep = selectedTransformerIndexes.map(_.filter(_ < transformers.size)).getOrElse(transformers.indices).toSet
     val transformersToApply = transformers.zipWithIndex
       .filter {case (t,idx) => selectedTransformerIndexesPrep.contains(idx)}
-      .map {case (t,idx) => replacedTransformers.getOrElse(idx,t)} ++ additionalTransformers
+      .map { case (t, idx) =>
+        replacedTransformers.getOrElse(idx, t) match {
+          case t: OptionsGenericDfTransformer if additionalTransformerOptions.isDefinedAt(idx) =>
+            val configuredOptions = ProductUtil.getFieldData[Map[String, String]](t.asInstanceOf[Product], "options").getOrElse(Map())
+            ProductUtil.dynamicCopy(t, "options", configuredOptions ++ additionalTransformerOptions(idx))
+          case t if additionalTransformerOptions.isDefinedAt(idx) =>
+            throw new IllegalStateException(s"additionalTransformerOptions defined for idx $idx but transformer of type ${t.getClass.getSimpleName} can not handle options")
+          case t => t
+        }
+      } ++ additionalTransformers
     println(s"Transformers applied: ${transformersToApply.map(_.name).mkString(", ")}")
     val outputSubFeed = action.applyTransformers(transformersToApply, inputSubFeeds.head, outputSubFeeds.head)(context)
     Map(outputSubFeed.dataObjectId.id -> outputSubFeed.dataFrame.get)
@@ -85,11 +104,14 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
    *                                  PostProcessing will filter DataFrames created by Transformations to configured outputs, and let outputs post-process SubFeeds.
    * @param additionalTransformers transformers to apply after existing transformers of the Action.
    *                               Note that these transformers are appended after existing transformers are selected by using selectedTransformerIndexes.
-   * @param replacedTransformers transformers to apply at the index of another configured transformers of the Action.
+   * @param replacedTransformers         transformers to apply at the index of another configured transformers of the Action.
+   *                                     The index of the transformer is starting from 0.
+   * @param additionalTransformerOptions additional transformer options to add to transformer at given index.
+   *                                     The index of the transformer is starting from 0.
    * @return a Map of ids and DataFrames.
    */
-  def getDataFrames(partitionValues: Seq[PartitionValues] = Seq(), filters: Map[String,Column] = Map(), selectedTransformerIndexes: Option[Seq[Int]] = None, postProcessOutputSubFeeds: Boolean = false, additionalTransformers: Seq[T] = Seq(), replacedTransformers: Map[Int,T] = Map()): Map[String, DataFrame] = {
-    getGenericDataFrames(partitionValues, filters.mapValues(SparkColumn).toMap, selectedTransformerIndexes, postProcessOutputSubFeeds,additionalTransformers, replacedTransformers)
+  def getDataFrames(partitionValues: Seq[PartitionValues] = Seq(), filters: Map[String, Column] = Map(), selectedTransformerIndexes: Option[Seq[Int]] = None, postProcessOutputSubFeeds: Boolean = false, additionalTransformers: Seq[T] = Seq(), replacedTransformers: Map[Int, T] = Map(), additionalTransformerOptions: Map[Int, Map[String, String]] = Map()): Map[String, DataFrame] = {
+    getGenericDataFrames(partitionValues, filters.mapValues(SparkColumn).toMap, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers, additionalTransformerOptions)
       .collect{case (id, df: SparkDataFrame) => (id,df.inner)}
   }
 
@@ -124,6 +146,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
                                            postProcessOutputSubFeeds: Boolean = false,
                                            additionalTransformers: Seq[T] = Seq(),
                                            replacedTransformers: Map[Int,T] = Map(),
+                                           additionalTransformerOptions: Map[Int, Map[String, String]] = Map()
                                          ) extends DataFrameBaseBuilder[GetDataFrameBuilder] {
 
     /**
@@ -146,11 +169,15 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
 
     /**
      * Replace transformer at configured at given index of this action.
+     *
+     * @param idx : index of the transformer, starting from 0
      */
     def withReplacedTransformer(idx: Int, transformer: T): GetDataFrameBuilder = copy(replacedTransformers = replacedTransformers + (idx -> transformer))
 
     /**
      * Replace transformer at configured at given index of this action with custom transformer.
+     *
+     * @param idx : index of the transformer, starting from 0
      */
     def withReplacedTransformer(idx: Int, transformer: S): GetDataFrameBuilder = copy(replacedTransformers = replacedTransformers + (idx -> createLabTransformer(transformer)))
 
@@ -165,10 +192,17 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
     def withAdditionalTransformer(transformer: S): GetDataFrameBuilder = copy(additionalTransformers = additionalTransformers :+ createLabTransformer(transformer))
 
     /**
+     * Add additional transformer options to transformer at given index.
+     *
+     * @param idx : index of the transformer, starting from 0
+     */
+    def withAdditionalTransformerOptions(idx: Int, options: Map[String, String]): GetDataFrameBuilder = copy(additionalTransformerOptions = additionalTransformerOptions + (idx -> options))
+
+    /**
      * Get DataFrames using selected options.
      */
     def get: Map[String,DataFrame] = {
-      val dfs = getDataFrames(partitionValues, filters, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers)
+      val dfs = getDataFrames(partitionValues, filters, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers, additionalTransformerOptions)
       println(s"DataFrames built: ${dfs.keys.mkString(", ")}")
       dfs
     }
@@ -178,7 +212,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
     override protected def setFilters(filters: Map[String, Column]): GetDataFrameBuilder = copy(filters = filters)
   }
 
-  private[smartdatalake] def getGenericDataFrames(partitionValues: Seq[PartitionValues] = Seq(), filters: Map[String,GenericColumn] = Map(), selectedTransformerIndexes: Option[Seq[Int]] = None, postProcessOutputSubFeeds: Boolean = false, additionalTransformers: Seq[T] = Seq(), replacedTransformers: Map[Int,T] = Map()): Map[String, GenericDataFrame] = {
+  private[smartdatalake] def getGenericDataFrames(partitionValues: Seq[PartitionValues] = Seq(), filters: Map[String, GenericColumn] = Map(), selectedTransformerIndexes: Option[Seq[Int]] = None, postProcessOutputSubFeeds: Boolean = false, additionalTransformers: Seq[T] = Seq(), replacedTransformers: Map[Int, T] = Map(), additionalTransformerOptions: Map[Int, Map[String, String]] = Map()): Map[String, GenericDataFrame] = {
     assert(!selectedTransformerIndexes.exists(_.isEmpty) || !postProcessOutputSubFeeds, "selectedTransformerIndexes=empty and postProcessOutputSubFeeds=true can not be set together")
 
     // prepare
@@ -192,7 +226,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
     }
 
     // transform
-    val outputDataFrames = transform(inputSubFeeds, outputSubFeeds, selectedTransformerIndexes, additionalTransformers, replacedTransformers)
+    val outputDataFrames = transform(inputSubFeeds, outputSubFeeds, selectedTransformerIndexes, additionalTransformers, replacedTransformers, additionalTransformerOptions)
 
     // check and adapt output SubFeeds
     if (postProcessOutputSubFeeds) {
@@ -210,7 +244,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
   /**
    * To override by subclasses to handle their specific transformer classes.
    */
-  private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[T], replacedTransformers: Map[Int,T] = Map()): Map[String,GenericDataFrame]
+  private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[T], replacedTransformers: Map[Int, T], additionalTransformerOptions: Map[Int, Map[String, String]]): Map[String, GenericDataFrame]
 
   /**
    * To override by subclasses to create create a transformer from a custom scala transformer class.
