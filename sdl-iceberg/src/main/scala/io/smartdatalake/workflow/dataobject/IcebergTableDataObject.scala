@@ -129,7 +129,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
 
-  val filetype: String = "." + options.getOrElse("write.format.default", "parquet") // Iceberg also supports avro or orc by setting this option, but default is parquet
+  val filetypePattern: String = ".*(\\.parquet|\\.avro|\\.orc|c\\d\\d\\d)$" // Iceberg supports to read mixed tables! 'c000' can be the file ending for parquet files of legacy hive tables!
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = context.sparkSession
@@ -223,14 +223,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           logger.info(s"($id) Creating Iceberg table ${table.fullName} for existing path $hadoopPath")
         } else {
           // if path has existing parquet files, convert to iceberg table
-          require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset Iceberg table.")
+          require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no data files. Delete whole base path to reset Iceberg table.")
           convertPathToIceberg
         }
       }
     } else if (filesystem.exists(hadoopPath)) {
       if (!filesystem.exists(getMetadataPath)) {
         // if path has existing parquet files but not in iceberg format, convert to iceberg format
-        require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset Iceberg table.")
+        require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no data files. Delete whole base path to reset Iceberg table.")
         convertTableToIceberg
         logger.info(s"($id) Converted existing table ${table.fullName} to Iceberg table")
       }
@@ -259,7 +259,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val schema = SparkSchemaUtil.convert(sparkSchema)
     // move parquet files and partitions from table root folder to data subfolder (Iceberg standard)
     val filesToMove = filesystem.listStatus(hadoopPath)
-      .filter(f => (f.isFile && f.getPath.getName.endsWith(filetype)) || (f.isDirectory && f.getPath.getName.contains("=")))
+      .filter(f => (f.isFile && f.getPath.getName.matches(filetypePattern)) || (f.isDirectory && f.getPath.getName.contains("=")))
     logger.info(s"($id) convertPathToIceberg: moving ${filesToMove.length} files to ./data subdirectory")
     filesToMove.foreach { f =>
       val newPath = new Path(new Path(hadoopPath, "data"), f.getPath.getName)
@@ -600,7 +600,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    */
   protected def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
     val hasFiles = filesystem.exists(hadoopPath.getParent) &&
-      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.endsWith(filetype))
+      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.matches(filetypePattern))
     if (!hasFiles) {
       logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")

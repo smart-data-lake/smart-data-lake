@@ -522,7 +522,6 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with Smart
 
     {
       val df = icebergDO.getSparkDataFrame()
-      df.show
       assert(df.isEqual(df1))
       assert(icebergDO.listPartitions.isEmpty)
     }
@@ -532,7 +531,48 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with Smart
 
     {
       val df = icebergDO.getSparkDataFrame()
-      df.show
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions.isEmpty)
+    }
+  }
+
+  test("Create from parquet files of legacy hive tables (c000 file ending)") {
+    // Define Iceberg Table
+    val icebergTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "parquet_legacy_to_iceberg", query = None)
+    val icebergConnection = IcebergTableConnection(id = "iceberg", db = "default", pathPrefix = tempPath, addFilesParallelism = Some(1))
+    instanceRegistry.register(icebergConnection)
+    val targetPath = icebergTable.name
+    val icebergDO = IcebergTableDataObject(id = "iceberg", path = Some(targetPath), table = icebergTable, connectionId = Some(icebergConnection.id))
+
+    // Create parquet files
+    val parquetConnection = HadoopFileConnection(id = "parquet", pathPrefix = tempPath)
+    instanceRegistry.register(parquetConnection)
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = targetPath, connectionId = Some(parquetConnection.id))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    parquetDO.filesystem.listStatus(parquetDO.hadoopPath)
+      .filter(s => s.isFile && s.getPath.getName.endsWith(".snappy.parquet"))
+      .map(_.getPath.toString)
+      .foreach { p =>
+        parquetDO.renameFile(p, p.stripSuffix(".snappy.parquet"))
+      }
+
+    // Initialize Iceberg table
+    icebergDO.prepare // does the table conversion
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions.isEmpty)
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
       assert(df.isEqual(df1))
       assert(icebergDO.listPartitions.isEmpty)
     }
