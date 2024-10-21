@@ -30,7 +30,6 @@ import io.smartdatalake.workflow.action.{CustomDataFrameAction, DataFrameActionI
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame}
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitSubFeed}
-import org.apache.spark.sql.functions.{col, expr, lit}
 import org.apache.spark.sql.{Column, DataFrame}
 
 case class LabSparkDfsActionWrapper[A <: CustomDataFrameAction](action: A, context: ActionPipelineContext) extends LabSparkActionWrapper[A, GenericDfsTransformerDef, CustomDfsTransformer](action, context) {
@@ -99,7 +98,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
       case Some(executionMode) =>
         implicit val implicitContext: ActionPipelineContext = context
         // prepare
-        val emptyInputSubFeeds = action.inputs.map(i => InitSubFeed(i.id, partitionValues, isSkipped = false, metrics = None))
+        val emptyInputSubFeeds = (action.inputs ++ action.recursiveInputs).map(i => InitSubFeed(i.id, partitionValues, isSkipped = false, metrics = None))
         val mainInput = action.getMainInput(emptyInputSubFeeds)
         val mainSubFeed = emptyInputSubFeeds.find(_.dataObjectId == mainInput.id).get
         val inputSubFeeds = emptyInputSubFeeds.map { subFeed =>
@@ -183,7 +182,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
     assert(!selectedTransformerIndexes.exists(_.isEmpty) || !postProcessOutputSubFeeds, "selectedTransformerIndexes=empty and postProcessOutputSubFeeds=true can not be set together")
 
     // prepare
-    val emptyInputSubFeeds = action.inputs.map(i => InitSubFeed(i.id, partitionValues, isSkipped = false, metrics = None))
+    val emptyInputSubFeeds = (action.inputs ++ action.recursiveInputs).map(i => InitSubFeed(i.id, partitionValues, isSkipped = false, metrics = None))
     var (inputSubFeeds, outputSubFeeds) = action.prepareInputSubFeeds(emptyInputSubFeeds)(context)
 
     // filter
