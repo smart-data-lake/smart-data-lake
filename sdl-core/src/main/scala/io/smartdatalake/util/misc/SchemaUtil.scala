@@ -31,11 +31,12 @@ import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
+import scaladoc.Tag
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
 import java.util.stream.Collectors
-import scala.reflect.runtime.universe.{Type, TypeTag}
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 object SchemaUtil {
 
@@ -129,7 +130,40 @@ object SchemaUtil {
   }
 
   def getSchemaFromCaseClass(tpe: Type): StructType = {
-    ProductUtil.createEncoder(tpe).schema
+    val schema = ProductUtil.createSchema(tpe)
+    enrichSchemaCommentsFromCaseClass(schema, tpe)
+  }
+
+  def enrichSchemaCommentsFromCaseClass(schema: StructType, tpe: Type): StructType = {
+    if (tpe <:< typeOf[Product]) {
+      val tpeAccessors = ProductUtil.classAccessors(tpe)
+      val scaladocParamTags = ScaladocUtil.extractScalaDoc(tpe.typeSymbol.annotations)
+        .toSeq.flatMap(_.tags.collect { case x: Tag.Param => x }).toSeq
+      val newFields = schema.fields.map { field =>
+        var newField = field
+        // enrich complex type
+        newField.dataType match {
+          case dt: StructType =>
+            val accessor = tpeAccessors.find(a => a.name.toString == field.name)
+            accessor.foreach { a =>
+              newField = newField.copy(dataType = enrichSchemaCommentsFromCaseClass(dt, a.returnType))
+            }
+          case dt: ArrayType if dt.elementType.isInstanceOf[StructType] =>
+            val accessor = tpeAccessors.find(a => a.name.toString == field.name)
+            accessor.foreach { a =>
+              val elementTpe = a.returnType.typeArgs.head
+              newField = newField.copy(dataType = dt.copy(elementType = enrichSchemaCommentsFromCaseClass(dt.elementType.asInstanceOf[StructType], elementTpe)))
+            }
+          case _ => () // nothing to do otherwise
+        }
+        // enrich comment
+        val comment = scaladocParamTags.find(p => p.name == field.name)
+        comment.foreach(c => newField = newField.withComment(ScaladocUtil.formatScaladocMarkup(c.markup)))
+        // return
+        newField
+      }
+      StructType(newFields)
+    } else schema
   }
 
   def getSchemaFromJavaBean(beanClass: Class[_]): StructType = {

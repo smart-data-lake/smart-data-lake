@@ -251,6 +251,18 @@
             <version>${scaladoc.reader.version}</version>
         </dependency>
 
+        <!-- parser for scaladoc annotations -->
+        <dependency>
+            <groupId>com.github.andyglow</groupId>
+            <artifactId>scaladoc-ast_${scala.minor.version}</artifactId>
+            <version>0.0.14</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.andyglow</groupId>
+            <artifactId>scaladoc-parser_${scala.minor.version}</artifactId>
+            <version>0.0.14</version>
+        </dependency>
+
         <!-- needed for AirbyteDataObject Json handling -->
         <dependency>
             <groupId>com.networknt</groupId>

@@ -1,7 +1,7 @@
 package io.smartdatalake.meta
 
 import io.smartdatalake.definitions.SaveModeOptions
-import io.smartdatalake.meta.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
+import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}

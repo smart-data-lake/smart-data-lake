@@ -22,6 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, ScalaReflection, SerializerBuildHelper}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 import java.time.format.DateTimeFormatter
@@ -160,6 +161,15 @@ private[smartdatalake] object ProductUtil {
     val msg = StringBuilder.newBuilder
     addObjToBuilder(msg, obj, spacing = false)
     msg.toString
+  }
+
+  /**
+   * Create an Schema for a product based on it's type given as parameter (not as type parameter).
+   */
+  def createSchema(tpe: Type): StructType = {
+    val mirror = ScalaReflection.mirror
+    val cls = mirror.runtimeClass(tpe)
+    ScalaReflection.encoderFor(tpe).schema
   }
 
   /**

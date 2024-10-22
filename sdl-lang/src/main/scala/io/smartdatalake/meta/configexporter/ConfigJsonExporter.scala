@@ -6,11 +6,10 @@ import io.smartdatalake.app.{AppUtil, UploadDefaults}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
-import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer

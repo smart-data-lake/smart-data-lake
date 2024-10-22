@@ -119,17 +119,6 @@
             <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>com.github.andyglow</groupId>
-            <artifactId>scaladoc-ast_${scala.minor.version}</artifactId>
-            <version>0.0.14</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.andyglow</groupId>
-            <artifactId>scaladoc-parser_${scala.minor.version}</artifactId>
-            <version>0.0.14</version>
-        </dependency>
-
         <!-- TEST dependencies -->
         <dependency>
             <groupId>org.scalatest</groupId>

@@ -22,8 +22,8 @@ package io.smartdatalake.meta.jsonschema
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.config.{ExcludeFromSchemaExport, ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, ScaladocUtil, jsonschema}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.meta.{GenericAttributeDef, GenericTypeDef, GenericTypeUtil, jsonschema}
+import io.smartdatalake.util.misc.{ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
@@ -34,11 +34,11 @@ import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
 
-import scala.jdk.CollectionConverters._
+import scala.collection.compat._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe.{ClassSymbol, Type, TypeRef, typeOf}
-import scala.collection.compat._
 
 /**
  * Create Json schema elements from generic type definitions.
