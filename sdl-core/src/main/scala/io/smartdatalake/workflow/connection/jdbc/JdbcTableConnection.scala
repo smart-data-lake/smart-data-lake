@@ -25,6 +25,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
@@ -34,7 +35,8 @@ import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.StructType
 
-import java.sql.{DriverManager, Connection => SqlConnection}
+import scala.collection.mutable.{Set => MutableSet}
+import java.sql.{DatabaseMetaData, DriverManager, ResultSet, SQLException, Connection => SqlConnection}
 
 /**
  * Connection information for JDBC tables.
@@ -149,6 +151,26 @@ case class JdbcTableConnection(override val id: ConnectionId,
   def dropTable(tableName: String, logging: Boolean = true): Unit = {
     if (catalog.isTableExisting(tableName)) {
       execJdbcStatement(s"drop table $tableName", logging = logging)
+    }
+  }
+
+  private lazy val connectionMetadata: DatabaseMetaData = this.getConnection.getMetaData
+
+  //The implementation to get the PK is not in the Catalog in order to use the JDBC standard method getPrimaryKeys
+  // and not having to adapt the Query for different DBs.
+  def getJdbcPrimaryKey(catalog: String, schema: String, tableName: String): Option[PrimaryKeyDefinition] = {
+    var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
+    var primaryKeyCols: MutableSet[String] = MutableSet()
+    var primaryKeyName: MutableSet[String] = MutableSet()
+    while (resultSet.next()) {
+      primaryKeyCols += resultSet.getString("COLUMN_NAME")
+      primaryKeyName += resultSet.getString("PK_NAME")
+    }
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection for $tableName returns more than one Primary Key!")
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
     }
   }
 

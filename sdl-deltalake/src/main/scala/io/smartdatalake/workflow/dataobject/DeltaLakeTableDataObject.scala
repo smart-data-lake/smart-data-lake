@@ -45,6 +45,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import java.sql.SQLException
 
 import scala.util.Try
 
@@ -120,7 +121,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -286,6 +287,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if (Environment.hadoopAuthoritiesWithAclsRequired.exists(a => filesystem.getUri.toString.contains(a))) {
       require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
     }
+  }
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
+    if (table.commentOnTable.isDefined) addTableComment(table.commentOnTable.get)
+    if (table.commentsOnColumns.isDefined) addColumnComments(table.commentsOnColumns.get)
+
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
@@ -641,6 +650,44 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
+
+  def getExistingPKConstraint(catalog: String, schema: String, tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
+    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '$catalog'"
+    val schemaConstraint = if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '$schema'"
+    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
+    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
+    val df = context.sparkSession.sql(query)
+    val (primaryKeyCols, primaryKeyName) = df.collect.foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The $tableName returns more than one Primary Key: ${pk.mkString}")
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
+    }
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def addColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
+    comments.foreach( comment => {
+      val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
+      SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+    }
+    )
   }
 }
 
