@@ -50,8 +50,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   val connection: DebeziumConnection = getConnection[DebeziumConnection](connectionId)
 
-  private val executorService: ExecutorService  = Executors.newSingleThreadExecutor
-
   private def getConfigPropertiesMap: Map[String, String] = {
 
     // If duplicate connection properties are set, prefer the ones coming from the connections
@@ -112,7 +110,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     import spark.implicits._
 
     val changeConsumer = new DebeziumChangeConsumer
-    val completionCallback = new DebeziumCompletionCallback(this.executorService)
+    val executorService = Executors.newSingleThreadExecutor
+    val completionCallback = new DebeziumCompletionCallback(executorService)
 
     val engine = DebeziumEngine.create(classOf[Connect])
       .using(properties)
