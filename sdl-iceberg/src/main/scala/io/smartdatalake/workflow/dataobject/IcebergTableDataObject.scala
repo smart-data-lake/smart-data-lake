@@ -252,10 +252,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * converts an existing path with parquet files to an iceberg table
    */
   private[smartdatalake] def convertPathToIceberg(implicit context: ActionPipelineContext): Unit = {
-    // get schema by using Parquet DataObject
-    val parquetDataObject = ParquetFileDataObject(id.id + "-convertion", hadoopPath.toString)
-    val sparkSchema = parquetDataObject.schema.map(_.asInstanceOf[SparkSchema].inner)
-      .getOrElse(parquetDataObject.getSparkDataFrame().schema)
+    // get schema using Spark. Note that this only work for parquet files.
+    val sparkSchema = context.sparkSession.read.parquet(hadoopPath.toString).schema
     val schema = SparkSchemaUtil.convert(sparkSchema)
     // move parquet files and partitions from table root folder to data subfolder (Iceberg standard)
     val filesToMove = filesystem.listStatus(hadoopPath)
