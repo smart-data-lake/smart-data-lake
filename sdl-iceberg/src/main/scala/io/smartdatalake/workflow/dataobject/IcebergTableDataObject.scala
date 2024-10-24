@@ -259,9 +259,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val filesToMove = filesystem.listStatus(hadoopPath)
       .filter(f => (f.isFile && f.getPath.getName.matches(filetypePattern)) || (f.isDirectory && f.getPath.getName.contains("=")))
     logger.info(s"($id) convertPathToIceberg: moving ${filesToMove.length} files to ./data subdirectory")
+    val dataPath = new Path(hadoopPath, "data")
+    filesystem.mkdirs(dataPath)
     filesToMove.foreach { f =>
-      val newPath = new Path(new Path(hadoopPath, "data"), f.getPath.getName)
-      filesystem.rename(f.getPath, newPath)
+      val newPath = new Path(dataPath, f.getPath.getName)
+      if (!filesystem.rename(f.getPath, newPath)) throw new IllegalStateException(s"($id) Failed to rename ${f.getPath} -> $newPath")
     }
     // create table
     logger.info(s"($id) convertPathToIceberg: creating iceberg table")

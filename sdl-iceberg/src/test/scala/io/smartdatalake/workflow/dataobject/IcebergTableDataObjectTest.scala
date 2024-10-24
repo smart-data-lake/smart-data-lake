@@ -22,6 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
@@ -575,6 +576,48 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with Smart
       val df = icebergDO.getSparkDataFrame()
       assert(df.isEqual(df1))
       assert(icebergDO.listPartitions.isEmpty)
+    }
+  }
+
+  test("Create from parquet files partitioned of legacy hive tables (c000 file ending)") {
+    // Define Iceberg Table
+    val icebergTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "parquet_partitioned_legacy_to_iceberg", query = None)
+    val icebergConnection = IcebergTableConnection(id = "iceberg", db = "default", pathPrefix = tempPath, addFilesParallelism = Some(1))
+    instanceRegistry.register(icebergConnection)
+    val targetPath = icebergTable.name
+    val icebergDO = IcebergTableDataObject(id = "iceberg", path = Some(targetPath), table = icebergTable, partitions = Seq("tpe"), connectionId = Some(icebergConnection.id))
+
+    // Create parquet files
+    val parquetConnection = HadoopFileConnection(id = "parquet", pathPrefix = tempPath)
+    instanceRegistry.register(parquetConnection)
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = targetPath, partitions = Seq("tpe"), connectionId = Some(parquetConnection.id))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    RemoteIteratorWrapper(parquetDO.filesystem.listFiles(parquetDO.hadoopPath, true))
+      .filter(s => s.isFile && s.getPath.getName.endsWith(".snappy.parquet"))
+      .map(_.getPath.toString)
+      .foreach { p =>
+        parquetDO.renameFile(p, p.stripSuffix(".snappy.parquet"))
+      }
+
+    // Initialize Iceberg table
+    icebergDO.prepare // does the table conversion
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
     }
   }
 
