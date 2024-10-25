@@ -45,7 +45,7 @@ import org.apache.spark.sql.catalyst.TableIdentifier
  *                                   As of now, this feature is only available for JdbcTableDataObject. Using it in other DataObjects
  *                                   will have no effect.
  * @param primaryKeyConstraintName  This parameter is used in case that createAndReplaceParameterPrimaryKey is set to TRUE.
- *                                  In case a constraint name is not given, the default value sdlb_"tableName" will be used
+ *                                  In case a constraint name is not given, the default value sdlb_"tableName"_pk will be used
  *                                  when updating the primary key.
  * @param foreignKeys optional sequence of foreign key definitions.
  *                    This is used as metadata for a data catalog.
