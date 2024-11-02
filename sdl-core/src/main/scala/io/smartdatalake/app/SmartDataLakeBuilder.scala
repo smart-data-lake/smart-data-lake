@@ -28,7 +28,7 @@ import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Prepare}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
@@ -38,25 +38,35 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 import scopt.{OParser, OParserBuilder}
 
-import java.io.File
 import java.time.{Duration, LocalDateTime}
 import scala.annotation.tailrec
 import scala.util.Try
 
 trait CanBuildSmartDataLakeBuilderConfig[R] {
   //All builder functions for all fields of the common SmartDataLakeBuilderConfig
-  def withfeedSel(value: String): R
-  def withapplicationName(value: Option[String]): R
-  def withconfiguration(value: Option[Seq[String]]): R
-  def withpartitionValues(value: Option[Seq[PartitionValues]]): R
-  def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): R
-  def withparallelism(value: Int): R
-  def withstatePath(value: Option[String]): R
-  def withoverrideJars(value: Option[Seq[String]]): R
-  def withtest(value: Option[TestMode.Value]): R
-  def withstreaming(value: Boolean): R
-  def withmaster(value: Option[String]): R
-  def withdeployMode(value: Option[String]): R
+  def withFeedSel(value: String): R = ProductUtil.dynamicCopy(this, "feedSel", value).asInstanceOf[R]
+
+  def withApplicationName(value: Option[String]): R = ProductUtil.dynamicCopy(this, "applicationName", value).asInstanceOf[R]
+
+  def withConfiguration(value: Option[Seq[String]]): R = ProductUtil.dynamicCopy(this, "configuration", value).asInstanceOf[R]
+
+  def withPartitionValues(value: Option[Seq[PartitionValues]]): R = ProductUtil.dynamicCopy(this, "partitionValues", value).asInstanceOf[R]
+
+  def withMultiPartitionValues(value: Option[Seq[PartitionValues]]): R = ProductUtil.dynamicCopy(this, "multiPartitionValues", value).asInstanceOf[R]
+
+  def withParallelism(value: Int): R = ProductUtil.dynamicCopy(this, "parallelism", value).asInstanceOf[R]
+
+  def withStatePath(value: Option[String]): R = ProductUtil.dynamicCopy(this, "statePath", value).asInstanceOf[R]
+
+  def withOverrideJars(value: Option[Seq[String]]): R = ProductUtil.dynamicCopy(this, "overrideJars", value).asInstanceOf[R]
+
+  def withTest(value: Option[TestMode.Value]): R = ProductUtil.dynamicCopy(this, "test", value).asInstanceOf[R]
+
+  def withStreaming(value: Boolean): R = ProductUtil.dynamicCopy(this, "streaming", value).asInstanceOf[R]
+
+  def withMaster(value: Option[String]): R = ProductUtil.dynamicCopy(this, "master", value).asInstanceOf[R]
+
+  def withDeployMode(value: Option[String]): R = ProductUtil.dynamicCopy(this, "deployMode", value).asInstanceOf[R]
 }
 
 /**
@@ -100,29 +110,7 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
   val appName: String = applicationName.getOrElse(feedSel)
 
   def isDryRun: Boolean = test.contains(TestMode.DryRun)
-  override def withfeedSel(value: String): SmartDataLakeBuilderConfig = copy(feedSel = value)
 
-  override def withapplicationName(value: Option[String]): SmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): SmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): SmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): SmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): SmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): SmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): SmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): SmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): SmartDataLakeBuilderConfig = copy(streaming = value)
 }
 
 object TestMode extends Enumeration {
@@ -167,7 +155,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     val nonRequiredFeedselParser =
       opt[String]('f', "feed-sel")
-        .action((arg, config) => config.withfeedSel(arg))
+        .action((arg, config) => config.withFeedSel(arg))
         .valueName("<operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]")
         .text(
           """Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
@@ -193,37 +181,37 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       head(appType, s"$appVersion"),
       if(feedSelRequired) requiredFeedselParser else nonRequiredFeedselParser,
       opt[String]('n', "name")
-        .action((arg, config) => config.withapplicationName(Some(arg)))
+        .action((arg, config) => config.withApplicationName(Some(arg)))
         .text("Optional name of the application. If not specified feed-sel is used."),
       opt[Seq[String]]('c', "config")
-        .action((arg, config) => config.withconfiguration(Some(arg)))
+        .action((arg, config) => config.withConfiguration(Some(arg)))
         .valueName("<file1>[,<file2>...]")
         .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."),
       opt[String]("partition-values")
-        .action((arg, config) => config.withpartitionValues(Some(PartitionValues.parseSingleColArg(arg))))
+        .action((arg, config) => config.withPartitionValues(Some(PartitionValues.parseSingleColArg(arg))))
         .valueName(PartitionValues.singleColFormat)
         .text(s"Partition values to process for one single partition column."),
       opt[String]("multi-partition-values")
-        .action((arg, config) => config.withpartitionValues(Some(PartitionValues.parseMultiColArg(arg))))
+        .action((arg, config) => config.withPartitionValues(Some(PartitionValues.parseMultiColArg(arg))))
         .valueName(PartitionValues.multiColFormat)
         .text(s"Partition values to process for multiple partition columns."),
       opt[Unit]('s', "streaming")
-        .action((_, config) => config.withstreaming(true))
+        .action((_, config) => config.withStreaming(true))
         .text(s"Enable streaming mode for continuous processing."),
       opt[Int]("parallelism")
-        .action((arg, config) => config.withparallelism(arg))
+        .action((arg, config) => config.withParallelism(arg))
         .valueName("<int>")
         .text(s"Max number of parallel executed SDLB actions"),
       opt[String]("state-path")
-        .action((arg, config) => config.withstatePath(Some(arg)))
+        .action((arg, config) => config.withStatePath(Some(arg)))
         .valueName("<path>")
         .text(s"Path to save run state files. Must be set to enable recovery in case of failures."),
       opt[Seq[String]]("override-jars")
-        .action((arg, config) => config.withoverrideJars(Some(arg)))
+        .action((arg, config) => config.withOverrideJars(Some(arg)))
         .valueName("<jar1>[,<jar2>...]")
         .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath."),
       opt[String]("test")
-        .action((arg, config) => config.withtest(Some(TestMode.withName(arg))))
+        .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
         .valueName("<config|dry-run>")
         .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage"),
       help("help").text("Display the help text."),

@@ -24,8 +24,6 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
-import java.io.File
-
 /**
  * Smart Data Lake Builder application for agent mode using simple, unsecure websocket communication with Jetty.
  * This is recommended for development use only.
@@ -73,7 +71,8 @@ case class LocalJettyAgentSmartDataLakeBuilderConfig(feedSel: String = null,
                                                      applicationName: Option[String] = None,
                                                      configuration: Option[Seq[String]] = None,
                                                      master: Option[String] = None,
-                                                     deployMode: Option[String] = None, partitionValues: Option[Seq[PartitionValues]] = None,
+                                                     deployMode: Option[String] = None,
+                                                     partitionValues: Option[Seq[PartitionValues]] = None,
                                                      multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                                      parallelism: Int = 1,
                                                      statePath: Option[String] = None,
@@ -84,28 +83,4 @@ case class LocalJettyAgentSmartDataLakeBuilderConfig(feedSel: String = null,
                                                      maxPortRetries: Int = MaxPortRetries
                                                     )
 
-  extends CanBuildSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig] {
-  override def withfeedSel(value: String): LocalJettyAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
-
-  override def withapplicationName(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): LocalJettyAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): LocalJettyAgentSmartDataLakeBuilderConfig = copy(streaming = value)
-}
+  extends CanBuildSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig]
