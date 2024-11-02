@@ -39,9 +39,8 @@ import scopt.{DefaultOParserSetup, OParser, OParserSetup}
  */
 class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  def parseAndRun(args: Array[String], ignoreOverrideJars: Boolean = false): Unit = {
+  def parseAndRun(args: Array[String]): Unit = {
     logger.info(s"Starting Program $appType $appVersion")
-
 
     // Ignore the arguments we don't recognize as AWS Glue provides many unexpected arguments
     val setup: OParserSetup = new DefaultOParserSetup {
@@ -50,7 +49,6 @@ class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
     OParser.parse(parser, args, SmartDataLakeBuilderConfig(), setup) match {
       case Some(config) =>
-        assert(config.overrideJars.isEmpty || ignoreOverrideJars, "Option override-jars is not supported by DefaultSmartDataLakeBuilder. Use DatabricksSmartDataLakeBuilder for this option.")
         val stats = run(config)
           .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
         logger.info(s"$appType finished successfully: $stats")
