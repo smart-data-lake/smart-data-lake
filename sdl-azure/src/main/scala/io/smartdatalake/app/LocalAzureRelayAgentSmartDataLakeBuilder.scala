@@ -37,7 +37,6 @@ case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel: String = null
                                                           multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                                           parallelism: Int = 1,
                                                           statePath: Option[String] = None,
-                                                          overrideJars: Option[Seq[String]] = None,
                                                           test: Option[TestMode.Value] = None,
                                                           streaming: Boolean = false,
                                                           azureRelayURL: Option[String] = None)

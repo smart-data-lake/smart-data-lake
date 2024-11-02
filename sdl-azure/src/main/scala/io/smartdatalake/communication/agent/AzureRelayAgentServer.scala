@@ -56,8 +56,8 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
             val sdlMessage = read[SDLMessage](message)
             val sdlConfig = SmartDataLakeBuilderConfig(localAzureRelayAgentConfig.feedSel, applicationName = localAzureRelayAgentConfig.applicationName, configuration = localAzureRelayAgentConfig.configuration,
               partitionValues = localAzureRelayAgentConfig.partitionValues, multiPartitionValues = localAzureRelayAgentConfig.multiPartitionValues,
-              parallelism = localAzureRelayAgentConfig.parallelism, statePath = localAzureRelayAgentConfig.statePath, overrideJars = localAzureRelayAgentConfig.overrideJars
-              , test = localAzureRelayAgentConfig.test, streaming = localAzureRelayAgentConfig.streaming)
+              parallelism = localAzureRelayAgentConfig.parallelism, statePath = localAzureRelayAgentConfig.statePath,
+              test = localAzureRelayAgentConfig.test, streaming = localAzureRelayAgentConfig.streaming)
             val responseMessageOpt = agentController.handle(sdlMessage, sdlConfig)
             if (responseMessageOpt.isDefined) {
               sendSDLMessage(responseMessageOpt.get, connection)

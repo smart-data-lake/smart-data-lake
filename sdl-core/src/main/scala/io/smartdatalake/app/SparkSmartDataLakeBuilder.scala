@@ -19,11 +19,8 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.EnvironmentUtil
 import scopt.OParser
-
-import java.io.File
 
 /**
  * Smart Data Lake Builder application for running SDL with Spark.
@@ -32,7 +29,7 @@ import java.io.File
  * for example for running SDLB locally on your laptop with Spark.
  */
 object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
-  val localParser: OParser[_, SmartDataLakeBuilderConfig] = {
+  val sparkParser: OParser[_, SmartDataLakeBuilderConfig] = {
     val builder = OParser.builder[SmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
@@ -58,7 +55,7 @@ object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
     logger.info(s"Starting Program $appType $appVersion")
 
     // Parse all command line arguments
-    OParser.parse(localParser, args, SmartDataLakeBuilderConfig()) match {
+    OParser.parse(sparkParser, args, SmartDataLakeBuilderConfig()) match {
       case Some(config) =>
 
         // checking environment variables for local mode

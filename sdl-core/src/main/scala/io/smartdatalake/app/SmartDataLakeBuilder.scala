@@ -58,8 +58,6 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   def withStatePath(value: Option[String]): R = ProductUtil.dynamicCopy(this, "statePath", value).asInstanceOf[R]
 
-  def withOverrideJars(value: Option[Seq[String]]): R = ProductUtil.dynamicCopy(this, "overrideJars", value).asInstanceOf[R]
-
   def withTest(value: Option[TestMode.Value]): R = ProductUtil.dynamicCopy(this, "test", value).asInstanceOf[R]
 
   def withStreaming(value: Boolean): R = ProductUtil.dynamicCopy(this, "streaming", value).asInstanceOf[R]
@@ -90,7 +88,6 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       parallelism: Int = 1,
                                       statePath: Option[String] = None,
-                                      overrideJars: Option[Seq[String]] = None,
                                       test: Option[TestMode.Value] = None,
                                       streaming: Boolean = false
                                      ) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig] {
@@ -206,10 +203,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .action((arg, config) => config.withStatePath(Some(arg)))
         .valueName("<path>")
         .text(s"Path to save run state files. Must be set to enable recovery in case of failures."),
-      opt[Seq[String]]("override-jars")
-        .action((arg, config) => config.withOverrideJars(Some(arg)))
-        .valueName("<jar1>[,<jar2>...]")
-        .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath."),
       opt[String]("test")
         .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
         .valueName("<config|dry-run>")
