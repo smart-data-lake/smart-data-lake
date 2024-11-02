@@ -56,9 +56,24 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
+  val sdlb = DefaultSmartDataLakeBuilder
+
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
+  before {
+    sdlb.instanceRegistry.clear()
+  }
+
+  test("Test command line argument parsing") {
+    val config = sdlb.parse(Seq("-f", "test", "-n", "name", "--partition-values", "dt=20000101,20000102")).get
+    assert(config == SmartDataLakeBuilderConfig(feedSel = "test", applicationName = Some("name"), partitionValues = Some(Seq(PartitionValues(Map("dt" -> "20000101")), PartitionValues(Map("dt" -> "20000102"))))))
+  }
+
+  test("Test command line unbounded argument parsing") {
+    val config = sdlb.parse(Seq("-f", "test", "-n", "name", "--partition-values", "dt=20000101", "--partition-values", "dt=20000102")).get
+    assert(config == SmartDataLakeBuilderConfig(feedSel = "test", applicationName = Some("name"), partitionValues = Some(Seq(PartitionValues(Map("dt" -> "20000101")), PartitionValues(Map("dt" -> "20000102"))))))
+  }
 
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
 
@@ -70,7 +85,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     Environment._sdlPlugin = Some(Some(new TestSDLPlugin))
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -169,7 +183,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -248,7 +261,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -343,7 +355,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -394,7 +405,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -449,7 +459,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -507,7 +516,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     instanceRegistry.clear()
@@ -599,7 +607,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(tempPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     instanceRegistry.clear()
@@ -665,7 +672,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     instanceRegistry.clear()
@@ -708,8 +714,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   test("sdlb run converting col names to lower case") {
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
     val config = ConfigFactory.parseString(
       """
         |actions = {
@@ -737,7 +741,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("testColumn", "c?olumnN[ä]me")
@@ -753,8 +757,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
 
   test("sdlb run converting column names to lower without additional options") {
-
-    val sdlb = new DefaultSmartDataLakeBuilder()
 
     val config = ConfigFactory.parseString(
       """
@@ -786,7 +788,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel="ids:act")
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     val dfSrc = Seq(("testData", "Foo"),("bar", "Space")).toDF("FOO", "noCamel")
@@ -810,7 +812,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     TestUtil.setupWebserviceStubs()
 
     val feedName = "test"
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
@@ -858,7 +859,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -963,7 +963,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   ignore("sdlb run test aws ui upload") {
 
     val feedName = "test"
-    val sdlb = new DefaultSmartDataLakeBuilder()
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"

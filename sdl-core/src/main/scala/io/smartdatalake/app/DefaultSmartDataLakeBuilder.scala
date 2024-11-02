@@ -18,31 +18,13 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.config.ConfigurationException
-import scopt.OParser
-
 /**
  * Default Smart Data Lake Command Line Application.
- * Note: When running SDLB with Spark, this entrypoint assumes that there it is running in an environment where Spark Config
+ * Note: When running SDLB with Spark, this entrypoint assumes that it is running in an environment where Spark Config
  * such as master and deploy-mode are already set. This is for example the case with Databricks.
+ * For other environments use SparkSmartDataLakeBuilder
  */
-class DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
-
-  def parseAndRun(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType $appVersion")
-
-    OParser.parse(parser, args, SmartDataLakeBuilderConfig()) match {
-      case Some (config) =>
-        val stats = run(config)
-          .toSeq.sortBy(_._1).map(x => x._1.toString + "=" + x._2).mkString(" ") // convert stats to string
-        logger.info(s"$appType finished successfully: $stats")
-      case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
-    }
-  }
-}
-
-object DefaultSmartDataLakeBuilder {
+object DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   /**
    * Entry-Point of the application.
@@ -50,7 +32,14 @@ object DefaultSmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    val app = new DefaultSmartDataLakeBuilder
-    app.parseAndRun(args)
+    logProgramStart()
+
+    parse(args) match {
+      case Some(config) =>
+        val stats = run(config)
+        logStats(stats)
+      case None =>
+        throwOParserError()
+    }
   }
 }

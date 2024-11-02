@@ -607,7 +607,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
   }
 
   test("copy load expectations test") {
-    val sdlb = new DefaultSmartDataLakeBuilder()
+    val sdlb = DefaultSmartDataLakeBuilder
     implicit val instanceRegistry = sdlb.instanceRegistry
 
     // setup DataObjects
@@ -641,7 +641,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with Bef
     srcDO2.writeSparkDataFrame(dfInput, Seq())
 
     // run
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:.*", applicationName = Some("test"))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:.*", applicationName = Some("test"))
     sdlb.run(sdlConfig)
   }
 

@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.EnvironmentUtil
 import scopt.OParser
 
@@ -29,7 +28,8 @@ import scopt.OParser
  * for example for running SDLB locally on your laptop with Spark.
  */
 object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
-  val sparkParser: OParser[_, SmartDataLakeBuilderConfig] = {
+
+  private val sparkParser: OParser[_, SmartDataLakeBuilderConfig] = {
     val builder = OParser.builder[SmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
@@ -45,14 +45,13 @@ object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
     )
   }
 
-
   /**
    * Entry-Point of the application.
    *
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType $appVersion")
+    logProgramStart()
 
     // Parse all command line arguments
     OParser.parse(sparkParser, args, SmartDataLakeBuilderConfig()) match {
@@ -62,11 +61,12 @@ object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
         require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!")
         require(!config.master.contains("yarn") || System.getenv("SPARK_HOME") != null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!")
 
+        // run
         val stats = run(config)
-          .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
-        logger.info(s"$appType finished successfully: $stats")
+        logStats(stats)
+
       case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+        throwOParserError()
     }
   }
 }

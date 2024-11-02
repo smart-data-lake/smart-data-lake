@@ -19,7 +19,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
@@ -29,22 +29,22 @@ import scopt.OParser
  * Sets master to local[*] and deployMode to client by default.
  */
 
-case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel: String = null,
-                                                          applicationName: Option[String] = Some("AgentApp"),
-                                                          configuration: Option[Seq[String]] = None,
-                                                          master: Option[String] = Some("local[*]"),
-                                                          deployMode: Option[String] = None, partitionValues: Option[Seq[PartitionValues]] = None,
-                                                          multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                                          parallelism: Int = 1,
-                                                          statePath: Option[String] = None,
-                                                          test: Option[TestMode.Value] = None,
-                                                          streaming: Boolean = false,
+case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
+                                                          override val applicationName: Option[String] = Some("AgentApp"),
+                                                          override val configuration: Option[Seq[String]] = None,
+                                                          override val master: Option[String] = Some("local[*]"),
+                                                          override val deployMode: Option[String] = None,
+                                                          override val partitionValues: Option[Seq[PartitionValues]] = None,
+                                                          override val parallelism: Int = 1,
+                                                          override val statePath: Option[String] = None,
+                                                          override val test: Option[TestMode.Value] = None,
+                                                          override val streaming: Boolean = false,
                                                           azureRelayURL: Option[String] = None)
   extends CanBuildSmartDataLakeBuilderConfig[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
 
 object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser: OParser[_, LocalAzureRelayAgentSmartDataLakeBuilderConfig] = {
+  private val agentParser: OParser[_, LocalAzureRelayAgentSmartDataLakeBuilderConfig] = {
     val builder = OParser.builder[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
@@ -62,13 +62,14 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType v$appVersion")
+    logProgramStart()
 
     OParser.parse(agentParser, args, LocalAzureRelayAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
         AzureRelayAgentServer.start(agentServerConfig, agentController)
-      case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+      case None =>
+        throwOParserError()
     }
   }
 }

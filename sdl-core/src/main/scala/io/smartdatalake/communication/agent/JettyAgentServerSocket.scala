@@ -50,7 +50,7 @@ class JettyAgentServerSocket(localJettyConfig: LocalJettyAgentSmartDataLakeBuild
     logger.info("Received " + message)
     val sdlMessage = read[SDLMessage](message)
     val sdlConfig = SmartDataLakeBuilderConfig(localJettyConfig.feedSel, applicationName = localJettyConfig.applicationName, configuration = localJettyConfig.configuration,
-      partitionValues = localJettyConfig.partitionValues, multiPartitionValues = localJettyConfig.multiPartitionValues,
+      partitionValues = localJettyConfig.partitionValues,
       parallelism = localJettyConfig.parallelism, statePath = localJettyConfig.statePath,
       test = localJettyConfig.test, streaming = localJettyConfig.streaming)
 

@@ -54,6 +54,13 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   val checkpointPath = "target/streamingCheckpointTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
+  val sdlb = DefaultSmartDataLakeBuilder
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+  before {
+    instanceRegistry.clear()
+  }
+
   after {
     // ensure cleanup
     session.streams.listListeners().foreach(session.streams.removeListener)
@@ -68,8 +75,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -123,7 +128,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       }
     }
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath), streaming = true)
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath), streaming = true)
     Environment._additionalStateListeners = Seq(stateListener)
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
@@ -157,8 +162,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -217,7 +220,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     session.streams.addListener(testStreamingQueryListener)
 
     // start run
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
@@ -263,8 +266,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -324,7 +325,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     session.streams.addListener(testStreamingQueryListener)
 
     // start run
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
@@ -344,8 +345,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -407,7 +406,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // start run failing actionA
     instanceRegistry.register(Seq(actionAFail, actionB))
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     intercept[TaskFailedException](sdlb.run(sdlConfig))
@@ -437,8 +436,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -493,7 +490,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // start run, actionB will fail after first runId
     instanceRegistry.register(Seq(actionA, actionB))
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     intercept[StreamingQueryException](sdlb.run(sdlConfig))
@@ -509,8 +506,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -543,7 +538,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // start run failing actionA
     instanceRegistry.register(Seq(actionAFail, actionB))
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     intercept[TaskFailedException](sdlb.run(sdlConfig))
@@ -597,8 +592,6 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    val sdlb = new DefaultSmartDataLakeBuilder()
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
@@ -658,7 +651,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // start run failing actionA
     instanceRegistry.register(Seq(actionA, actionB))
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), streaming = true, statePath = Some(statePath))
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)

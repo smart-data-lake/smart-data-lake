@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
@@ -93,7 +92,7 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
 
   test("One simple Dataset transformation with different input and output Dataset-type using config file") {
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
+    val sdlb = DefaultSmartDataLakeBuilder
     // setup input data
     val srcDO = CsvFileDataObject("src1DS", "target/src1DS",
       schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))

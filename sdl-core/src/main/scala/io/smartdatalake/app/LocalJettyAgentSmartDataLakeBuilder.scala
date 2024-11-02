@@ -20,7 +20,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
 import io.smartdatalake.communication.agent.{AgentServerController, JettyAgentServer, JettyAgentServerConfig}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
@@ -31,7 +31,7 @@ import scopt.OParser
  */
 object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
+  private val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
     val builder = OParser.builder[LocalJettyAgentSmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
@@ -48,7 +48,7 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType v$appVersion")
+    logProgramStart()
 
     val envconfig = LocalJettyAgentSmartDataLakeBuilderConfig(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
@@ -63,23 +63,23 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
         JettyAgentServer.start(agentServerConfig, agentController)
-      case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+      case None =>
+        throwOParserError()
     }
   }
 }
-case class LocalJettyAgentSmartDataLakeBuilderConfig(feedSel: String = null,
-                                                     applicationName: Option[String] = None,
-                                                     configuration: Option[Seq[String]] = None,
-                                                     master: Option[String] = None,
-                                                     deployMode: Option[String] = None,
-                                                     partitionValues: Option[Seq[PartitionValues]] = None,
-                                                     multiPartitionValues: Option[Seq[PartitionValues]] = None,
-                                                     parallelism: Int = 1,
-                                                     statePath: Option[String] = None,
-                                                     test: Option[TestMode.Value] = None,
-                                                     streaming: Boolean = false,
+
+case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
+                                                     override val applicationName: Option[String] = None,
+                                                     override val configuration: Option[Seq[String]] = None,
+                                                     override val master: Option[String] = None,
+                                                     override val deployMode: Option[String] = None,
+                                                     override val partitionValues: Option[Seq[PartitionValues]] = None,
+                                                     override val parallelism: Int = 1,
+                                                     override val statePath: Option[String] = None,
+                                                     override val test: Option[TestMode.Value] = None,
+                                                     override val streaming: Boolean = false,
                                                      port: Int = DefaultPort,
                                                      maxPortRetries: Int = MaxPortRetries
                                                     )
-
   extends CanBuildSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig]
