@@ -23,8 +23,6 @@ import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
-import java.io.File
-
 /**
  * Smart Data Lake Builder application for agent mode.
  *
@@ -43,31 +41,7 @@ case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel: String = null
                                                           test: Option[TestMode.Value] = None,
                                                           streaming: Boolean = false,
                                                           azureRelayURL: Option[String] = None)
-  extends CanBuildSmartDataLakeBuilderConfig[LocalAzureRelayAgentSmartDataLakeBuilderConfig] {
-  override def withfeedSel(value: String): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
-
-  override def withapplicationName(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): LocalAzureRelayAgentSmartDataLakeBuilderConfig = copy(streaming = value)
-}
+  extends CanBuildSmartDataLakeBuilderConfig[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
 
 object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
