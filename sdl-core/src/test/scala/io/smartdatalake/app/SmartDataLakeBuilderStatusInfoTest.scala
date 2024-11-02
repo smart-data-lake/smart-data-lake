@@ -59,8 +59,8 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configstatusinfo/application.conf").getPath))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(
+      getClass.getResource("/configstatusinfo/application.conf").getPath)
     )
     //Run SDLB
     sdlb.run(sdlConfig)

@@ -31,7 +31,8 @@ import scopt.OParser
 
 case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
                                                           override val applicationName: Option[String] = Some("AgentApp"),
-                                                          override val configuration: Option[Seq[String]] = None,
+                                                          override val configuration: Seq[String] = Seq(),
+                                                          override val configurationValueOverwrite: Map[String, String] = Map(),
                                                           override val master: Option[String] = Some("local[*]"),
                                                           override val deployMode: Option[String] = None,
                                                           override val partitionValues: Option[Seq[PartitionValues]] = None,

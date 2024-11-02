@@ -101,8 +101,8 @@ class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
     val dfSrc1 = Seq(("john", 5)).toDF("name", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDsTransformer/application.conf").getPath))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq(
+      getClass.getResource("/configScalaClassSparkDsTransformer/application.conf").getPath)
     )
     //Run SDLB
     sdlb.run(sdlConfig)
