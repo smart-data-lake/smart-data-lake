@@ -44,7 +44,7 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val feedName = "test"
   FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_agent_dummy_connection").toFile)
   FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_dummy_cloud_connection").toFile)
-  val sdlb = new DefaultSmartDataLakeBuilder()
+  val sdlb = DefaultSmartDataLakeBuilder
 
   // setup input DataObject
   val srcDO = CsvFileDataObject("src1", "target/relay_agent_dummy_connection/remote-file")(sdlb.instanceRegistry)
@@ -52,8 +52,8 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
   val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;EntityPath=tbb-test-connection;SharedAccessKey="
-  val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None, azureRelayURL = Some(azureRelayUrl))
-  val remoteSDLB = new DefaultSmartDataLakeBuilder()
+  val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(), azureRelayURL = Some(azureRelayUrl))
+  val remoteSDLB = DefaultSmartDataLakeBuilder
   //Make sure this string matches the config from the file application-azureRelayAgent.conf
   val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
   val agentServerThread =
@@ -65,7 +65,7 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   require(configFileResource != null, "Please make sure the file application-azureRelayAgent.conf is included in the resources when running this test." +
     "In IntelliJ, you can do this with the option Modify Classpath")
   Thread.sleep(5000)
-  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(configFileResource.getPath))
+  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(configFileResource.getPath)
   )
   //Run SDLB Main Instance
   sdlb.run(sdlConfig)

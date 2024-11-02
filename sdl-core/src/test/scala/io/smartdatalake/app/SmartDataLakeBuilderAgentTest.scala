@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.communication.agent.{AgentClient, AgentServerController, JettyAgentServer, JettyAgentServerConfig}
+import io.smartdatalake.communication.agent.{AgentClient, AgentServerController, JettyAgentServer}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
@@ -43,17 +43,19 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
 
   import session.implicits._
 
+  val sdlb = DefaultSmartDataLakeBuilder
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+
+  before {
+    instanceRegistry.clear()
+  }
+
   test("Test Config Parsing") {
     val feedName = "test"
-    val sdlb = new DefaultSmartDataLakeBuilder()
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configAgents/application-jettyagent.conf").getPath))
-    )
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq("cp:/configAgents/application-jettyagent.conf"))
 
     sdlb.loadConfigIntoInstanceRegistry(sdlConfig, session)
-
-    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
     val actionToSend = sdlb.instanceRegistry.getActions.filter(_.id.id == "remote-to-cloud").head.asInstanceOf[ProxyAction].wrappedAction
 
@@ -72,25 +74,22 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter {
     //Contents of the action and objects generated out of the serialized hocon string should match the contents of /configAgents/application-jettyagent.conf
     assert(dataObjects.contains("remote-file") && dataObjects.contains("cloud-file1") && connections.contains("remoteFile") && actions.contains("remote-to-cloud"))
   }
+
   test("sdlb run with JettyAgentServer: Test starting remote action from sdlb to agentserver") {
 
     val feedName = "test"
     FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/jetty_agent_dummy_connection").toFile)
     FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/jetty_dummy_cloud_connection").toFile)
-    val sdlb = new DefaultSmartDataLakeBuilder()
     // setup input DataObject
     val srcDO = CsvFileDataObject("src1", "target/jetty_agent_dummy_connection/remote-file")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
-
-    val remoteSDLB = new DefaultSmartDataLakeBuilder()
+    val remoteSDLB = new SmartDataLakeBuilder {}
     val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
     JettyAgentServer.start(LocalJettyAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = None), agentController)
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configAgents/application-jettyagent.conf").getPath))
-    )
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq("cp:/configAgents/application-jettyagent.conf"))
     //Run SDLB Main Instance
     sdlb.run(sdlConfig)
 

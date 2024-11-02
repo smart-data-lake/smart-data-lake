@@ -18,8 +18,7 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.config.ConfigurationException
-import scopt.{DefaultOParserSetup, OParser, OParserSetup}
+import scopt.{DefaultOParserSetup, OParser}
 
 /*
  * AWS Glue Smart Data Lake Command Line Application.
@@ -37,28 +36,7 @@ import scopt.{DefaultOParserSetup, OParser, OParserSetup}
  *  - specify the path to it in the job property `Dependent JARs path` and 
  *  - set Job parameter: `--user-jars-first` with value `true`
  */
-class GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
-
-  def parseAndRun(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType $appVersion")
-
-    // Ignore the arguments we don't recognize as AWS Glue provides many unexpected arguments
-    val setup: OParserSetup = new DefaultOParserSetup {
-      override def errorOnUnknownArgument: Boolean = false
-    }
-
-    OParser.parse(parser, args, SmartDataLakeBuilderConfig(), setup) match {
-      case Some(config) =>
-        val stats = run(config)
-          .toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
-        logger.info(s"$appType finished successfully: $stats")
-      case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
-    }
-  }
-}
-
-object GlueSmartDataLakeBuilder {
+object GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
   /**
    * Entry-Point of the application.
@@ -66,7 +44,19 @@ object GlueSmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    val app = new GlueSmartDataLakeBuilder
-    app.parseAndRun(args)
+    logProgramStart()
+
+    // Ignore the arguments we don't recognize as AWS Glue provides many unexpected arguments
+    val setup = new DefaultOParserSetup {
+      override def errorOnUnknownArgument: Boolean = false
+    }
+
+    OParser.parse(parser, args, SmartDataLakeBuilderConfig(), setup) match {
+      case Some(config) =>
+        val stats = run(config)
+        logStats(stats)
+      case None =>
+        throwOParserError()
+    }
   }
 }

@@ -24,7 +24,7 @@ import io.smartdatalake.communication.statusinfo.StatusInfoServer
 import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
 import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -43,28 +43,55 @@ import scala.annotation.tailrec
 import scala.util.Try
 
 trait CanBuildSmartDataLakeBuilderConfig[R] {
+
   //All builder functions for all fields of the common SmartDataLakeBuilderConfig
   def withFeedSel(value: String): R = ProductUtil.dynamicCopy(this, "feedSel", value).asInstanceOf[R]
-
   def withApplicationName(value: Option[String]): R = ProductUtil.dynamicCopy(this, "applicationName", value).asInstanceOf[R]
 
-  def withConfiguration(value: Option[Seq[String]]): R = ProductUtil.dynamicCopy(this, "configuration", value).asInstanceOf[R]
+  def addConfiguration(value: Seq[String]): R = ProductUtil.dynamicCopy(this, "configuration", Some(configuration.getOrElse(Seq()) ++ value)).asInstanceOf[R]
 
-  def withPartitionValues(value: Option[Seq[PartitionValues]]): R = ProductUtil.dynamicCopy(this, "partitionValues", value).asInstanceOf[R]
-
-  def withMultiPartitionValues(value: Option[Seq[PartitionValues]]): R = ProductUtil.dynamicCopy(this, "multiPartitionValues", value).asInstanceOf[R]
-
+  def addPartitionValues(value: Seq[PartitionValues]): R = ProductUtil.dynamicCopy(this, "partitionValues", Some(partitionValues.getOrElse(Seq()) ++ value)).asInstanceOf[R]
   def withParallelism(value: Int): R = ProductUtil.dynamicCopy(this, "parallelism", value).asInstanceOf[R]
-
   def withStatePath(value: Option[String]): R = ProductUtil.dynamicCopy(this, "statePath", value).asInstanceOf[R]
-
   def withTest(value: Option[TestMode.Value]): R = ProductUtil.dynamicCopy(this, "test", value).asInstanceOf[R]
-
   def withStreaming(value: Boolean): R = ProductUtil.dynamicCopy(this, "streaming", value).asInstanceOf[R]
-
   def withMaster(value: Option[String]): R = ProductUtil.dynamicCopy(this, "master", value).asInstanceOf[R]
-
   def withDeployMode(value: Option[String]): R = ProductUtil.dynamicCopy(this, "deployMode", value).asInstanceOf[R]
+
+  // abstract instance variables
+  def feedSel: String
+
+  def applicationName: Option[String]
+
+  def configuration: Option[Seq[String]]
+
+  def partitionValues: Option[Seq[PartitionValues]]
+
+  def parallelism: Int
+
+  def statePath: Option[String]
+
+  def test: Option[TestMode.Value]
+
+  def streaming: Boolean
+
+  def master: Option[String]
+
+  def deployMode: Option[String]
+
+  // helper methods
+  def validate(): Unit = {
+    assert(!applicationName.exists(_.contains({
+      HadoopFileActionDAGRunStateStore.fileNamePartSeparator
+    })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
+    assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
+    assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
+  }
+
+  val appName: String = applicationName.getOrElse(feedSel)
+
+  def isDryRun: Boolean = test.contains(TestMode.DryRun)
 }
 
 /**
@@ -72,12 +99,7 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
  * It is populated by parsing command-line arguments.
  * It also specifies default values.
  *
- * @param feedSel         Expressions to select the actions to execute. See [[AppUtil.filterActionList()]] or commandline help for syntax description.
- * @param applicationName Application name.
- * @param configuration   One or multiple configuration files or directories containing configuration files, separated by comma.
- * @param test            Run in test mode:
- *                        - "config": validate configuration
- *                        - "dry-run": execute "prepare" and "init" phase to check environment
+ * See command line help for a description of the parameters.
  */
 case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       applicationName: Option[String] = None,
@@ -85,30 +107,11 @@ case class SmartDataLakeBuilderConfig(feedSel: String = null,
                                       master: Option[String] = None,
                                       deployMode: Option[String] = None,
                                       partitionValues: Option[Seq[PartitionValues]] = None,
-                                      multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       parallelism: Int = 1,
                                       statePath: Option[String] = None,
                                       test: Option[TestMode.Value] = None,
                                       streaming: Boolean = false
-                                     ) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig] {
-
-  def validate(): Unit = {
-    assert(!applicationName.exists(_.contains({
-      HadoopFileActionDAGRunStateStore.fileNamePartSeparator
-    })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
-    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
-    assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
-    assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
-    assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
-  }
-
-  def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
-
-  val appName: String = applicationName.getOrElse(feedSel)
-
-  def isDryRun: Boolean = test.contains(TestMode.DryRun)
-
-}
+                                     ) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig]
 
 object TestMode extends Enumeration {
   type TestMode = Value
@@ -181,16 +184,19 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .action((arg, config) => config.withApplicationName(Some(arg)))
         .text("Optional name of the application. If not specified feed-sel is used."),
       opt[Seq[String]]('c', "config")
-        .action((arg, config) => config.withConfiguration(Some(arg)))
+        .action((arg, config) => config.addConfiguration(arg))
         .valueName("<file1>[,<file2>...]")
+        .unbounded()
         .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."),
       opt[String]("partition-values")
-        .action((arg, config) => config.withPartitionValues(Some(PartitionValues.parseSingleColArg(arg))))
+        .action((arg, config) => config.addPartitionValues(PartitionValues.parseSingleColArg(arg)))
         .valueName(PartitionValues.singleColFormat)
+        .unbounded()
         .text(s"Partition values to process for one single partition column."),
       opt[String]("multi-partition-values")
-        .action((arg, config) => config.withPartitionValues(Some(PartitionValues.parseMultiColArg(arg))))
+        .action((arg, config) => config.addPartitionValues(PartitionValues.parseMultiColArg(arg)))
         .valueName(PartitionValues.multiColFormat)
+        .unbounded()
         .text(s"Partition values to process for multiple partition columns."),
       opt[Unit]('s', "streaming")
         .action((_, config) => config.withStreaming(true))
@@ -198,7 +204,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       opt[Int]("parallelism")
         .action((arg, config) => config.withParallelism(arg))
         .valueName("<int>")
-        .text(s"Max number of parallel executed SDLB actions"),
+        .text(s"Max number of parallel executed SDLB actions."),
       opt[String]("state-path")
         .action((arg, config) => config.withStatePath(Some(arg)))
         .valueName("<path>")
@@ -214,9 +220,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   protected val parser: OParser[_, SmartDataLakeBuilderConfig] = {
-
     val builder = OParser.builder[SmartDataLakeBuilderConfig]
-
     import builder._
 
     OParser.sequence(
@@ -224,6 +228,26 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       head(appType, s"$appVersion"),
       parserGeneric()
     )
+  }
+
+  /**
+   * Default command line parsing method
+   */
+  private[smartdatalake] def parse(args: Seq[String], parserToUse: OParser[_, SmartDataLakeBuilderConfig] = parser): Option[SmartDataLakeBuilderConfig] = {
+    OParser.parse(parserToUse, args, SmartDataLakeBuilderConfig())
+  }
+
+  private[smartdatalake] def logProgramStart(): Unit = {
+    logger.info(s"Starting Program $appType $appVersion")
+  }
+
+  private[smartdatalake] def logStats(stats: Map[RuntimeEventState, Int]): Unit = {
+    val statsStr = stats.toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
+    logger.info(s"$appType finished successfully: $statsStr")
+  }
+
+  private[smartdatalake] def throwOParserError(): Unit = {
+    logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
   }
 
   /**
@@ -360,7 +384,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     appConfig.validate()
 
     // log start parameters
-    logger.info(s"Starting run: runId=${executionId.runId} attemptId=${executionId.attemptId} feedSel=${appConfig.feedSel} appName=${appConfig.appName} streaming=${appConfig.streaming} test=${appConfig.test} givenPartitionValues=${appConfig.getPartitionValues.map(x => "(" + x.mkString(",") + ")").getOrElse("None")}")
+    logger.info(s"Starting run: runId=${executionId.runId} attemptId=${executionId.attemptId} feedSel=${appConfig.feedSel} appName=${appConfig.appName} streaming=${appConfig.streaming} test=${appConfig.test} givenPartitionValues=${appConfig.partitionValues.map(x => "(" + x.mkString(",") + ")").getOrElse("None")}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
@@ -423,7 +447,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
     val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
     val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
-    val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
+    val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
         // check action type
@@ -461,7 +485,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
     val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
     val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
-    val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
+    val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {
       case Prepare =>
@@ -489,7 +513,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val nextExec: Option[(ActionDAGRun, ActionPipelineContext, Option[LocalDateTime])] = if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
       // we have to recreate the action DAG if there are skipped actions in the original DAG
       val newContext = context.copy(actionsSkipped = Seq())
-      val newDag = ActionDAGRun(actionsSelected, Map[ActionId, RuntimeInfo](), context.appConfig.getPartitionValues.getOrElse(Seq()), context.appConfig.parallelism, actionDAGRun.initialSubFeeds, actionDAGRun.initialDataObjectsState, actionDAGRun.stateStore, actionDAGRun.stateListeners)(newContext)
+      val newDag = ActionDAGRun(actionsSelected, Map[ActionId, RuntimeInfo](), context.appConfig.partitionValues.getOrElse(Seq()), context.appConfig.parallelism, actionDAGRun.initialSubFeeds, actionDAGRun.initialDataObjectsState, actionDAGRun.stateStore, actionDAGRun.stateListeners)(newContext)
       Some(newDag, newContext, None)
     } else {
 

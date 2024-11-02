@@ -111,7 +111,8 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
   private val tempDir = Files.createTempDirectory("testScalaClassSparkDs2To1TransformerTest")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  val sdlb = DefaultSmartDataLakeBuilder
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   before {
@@ -224,11 +225,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
       .toDF("name", "rating")
     srcDO2.writeSparkDataFrame(dfSrc2, Seq())
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDsNto1Transformer/usingDataObjectId.conf").getPath))
-    )
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectId.conf"))
     //Run SDLB
     sdlb.run(sdlConfig)
 
@@ -267,11 +264,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
       .toDF("name", "rating")
     srcDO2.writeSparkDataFrame(dfSrc2, Seq())
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering.conf").getPath))
-    )
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering.conf"))
     //Run SDLB
     sdlb.run(sdlConfig)
 
@@ -311,10 +304,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
         .toDF("name", "rating", "year", "month", "day")
     ), DataObjectId("src2Ds"), partitionValues)
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDsNto1Transformer/usingDataObjectIdWithPartitionAutoSelect.conf").getPath)),
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectIdWithPartitionAutoSelect.conf"),
       partitionValues =
         Some(Seq(PartitionValues(
           Map(("year" -> "1992"),
@@ -381,11 +371,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
       , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO9.writeSparkDataFrame(dfSrc2, Seq())
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9Inputs.conf").getPath))
-    )
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9Inputs.conf"))
     //Run SDLB
     sdlb.run(sdlConfig)
 
@@ -432,11 +418,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
       .toDF("name", "rating")
     srcDO2.writeSparkDataFrame(dfSrc2, Seq())
 
-    val sdlb = new DefaultSmartDataLakeBuilder()
-
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Some(Seq(
-      getClass.getResource("/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9InputsWrongTransformer.conf").getPath))
-    )
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9InputsWrongTransformer.conf"))
     //Run SDLB
 
     a[TaskFailedException] shouldBe thrownBy(sdlb.run(sdlConfig))
