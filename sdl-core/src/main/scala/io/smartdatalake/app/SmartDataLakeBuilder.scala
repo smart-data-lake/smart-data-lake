@@ -48,8 +48,9 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
   def withFeedSel(value: String): R = ProductUtil.dynamicCopy(this, "feedSel", value).asInstanceOf[R]
   def withApplicationName(value: Option[String]): R = ProductUtil.dynamicCopy(this, "applicationName", value).asInstanceOf[R]
 
-  def addConfiguration(value: Seq[String]): R = ProductUtil.dynamicCopy(this, "configuration", Some(configuration.getOrElse(Seq()) ++ value)).asInstanceOf[R]
+  def addConfiguration(value: Seq[String]): R = ProductUtil.dynamicCopy(this, "configuration", configuration ++ value).asInstanceOf[R]
 
+  def addConfigurationValueOverwrite(value: (String, String)): R = ProductUtil.dynamicCopy(this, "configurationValueOverwrite", configurationValueOverwrite + value).asInstanceOf[R]
   def addPartitionValues(value: Seq[PartitionValues]): R = ProductUtil.dynamicCopy(this, "partitionValues", Some(partitionValues.getOrElse(Seq()) ++ value)).asInstanceOf[R]
   def withParallelism(value: Int): R = ProductUtil.dynamicCopy(this, "parallelism", value).asInstanceOf[R]
   def withStatePath(value: Option[String]): R = ProductUtil.dynamicCopy(this, "statePath", value).asInstanceOf[R]
@@ -63,7 +64,9 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   def applicationName: Option[String]
 
-  def configuration: Option[Seq[String]]
+  def configuration: Seq[String]
+
+  def configurationValueOverwrite: Map[String, String]
 
   def partitionValues: Option[Seq[PartitionValues]]
 
@@ -85,6 +88,7 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
       HadoopFileActionDAGRunStateStore.fileNamePartSeparator
     })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
     assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
+    assert(configuration.nonEmpty, "Configuration files are empty")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
     assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
   }
@@ -92,6 +96,13 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
   val appName: String = applicationName.getOrElse(feedSel)
 
   def isDryRun: Boolean = test.contains(TestMode.DryRun)
+
+  def getHoconConfig(implicit hadoopConfiguration: Configuration): Config = {
+    val config = ConfigLoader.loadConfigFromFilesystem(configuration, hadoopConfiguration, configurationValueOverwrite)
+    require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
+    require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
+    config
+  }
 }
 
 /**
@@ -101,16 +112,17 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
  *
  * See command line help for a description of the parameters.
  */
-case class SmartDataLakeBuilderConfig(feedSel: String = null,
-                                      applicationName: Option[String] = None,
-                                      configuration: Option[Seq[String]] = None,
-                                      master: Option[String] = None,
-                                      deployMode: Option[String] = None,
-                                      partitionValues: Option[Seq[PartitionValues]] = None,
-                                      parallelism: Int = 1,
-                                      statePath: Option[String] = None,
-                                      test: Option[TestMode.Value] = None,
-                                      streaming: Boolean = false
+case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
+                                      override val applicationName: Option[String] = None,
+                                      override val configuration: Seq[String] = Seq(),
+                                      override val configurationValueOverwrite: Map[String, String] = Map(),
+                                      override val master: Option[String] = None,
+                                      override val deployMode: Option[String] = None,
+                                      override val partitionValues: Option[Seq[PartitionValues]] = None,
+                                      override val parallelism: Int = 1,
+                                      override val statePath: Option[String] = None,
+                                      override val test: Option[TestMode.Value] = None,
+                                      override val streaming: Boolean = false
                                      ) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig]
 
 object TestMode extends Enumeration {
@@ -184,16 +196,22 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .action((arg, config) => config.withApplicationName(Some(arg)))
         .text("Optional name of the application. If not specified feed-sel is used."),
       opt[Seq[String]]('c', "config")
-        .action((arg, config) => config.addConfiguration(arg))
+        .action((arg, config) => config.addConfiguration(arg.map(_.trim)))
         .valueName("<file1>[,<file2>...]")
         .unbounded()
+        .required()
         .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."),
-      opt[String]("partition-values")
+      opt[String]('o', "config-value-overwrite")
+        .action((arg, config) => config.addConfigurationValueOverwrite(parseKeyValue(arg)))
+        .valueName("<nested.key>=<value>")
+        .unbounded()
+        .text("Overwrite configuration value at given nested key. Note that it is not recommended to overwrite array values. Use overwrite together with hocon substitution for this."),
+      opt[String]('p', "partition-values")
         .action((arg, config) => config.addPartitionValues(PartitionValues.parseSingleColArg(arg)))
         .valueName(PartitionValues.singleColFormat)
         .unbounded()
         .text(s"Partition values to process for one single partition column."),
-      opt[String]("multi-partition-values")
+      opt[String]('m', "multi-partition-values")
         .action((arg, config) => config.addPartitionValues(PartitionValues.parseMultiColArg(arg)))
         .valueName(PartitionValues.multiColFormat)
         .unbounded()
@@ -208,7 +226,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       opt[String]("state-path")
         .action((arg, config) => config.withStatePath(Some(arg)))
         .valueName("<path>")
-        .text(s"Path to save run state files. Must be set to enable recovery in case of failures."),
+        .text(s"Hadoop path to save run state files. Must be set to enable recovery in case of failures."),
       opt[String]("test")
         .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
         .valueName("<config|dry-run>")
@@ -217,6 +235,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       version("version").text("Display version information.")
     )
 
+  }
+
+  def parseKeyValue(arg: String): (String, String) = {
+    val keyValues = arg.split("=")
+    if (keyValues.size != 2) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
+    val Array(key, value) = keyValues
+    (key, value)
   }
 
   protected val parser: OParser[_, SmartDataLakeBuilderConfig] = {
@@ -369,8 +394,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, session: SparkSession): Unit = {
-    val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
-    ConfigParser.parse(config, this.instanceRegistry)
+    ConfigParser.parse(appConfig.getHoconConfig(session.sparkContext.hadoopConfiguration), this.instanceRegistry)
   }
 
   /**
@@ -389,12 +413,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
     // load config
-    val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.map(_.trim), hadoopConf)
-      case None => ConfigLoader.loadConfigFromClasspath
-    }
-    require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
-    require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
+    val config = appConfig.getHoconConfig
 
     // parse global config
     val globalConfig = GlobalConfig.from(config)

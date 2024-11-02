@@ -53,7 +53,7 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     val envconfig = LocalJettyAgentSmartDataLakeBuilderConfig(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
+      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',').toSeq).getOrElse(Seq()),
       parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
       statePath = sys.env.get("SDL_STATE_PATH"),
       applicationName = Some("AgentServer")
@@ -71,7 +71,8 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
 case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
                                                      override val applicationName: Option[String] = None,
-                                                     override val configuration: Option[Seq[String]] = None,
+                                                     override val configuration: Seq[String] = Seq(),
+                                                     override val configurationValueOverwrite: Map[String, String] = Map(),
                                                      override val master: Option[String] = None,
                                                      override val deployMode: Option[String] = None,
                                                      override val partitionValues: Option[Seq[PartitionValues]] = None,
