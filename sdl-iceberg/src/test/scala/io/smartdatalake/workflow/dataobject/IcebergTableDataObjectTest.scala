@@ -680,10 +680,39 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with Smart
     assert(expected.isEqual(actual))
   }
 
-  test("Create from parquet files partitioned on hadoop catalog") {
+  test("Create from parquet files on hadoop catalog") {
 
     // Setup Iceberg table
     val icebergTable = Table(catalog = Some("iceberg_hadoop"), db = Some("default"), name = "parquet_to_iceberg")
+    val icebergDO = IcebergTableDataObject(id = "iceberg", table = icebergTable)
+
+    // Create parquet files
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = icebergDO.hadoopPath.toString)
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    // initialize Iceberg table
+    icebergDO.prepare
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+    }
+  }
+
+  test("Create from parquet files partitioned on hadoop catalog") {
+
+    // Setup Iceberg table
+    val icebergTable = Table(catalog = Some("iceberg_hadoop"), db = Some("default"), name = "parquet_to_iceberg_partitioned")
     val icebergDO = IcebergTableDataObject(id = "iceberg", table = icebergTable, partitions = Seq("tpe"))
 
     // Create parquet files
