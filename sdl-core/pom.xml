@@ -231,12 +231,6 @@
             <version>${commons-pool2.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.tika</groupId>
-            <artifactId>tika-core</artifactId>
-            <scope>compile</scope>
-        </dependency>
-
         <!-- needed to find ModulePlugins -->
         <dependency>
             <groupId>org.reflections</groupId>
