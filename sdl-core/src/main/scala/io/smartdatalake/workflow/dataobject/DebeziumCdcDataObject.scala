@@ -52,9 +52,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   private def getConfigPropertiesMap: Map[String, String] = {
 
-    // If duplicate connection properties are set, prefer the ones coming from the connections
+    // If duplicate connection properties are set, prefer the ones the user has set in the config file
     var props: Map[String, String] = debeziumProperties.getOrElse(Map()) ++ connection.connectionPropertiesMap.map {
-      case (key, value) => if (connection.connectionPropertiesMap.contains(key)) key -> connection.connectionPropertiesMap(key) else key -> debeziumProperties.getOrElse(Map())(key)
+      case (key, value) => if (debeziumProperties.getOrElse(Map()).contains(key)) key -> debeziumProperties.getOrElse(Map())(key) else key -> connection.connectionPropertiesMap(key)
     }
 
     val defaultOffsetProperties: Map[String, String] = Map(
