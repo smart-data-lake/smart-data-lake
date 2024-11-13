@@ -243,7 +243,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       if (state.isDefined) {
         state.get.split(",").foreach { pair =>
           val Array(key, value) = pair.split(":")
-          incrementalState + (stringToByteBuffer(key) -> stringToByteBuffer(value))
+          incrementalState = incrementalState ++ Map(stringToByteBuffer(key) -> stringToByteBuffer(value))
         }
       }
   }
