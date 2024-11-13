@@ -34,9 +34,12 @@ import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
+import java.nio.ByteBuffer
 import java.util
 import java.util.Properties
 import java.util.concurrent.{ExecutorService, Executors}
+import java.util.{Base64, Properties}
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
@@ -46,7 +49,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  maxWaitTimeInSeconds: Int = 10,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame {
+  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   val connection: DebeziumConnection = getConnection[DebeziumConnection](connectionId)
 
@@ -223,6 +226,45 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     reorderedDF
   }
 
+  private val incrementalState: mutable.Map[ByteBuffer, ByteBuffer] = mutable.Map()
+
+  /**
+   * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
+   * The state is just a string. It's semantics is internal to the DataObject.
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   *
+   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   */
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+      state.getOrElse("").split(",").foreach { pair =>
+        val Array(key, value) = pair.split(":")
+        incrementalState + (stringToByteBuffer(key) -> stringToByteBuffer(value))
+      }
+  }
+
+  // Helper function to convert Base64 string back to ByteBuffer
+  private def stringToByteBuffer(str: String): ByteBuffer = {
+    val bytes = Base64.getDecoder.decode(str)
+    ByteBuffer.wrap(bytes)
+  }
+
+  /**
+   * Return the state of the last increment or empty if no increment was processed.
+   */
+  override def getState: Option[String] = {
+    val state = incrementalState.map { case (key, value) =>
+      s"${byteBufferToString(key)}:${byteBufferToString(value)}"
+    }.mkString(",")
+
+    Some(state)
+  }
+
+  // Helper function to convert ByteBuffer to Base64 string
+  private def byteBufferToString(buffer: ByteBuffer): String = {
+    val bytes = new Array[Byte](buffer.remaining())
+    buffer.get(bytes)
+    Base64.getEncoder.encodeToString(bytes)
+  }
 }
 
 object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
