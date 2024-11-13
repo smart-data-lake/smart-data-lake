@@ -23,24 +23,27 @@ import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
+import org.apache.kafka.connect.runtime.WorkerConfig
 import org.apache.kafka.connect.source.SourceRecord
+import org.apache.kafka.connect.storage.OffsetBackingStore
+import org.apache.kafka.connect.util.Callback
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
 import java.nio.ByteBuffer
 import java.util
-import java.util.Properties
-import java.util.concurrent.{ExecutorService, Executors}
 import java.util.{Base64, Properties}
+import java.util.concurrent.{CompletableFuture, ExecutorService, Executors, Future}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
+import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter}
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
@@ -61,9 +64,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     }
 
     val defaultOffsetProperties: Map[String, String] = Map(
-      "offset.storage" -> "org.apache.kafka.connect.storage.FileOffsetBackingStore", // TODO: implement custom backing store to store the data in sdlb state
-      "offset.storage.file.filename" -> "C://TEMP/offsets.dat", //TODO: change before commit and push
-      "offset.flush.interval.ms" -> "1000")
+      "offset.storage" -> "io.smartdatalake.workflow.dataobject.SDLBDebeziumOffsetStorage",
+      "offset.storage.sdlb.data.object.id" -> this.id.id,
+      "offset.flush.interval.ms" -> "10000")
 
     // If duplicate offset properties are set, prefer the ones the user has set in the config file
     props = props ++ defaultOffsetProperties.map {
@@ -226,7 +229,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     reorderedDF
   }
 
-  private val incrementalState: mutable.Map[ByteBuffer, ByteBuffer] = mutable.Map()
+  protected[dataobject] var incrementalState: mutable.Map[ByteBuffer, ByteBuffer] = mutable.Map()
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
@@ -236,9 +239,12 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
    * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
-      state.getOrElse("").split(",").foreach { pair =>
-        val Array(key, value) = pair.split(":")
-        incrementalState + (stringToByteBuffer(key) -> stringToByteBuffer(value))
+
+      if (state.isDefined) {
+        state.get.split(",").foreach { pair =>
+          val Array(key, value) = pair.split(":")
+          incrementalState + (stringToByteBuffer(key) -> stringToByteBuffer(value))
+        }
       }
   }
 
@@ -327,4 +333,39 @@ private[smartdatalake] object DebeziumRowConverter {
 
   }
 
+}
+
+class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeLogger {
+
+  private val SDLB_DATA_OBJECT_ID_CONFIG = "offset.storage.sdlb.data.object.id"
+  private var dataObjectId: String = ""
+
+  private val instanceRegistry = Environment.instanceRegistry
+
+  private var data: mutable.Map[ByteBuffer, ByteBuffer] = mutable.Map()
+
+  override def start(): Unit = {
+    logger.info(s"Start SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
+    data = data ++ instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState
+  }
+
+  override def stop(): Unit = {
+    logger.info(s"Stop SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
+  }
+
+  override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] = {
+   CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).asJava)
+  }
+
+  override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
+
+    data = data ++ values.asScala
+    instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState = data
+
+    CompletableFuture.completedFuture(null)
+  }
+
+  override def configure(config: WorkerConfig): Unit = {
+    dataObjectId = config.originalsStrings().get(SDLB_DATA_OBJECT_ID_CONFIG)
+  }
 }
