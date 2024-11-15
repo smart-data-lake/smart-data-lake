@@ -26,14 +26,16 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.webservice.SttpUtil.guessMimeType
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+import sttp.client3.SttpBackendOptions
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
-import java.net.URLConnection
-import javax.ws.rs.core.MediaType
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -48,9 +50,22 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  * @param host proxy host
  * @param port proxy port
  */
-case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None)
+case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None) extends SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
+    if (user.nonEmpty && password.nonEmpty) options.httpProxy(host, port, user.get.resolve(), password.get.resolve())
+    else options.httpProxy(host, port)
+  }
+}
 
-case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
+case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) extends SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
+    options.connectionTimeout(FiniteDuration(connectionTimeoutMs, TimeUnit.MILLISECONDS))
+  }
+}
+
+trait SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions
+}
 
 /**
  * [[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.
@@ -129,17 +144,6 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     }
   }
 
-  def guessMimeType(content: Array[Byte]): Option[String] = {
-    Option(URLConnection.guessContentTypeFromStream(new ByteArrayInputStream(content)))
-      .orElse {
-        // manually detect type as guessContentTypeFromStream doesnt work for Json and Text...
-        val str = new String(content)
-        if (str.take(100).matches("(?:\\P{Cntrl}|\\p{Space})+")) { // is text
-          if (str.matches("\\s*[{\\[]")) Some(MediaType.APPLICATION_JSON)
-          else Some(MediaType.TEXT_PLAIN)
-        } else None
-      }
-  }
 
   /**
    * Calls webservice POST method with binary data as body
@@ -174,24 +178,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def createInputStreams(query: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     val targetUrl = url + query
-    val responses: Iterator[Array[Byte]] = new Iterator[Array[Byte]]() {
-      var nextLink: Option[String] = Some(targetUrl)
-      override def hasNext: Boolean = nextLink.isDefined
-      override def next(): Array[Byte] = {
-        assert(nextLink.nonEmpty)
-        val response = getResponse(nextLink.get)
-        nextLink = pagingLinkRegex.flatMap{ patternStr =>
-          val pattern = patternStr.r.unanchored
-          new String(response) match {
-            case pattern(link) =>
-              logger.debug(s"next pagingLink found: $link")
-              Some(link)
-            case _ => None
-          }
-        }
-        response
-      }
-    }
+    val responses = if (pagingLinkRegex.isDefined) SttpUtil.getPagedResponseIterator(targetUrl, pagingLinkRegex.get, url => new String(getResponse(url))).map(_.getBytes)
+    else Iterator(getResponse(targetUrl))
     responses.map(e => new ByteArrayInputStream(e))
   }
 

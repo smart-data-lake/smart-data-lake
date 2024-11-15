@@ -44,11 +44,16 @@ trait UserDefinedSchema {
    * The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
    *
    * Schema Providers available are (see also [[io.smartdatalake.util.misc.SchemaProviderType]]):
-   * - ddl: create the schema from a Spark ddl string, e.g. `ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`
-   * - ddlFile: read a Spark ddl definition from a file and create a schema, e.g. `ddlFile#abc/xyz.ddl`
-   * - caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g. `caseClass#com.sample.XyzClass`
-   * - javaBean: convert a Java Bean to a schema using Spark encoders, e.g. `javaBean#com.sample.XyzClass`
-   * - xsdFile: read an Xml Schema Definition file and create a schema, e.g. `xsdFile#abc/xyz.xsd`
+   *
+   * - ddl: create the schema from a Spark ddl string, e.g. `ddl#a string, b array<struct<b1: string, b2: long>>, c struct<c1: string, c2: long>`.
+   *
+   * - ddlFile: read a Spark ddl definition from a file and create a schema, e.g. `ddlFile#abc/xyz.ddl`.
+   *
+   * - caseClass: convert a Scala Case Class to a schema using Spark encoders, e.g. `caseClass#com.sample.XyzClass`.
+   *
+   * - javaBean: convert a Java Bean to a schema using Spark encoders, e.g. `javaBean#com.sample.XyzClass`.
+   *
+   * - xsdFile: read an Xml Schema Definition file and create a schema, e.g. `xsdFile#abc/xyz.xsd`.
    *   The following parameters allow to customize the behavior: `xsdFile#<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>`
    *   <row-tag>: configure the path of the element to extract from the xsd schema. Leave empty to extract the root.
    *   <maxRecursion>: if xsd schema is recursive, this configures the number of levels to create in the schema.
@@ -58,7 +63,8 @@ trait UserDefinedSchema {
    *   If true, the singular name of the array element in the XSD is converted to a plural name by adding an 's'
    *   in order to read corresponding json files.
    *   Default is false.
-   * - jsonSchemaFile: read a Json Schema file and create a schema, e.g. `jsonSchemaFile#abc/xyz.json`
+   *
+   * - jsonSchemaFile: read a Json Schema file and create a schema, e.g. `jsonSchemaFile#abc/xyz.json`.
    *   The following parameters allow to customize the behavior: `jsonSchemaFile#<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>`
    *   <row-tag>: configure the path of the element to extract from the json schema. Leave empty to extract the root.
    *   <strictTyping>: if true
@@ -68,9 +74,13 @@ trait UserDefinedSchema {
    *   <additionalPropertiesDefault>: Set to true or false.
    *   This is used as default value for 'additionalProperties'-field if it is missing in a schema with type='object'.
    *   Default value is additionalPropertiesDefault=true, as this is conform with the specification.
-   * - avroSchemaFile: read an Avro Schema file and create a schema, e.g. `avroSchemaFile#abc/xyz.avsc`
+   *
+   * - avroSchemaFile: read an Avro Schema file and create a schema, e.g. `avroSchemaFile#abc/xyz.avsc`.
    *   The following parameters allow to customize the behavior: `avroSchemaFile#<path-to-avsc-file>;<row-tag>`
    *   <row-tag>: configure the path of the element to extract from the avro schema. Leave empty to extract the root.
+   *
+   * - openApi: read Schema from OpenApi specification operation, e.g. `openApi#https://swagger.myswitzerland.io;getDestinations;opendata.json`.
+   * The following parameters allow to customize the behaviour: `openApi#<baseUrl>;<operationId>;[<apiDocsPath>;][<responseContentType>]`
    *
    * Note that all schema files are configured as Hadoop path. The custom prefix 'cp' can be used to read schema files
    * from the classpath, e.g. `xsdFile#cp:/xyz.xsd`.

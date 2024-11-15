@@ -19,20 +19,71 @@
 
 package io.smartdatalake.util.webservice
 
-import sttp.client3.Response
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import sttp.client3.{Identity, Request, Response, SttpBackend}
 
-object SttpUtil {
+import java.io.ByteArrayInputStream
+import java.net.URLConnection
+import javax.ws.rs.core.MediaType
 
-  def getContent(response: Response[Either[String, String]], context: String): String = {
+object SttpUtil extends SmartDataLakeLogger {
+  def sendRequest[T](request: Request[Either[String, T], Any], context: String)(implicit httpBackend: SttpBackend[Identity, Any]): T = {
+    logger.info(s"${request.method} ${request.uri}")
+    val response = request.send(httpBackend)
+    getContent(response, context)
+  }
+
+  def getContent[T](response: Response[Either[String, T]], context: String): T = {
     validateResponse(response, context)
     response.body.right.get
   }
 
-  def validateResponse(response: Response[Either[String, String]], context: String): Unit = {
+  def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
     if (response.body.isLeft) {
       throw HttpRequestError(context, response.code.code, response.body.left.get)
     }
     assert(response.isSuccess, throw HttpRequestError(context, response.code.code, "StatusCode is not successfull, but there is no error message!"))
+  }
+
+  def guessMimeType(content: Array[Byte]): Option[String] = {
+    Option(URLConnection.guessContentTypeFromStream(new ByteArrayInputStream(content)))
+      .orElse {
+        // manually detect type as guessContentTypeFromStream doesnt work for Json and Text...
+        val str = new String(content)
+        if (str.take(100).matches("(?:\\P{Cntrl}|\\p{Space})+")) { // is text
+          if (str.matches("\\s*[{\\[]")) Some(MediaType.APPLICATION_JSON)
+          else Some(MediaType.TEXT_PLAIN)
+        } else None
+      }
+  }
+
+  /**
+   * Create an Iterator that query pages Webservices.
+   * The Iterator queries the initial URL and extract next URL from response until all pages have been queried.
+   *
+   * Note: this only works with Response of type String
+   */
+  def getPagedResponseIterator(url: String, pagingLinkRegex: String, getResponse: String => String): Iterator[String] = {
+    val pagingLinkPattern = pagingLinkRegex.r.unanchored
+    new Iterator[String]() {
+      var nextLink: Option[String] = Some(url)
+
+      override def hasNext: Boolean = nextLink.isDefined
+
+      override def next(): String = {
+        assert(nextLink.nonEmpty)
+        val response = getResponse(nextLink.get)
+        nextLink = {
+          response match {
+            case pagingLinkPattern(link) =>
+              logger.debug(s"next pagingLink found: $link")
+              Some(link)
+            case _ => None
+          }
+        }
+        response
+      }
+    }
   }
 }
 
