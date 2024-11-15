@@ -158,9 +158,19 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
         case Type.BOOLEAN => BooleanType
         case Type.STRING => StringType
         case Type.BYTES => BinaryType
+        case Type.MAP => {
+          // Infer key and value types for MapType
+          val keyType = inferSparkSchema(field.schema().keySchema())
+          val valueType = inferSparkSchema(field.schema().valueSchema())
+          MapType(keyType, valueType)
+        }
+        case Type.ARRAY => {
+          // Infer the element type for ArrayType
+          val elementType = inferSparkSchema(field.schema().valueSchema())
+          ArrayType(elementType)
+        }
         case Type.STRUCT => inferSparkSchema(field.schema())
         case _ => StringType
-        // Todo: add more conversions
       }
       StructField(fieldName, fieldType, nullable = true)
     }
