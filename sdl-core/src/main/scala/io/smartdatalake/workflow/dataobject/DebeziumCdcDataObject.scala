@@ -239,7 +239,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     reorderedDF
   }
 
-  protected[dataobject] var incrementalState: mutable.Map[ByteBuffer, ByteBuffer] = mutable.Map()
+  protected[dataobject] var incrementalState: mutable.Map[String, String] = mutable.Map()
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
@@ -253,15 +253,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       if (state.isDefined) {
         state.get.split(",").foreach { pair =>
           val Array(key, value) = pair.split(":")
-          incrementalState = incrementalState ++ Map(stringToByteBuffer(key) -> stringToByteBuffer(value))
+          incrementalState.put(key, value)
         }
       }
-  }
-
-  // Helper function to convert Base64 string back to ByteBuffer
-  private def stringToByteBuffer(str: String): ByteBuffer = {
-    val bytes = Base64.getDecoder.decode(str)
-    ByteBuffer.wrap(bytes)
   }
 
   /**
@@ -269,17 +263,10 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
    */
   override def getState: Option[String] = {
     val state = incrementalState.map { case (key, value) =>
-      s"${byteBufferToString(key)}:${byteBufferToString(value)}"
+      s"$key:$value"
     }.mkString(",")
 
     Some(state)
-  }
-
-  // Helper function to convert ByteBuffer to Base64 string
-  private def byteBufferToString(buffer: ByteBuffer): String = {
-    val bytes = new Array[Byte](buffer.remaining())
-    buffer.get(bytes)
-    Base64.getEncoder.encodeToString(bytes)
   }
 }
 
@@ -356,11 +343,25 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
 
   override def start(): Unit = {
     logger.info(s"Start SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
-    data = data ++ instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState
+    instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.foreach(state => {
+      val key = stringToByteBuffer(state._1)
+      val value = stringToByteBuffer(state._2)
+
+      data.put(key, value)
+
+    })
+
+  }
+
+  // Helper function to convert Base64 string back to ByteBuffer
+  private def stringToByteBuffer(str: String): ByteBuffer = {
+    val bytes = Base64.getDecoder.decode(str)
+    ByteBuffer.wrap(bytes)
   }
 
   override def stop(): Unit = {
     logger.info(s"Stop SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
+    data.clear()
   }
 
   override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] = {
@@ -369,10 +370,20 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
 
   override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
 
-    data = data ++ values.asScala
-    instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState = data
+    values.asScala.foreach(state => {
+      val key = byteBufferToString(state._1)
+      val value = byteBufferToString(state._2)
+      instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.put(key, value)
+    })
 
     CompletableFuture.completedFuture(null)
+  }
+
+  // Helper function to convert ByteBuffer to Base64 string
+  private def byteBufferToString(buffer: ByteBuffer): String = {
+    val bytes = new Array[Byte](buffer.remaining())
+    buffer.get(bytes)
+    Base64.getEncoder.encodeToString(bytes)
   }
 
   override def configure(config: WorkerConfig): Unit = {
