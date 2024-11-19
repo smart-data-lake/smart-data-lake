@@ -22,7 +22,7 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
 import io.smartdatalake.util.webservice.OpenApiUtil
-import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
+import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
@@ -188,10 +188,10 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
-  def getSchemaFromOpenApi(baseUrl: String, operationId: String, apiDocsPath: String = "v3/api-docs", responseContentType: String = "application/json"): StructType = {
-    OpenApiUtil.queryOperationSchema(baseUrl, operationId, apiDocsPath, responseContentType) match {
+  def getSchemaFromOpenApi(specUrl: String, operationId: String, responseContentType: String = "application/json")(implicit hadoopConfiguration: Configuration): StructType = {
+    OpenApiUtil.queryOperationSchema(specUrl, operationId, responseContentType) match {
       case (contentType, x: StructType) => x
-      case (contentType, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema for $operationId, but needs StructType ($baseUrl/$apiDocsPath)")
+      case (contentType, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema for $operationId, but needs StructType ($specUrl)")
     }
   }
 
@@ -269,13 +269,12 @@ object SchemaUtil {
         } else LazyGenericSchema(schemaConfig)
       case OpenApi =>
         val valueElements = value.split(";")
-        assert(2 <= valueElements.size && valueElements.size <= 4, s"OpenApi schema provider configuration error. Configuration format is '<baseUrl>;<operationId>;<apiDocsPath>;<responseContentType>', but received $value.")
-        val baseUrl = valueElements(1)
+        assert(2 <= valueElements.size && valueElements.size <= 3, s"OpenApi schema provider configuration error. Configuration format is '<apiDocsUrl>;<operationId>;<responseContentType>', but received $value.")
+        val apiDocsUrl = valueElements(1)
         val operationId = valueElements(2)
-        val apiDocsPath = if (valueElements.size >= 3) valueElements(3) else defaultApiDocsPath
-        val responseContentType = if (valueElements.size >= 4) valueElements(3) else defaultResponseContentType
+        val responseContentType = if (valueElements.size >= 3) valueElements(3) else defaultResponseContentType
         if (!lazyFileReading) {
-          val (contentType, dataType) = OpenApiUtil.queryOperationSchema(baseUrl, operationId, apiDocsPath, responseContentType)
+          val (contentType, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
           dataType match {
             case schema: StructType => SparkSchema(schema)
             case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed, but got dataType $dataType for operation $operationId")

@@ -34,6 +34,8 @@ object ResourceUtil {
    */
   def canHandleScheme(path: Path): Boolean = path.toUri.getScheme == "cp"
 
+  def canHandleScheme(path: String): Boolean = canHandleScheme(new Path(path))
+
   /**
    * Creates InputStream out of provided file path
    *

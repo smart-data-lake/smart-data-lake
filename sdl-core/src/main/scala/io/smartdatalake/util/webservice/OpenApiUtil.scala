@@ -20,9 +20,11 @@
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice.OpenApiUtil.simplifyContentType
 import io.smartdatalake.util.webservice.SttpUtil.sendRequest
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import org.json4s.JsonDSL._
@@ -50,18 +52,15 @@ object OpenApiUtil extends SmartDataLakeLogger {
    *
    * For now this supports OpenApi V3, most parts of json schema and reusable schema components.
    *
-   * @param baseUrl             base Url of the webservice
+   * @param specUrl Url of OpenApi specification
    * @param operationId         Id of operation to extract schema for
-   * @param apiDocsPath         path appended to baseUrl to query OpenApi documentation/specification
-   *                            Default is 'v3/api-docs'
    * @param responseContentType response content type to extract schema for.
    *                            Default is 'application/json'.
    * @return The Spark DataType for the given operation.
    */
-  def queryOperationSchema(baseUrl: String, operationId: String, responseContentType: String, apiDocsPath: String = defaultApiDocsPath): (String, DataType) = {
+  def queryOperationSchema(specUrl: String, operationId: String, responseContentType: String)(implicit hadoopConf: Configuration): (String, DataType) = {
     // query webservice and cache result
-    val url = s"$baseUrl/$apiDocsPath"
-    val spec = specCache.getOrElseUpdate(url, getAndParseSpec(url)(httpBackend))
+    val spec = specCache.getOrElseUpdate(specUrl, getAndParseSpec(specUrl)(httpBackend, hadoopConf))
     // find operation in spec
     val operation = spec.operations.find(p => p.operationId == operationId)
       .getOrElse(throw ConfigurationException(s"operationId $operationId not found in OpenApi Spec operations: ${spec.operations.map(_.operationId).mkString(", ")}"))
@@ -69,12 +68,16 @@ object OpenApiUtil extends SmartDataLakeLogger {
     operation.responseSchema(responseContentType)
   }
 
-  private[smartdatalake] def getAndParseSpec(url: String)(implicit httpBackend: SttpBackend[Identity, Any]): OpenApiSpec = {
-    val request = basicRequest
-      .get(Uri.unsafeParse(url))
-      .header(Header.accept(MediaType.ApplicationJson))
-      .followRedirects(true)
-    val schema = sendRequest(request, s"get OpenApi specification")
+  private[smartdatalake] def getAndParseSpec(url: String)(implicit httpBackend: SttpBackend[Identity, Any], hadoopConf: Configuration): OpenApiSpec = {
+    val schema = if (SttpUtil.canHandleScheme(url)) {
+      val request = basicRequest
+        .get(Uri.unsafeParse(url))
+        .header(Header.accept(MediaType.ApplicationJson))
+        .followRedirects(true)
+      sendRequest(request, s"get OpenApi specification")
+    } else {
+      SchemaUtil.readFromPath(new Path(url))
+    }
     logger.debug(s"got response $schema")
     val jsonSpec = parse(schema)
     val operations = extractOperationsFromJson(jsonSpec)

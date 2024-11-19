@@ -23,44 +23,41 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.explode
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.scalatest.FunSuite
 
-class OpenApiDataObjectIT extends FunSuite {
+class OpenApiDataObjectTest extends FunSuite {
   protected implicit lazy val session: SparkSession = TestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
-  test("get data.sbb.ch datasets") {
-    import session.implicits._
+  test("read openapi spec from file") {
     val do1 = OpenApiDataObject(
       id = "do1",
-      baseUrl = "https://data.sbb.ch/api/explore/v2.1",
-      apiDocsUrl = "swagger.json",
-      operationId = "getDatasets",
+      baseUrl = "https://test.com",
+      apiDocsUrl = "./sdl-core/src/test/resources/openApiSpec/sampleApiDoc.json",
+      operationId = "getPing",
     )
     do1.prepare
-    val df = do1.getSparkDataFrame()
-    df.printSchema
-    df.withColumn("result", explode($"results")).drop("results")
-      .show(false)
+    val df = do1.getSparkDataFrame()(contextInit)
+
+    val schemaExpected = StructType.fromDDL("id long, username string")
+    assert(DataType.equalsIgnoreNullability(df.schema, schemaExpected))
   }
 
-  test("get data.sbb.ch datasets with paging") {
-    import session.implicits._
+  test("read openapi spec from classpath") {
     val do1 = OpenApiDataObject(
       id = "do1",
-      baseUrl = "https://data.sbb.ch/api/explore/v2.1",
-      apiDocsUrl = "swagger.json",
-      operationId = "getDatasets",
-      urlParameters = Map("include_links" -> "true")
+      baseUrl = "https://test.com",
+      apiDocsUrl = "cp:/openApiSpec/sampleApiDoc.json",
+      operationId = "getPing",
     )
     do1.prepare
-    val df = do1.getSparkDataFrame()
-    df.printSchema
-    df.withColumn("result", explode($"results")).drop("results")
-      .show(false)
+    val df = do1.getSparkDataFrame()(contextInit)
+
+    val schemaExpected = StructType.fromDDL("id long, username string")
+    assert(DataType.equalsIgnoreNullability(df.schema, schemaExpected))
   }
 
 }

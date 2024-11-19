@@ -24,12 +24,14 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.json.JsonUtils
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
 import io.smartdatalake.util.webservice.{OpenApiOperation, OpenApiSpec, OpenApiUtil, SttpUtil}
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
 import org.json4s.JObject
@@ -57,8 +59,12 @@ import scala.concurrent.duration.FiniteDuration
  * @param baseUrl                   the server url to use for querying the OpenApi specification and content
  * @param operationId               the operationId from the OpenApi specification to use to get data for this DataObject
  *                                  If OpenApi specification has no operationId defined, `<sub-path>:<operation>` is used, e.g. `/test/abc:get`.
- * @param apiDocsPath               sub-path to use together with baseUrl for querying OpenApi specification.
- *                                  Default is "v3/api-docs", e.g. `<baseUrl>/v3/api-docs`.
+ * @param apiDocsUrl                The url to load the OpenApi specification from.
+ *                                  If it is a relative Url it is appended to baseUrl.
+ *                                  Default is "v3/api-docs", which will be concatenated to `<baseUrl>/v3/api-docs`.
+ *                                  Alternatively this can also be a hadoop file or classpath resource.
+ *                                  An url starting with protocol "cp:" will be resolved as classpath resource.
+ *                                  All protocols different from http/https/cp will be resolved as Hadoop path. To use a relative Hadoop path start with "./".
  * @param useFirstOpenApiSpecServer if true content is queried using first server definition from OpenApi specification, instead of using baseUrl.
  *                                  Default is false.
  * @param responseContentType       Content-type of OpenApi response to use. Default is application/json.
@@ -81,8 +87,7 @@ import scala.concurrent.duration.FiniteDuration
 case class OpenApiDataObject(override val id: DataObjectId,
                              baseUrl: String,
                              operationId: String,
-                             //TODO: read from file... also in SchemaUtil...
-                             apiDocsPath: String = defaultApiDocsPath,
+                             apiDocsUrl: String = defaultApiDocsPath,
                              useFirstOpenApiSpecServer: Boolean = false,
                              responseContentType: String = defaultResponseContentType,
                              authMode: Option[HttpAuthMode] = None,
@@ -98,7 +103,13 @@ case class OpenApiDataObject(override val id: DataObjectId,
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
   private val mediaType = MediaType.parse(responseContentType).right.get
   assert(pagingLinkRegex.isEmpty || mediaType.equalsIgnoreParameters(MediaType.ApplicationJson), "PagingLinkRegex can only be used when responseContentType=application/json")
-  private val specUrl = s"$baseUrl/${apiDocsPath.dropWhile(_ == '/')}"
+  private val specUrl = {
+    if (apiDocsUrl.startsWith("./")) apiDocsUrl
+    else if (SttpUtil.canHandleScheme(apiDocsUrl)) apiDocsUrl
+    else if (ResourceUtil.canHandleScheme(new Path(apiDocsUrl))) apiDocsUrl
+    else if (apiDocsUrl.matches("^\\w*:")) apiDocsUrl
+    else s"$baseUrl/${apiDocsUrl.dropWhile(_ == '/')}"
+  }
 
   // these variables will be initialized in prepare phase
   private var spec: Option[OpenApiSpec] = None
@@ -115,6 +126,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
   @transient private lazy implicit val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(sttpBackendOptions)
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
+    implicit val hadoopConf: Configuration = context.hadoopConf
     super.prepare
     spec = Some(OpenApiUtil.getAndParseSpec(specUrl))
     operation = spec.flatMap(_.operations.find(_.operationId == operationId))
@@ -158,7 +170,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
         DataFrameUtil.getEmptyDataFrame(schema.get)
       // exec phase -> read: return data
       case ExecutionPhase.Exec =>
-        val targetUrl = s"$baseUrl/${operation.get.path}"
+        val targetUrl = s"$baseUrl/${operation.get.path.dropWhile(_ == '/')}"
         if (pagingLinkRegex.isDefined) {
           assert(mediaType.equalsIgnoreParameters(MediaType.ApplicationJson))
           val data = SttpUtil.getPagedResponseIterator(targetUrl, pagingLinkRegex.get, url => new String(getContent(url, operationContentType.get))).map(_.getBytes)

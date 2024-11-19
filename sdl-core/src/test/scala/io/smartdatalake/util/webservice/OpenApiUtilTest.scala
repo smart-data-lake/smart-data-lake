@@ -21,11 +21,14 @@ package io.smartdatalake.util.webservice
 
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.testutils.TestUtil
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.json4s.jackson.JsonMethods.parse
 import org.scalatest.FunSuite
 
 class OpenApiUtilTest extends FunSuite {
+
+  implicit val hadoopConf: Configuration = new Configuration()
 
   test("parsing schema for path with operationId") {
     val specJson =
