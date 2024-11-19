@@ -20,15 +20,15 @@ By default, all data in the specified DataObjects are processed. The execution m
 By default, an Action is executed if all inputs are available, e.g. no input from a previous Action is skipped.
 Override the default behaviour by specifying an *executionCondition* in SQL syntax on the Action. It is evaluated against the properties available in [[SubFeedsExpressionData]]. If true, the Action is executed, otherwise it is skipped. Details see also [[Condition]].
 
-Example: execute if input stg-src1 is not skipped.
+Example: execute if input stg-src1 or input stg-src2 is not skipped.
 ```
   action1 {
     type = CustomDataFrameAction
     inputIds = [stg-src1, stg-src2]
     outputIds = [int-tgt]
     executionCondition = {
-      description = "execute if input stg-src1 is not skipped"
-      expression = "!inputSubFeeds.stg-src1.isSkipped"
+      description = "execute if at least one of the inputs is not skipped"
+      expression = "!inputSubFeeds['stg-src1'].isSkipped or !inputSubFeeds['stg-src2'].isSkipped"
     }
     ...
 ```
