@@ -20,17 +20,34 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
-import io.smartdatalake.definitions.BasicAuthMode
+import io.smartdatalake.definitions.{BasicAuthMode, Environment}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.connection.{DebeziumConnection, DebeziumDatabaseEngine}
+import org.apache.spark.sql.{Row, functions}
+import org.apache.spark.sql.functions.{col, lit, when}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+
+import scala.collection.JavaConverters._
 
 object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
+
+  /**
+   * Init tests
+   */
+
   implicit val sparkSession = TestUtil.session
   implicit val instanceRegistry = new InstanceRegistry()
+  Environment._instanceRegistry = instanceRegistry
   implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+
+  import sparkSession.implicits._
+
+  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
 
   val connection = DebeziumConnection(
     id = "dbzCon",
@@ -40,14 +57,88 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
     authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))
   )
 
+  val jdbcConnection = JdbcTableConnection(
+    id = "mysqlCon",
+    url = s"jdbc:mysql://${sys.env("MYSQL_HOSTNAME")}:${sys.env("MYSQL_PORT").toInt}",
+    driver = "com.mysql.cj.jdbc.Driver",
+    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))),
+    db = Some("demo")
+  )
+
   instanceRegistry.register(connection)
 
   val testDO = DebeziumCdcDataObject("test1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true")))
   instanceRegistry.register(testDO)
 
-  val df = testDO.getSparkDataFrame()
 
-  assert(df.columns.contains("id") && df.columns.contains("value"))
+  /**
+   * Tests
+   */
 
+  jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
+  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value) VALUES ('INIT 1')")
+
+
+  // 1. Initial READ test
+  testDO.setState(None)
+  var df = testDO.getSparkDataFrame()
+
+  var newState = testDO.getState
+
+  assert(df.columns.contains("id") &&
+    df.columns.contains("value") &&
+    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
+  )
+
+  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+
+  // 2. Insert test
+  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value) VALUES ('INSERT TEST')")
+
+  testDO.setState(newState)
+  df = testDO.getSparkDataFrame()
+
+  newState = testDO.getState
+
+  assert(df.columns.contains("id") &&
+    df.columns.contains("value") &&
+    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
+  )
+
+  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("create")).filter(!$"test").isEmpty)
+
+  // 3. Update test
+  jdbcConnection.execJdbcStatement("UPDATE demo.test SET value = 'UPDATE TEST' WHERE value = 'INSERT TEST'")
+
+  testDO.setState(newState)
+  df = testDO.getSparkDataFrame()
+
+  newState = testDO.getState
+
+  assert(df.columns.contains("id") &&
+    df.columns.contains("value") &&
+    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
+  )
+
+  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
+
+  // 4. Delete test
+  jdbcConnection.execJdbcStatement("DELETE FROM demo.test WHERE value = 'UPDATE TEST'")
+
+  testDO.setState(newState)
+  df = testDO.getSparkDataFrame()
+
+  newState = testDO.getState
+
+  assert(df.columns.contains("id") &&
+    df.columns.contains("value") &&
+    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
+  )
+
+  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
 
 }
