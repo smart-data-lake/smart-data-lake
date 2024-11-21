@@ -62,7 +62,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- * @param comment      An optional comment to add to the table after writing a DataFrame to it
  * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
  *                     These options override connection.options.
  * @param metadata     meta data
@@ -81,7 +80,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     override val expectedPartitionsCondition: Option[String] = None,
-                                    comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation {
@@ -148,7 +146,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         .save()
     )
 
-    if (comment.isDefined) {
+    metadata.flatMap(_.description).foreach { comment =>
       val sql = s"comment on table ${table.fullName} is '$comment';"
       connection.execJdbcStatement(sql)
     }
