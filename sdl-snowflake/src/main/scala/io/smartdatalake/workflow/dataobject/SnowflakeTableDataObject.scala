@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataobject
 import com.snowflake.snowpark
 import com.snowflake.snowpark.SaveMode
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
@@ -30,6 +30,7 @@ import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
@@ -59,6 +60,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
+ * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflake decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
@@ -79,6 +81,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     connectionId: ConnectionId,
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
+                                    readTransformer: Option[GenericDfTransformer] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -117,7 +120,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       .options(instanceSparkOptions)
       .options(queryOrTable)
       .load()
-    df
+    applyReadTransformer(partitionValues, SparkDataFrame(df))
+      .asInstanceOf[SparkDataFrame].inner
   }
 
   // Write a Spark DataFrame to the Snowflake table
@@ -220,12 +224,20 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
+  private def applyReadTransformer(partitionValues: Seq[PartitionValues], df: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    readTransformer.map { t =>
+      t.transform(context.currentAction.map(_.id).getOrElse(ActionId("undefined")), partitionValues, df, this.id, previousTransformerName = None, executionModeResultOptions = Map())
+    }.getOrElse(df)
+  }
+
   /**
    * Read the contents of a table as a Snowpark DataFrame
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
-    this.snowparkSession.table(table.fullName)
+    val df = SnowparkDataFrame(snowparkSession.table(table.fullName))
+    applyReadTransformer(partitionValues, df)
+      .asInstanceOf[SnowparkDataFrame].inner
   }
 
   /**
