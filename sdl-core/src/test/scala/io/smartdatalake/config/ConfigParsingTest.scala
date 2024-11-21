@@ -272,6 +272,99 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     dataObjects should contain allOf(actions.tail.head.asInstanceOf[TestAction].input, actions.tail.head.asInstanceOf[TestAction].output)
   }
 
+  "Action" should "throw ConfigurationException on wrong DataObject type" in {
+    val config = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        |   tdo1 = {
+        |     type = io.smartdatalake.config.objects.TestDataObject
+        |     arg1 = foo
+        |     args = []
+        |   }
+        |   tdo2 = {
+        |     type = CsvFileDataObject
+        |     path = ./csv
+        |   }
+        |}
+        |actions = {
+        |   ta1 = {
+        |     type = io.smartdatalake.config.objects.TestAction
+        |     inputId = tdo1
+        |     outputId = tdo2
+        |   }
+        |}
+        |""".stripMargin)
+
+    val ex = intercept[ConfigurationException](ConfigParser.parse(config))
+    assert(ex.message.contains("does not implement expected DataObject type"))
+    assert(Option(ex.getCause).isEmpty)
+  }
+
+  "Action" should "throw ConfigurationException on wrong transformation type" in {
+    val config = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        |   tdo1 = {
+        |     type = io.smartdatalake.config.objects.TestDataObject
+        |     arg1 = foo
+        |     args = []
+        |   }
+        |   tdo2 = {
+        |     type = io.smartdatalake.config.objects.TestDataObject
+        |     arg1 = foo
+        |     args = []
+        |   }
+        |}
+        |actions = {
+        |   ta1 = {
+        |     type = io.smartdatalake.config.objects.TestAction
+        |     inputId = tdo1
+        |     outputId = tdo2
+        |     transformers = [{
+        |       type = ScalaClassSparkDfsTransformer
+        |       className = blabla
+        |     }]
+        |   }
+        |}
+        |""".stripMargin)
+
+    val ex = intercept[ConfigurationException](ConfigParser.parse(config))
+    assert(ex.message.contains("does not implement expected interface"))
+  }
+
+
+  "Action" should "throw ConfigurationException on wrong transformation type (full class name)" in {
+    val config = ConfigFactory.parseString(
+      """
+        |dataObjects = {
+        |   tdo1 = {
+        |     type = io.smartdatalake.config.objects.TestDataObject
+        |     arg1 = foo
+        |     args = []
+        |   }
+        |   tdo2 = {
+        |     type = io.smartdatalake.config.objects.TestDataObject
+        |     arg1 = foo
+        |     args = []
+        |   }
+        |}
+        |actions = {
+        |   ta1 = {
+        |     type = io.smartdatalake.config.objects.TestAction
+        |     inputId = tdo1
+        |     outputId = tdo2
+        |     transformers = [{
+        |       type = io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+        |       className = blabla
+        |     }]
+        |   }
+        |}
+        |""".stripMargin)
+
+    val ex = intercept[ConfigurationException](ConfigParser.parse(config))
+    assert(ex.message.contains("does not implement expected interface"))
+  }
+
   "TestDataObject" should "be parsable" in {
     implicit val registry: InstanceRegistry = new InstanceRegistry()
     val config = ConfigFactory.parseString(
@@ -359,6 +452,32 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     val expected = TestAction(id = "a", arg1 = None, inputId = "tdo1", outputId = "tdo2", housekeepingMode = Some(TestHousekeepingMode(arg1 = Some("foo"))))
     testAction shouldEqual expected
   }
+
+  "TestDataObject" should "throw ConfigurationException on wrong connection type" in {
+    implicit val registry: InstanceRegistry = new InstanceRegistry()
+    val config = ConfigFactory.parseString(
+      """
+        | connections {
+        |   c1 = {
+        |     type = HadoopFileConnection
+        |     pathPrefix = ./test
+        |   }
+        | }
+        | dataObjects {
+        |   tdo = {
+        |     type = io.smartdatalake.config.objects.TestDataObject
+        |     connectionId = c1
+        |     arg1 = "first"
+        |     args = [one, two]
+        |   }
+        | }
+    """.stripMargin).resolve()
+
+    val ex = intercept[ConfigurationException](ConfigParser.parse(config))
+    assert(ex.message.contains("does not implement expected connection type"))
+    assert(Option(ex.getCause).isEmpty)
+  }
+
 
   "Parser" should "fail if entry is not of type object" in {
     val dataObjectsConfig = ConfigFactory.parseString(

@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.Connection
@@ -105,20 +105,13 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
   /**
    * Handle class cast exception when getting objects from instance registry
    */
-  protected def getConnection[T <: Connection](connectionId: ConnectionId)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val connection = try {
+  protected def getConnection[T <: Connection : TypeTag : ClassTag](connectionId: ConnectionId)(implicit registry: InstanceRegistry): T = {
+    try {
       registry.get[T](connectionId)
     } catch {
-      case _: NoSuchElementException => throw new NoSuchElementException(s"key not found in instance registry: $connectionId")
-    }
-    try {
-      // force class cast on generic type (otherwise the ClassCastException is thrown later)
-      ct.runtimeClass.cast(connection).asInstanceOf[T]
-    } catch {
-      case e: ClassCastException =>
-        val objClass = connection.getClass.getSimpleName
-        val expectedClass = tt.tpe.toString.replaceAll(classOf[DataObject].getPackage.getName+".", "")
-        throw ConfigurationException(s"${this.id} needs $expectedClass as connection but $connectionId is of type $objClass")
+      case _: NoSuchElementException => throw new NoSuchElementException(s"($id) $connectionId not found in instance registry")
+      case TypeMismatchException(_, currentClass, expectedType) =>
+        throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
     }
   }
   protected def getConnectionReg[T <: Connection](connectionId: ConnectionId, registry: InstanceRegistry)(implicit ct: ClassTag[T], tt: TypeTag[T]): T = {

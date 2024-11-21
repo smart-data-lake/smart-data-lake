@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -326,20 +326,13 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Handle class cast exception when getting objects from instance registry
    */
-  private def getDataObject[T <: DataObject](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val dataObject = try {
+  private def getDataObject[T <: DataObject : ClassTag : TypeTag](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry): T = {
+    try {
       registry.get[T](dataObjectId)
     } catch {
       case _: NoSuchElementException => throw new NoSuchElementException(s"($id) key not found in instance registry for $role: $dataObjectId")
-    }
-    try {
-      // force class cast on generic type (otherwise the ClassCastException is thrown later)
-      ct.runtimeClass.cast(dataObject).asInstanceOf[T]
-    } catch {
-      case _: ClassCastException =>
-        val objClass = dataObject.getClass.getSimpleName
-        val expectedClass = tt.tpe.toString.replaceAll(classOf[DataObject].getPackage.getName+".", "")
-        throw ConfigurationException(s"$toStringShort needs $expectedClass as $role but $dataObjectId is of type $objClass")
+      case TypeMismatchException(_, currentClass, expectedType) =>
+        throw ConfigurationException(s"($id) $role $dataObjectId of type ${currentClass.getSimpleName} does not implement expected DataObject type $expectedType")
     }
   }
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
