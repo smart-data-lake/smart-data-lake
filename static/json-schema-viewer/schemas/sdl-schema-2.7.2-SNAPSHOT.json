@@ -4332,13 +4332,57 @@
             },
             "description" : "Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own."
           },
+          "readTransformer" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/DeduplicateTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/SQLDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ScalaClassGenericDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSnowparkDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDsTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/SparkFlattenDfTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/StandardizeSparkDatatypesTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/WhitelistTransformer"
+            } ],
+            "description" : "An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte."
+          },
           "expectedPartitionsCondition" : {
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
-          },
-          "comment" : {
-            "type" : "string",
-            "description" : "An optional comment to add to the table after writing a DataFrame to it"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata"
@@ -4347,7 +4391,7 @@
         "title" : "SnowflakeTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "[[DataObject]] of type SnowflakeTableDataObject.\nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake"
+        "description" : "[[DataObject]] of type SnowflakeTableDataObject.\nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake\n\nNote 1: Snowflake does not support partitioning.\nBut SDLB emulates partitions through the `virtualPartitions` attribute.\n\nNote 2: Snowflake is tricky with Datatypes.\nAs Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.\nSDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).\nFor adapting types on read, use the `readTransformer` attribute.\n\nNote 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive` )\nIf `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector."
       },
       "SplunkDataObject" : {
         "type" : "object",
