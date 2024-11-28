@@ -25,11 +25,10 @@ password = "password123"
 ```
 provides plaintext secret values. To read from environment variables, write
 ```
-user = "${JDBCuser}"
-password = "${JDBCpw}"
+user = ${JDBCuser}
+password = ${JDBCpw}
 ```
-as explained in [Environment variables](hoconVariables#environment-variables).
-
+(You may also use environment variables to set other settings.)
 
 Whether secret providers can be used for a property can be seen in its description in the 
 [Schema Viewer](http://smartdatalake.ch/json-schema-viewer/index.html).
