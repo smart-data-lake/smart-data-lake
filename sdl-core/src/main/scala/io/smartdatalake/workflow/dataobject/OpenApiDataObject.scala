@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import com.jayway.jsonpath.PathNotFoundException
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
@@ -34,7 +35,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
-import org.json4s.JObject
+import org.json4s.{JObject, JValue}
 import sttp.client3.{HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, asByteArray, basicRequest}
 import sttp.model.{MediaType, Uri}
 
@@ -49,7 +50,7 @@ import scala.concurrent.duration.FiniteDuration
  *   - Only GET method implemented for now
  *   - No dynamic URL parameters supported for now
  *   - Only responseContentType=application/json will be parsed into schema. Otherwise schema will be a single column with name 'content' of type String or Binary.
- *   - Only token based pagination is supported. Use pagingLinkRegex to extract Url for next page.
+ *   - Only token based pagination is supported. Use pagingLinkJsonPath to extract Url for the next page.
  *   - OpenApi Webservice requests can not be parallelized and distributed to executors. They run on the driver.
  *     In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
  *
@@ -76,9 +77,10 @@ import scala.concurrent.duration.FiniteDuration
  * @param authMode                  Optional configuration of webservice authentication. Supported `AuthMode`s are BasicAuthMode and CustomHttpAuthMode.
  *                                  CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
  * @param followRedirects           if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
- *                                  //TODO: this should be Json path...
- * @param pagingLinkRegex           if Webservice implements paging, configure a regular expression to extract a link for the next page.
- *                                  Example: "\slink=(\S*)"
+ * @param pagingLinkJsonPath        If selected operation implements paging and returns content-type application/json, configure a JsonPath expression to extract the link of the next page to query.
+ *                                  The JsonPath expression should return a String or a list of Strings as result.
+ *                                  If a link for the next page is not found, it is assumed that it is the last page and no further queries will be made.
+ *                                  Example JsonPath expression: "$._links[?(@.rel == 'next')].href"
  * @param maxPagesPerPartition      Only relevant together pagingLinkRegex.
  *                                  Sets maximum number of pages to put into one Spark partition.
  *                                  Default is 10. Remember that a page normally includes multiple records and can already be quite large.
@@ -96,13 +98,13 @@ case class OpenApiDataObject(override val id: DataObjectId,
                              urlParameters: Map[String, String] = Map(),
                              additionalHeaders: Map[String, String] = Map(),
                              timeouts: Option[HttpTimeoutConfig] = None,
-                             pagingLinkRegex: Option[String] = None,
+                             pagingLinkJsonPath: Option[String] = None,
                              maxPagesPerPartition: Int = 10,
                              override val metadata: Option[DataObjectMetadata] = None
                             )
-  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SmartDataLakeLogger {
+  extends DataObject with CanCreateSparkDataFrame with SmartDataLakeLogger {
   private val mediaType = MediaType.parse(responseContentType).right.get
-  assert(pagingLinkRegex.isEmpty || mediaType.equalsIgnoreParameters(MediaType.ApplicationJson), "PagingLinkRegex can only be used when responseContentType=application/json")
+  assert(pagingLinkJsonPath.isEmpty || mediaType.equalsIgnoreParameters(MediaType.ApplicationJson), "PagingLinkRegex can only be used when responseContentType=application/json")
   private val specUrl = {
     if (apiDocsUrl.startsWith("./")) apiDocsUrl
     else if (SttpUtil.canHandleScheme(apiDocsUrl)) apiDocsUrl
@@ -116,9 +118,6 @@ case class OpenApiDataObject(override val id: DataObjectId,
   private var operation: Option[OpenApiOperation] = None
   private var operationContentType: Option[String] = None
   private var schema: Option[StructType] = None
-
-  //TODO
-  private var state: Option[String] = None
 
   private val sttpBackendOptions = Seq(proxy, timeouts).flatten.foldLeft(SttpBackendOptions.Default) {
     case (options, config) => config.sttpConfig(options)
@@ -147,9 +146,9 @@ case class OpenApiDataObject(override val id: DataObjectId,
     logger.info(s"($id) got schema: ${schema.get.simpleString}")
   }
 
-  def getContent(url: String, contentType: String): Array[Byte] = {
+  def getContent(url: String, contentType: String, withUrlParameters: Boolean = true): Array[Byte] = {
     var request = basicRequest
-      .get(Uri.unsafeParse(url).addParams(urlParameters))
+      .get(Uri.unsafeParse(url).addParams(if (withUrlParameters) urlParameters else Map[String, String]()))
       .headers(additionalHeaders ++ authMode.map(_.getHeaders).getOrElse(Map()))
       .header("Allow", contentType)
       .followRedirects(followRedirects)
@@ -171,10 +170,13 @@ case class OpenApiDataObject(override val id: DataObjectId,
       // exec phase -> read: return data
       case ExecutionPhase.Exec =>
         val targetUrl = s"$baseUrl/${operation.get.path.dropWhile(_ == '/')}"
-        if (pagingLinkRegex.isDefined) {
+        if (pagingLinkJsonPath.isDefined) {
           assert(mediaType.equalsIgnoreParameters(MediaType.ApplicationJson))
-          val data = SttpUtil.getPagedResponseIterator(targetUrl, pagingLinkRegex.get, url => new String(getContent(url, operationContentType.get))).map(_.getBytes)
-          val rows = data.map(r => JsonUtils.convertObjectToCatalyst(parse(new String(r)).asInstanceOf[JObject], schema.get))
+
+          def getResponse(url: String, idx: Int) = parse(new String(getContent(url, operationContentType.get, withUrlParameters = idx == 0)))
+
+          val data = SttpUtil.getPagedResponseIterator(targetUrl, createPagingLinkJsonPathExtractor(pagingLinkJsonPath.get), getResponse)
+          val rows = data.map(r => JsonUtils.convertObjectToCatalyst(r.asInstanceOf[JObject], schema.get))
           DatasetHelper.parallelizeInternalRows(rows, schema.get, maxPagesPerPartition)
         } else operation.get.responseSchema(responseContentType) match {
           case (contentType, _: StructType) =>
@@ -196,12 +198,21 @@ case class OpenApiDataObject(override val id: DataObjectId,
     df
   }
 
-  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
-    this.state = state
-  }
-
-  override def getState: Option[String] = {
-    state
+  private def createPagingLinkJsonPathExtractor(jsonPath: String): JValue => Option[String] = response => {
+    try {
+      val result = JsonUtils.evaluateJsonPath(response, jsonPath).values
+      val link = result match {
+        case x: Seq[String] => x.headOption
+        case x: String => Some(x)
+        case x => throw new IllegalStateException(s"($id) pagingLinkJsonPathExtractor expects a String or a list of Strings as result, but got $x")
+      }
+      link.foreach(l => logger.debug(s"next pagingLink found: $l"))
+      link
+    } catch {
+      case e: PathNotFoundException =>
+        logger.warn(s"($id) Error while extracting next paging link: ${e.getClass.getSimpleName}: ${e.getMessage}")
+        None
+    }
   }
 
   override def factory: FromConfigFactory[DataObject] = OpenApiDataObject

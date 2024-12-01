@@ -64,29 +64,21 @@ object SttpUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Create an Iterator that query pages Webservices.
+   * Create an Iterator that query paged Webservices.
    * The Iterator queries the initial URL and extract next URL from response until all pages have been queried.
-   *
-   * Note: this only works with Response of type String
    */
-  def getPagedResponseIterator(url: String, pagingLinkRegex: String, getResponse: String => String): Iterator[String] = {
-    val pagingLinkPattern = pagingLinkRegex.r.unanchored
-    new Iterator[String]() {
+  def getPagedResponseIterator[R](url: String, pagingLinkExtractor: R => Option[String], getResponse: (String, Int) => R): Iterator[R] = {
+    new Iterator[R]() {
       var nextLink: Option[String] = Some(url)
+      var idx = 0
 
       override def hasNext: Boolean = nextLink.isDefined
 
-      override def next(): String = {
+      override def next(): R = {
         assert(nextLink.nonEmpty)
-        val response = getResponse(nextLink.get)
-        nextLink = {
-          response match {
-            case pagingLinkPattern(link) =>
-              logger.debug(s"next pagingLink found: $link")
-              Some(link)
-            case _ => None
-          }
-        }
+        val response = getResponse(nextLink.get, idx)
+        nextLink = pagingLinkExtractor(response)
+        idx = idx + 1
         response
       }
     }

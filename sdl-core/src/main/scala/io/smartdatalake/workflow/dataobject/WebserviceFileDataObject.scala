@@ -178,9 +178,20 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def createInputStreams(query: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     val targetUrl = url + query
-    val responses = if (pagingLinkRegex.isDefined) SttpUtil.getPagedResponseIterator(targetUrl, pagingLinkRegex.get, url => new String(getResponse(url))).map(_.getBytes)
+    val pagingLinkExtractorFun = createPagingLinkRegexExtractor(pagingLinkRegex.get)
+    val responses = if (pagingLinkRegex.isDefined) SttpUtil.getPagedResponseIterator(targetUrl, pagingLinkExtractorFun, (url, idx) => getResponse(url))
     else Iterator(getResponse(targetUrl))
     responses.map(e => new ByteArrayInputStream(e))
+  }
+
+  private def createPagingLinkRegexExtractor(regex: String): Array[Byte] => Option[String] = response => {
+    val pagingLinkPattern = regex.r.unanchored
+    new String(response) match {
+      case pagingLinkPattern(link) =>
+        logger.debug(s"next pagingLink found: $link")
+        Some(link)
+      case _ => None
+    }
   }
 
   override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()

@@ -54,12 +54,14 @@ class OpenApiDataObjectIT extends FunSuite {
       baseUrl = "https://data.sbb.ch/api/explore/v2.1",
       apiDocsUrl = "swagger.json",
       operationId = "getDatasets",
-      urlParameters = Map("include_links" -> "true")
+      urlParameters = Map("include_links" -> "true"),
+      pagingLinkJsonPath = Some("$._links[?(@.rel == 'next')].href")
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
     df.printSchema
-    df.withColumn("result", explode($"results")).drop("results")
+    df.withColumn("result", explode($"results"))
+      .select($"result.*")
       .show(false)
   }
 

@@ -1,5 +1,6 @@
 package io.smartdatalake.util.json
 
+import com.jayway.jsonpath.{Configuration, JsonPath}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import io.smartdatalake.util.misc.ProductUtil
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
@@ -99,5 +100,15 @@ object JsonUtils {
     }
     CatalystTypeConverters.convertToCatalyst(scalaValue)
   }
+
+  /**
+   * Evaluate a JsonPath expression on a Json4s json tree.
+   */
+  def evaluateJsonPath(json: JValue, jsonPath: String): JValue = {
+    val jsonPathExpr = JsonPath.compile(jsonPath)
+    jsonPathExpr.read(json, jsonPathConfig)
+  }
+
+  private[smartdatalake] val jsonPathConfig = Configuration.builder.jsonProvider(new Json4sJsonPathProvider()).mappingProvider(new DummyMappingProvider).build()
 
 }
