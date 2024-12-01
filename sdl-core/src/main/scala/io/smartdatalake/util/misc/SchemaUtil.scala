@@ -35,9 +35,6 @@ import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import scaladoc.Tag
 
-import java.io.{BufferedReader, InputStreamReader}
-import java.nio.charset.StandardCharsets
-import java.util.stream.Collectors
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 object SchemaUtil {
@@ -197,12 +194,8 @@ object SchemaUtil {
 
   def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
     val path = addHadoopDefaultSchemaAuthority(inputPath)
-    if (ResourceUtil.canHandleScheme(path)) {
-      val inputStream = ResourceUtil.readResource(path)
-      new BufferedReader(
-        new InputStreamReader(inputStream, StandardCharsets.UTF_8)
-      ).lines().collect(Collectors.joining())
-    } else {
+    if (ResourceUtil.canHandleScheme(path)) ResourceUtil.readResourceAsString(path)
+    else {
       val filesystem = getHadoopFsWithConf(path)
       readHadoopFile(path)(filesystem)
     }

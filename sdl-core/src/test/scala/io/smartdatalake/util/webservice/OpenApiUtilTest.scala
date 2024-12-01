@@ -256,7 +256,7 @@ class OpenApiUtilTest extends FunSuite {
       .willReturn(w.aResponse().withBody(specJson))
     )
 
-    val (contentType, schema) = OpenApiUtil.queryOperationSchema("http://localhost:8080", "getPing", responseContentType = "application/json")
+    val (contentType, schema) = OpenApiUtil.queryOperationSchema(s"http://$host:$port/v3/api-docs", "getPing", responseContentType = "application/json")
     val expected = StructType.fromDDL("id long, username string")
     assert(DataType.equalsIgnoreNullability(schema, expected))
 

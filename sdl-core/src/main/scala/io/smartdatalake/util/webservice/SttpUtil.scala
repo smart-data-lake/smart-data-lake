@@ -31,7 +31,7 @@ object SttpUtil extends SmartDataLakeLogger {
   /**
    * Validates if the a provided uri has the scheme/protocol 'http' or 'https'
    */
-  def canHandleScheme(uri: String): Boolean = uri.matches("^https?:")
+  def canHandleScheme(uri: String): Boolean = uri.matches("https?:.*")
 
   def sendRequest[T](request: Request[Either[String, T], Any], context: String)(implicit httpBackend: SttpBackend[Identity, Any]): T = {
     logger.info(s"${request.method} ${request.uri}")

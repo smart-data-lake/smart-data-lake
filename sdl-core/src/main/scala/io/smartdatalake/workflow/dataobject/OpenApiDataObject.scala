@@ -210,7 +210,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
       link
     } catch {
       case e: PathNotFoundException =>
-        logger.warn(s"($id) Error while extracting next paging link: ${e.getClass.getSimpleName}: ${e.getMessage}")
+        logger.info(s"($id) Next paging link not found: ${e.getClass.getSimpleName}: ${e.getMessage}")
         None
     }
   }
