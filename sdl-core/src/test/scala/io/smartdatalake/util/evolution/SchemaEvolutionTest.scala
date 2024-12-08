@@ -21,10 +21,12 @@ package io.smartdatalake.util.evolution
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.dataframe.DataFrameFunctions
+import io.smartdatalake.workflow.dataframe.spark._
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{StructField, _}
+import org.apache.spark.sql.types._
 import org.scalatest.FunSuite
 import org.scalatestplus.scalacheck.Checkers
 
@@ -37,21 +39,38 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
 
   implicit lazy val session: SparkSession = TestUtil.session
 
+  implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
+
+  import functions._
+
+
   test("Schema with same column names and types need to be identical") {
-    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
-    val schemaNew = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType))))
     assert(SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
+  test("Schema with same column names which differs with upper/lowercase and same types need to be identical in case-insensitive mode") {
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("B", IntegerType))))
+    assert(SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, caseSensitiveComparison = false))
+  }
+
+  test("Schema with same column names which differs with upper/lowercase and same types need to be different in case-sensitive mode") {
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("B", IntegerType))))
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, caseSensitiveComparison = true))
+  }
+
   test("Schema with different columns") {
-    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
-    val schemaNew = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("c", IntegerType)))
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("c", IntegerType))))
     assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
   test("Different Schema: same column names but different types") {
-    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
-    val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StringType)))
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", StringType))))
     assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
@@ -88,8 +107,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_6", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     // old -> new
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf))
@@ -143,8 +162,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_NEW_DOUBLE", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     assert(SchemaEvolution.newColumns(oldDf, newDf).toSet == Set("SF_NEW_STR_1", "SF_NEW_DOUBLE_1", "SF_NEW_DOUBLE_2", "SF_NEW_DOUBLE"))
 
@@ -154,8 +173,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
     assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
 
-    assert(oldEvoDf.count()>0)
-    assert(newEvoDf.count()>0)
+    assert(oldEvoDf.count > 0)
+    assert(newEvoDf.count > 0)
   }
 
   test("DataFrame columns should be sorted in a specific order") {
@@ -173,7 +192,7 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_3", StringType)
     ))
 
-    val df = TestUtil.arbitraryDataFrame(schema)
+    val df = SparkDataFrame(TestUtil.arbitraryDataFrame(schema))
 
     val order = Seq(
       "SF_NR_3",
@@ -218,8 +237,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_3", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
@@ -255,8 +274,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_3", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     assert(SchemaEvolution.deletedColumns(oldDf, newDf).toSet == Set("SF_STR_4", "SF_TIME_1", "SF_STR_5", "SF_STR_6"))
 
@@ -307,8 +326,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_6_1", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -350,8 +369,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("SF_STR_6", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore)
@@ -375,15 +394,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_nr_3", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
-    assert(oldEvoDf.schema.map(s => s.dataType).distinct == Seq(StringType))
+    assert(oldEvoDf.schema.fields.map(s => s.dataType).distinct.forall(_.typeName == "string"))
 
-    assert(oldEvoDf.count()>0)
-    assert(newEvoDf.count()>0)
+    assert(oldEvoDf.count > 0)
+    assert(newEvoDf.count > 0)
   }
 
   test("Columns of result are ordered by default according to oldDf, then newColumns, then cols2Ignore") {
@@ -391,8 +410,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("c", IntegerType),StructField("dl_ts_captured", TimestampType),StructField("dl_ts_delimited", TimestampType)))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("d", IntegerType)))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore)
@@ -408,17 +427,21 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType),StructField("b3", IntegerType))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    schemaNew.fields.foreach(f => println(s"${f.name}: typeName=${f.dataType.typeName} simpleName==${f.dataType.simpleString} sql===${f.dataType.sql}"))
+
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
+    print(oldEvoDf.schema.treeString())
+    print(newEvoDf.schema.treeString())
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
-    assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("b3").dataType == IntegerType)
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkStructDataType].getDataType("b3").typeName.equalsIgnoreCase("int"))
 
-    oldEvoDf.cache()
-    assert(oldEvoDf.count()>0)
-    assert(oldEvoDf.where(col("b.b3").isNull).count()>0)
-    assert(newEvoDf.count()>0)
+    oldEvoDf.cache
+    assert(oldEvoDf.count > 0)
+    assert(oldEvoDf.where(col("b.b3").isNull).count > 0)
+    assert(newEvoDf.count > 0)
   }
 
   test("Changed data type in struct type") {
@@ -426,15 +449,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType),StructField("b2", StringType))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
-    assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("b2").dataType == StringType)
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkStructDataType].getDataType("b2").typeName == "string")
 
-    assert(oldEvoDf.count()>0)
-    assert(newEvoDf.count()>0)
+    assert(oldEvoDf.count > 0)
+    assert(newEvoDf.count > 0)
   }
 
   test("Changed data type of array type") {
@@ -442,15 +465,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", ArrayType(FloatType))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", ArrayType(DoubleType))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
-    assert(oldEvoDf.schema("b").dataType.asInstanceOf[ArrayType].elementType == DoubleType)
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkArrayDataType].elementDataType.typeName == "double")
 
-    assert(oldEvoDf.select(explode(col("b"))).count()>0)
-    assert(newEvoDf.select(explode(col("b"))).count()>0)
+    assert(oldEvoDf.select(explode(col("b"))).count > 0)
+    assert(newEvoDf.select(explode(col("b"))).count > 0)
   }
 
   test("New column in array type of struct type") {
@@ -458,15 +481,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType)))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType),StructField("b3", IntegerType)))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
-    assert(oldEvoDf.schema("b").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]("b3").dataType == IntegerType)
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkArrayDataType].elementDataType.asInstanceOf[SparkStructDataType].getDataType("b3").typeName == "int")
 
-    assert(oldEvoDf.select(explode(col("b.b3"))).count()>0)
-    assert(newEvoDf.select(explode(col("b.b3"))).count()>0)
+    assert(oldEvoDf.select(explode(col("b.b3"))).count > 0)
+    assert(newEvoDf.select(explode(col("b.b3"))).count > 0)
   }
 
   test("Deleted column in array type of struct type") {
@@ -474,15 +497,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType),StructField("b3", IntegerType)))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("b", ArrayType(StructType(List(StructField("b1", IntegerType),StructField("b2", IntegerType)))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, ignoreOldDeletedNestedColumns = false)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
-    assert(newEvoDf.schema("b").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]("b3").dataType == IntegerType)
+    assert(newEvoDf.schema.getDataType("b").asInstanceOf[SparkArrayDataType].elementDataType.asInstanceOf[SparkStructDataType].getDataType("b3").typeName.equalsIgnoreCase("int"))
 
-    assert(oldEvoDf.select(explode(col("b.b3"))).count()>0)
-    assert(newEvoDf.select(explode(col("b.b3"))).count()>0)
+    assert(oldEvoDf.select(explode(col("b.b3"))).count > 0)
+    assert(newEvoDf.select(explode(col("b.b3"))).count > 0)
   }
 
   test("CaseSensitive: Old and new schema with different sorting are identical, no matter in which order, but newDf is sorted according to oldDf") {
@@ -524,8 +547,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_str_6", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     // old -> new
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf, Environment.caseSensitive))
@@ -590,8 +613,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_new_double", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     assert(SchemaEvolution.newColumns(oldDf, newDf).toSet == Set("SF_NEW_STR_1", "sf_new_double_1", "sf_new_double_2", "sf_new_double"))
 
@@ -601,8 +624,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
     assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
 
-    assert(oldEvoDf.count() > 0)
-    assert(newEvoDf.count() > 0)
+    assert(oldEvoDf.count > 0)
+    assert(newEvoDf.count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
@@ -630,7 +653,7 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_str_3", StringType)
     ))
 
-    val df = TestUtil.arbitraryDataFrame(schema)
+    val df = SparkDataFrame(TestUtil.arbitraryDataFrame(schema))
 
     val order = Seq(
       "SF_NR_3",
@@ -685,8 +708,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_str_3", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf, Environment.caseSensitive))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
@@ -732,8 +755,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_str_3", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     assert(SchemaEvolution.deletedColumns(oldDf, newDf).toSet == Set("sf_str_4", "SF_TIME_1", "sf_str_5", "sf_str_6"))
 
@@ -795,8 +818,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_str_6_1", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
@@ -847,8 +870,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_str_6", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore, caseSensitiveComparison = Environment.caseSensitive)
@@ -881,15 +904,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
       StructField("sf_nr_3", StringType)
     ))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
-    assert(oldEvoDf.schema.map(s => s.dataType).distinct == Seq(StringType))
+    assert(oldEvoDf.schema.fields.map(s => s.dataType.typeName).distinct == Seq("string"))
 
-    assert(oldEvoDf.count() > 0)
-    assert(newEvoDf.count() > 0)
+    assert(oldEvoDf.count > 0)
+    assert(newEvoDf.count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
@@ -907,8 +930,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("A", StringType), StructField("b", IntegerType), StructField("C", IntegerType), StructField("dl_ts_captured", TimestampType), StructField("dl_ts_delimited", TimestampType)))
     val schemaNew = StructType(List(StructField("A", StringType), StructField("b", IntegerType), StructField("d", IntegerType)))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore, caseSensitiveComparison = Environment.caseSensitive)
@@ -934,17 +957,17 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType))))))
     val schemaNew = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType), StructField("B3", IntegerType))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
-    assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("B3").dataType == IntegerType)
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkStructDataType].getDataType("B3").typeName == "int")
 
-    oldEvoDf.cache()
-    assert(oldEvoDf.count() > 0)
-    assert(oldEvoDf.where(col("b.B3").isNull).count() > 0)
-    assert(newEvoDf.count() > 0)
+    oldEvoDf.cache
+    assert(oldEvoDf.count > 0)
+    assert(oldEvoDf.where(col("b.B3").isNull).count > 0)
+    assert(newEvoDf.count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
@@ -961,15 +984,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType))))))
     val schemaNew = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", StringType))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
-    assert(oldEvoDf.schema("b").dataType.asInstanceOf[StructType]("B2").dataType == StringType)
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkStructDataType].getDataType("B2").typeName == "string")
 
-    assert(oldEvoDf.count() > 0)
-    assert(newEvoDf.count() > 0)
+    assert(oldEvoDf.count > 0)
+    assert(newEvoDf.count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
@@ -986,15 +1009,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("B", ArrayType(FloatType))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("B", ArrayType(DoubleType))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
-    assert(oldEvoDf.schema("B").dataType.asInstanceOf[ArrayType].elementType == DoubleType)
+    assert(oldEvoDf.schema.getDataType("B").asInstanceOf[SparkArrayDataType].elementDataType.typeName == "double")
 
-    assert(oldEvoDf.select(explode(col("B"))).count() > 0)
-    assert(newEvoDf.select(explode(col("B"))).count() > 0)
+    assert(oldEvoDf.select(explode(col("B"))).count > 0)
+    assert(newEvoDf.select(explode(col("B"))).count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
@@ -1012,15 +1035,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("A", StringType), StructField("B", ArrayType(StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType)))))))
     val schemaNew = StructType(List(StructField("A", StringType), StructField("B", ArrayType(StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType), StructField("B3", IntegerType)))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
-    assert(oldEvoDf.schema("B").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]("B3").dataType == IntegerType)
+    assert(oldEvoDf.schema.getDataType("B").asInstanceOf[SparkArrayDataType].elementDataType.asInstanceOf[SparkStructDataType].getDataType("B3").typeName == "int")
 
-    assert(oldEvoDf.select(explode(col("B.B3"))).count() > 0)
-    assert(newEvoDf.select(explode(col("B.B3"))).count() > 0)
+    assert(oldEvoDf.select(explode(col("B.B3"))).count > 0)
+    assert(newEvoDf.select(explode(col("B.B3"))).count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
@@ -1038,15 +1061,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val schemaOld = StructType(List(StructField("a", StringType), StructField("B", ArrayType(StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType), StructField("B3", IntegerType)))))))
     val schemaNew = StructType(List(StructField("a", StringType), StructField("B", ArrayType(StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType)))))))
 
-    val oldDf = TestUtil.arbitraryDataFrame(schemaOld)
-    val newDf = TestUtil.arbitraryDataFrame(schemaNew)
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, ignoreOldDeletedNestedColumns = false, caseSensitiveComparison = Environment.caseSensitive)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
-    assert(newEvoDf.schema("B").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType]("B3").dataType == IntegerType)
+    assert(newEvoDf.schema.getDataType("B").asInstanceOf[SparkArrayDataType].elementDataType.asInstanceOf[SparkStructDataType].getDataType("B3").typeName == "int")
 
-    assert(oldEvoDf.select(explode(col("B.B3"))).count() > 0)
-    assert(newEvoDf.select(explode(col("B.B3"))).count() > 0)
+    assert(oldEvoDf.select(explode(col("B.B3"))).count > 0)
+    assert(newEvoDf.select(explode(col("B.B3"))).count > 0)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)

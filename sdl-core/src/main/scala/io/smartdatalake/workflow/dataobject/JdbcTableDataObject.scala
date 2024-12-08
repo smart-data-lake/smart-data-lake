@@ -253,7 +253,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     val existingSchema = SparkSchema(getExistingSchema.get)
-    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema]
+    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SparkSchema(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     // prepare changes
     val newColumns = newSchema.columns.diff(existingSchema.columns) // add new column
     val missingNotNullColumns = existingSchema.columns.diff(newSchema.columns) // make missing columns nullable
@@ -448,7 +448,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema].inner)
+      if (!Environment.caseSensitive) cachedExistingSchema = Some(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     }
     cachedExistingSchema
   }
