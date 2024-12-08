@@ -26,6 +26,8 @@ import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
 import java.net.URI
+import java.sql.Timestamp
+import java.time.LocalDateTime
 
 /**
  * Environment dependent configurations.
@@ -518,6 +520,22 @@ object Environment extends SmartDataLakeLogger {
     _analyzeTableColumnMaxBytesThreshold.get
   }
   var _analyzeTableColumnMaxBytesThreshold: Option[Int] = None
+
+  /**
+   * Threshold for analyzing table columns.
+   * If table size is bigger than analyzeTableColumnMaxThresholdBytes, table columns are not analyzed.
+   */
+  def historizationUpperHorizonTimestamp: Timestamp = {
+    if (_historizationUpperHorizonTimestamp.isEmpty) {
+      _historizationUpperHorizonTimestamp = Some(
+        EnvironmentUtil.getSdlParameter("historizationUpperHorizonTimestamp")
+          .map(Timestamp.valueOf).getOrElse(Timestamp.valueOf(LocalDateTime.of(9999, 12, 31, 0, 0, 0, 0)))
+      )
+    }
+    _historizationUpperHorizonTimestamp.get
+  }
+
+  var _historizationUpperHorizonTimestamp: Option[Timestamp] = None
 
   /**
    * Whether SDLB should throw an exception if a SparkListener doesn't get expected notifications.

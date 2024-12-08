@@ -23,9 +23,9 @@ import io.smartdatalake.definitions.TechnicalTableColumn
 import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.ExecutionPhase
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.generic.transformer.FilterTransformer
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
@@ -42,7 +42,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   private var tempDir: NioPath = _
   private var tempPath: String = _
@@ -57,11 +57,9 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
-
   test("deduplicate 1st 2nd load") {
 
     // setup DataObjects
-    val feed = "deduplicate"
     val srcTable = Table(Some("default"), "deduplicate_input")
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"),  table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
@@ -127,7 +125,6 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
   test("deduplicate with filter clause") {
 
     // setup DataObjects
-    val feed = "deduplicate"
     val srcTable = Table(Some("default"), "deduplicate_input")
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
@@ -158,44 +155,44 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val colValueNew = "new_value_column_decimal"
 
     // initial deduplication while adding new column
-    val df1 = createDf(Map(
+    val df1 = SparkDataFrame(createDf(Map(
       colId -> 1,
       colValueOld -> "X",
       TechnicalTableColumn.captured -> ts("2020-07-01 10:00")
-    ))
+    )))
 
-    val df2 = createDf(Map(
+    val df2 = SparkDataFrame(createDf(Map(
       colId -> 1,
       colValueOld -> "A",
       colValueNew -> dec(100)
-    ))
+    )))
 
-    val dateTime1 = LocalDateTime.of(2020, Month.AUGUST, 15, 10, 0, 0)
+    val dateTime1 = Timestamp.valueOf(LocalDateTime.of(2020, Month.AUGUST, 15, 10, 0, 0))
     val dfResult1 = DeduplicateAction
       .deduplicateDataFrame(Option(df1), Seq(colId), dateTime1,
         ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df2)
 
     // deduplicate again, using the new column
-    val df3 = createDf(Map(
+    val df3 = SparkDataFrame(createDf(Map(
       colId -> 1,
       colValueOld -> "B",
       colValueNew -> dec(200)
-    ))
+    )))
 
-    val dateTime2 = LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0)
+    val dateTime2 = Timestamp.valueOf(LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0))
     val dfResult2 = DeduplicateAction
       .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2,
         ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
 
     // the expected result is the final passed value with a captured column
-    val dfExpected = createDf(Map(
+    val dfExpected = SparkDataFrame(createDf(Map(
       colId -> 1,
       colValueOld -> "B",
       colValueNew -> dec(200),
       TechnicalTableColumn.captured -> ts("2020-08-16 10:00")
-    ))
+    )))
 
-    assertDataFramesEqual(dfExpected, dfResult2)
+    assertDataFramesEqualGeneric(dfExpected, dfResult2)
   }
 
 }

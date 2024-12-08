@@ -42,6 +42,8 @@ class ActionDAGRunTest extends FunSuite {
   private val sdlbVersionInfo = BuildVersionInfo.sdlbVersionInfo.map(_.entries().toMap)
   private val appVersionInfo = BuildVersionInfo.appVersionInfo.map(_.entries().toMap).orElse(AppUtil.getManifestVersion.map(v => Map("version"->v)))
 
+  session.catalog.listCatalogs().show
+
   test("convert ActionDAGRunState to json and back") {
     val df = Seq(("a",1)).toDF("txt", "value")
     val startTime = LocalDateTime.now

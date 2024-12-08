@@ -24,6 +24,7 @@ import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.evolution.SchemaEvolution.listFind
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
@@ -38,9 +39,17 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with SmartDataLakeLogger {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def schema: SnowparkSchema = SnowparkSchema(inner.schema)
-  override def join(other: GenericDataFrame, joinCols: Seq[String]): SnowparkDataFrame = {
+
+  override def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String): SnowparkDataFrame = {
     other match {
-      case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.join(snowparkOther.inner, joinCols))
+      case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.join(snowparkOther.inner, joinCols, joinType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): SnowparkDataFrame = {
+    (other, condition) match {
+      case (snowparkOther: SnowparkDataFrame, snowparkCondition: SnowparkColumn) => SnowparkDataFrame(inner.join(snowparkOther.inner, snowparkCondition.inner, joinType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -88,14 +97,28 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     }
   }
   override def drop(colName: String): GenericDataFrame = SnowparkDataFrame(inner.drop(colName))
+
+  override def drop(col: GenericColumn): GenericDataFrame = {
+    col match {
+      case snowparkCol: SnowparkColumn => SnowparkDataFrame(inner.drop(snowparkCol.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(col)
+    }
+  }
+
   override def createOrReplaceTempView(viewName: String): Unit = {
     inner.createOrReplaceTempView(viewName)
+  }
+
+  override def dropDuplicates(cols: Seq[String]): SnowparkDataFrame = {
+    SnowparkDataFrame(inner.dropDuplicates(cols: _*))
   }
   override def isEmpty: Boolean = inner.count() == 0
   override def count: Long = inner.count()
   override def cache: GenericDataFrame = SnowparkDataFrame(inner.cacheResult())
   // not implemented in Snowpark
   override def uncache: GenericDataFrame = this
+
+  override def as(alias: String): GenericDataFrame = SnowparkDataFrame(inner.alias(alias))
   override def showString(options: Map[String,String] = Map()): String = {
     val showNumRows = options.get("showNumRows").map(_.toInt).getOrElse(10)
     val showWidth = options.get("showWidth").map(_.toInt).getOrElse(200)
@@ -157,7 +180,14 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     val df = context.instanceRegistry.get[SnowflakeTableDataObject](dataObjectId).snowparkSession.createDataFrame(Seq.empty[Row], inner)
     SnowparkDataFrame(df)
   }
-  override def getDataType(colName: String): GenericDataType = SnowparkDataType(inner.apply(colName).dataType)
+
+  override def getDataType(colName: String): GenericDataType = {
+    SnowparkDataType(listFind[StructField](inner, colName, _.name, Environment.caseSensitive)
+      .getOrElse(throw new IllegalArgumentException(s"Column $colName does not exists. Available: ${inner.names.mkString(", ")}")).dataType
+    )
+  }
+
+
   override def makeNullable: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.makeNullable.inner)))
   override def toLowerCase: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.toLowerCase.inner)))
   override def removeMetadata: SnowparkSchema = this // metadata not existing in Snowpark
@@ -169,6 +199,13 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
   override def ===(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner === snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def =!=(other: GenericColumn): SnowparkColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner =!= snowparkColumn.inner)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -225,6 +262,8 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
     SnowparkColumn(list.map(inner===_).reduce(_ or _))
   }
   override def isNull: SnowparkColumn = SnowparkColumn(inner.is_null)
+
+  override def isNotNull: GenericColumn = SnowparkColumn(inner.is_not_null)
   override def as(name: String): SnowparkColumn = SnowparkColumn(inner.as(name))
   override def cast(dataType: GenericDataType): SnowparkColumn = {
     dataType match {
@@ -259,17 +298,31 @@ trait SnowparkDataType extends GenericDataType {
     case StringType | LongType | IntegerType | ShortType | FloatType | DoubleType | DecimalType(_,_) | TimestampType | TimeType | DateType => true
     case _ => false
   }
-  override def typeName: String = inner.typeName
+
+  override def typeName: String = standardizeTypeName(inner.typeName.toLowerCase)
   override def sql: String = convertToSFType(inner)
   override def makeNullable: SnowparkDataType
   override def toLowerCase: SnowparkDataType
   override def removeMetadata: SnowparkDataType = this // metadata is not existing in Snowpark
-  override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
+
+  override def isSameType(other: GenericDataType): Boolean = {
+    other match {
+      case snowparkOther: SnowparkDataType => inner.typeName == snowparkOther.typeName
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
 }
-case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType {
+
+case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType with GenericSimpleDataType {
   override def makeNullable: SnowparkDataType = this
   override def toLowerCase: SnowparkDataType = this
-  override def isSimpleType: Boolean = true
+
+  override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
+
+  override def getDecimalSpec: Option[(Int, Int)] = inner match {
+    case d: DecimalType => Some((d.precision, d.scale))
+    case _ => None
+  }
   def toJson: JValue = JString(inner.typeName)
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
@@ -282,7 +335,8 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
     }
   }
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
-  override def isSimpleType: Boolean = false
+
+  override def fieldIndex(fieldName: String): Int = inner.indexWhere(_.name == fieldName)
 }
 case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with GenericArrayDataType {
   override def makeNullable: SnowparkDataType = SnowparkArrayDataType(ArrayType(SnowparkArrayDataType(inner).makeNullable.inner))
@@ -295,7 +349,6 @@ case class SnowparkArrayDataType(inner: ArrayType) extends SnowparkDataType with
   }
   override def containsNull: Boolean = true // not existing in Snowpark
   override def elementDataType: SnowparkDataType = SnowparkDataType(inner.elementType)
-  override def isSimpleType: Boolean = false
 }
 case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with GenericMapDataType {
   override def makeNullable: SnowparkDataType = SnowparkMapDataType(MapType(SnowparkDataType(inner.keyType).makeNullable.inner,SnowparkDataType(inner.valueType).makeNullable.inner))
@@ -315,7 +368,6 @@ case class SnowparkMapDataType(inner: MapType) extends SnowparkDataType with Gen
   override def valueContainsNull: Boolean = true // not existing in Snowpark
   override def keyDataType: SnowparkDataType = SnowparkDataType(inner.keyType)
   override def valueDataType: SnowparkDataType = SnowparkDataType(inner.valueType)
-  override def isSimpleType: Boolean = false
 }
 object SnowparkDataType {
   def apply(inner: DataType): SnowparkDataType = inner match {
@@ -329,6 +381,8 @@ object SnowparkDataType {
 case class SnowparkRow(inner: Row) extends GenericRow {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def get(index: Int): Any = inner.get(index)
+
+  override def getStruct(index: Int): GenericRow = throw new NotImplementedError("Snowpark row.getStruct not supported by Snowflake")
   override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
   override def toSeq: Seq[Any] = inner.toSeq
 }

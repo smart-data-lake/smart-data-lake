@@ -20,6 +20,7 @@
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
+ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
@@ -84,7 +85,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.asInstanceOf[SparkSubFeed].isDummy) // should return a dummy DataFrame as breakDataFrameOutputLineage is set to true
 
     {
-      val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)))
+      val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Environment.historizationUpperHorizonTimestamp))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
@@ -108,7 +109,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     {
       val expected = Seq(
         ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-        ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+        ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
@@ -133,7 +134,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
       val expected = Seq(
         ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
         ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-        ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+        ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
       val resultat = expected.isEqual(actual)

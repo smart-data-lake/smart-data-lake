@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.snowflake.snowpark
 import com.snowflake.snowpark.SaveMode
+import com.snowflake.snowpark.types.StructType
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
@@ -28,7 +29,7 @@ import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
+import io.smartdatalake.util.misc.SQLUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
@@ -224,12 +225,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
   }
   // cache response to avoid schema query.
-  private var cachedExistingSchema: Option[GenericSchema] = None
-  private def getExistingSchema(implicit context: ActionPipelineContext): Option[GenericSchema] = {
+  private var cachedExistingSchema: Option[SnowparkSchema] = None
+
+  private def getExistingSchema(implicit context: ActionPipelineContext): Option[SnowparkSchema] = {
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(SnowparkSchema(getSnowparkDataFrame().schema))
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(cachedExistingSchema.get, ignoreNullable = false, caseSensitive = false))
+      if (!Environment.caseSensitive) cachedExistingSchema = cachedExistingSchema.map(convertColNamesLowercase)
     }
     cachedExistingSchema
   }
@@ -342,11 +344,22 @@ object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
     import functions._
     val targetCols = df.schema.columns.map { n =>
       // if name is all uppercase, SDLB assumes it is not case sensitive and will convert it to lowercase.
-      if (n.matches("[A-Z0-9_]+")) col(n.toLowerCase)
+      if (isAllUppercase(n)) col(n.toLowerCase)
       else col(n)
     }
     df.select(targetCols)
   }
+
+  def convertColNamesLowercase(schema: SnowparkSchema): SnowparkSchema = {
+    SnowparkSchema(StructType(
+      schema.fields.map(f =>
+        // if name is all uppercase, SDLB assumes it is not case sensitive and will convert it to lowercase.
+        if (isAllUppercase(f.name)) f.toLowerCase.inner
+        else f.inner
+      )))
+  }
+
+  def isAllUppercase(str: String): Boolean = str.matches("[A-Z0-9_]+")
 
   def sparkCastIntegralTypesToDecimal(df: spark.DataFrame): spark.DataFrame = {
     val targetCols = df.schema.fields.map { f =>

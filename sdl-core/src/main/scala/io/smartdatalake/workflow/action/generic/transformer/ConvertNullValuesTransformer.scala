@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSimpleDataType}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
@@ -64,7 +64,7 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
       (acc, columnName) =>
         // Get correct substitution value
         val substitutionValue = df.schema.getDataType(columnName) match {
-          case dt if dt.isNumeric => Some(valueForNumber)
+          case dt: GenericSimpleDataType if dt.isNumeric => Some(valueForNumber)
           case dt if dt.typeName.toLowerCase == "string" => Some(valueForString)
           case _ => None
         }
