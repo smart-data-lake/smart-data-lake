@@ -479,7 +479,7 @@ object Environment extends SmartDataLakeLogger {
   var _failSimulationOnMissingInputSubFeeds: Option[Boolean] = None
 
   /**
-   * Whether SDL should run in case sensitive mode. If true Spark will also be configured to be case sensitive.
+   * Whether SDLB should run in case sensitive mode. If true Spark will also be configured to be case sensitive.
    * Default is false.
    */
   def caseSensitive: Boolean = {
@@ -519,6 +519,20 @@ object Environment extends SmartDataLakeLogger {
   }
   var _analyzeTableColumnMaxBytesThreshold: Option[Int] = None
 
+  /**
+   * Whether SDLB should throw an exception if a SparkListener doesn't get expected notifications.
+   * If true SDLB will throw an exception and stop execution, otherwise a Warning is logged.
+   * Default is false, e.g. a warning is logged.
+   */
+  def throwExceptionOnSparkListenerError: Boolean = {
+    if (_throwExceptionOnSparkListenerError.isEmpty) {
+      _throwExceptionOnSparkListenerError = Some(EnvironmentUtil.getSdlParameter("throwExceptionOnSparkListenerError").exists(_.toBoolean))
+    }
+    _throwExceptionOnSparkListenerError.get
+  }
+
+  var _throwExceptionOnSparkListenerError: Option[Boolean] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
@@ -538,7 +552,7 @@ object Environment extends SmartDataLakeLogger {
   private[smartdatalake] var _sdlPlugin: Option[Option[SDLPlugin]] = None
 
   // dynamically shared environment for custom code (see also #106)
-  // attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDL code, but might be used in custom code on your own risk.
+  // attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDLB code, but might be used in custom code on your own risk.
   def sparkSession: SparkSession = _sparkSession
   private [smartdatalake] var _sparkSession: SparkSession = _
   def instanceRegistry: InstanceRegistry = _instanceRegistry
