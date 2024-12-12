@@ -35,7 +35,7 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject.{convertColNamesLowercase, snowparkCastIntegralTypesToDecimal, sparkCastIntegralTypesToDecimal}
+import io.smartdatalake.workflow.dataobject.SnowflakeUtils._
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
@@ -336,6 +336,9 @@ object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
                          (implicit instanceRegistry: InstanceRegistry): SnowflakeTableDataObject = {
     extract[SnowflakeTableDataObject](config)
   }
+}
+
+object SnowflakeUtils {
 
   def convertColNamesLowercase(df: GenericDataFrame): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
@@ -351,25 +354,28 @@ object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
   def sparkCastIntegralTypesToDecimal(df: spark.DataFrame): spark.DataFrame = {
     val targetCols = df.schema.fields.map { f =>
       val targetType = f.dataType match {
-        case spark.types.ByteType => spark.types.DecimalType(3,0)
-        case spark.types.ShortType => spark.types.DecimalType(5,0)
-        case spark.types.IntegerType => spark.types.DecimalType(10,0)
-        case spark.types.LongType => spark.types.DecimalType(19,0)
+        case spark.types.ByteType => spark.types.DecimalType(3, 0)
+        case spark.types.ShortType => spark.types.DecimalType(5, 0)
+        case spark.types.IntegerType => spark.types.DecimalType(10, 0)
+        case spark.types.LongType => spark.types.DecimalType(19, 0)
         case _ => f.dataType
       }
       if (f.dataType != targetType) spark.functions.col(f.name).cast(targetType)
       else spark.functions.col(f.name)
     }
-    df.select(targetCols:_*)
+    df.select(targetCols: _*)
   }
 
+  // Attention: snowpark.types.DecimalType implements scala.Serializable.
+  // This might result in "ClassNotFoundException: scala.Serializable" when parsing SnowflakeTableDataObject on some Environments.
+  // Workaround: move it from object SnowflakeTableDataObject to separate object SnowflakeUtils.
   def snowparkCastIntegralTypesToDecimal(df: snowpark.DataFrame): snowpark.DataFrame = {
     val targetCols = df.schema.fields.map { f =>
       val targetType = f.dataType match {
-        case snowpark.types.ByteType => snowpark.types.DecimalType(3,0)
-        case snowpark.types.ShortType => snowpark.types.DecimalType(5,0)
-        case snowpark.types.IntegerType => snowpark.types.DecimalType(10,0)
-        case snowpark.types.LongType => snowpark.types.DecimalType(19,0)
+        case snowpark.types.ByteType => snowpark.types.DecimalType(3, 0)
+        case snowpark.types.ShortType => snowpark.types.DecimalType(5, 0)
+        case snowpark.types.IntegerType => snowpark.types.DecimalType(10, 0)
+        case snowpark.types.LongType => snowpark.types.DecimalType(19, 0)
         case _ => f.dataType
       }
       if (f.dataType != targetType) snowpark.functions.col(f.name).cast(targetType).as(f.name)
