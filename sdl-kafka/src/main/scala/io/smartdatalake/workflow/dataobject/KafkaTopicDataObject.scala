@@ -40,7 +40,7 @@ import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.confluent.avro.{AvroSchemaConverter, ConfluentAvroConnector}
 import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
 import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
-import org.apache.spark.sql.functions.{col, from_json, to_json, udf}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
 
@@ -224,7 +224,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     val df = dfRaw
       .withColumn("key", convertFromKafka(keyType, col("key"), SubjectType.key, keySchema))
-      .withColumn("value", convertFromKafka(valueType, col("value"), SubjectType.value, valueSchema))
+      .withColumn("value", when(col("value").isNotNull or length(col("value")) > 0, convertFromKafka(valueType, col("value"), SubjectType.value, valueSchema)))
       .as("kafka")
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .select(colsToSelect:_*)
@@ -349,11 +349,11 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   private def convertToWriteDataFrame(df: DataFrame): DataFrame = {
     require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
-    keySchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("key").dataType.asInstanceOf[StructType]), "read (keySchema)"))
-    valueSchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("value").dataType.asInstanceOf[StructType]), "read (valueSchema)"))
+    keySchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("key").dataType.asInstanceOf[StructType]), "write (keySchema)"))
+    valueSchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("value").dataType.asInstanceOf[StructType]), "write (valueSchema)"))
     df.select(
       convertToKafka(keyType, col("key"), SubjectType.key, keySchema).as("key"),
-      convertToKafka(valueType, col("value"), SubjectType.value, valueSchema).as("value")
+      when(col("value").isNotNull, convertToKafka(valueType, col("value"), SubjectType.value, valueSchema)).as("value")
     )
   }
 
