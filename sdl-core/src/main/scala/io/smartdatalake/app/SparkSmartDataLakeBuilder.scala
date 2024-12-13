@@ -24,8 +24,8 @@ import scopt.OParser
 /**
  * Smart Data Lake Builder application for running SDL with Spark.
  * Allows to explicitly override master and deploy-mode settings of Spark using the command-line.
- * This entrypoint should be used when there is no existing Spark-Settings on the environment where SDLB is running,
- * for example for running SDLB locally on your laptop with Spark.
+ * This entrypoint should be used when there is no existing Spark-Session running on the environment where SDLB is started,
+ * for example for starting SDLB locally on your laptop with Spark.
  */
 object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
@@ -36,12 +36,10 @@ object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
       parserGeneric(),
       opt[String]('m', "master")
         .action((arg, config) => config.copy(master = Some(arg)))
-        .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).")
-      .required(),
+        .text("The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT)."),
       opt[String]('x', "deploy-mode")
         .action((arg, config) => config.copy(deployMode = Some(arg)))
         .text("The Spark deploy mode passed to SparkContext (default=client, cluster).")
-        .required()
     )
   }
 

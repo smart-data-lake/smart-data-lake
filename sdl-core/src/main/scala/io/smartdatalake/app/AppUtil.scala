@@ -20,7 +20,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.{EnvironmentUtil, GraphUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -54,7 +54,7 @@ object AppUtil extends SmartDataLakeLogger {
                          sparkOptionsOpt: Map[String,StringOrSecret] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
-    logger.info(s"Creating spark session. Note that None means that the Defaults of the Spark Environment apply." +
+    logger.info(s"Creating spark session. Note that None means that the Defaults of the Spark Environment apply: " +
       s"name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt")
 
     // prepare extensions

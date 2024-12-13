@@ -657,7 +657,7 @@
                         <archive>
                             <manifest>
                                 <addClasspath>true</addClasspath>
-                                <mainClass>io.smartdatalake.app.LocalSmartDataLakeBuilder</mainClass>
+                                <mainClass>io.smartdatalake.app.SparkSmartDataLakeBuilder</mainClass>
                                 <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                             </manifest>
                         </archive>
@@ -732,7 +732,7 @@
                                 <transformers>
                                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                         <manifestEntries>
-                                            <Main-Class>io.smartdatalake.app.LocalSmartDataLakeBuilder</Main-Class>
+                                            <Main-Class>io.smartdatalake.app.SparkSmartDataLakeBuilder</Main-Class>
                                             <Implementation-Version>${project.version}</Implementation-Version>
                                             <Multi-Release>true</Multi-Release>
                                         </manifestEntries>
