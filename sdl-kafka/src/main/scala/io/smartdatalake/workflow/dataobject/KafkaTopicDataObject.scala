@@ -146,6 +146,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
   override def schemaMin: Option[GenericSchema] = None // minimal schema doesn't make sense, as schema is always fully defined.
 
+
   private val connection = getConnection[KafkaConnection](connectionId)
 
   if (keyType==KafkaColumnType.JsonSchemaRegistry || valueType==KafkaColumnType.JsonSchemaRegistry) assert(connection.schemaRegistry.nonEmpty, s"($id) If key or value is of type JsonSchemaRegistry, the schemaRegistry must be defined in the connection")
@@ -214,22 +215,23 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
       .option("subscribe", topicName)
       .load()
-    convertToReadDataFrame(dfRaw)
+    convertToReadDataFrame(decodeKeyValue(dfRaw))
   }
 
   private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
     import DataFrameUtil._
-
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
-    val df = dfRaw
+    dfRaw
+      .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
+      .as("kafka")
+      .select(colsToSelect: _*)
+  }
+
+  private def decodeKeyValue(dfRaw: DataFrame): DataFrame = {
+    dfRaw
       .withColumn("key", convertFromKafka(keyType, col("key"), SubjectType.key, keySchema))
       .withColumn("value", when(col("value").isNotNull or length(col("value")) > 0, convertFromKafka(valueType, col("value"), SubjectType.value, valueSchema)))
-      .as("kafka")
-      .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
-      .select(colsToSelect:_*)
-    // return
-    df
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -297,7 +299,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       createSparkDataFrameInternal("earliest", "latest")
     }
 
-    convertToReadDataFrame(dfRaw)
+    convertToReadDataFrame(decodeKeyValue(dfRaw))
   }
 
   private def createSparkDataFrameInternal(startingOffsets: String, endingOffsets: String)(implicit session: SparkSession) = {
@@ -347,7 +349,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     dfs.reduce(_ union _)
   }
 
-  private def convertToWriteDataFrame(df: DataFrame): DataFrame = {
+  private def encodeKeyValue(df: DataFrame): DataFrame = {
     require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     keySchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("key").dataType.asInstanceOf[StructType]), "write (keySchema)"))
     valueSchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("value").dataType.asInstanceOf[StructType]), "write (valueSchema)"))
@@ -361,7 +363,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                              (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) KafkaTopicDataObject does not support writing using partition values: partitionValues=${partitionValues.mkString(",")}")
     SparkStageMetricsListener.execWithMetrics(this.id,
-      convertToWriteDataFrame(df)
+      encodeKeyValue(df)
         .write
         .format("kafka")
         .options(instanceOptions)
@@ -374,7 +376,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                       (implicit context: ActionPipelineContext): StreamingQuery = {
     df match {
       case sparkDf: SparkDataFrame =>
-        convertToWriteDataFrame(sparkDf.inner)
+        encodeKeyValue(sparkDf.inner)
           .writeStream
           .format("kafka")
           .trigger(trigger)
@@ -599,7 +601,7 @@ private object TopicPartitionOffsets {
   /**
    * Create string to use as starting/endingOffset option for Spark Kafka data source
    *
-   * Output format: `"<partitionNb:integer>":<offset:long>``
+   * Output format: `"<partitionNb:integer>":<offset:long>`
    */
   def getOffsetForSpark(partition: Int, offset: Option[Long], defaultOffset: Int): String = {
     // if partition is empty we get no offset, but we have to define one for spark. Define defaultOffset for this.
