@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.historization
 
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -53,7 +53,7 @@ class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with 
       (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs()),
       (123, "Egon", 23, "healthy", false, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs),
     )
-    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
     if (!result) TestUtil.printFailedTestResultGeneric("New/updated record creates updateClose and insertNew records for merge statement")(dfHistorized)(dfExpected)
@@ -71,8 +71,8 @@ class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with 
     val dataExpected = Seq(
       (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs()),
     )
-    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
-      .withColumn(TechnicalTableColumn.captured, col(TechnicalTableColumn.captured).cast(SparkSimpleDataType(TimestampType)))
+    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
+      .withColumn(Environment.capturedColumnName, col(Environment.capturedColumnName).cast(SparkSimpleDataType(TimestampType)))
 
     val result = dfExpected.isEqual(dfHistorized)
     if (!result) TestUtil.printFailedTestResultGeneric("Deleted record creates updateClose record for merge statement")(dfHistorized)(dfExpected)

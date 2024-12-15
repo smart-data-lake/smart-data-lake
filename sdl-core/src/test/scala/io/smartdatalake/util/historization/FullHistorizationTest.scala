@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.historization
 
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.historization.HistorizationTestUtils._
@@ -56,7 +56,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
     val (oldEvolvedDf, newEvolvedDf) = SchemaEvolution.process(dfOldHist, dfNewFeed,
-      colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+      colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val dfHistorized = Historization.fullHistorize(oldEvolvedDf, newEvolvedDf, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
@@ -270,8 +270,8 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
       StructField("col_B", StringType, nullable = true))
 
     val schemaHistory = schemaValues ++ List(
-      StructField(TechnicalTableColumn.captured, TimestampType, nullable = false),
-      StructField(TechnicalTableColumn.delimited, TimestampType, nullable = true))
+      StructField(Environment.capturedColumnName, TimestampType, nullable = false),
+      StructField(Environment.delimitedColumnName, TimestampType, nullable = true))
 
     val existingData = Seq(Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHistTs, doomsdayTs)))
     val newData = Seq(Row.fromSeq(Seq(1, "value", null)))
@@ -342,7 +342,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     assert(result)
 
     println(dfHistorized.showString(Map("truncate" -> "100")))
-    assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + TechnicalTableColumn.delimited) === col("b." + TechnicalTableColumn.captured), "inner").count == 1)
+    assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + Environment.delimitedColumnName) === col("b." + Environment.capturedColumnName), "inner").count == 1)
   }
 
 }

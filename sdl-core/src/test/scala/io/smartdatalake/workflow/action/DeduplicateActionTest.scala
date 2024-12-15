@@ -19,14 +19,14 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.generic.transformer.FilterTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -158,7 +158,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val df1 = SparkDataFrame(createDf(Map(
       colId -> 1,
       colValueOld -> "X",
-      TechnicalTableColumn.captured -> ts("2020-07-01 10:00")
+      Environment.capturedColumnName -> ts("2020-07-01 10:00")
     )))
 
     val df2 = SparkDataFrame(createDf(Map(
@@ -189,7 +189,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       colId -> 1,
       colValueOld -> "B",
       colValueNew -> dec(200),
-      TechnicalTableColumn.captured -> ts("2020-08-16 10:00")
+      Environment.capturedColumnName -> ts("2020-08-16 10:00")
     )))
 
     assertDataFramesEqualGeneric(dfExpected, dfResult2)
