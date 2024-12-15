@@ -538,6 +538,34 @@ object Environment extends SmartDataLakeLogger {
   var _historizationUpperHorizonTimestamp: Option[Timestamp] = None
 
   /**
+   * Name of column that marks the creation date of a record.
+   * Used in Historize- and DeduplicateAction.
+   * Default is `dl_ts_captured`.
+   */
+  def capturedColumnName: String = {
+    if (_capturedColumnName.isEmpty) {
+      _capturedColumnName = Some(EnvironmentUtil.getSdlParameter("capturedColumnName").getOrElse("dl_ts_captured"))
+    }
+    _capturedColumnName.get
+  }
+
+  var _capturedColumnName: Option[String] = None
+
+  /**
+   * Name of column that marks the end of validity of a record
+   * Used in HistorizeAction.
+   * Default is `dl_ts_delimited`.
+   */
+  def delimitedColumnName: String = {
+    if (_delimitedColumnName.isEmpty) {
+      _delimitedColumnName = Some(EnvironmentUtil.getSdlParameter("delimitedColumnName").getOrElse("dl_ts_delimited"))
+    }
+    _delimitedColumnName.get
+  }
+
+  var _delimitedColumnName: Option[String] = None
+
+  /**
    * Whether SDLB should throw an exception if a SparkListener doesn't get expected notifications.
    * If true SDLB will throw an exception and stop execution, otherwise a Warning is logged.
    * Default is false, e.g. a warning is logged.

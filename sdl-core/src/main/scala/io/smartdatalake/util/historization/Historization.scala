@@ -19,7 +19,7 @@
 package io.smartdatalake.util.historization
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{Environment, TechnicalTableColumn}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DataFrameSubFeed
@@ -63,10 +63,10 @@ object Historization extends SmartDataLakeLogger {
     val doomsday = lit(Environment.historizationUpperHorizonTimestamp)
 
     // Name for Hive column "last updated on ..."
-    val lastUpdateCol = TechnicalTableColumn.captured
+    val lastUpdateCol = Environment.capturedColumnName
 
     // Name for Hive column "Replaced on ..."
-    val expiryDateCol = TechnicalTableColumn.delimited
+    val expiryDateCol = Environment.delimitedColumnName
 
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)
@@ -191,8 +191,8 @@ object Historization extends SmartDataLakeLogger {
     // Previous entry on time axis before the reference timestamp ("Tick"). This is used to delimit existing old records.
     val timestampOld = lit(timeAxisUnit.map(getPreviousTimeAxisEntry(referenceTimestamp, _)).getOrElse(referenceTimestamp))
     // prepare columns
-    val existingCapturedCol = col(s"existing.${TechnicalTableColumn.captured}")
-    val existingDelimitedCol = col(s"existing.${TechnicalTableColumn.delimited}")
+    val existingCapturedCol = col(s"existing.${Environment.capturedColumnName}")
+    val existingDelimitedCol = col(s"existing.${Environment.delimitedColumnName}")
     val existingHashCol = col(s"existing.$historizeHashColName")
     val newHashCol = col(s"new.$historizeHashColName")
     val hashColEqualsExpr = existingHashCol === newHashCol
@@ -201,12 +201,12 @@ object Historization extends SmartDataLakeLogger {
     val dfExistingHashed = if (addExistingDfHashColumn) {
       dfExisting
     } else {
-      addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+      addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
     }
     // join existing with new and determine operations needed
     val dfOperations = dfExistingHashed.as("existing")
       .where(existingDelimitedCol === lit(Environment.historizationUpperHorizonTimestamp)) // only current records needed
-      .select((primaryKey :+ TechnicalTableColumn.captured :+ TechnicalTableColumn.delimited :+ historizeHashColName).map(col))
+      .select((primaryKey :+ Environment.capturedColumnName :+ Environment.delimitedColumnName :+ historizeHashColName).map(col))
       .join(dfNewHashed.as("new"), primaryKey, "full")
       .withColumn("_operations",
         // 1. primary key matched and attributes have changed -> update record to close existing version, insert record to create new version
@@ -227,18 +227,18 @@ object Historization extends SmartDataLakeLogger {
       .withColumn(historizeOperationColName, explode(col("_operations"))) // note: this filters records with no action
       .drop("_operations")
       .drop(col(s"existing.$historizeHashColName"))
-      .withColumn(TechnicalTableColumn.captured,
+      .withColumn(Environment.capturedColumnName,
         when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), timestampNew)
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), existingCapturedCol) // is needed vor merge join condition
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateExisting), existingCapturedCol)
       )
-      .withColumn(TechnicalTableColumn.delimited,
+      .withColumn(Environment.delimitedColumnName,
         when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(Environment.historizationUpperHorizonTimestamp))
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), timestampOld)
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateExisting), existingDelimitedCol)
       )
-      .drop(col(s"existing.${TechnicalTableColumn.captured}"))
-      .drop(col(s"existing.${TechnicalTableColumn.delimited}"))
+      .drop(col(s"existing.${Environment.capturedColumnName}"))
+      .drop(col(s"existing.${Environment.delimitedColumnName}"))
     // return
     dfOperationVersioned
   }
@@ -290,11 +290,11 @@ object Historization extends SmartDataLakeLogger {
         when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(false)) // inster should not match with existing records in merge join condition
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), lit(true)) // should match with existing records in merge join condition
       )
-      .withColumn(TechnicalTableColumn.captured,
+      .withColumn(Environment.capturedColumnName,
         when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), timestampNew)
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), lit(null)) // not needed for incremental CDC merge
       )
-      .withColumn(TechnicalTableColumn.delimited,
+      .withColumn(Environment.delimitedColumnName,
         when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(Environment.historizationUpperHorizonTimestamp))
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), timestampOld)
       )
@@ -310,7 +310,7 @@ object Historization extends SmartDataLakeLogger {
    * @return initial history, identical with data from current run
    */
   def getInitialHistory(df: GenericDataFrame, referenceTimestamp: Timestamp): GenericDataFrame = {
-    logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
+    logger.debug(s"Initial history used for ${Environment.capturedColumnName}: $referenceTimestamp")
     addVersionCols(df, referenceTimestamp, Environment.historizationUpperHorizonTimestamp)
   }
 
@@ -324,7 +324,7 @@ object Historization extends SmartDataLakeLogger {
   def getInitialHistoryWithDummyCol(df: GenericDataFrame, referenceTimestamp: Timestamp): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
-    logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
+    logger.debug(s"Initial history used for ${Environment.capturedColumnName}: $referenceTimestamp")
     val df1 = df.withColumn(historizeDummyColName, lit(true))
     addVersionCols(df1, referenceTimestamp, Environment.historizationUpperHorizonTimestamp)
   }
@@ -339,7 +339,7 @@ object Historization extends SmartDataLakeLogger {
   def getInitialHistoryWithHashCol(df: GenericDataFrame, referenceTimestamp: Timestamp, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]]): GenericDataFrame = {
     val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
-    logger.debug(s"Initial history used for ${TechnicalTableColumn.captured}: $referenceTimestamp")
+    logger.debug(s"Initial history used for ${Environment.capturedColumnName}: $referenceTimestamp")
     val df1 = addHashCol(df, historizeWhitelist, historizeBlacklist, useHash = true)
     addVersionCols(df1, referenceTimestamp, Environment.historizationUpperHorizonTimestamp)
       .withColumn(historizeOperationColName, lit(HistorizationRecordOperations.insertNew))
@@ -348,8 +348,8 @@ object Historization extends SmartDataLakeLogger {
   private[smartdatalake] def addVersionCols(df: GenericDataFrame, captured: Timestamp, delimited: Timestamp): GenericDataFrame = {
     val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
-    df.withColumn(TechnicalTableColumn.captured, lit(captured))
-      .withColumn(TechnicalTableColumn.delimited, lit(delimited))
+    df.withColumn(Environment.capturedColumnName, lit(captured))
+      .withColumn(Environment.delimitedColumnName, lit(delimited))
   }
 
   private def joinCols(left: GenericDataFrame, right: GenericDataFrame, cols: Seq[String]): GenericColumn = {

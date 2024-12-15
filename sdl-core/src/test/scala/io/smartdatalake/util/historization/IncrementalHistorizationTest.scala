@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.historization
 
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -64,7 +64,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
       (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
       (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs)
     )
-    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
     if (!result) TestUtil.printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
@@ -240,7 +240,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     if (!result) TestUtil.printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
     assert(result)
 
-    assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + TechnicalTableColumn.delimited) === col("b." + TechnicalTableColumn.captured), "inner").count == 1)
+    assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + Environment.delimitedColumnName) === col("b." + Environment.capturedColumnName), "inner").count == 1)
   }
 
 }

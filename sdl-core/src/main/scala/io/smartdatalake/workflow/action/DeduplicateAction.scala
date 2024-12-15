@@ -41,8 +41,8 @@ import scala.reflect.runtime.universe.Type
  * Deduplication keeps the last record for every key, also after it has been deleted in the source.
  * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
  *
- * DeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]]. It contains the timestamp of the last occurrence of the record in the source.
- * This creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.
+ * DeduplicateAction adds an additional Column [[Environment.capturedColumnName]]. It contains the timestamp of the last occurrence of the record in the source.
+ * This creates lots of updates. Especially when using saveMode.Merge it is better to set [[Environment.capturedColumnName]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.
  *
  * DeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]]) as output with defined primary keys.
  * If output implements [[CanMergeDataFrame]], saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.
@@ -50,21 +50,21 @@ import scala.reflect.runtime.universe.Type
  * DeduplicateAction's input data must be unique across the primary key, otherwise the merge statement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same`.
  * This can be achieved through adding a DeduplicateTransformer to transformers. Note that this is not included by default in DeduplicateAction, as it is a performance intensive operation.
  *
- * @param inputId inputs DataObject
- * @param outputId output DataObject
- * @param transformer optional custom transformation to apply
- * @param transformers optional list of transformations to apply before deduplication. See [[sparktransformer]] for a list of included Transformers.
- *                     The transformations are applied according to the lists ordering.
- * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
- * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
- *                                      Keeping deleted columns in complex data types has performance impact as all new data
- *                                      in the future has to be converted by a complex function.
- * @param updateCapturedColumnOnlyWhenChanged Set to true to enable update Column [[TechnicalTableColumn.captured]] only if Record has changed in the source, instead of updating it with every execution (default=false).
+ * @param inputId                             inputs DataObject
+ * @param outputId                            output DataObject
+ * @param transformer                         optional custom transformation to apply
+ * @param transformers                        optional list of transformations to apply before deduplication. See [[sparktransformer]] for a list of included Transformers.
+ *                                            The transformations are applied according to the lists ordering.
+ * @param ignoreOldDeletedColumns             if true, remove no longer existing columns in Schema Evolution
+ * @param ignoreOldDeletedNestedColumns       if true, remove no longer existing columns from nested data types in Schema Evolution.
+ *                                            Keeping deleted columns in complex data types has performance impact as all new data
+ *                                            in the future has to be converted by a complex function.
+ * @param updateCapturedColumnOnlyWhenChanged Set to true to enable update Column [[Environment.capturedColumnName]] only if Record has changed in the source, instead of updating it with every execution (default=false).
  *                                            This results in much less records updated with saveMode.Merge.
- * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance. Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
- * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
- *                                Specify a condition to select existing data to be used in transformation as Spark SQL expression.
- *                                Use table alias 'existing' to reference columns of the existing table data.
+ * @param mergeModeEnable                     Set to true to use saveMode.Merge for much better performance. Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
+ * @param mergeModeAdditionalJoinPredicate    To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
+ *                                            Specify a condition to select existing data to be used in transformation as Spark SQL expression.
+ *                                            Use table alias 'existing' to reference columns of the existing table data.
  */
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
@@ -229,7 +229,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
   def deduplicate(baseDf: GenericDataFrame, newDf: GenericDataFrame, keyColumns: Seq[String]): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(baseDf.subFeedType)
     baseDf.unionByName(newDf)
-      .withColumn(rnkColName, functions.window(() => functions.row_number, partitionBy = keyColumns.map(functions.col), orderBy = functions.col(TechnicalTableColumn.captured).desc))
+      .withColumn(rnkColName, functions.window(() => functions.row_number, partitionBy = keyColumns.map(functions.col), orderBy = functions.col(Environment.capturedColumnName).desc))
       .where(functions.col(rnkColName) === functions.lit(1))
       .drop(rnkColName)
   }
@@ -239,7 +239,7 @@ object DeduplicateAction extends FromConfigFactory[Action] {
    */
   def enhanceDataFrame(df: GenericDataFrame, refTimestamp: Timestamp): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
-    df.withColumn(TechnicalTableColumn.captured, functions.lit(refTimestamp))
+    df.withColumn(Environment.capturedColumnName, functions.lit(refTimestamp))
   }
 
   private val rnkColName = "__rnk"

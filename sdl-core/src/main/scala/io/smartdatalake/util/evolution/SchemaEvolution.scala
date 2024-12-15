@@ -106,7 +106,7 @@ object SchemaEvolution extends SmartDataLakeLogger {
    *
    * @param oldDf [[DataFrame]] with old data
    * @param newDf [[DataFrame]] with new data with potential changes in schema
-   * @param colsToIgnore technical columns to be ignored in oldDf (e.g TechnicalTableColumn.captured and TechnicalTableColumn.delimited for historization)
+   * @param colsToIgnore technical columns to be ignored in oldDf (e.g Environment.capturedColumnName and Environment.delimitedColumnName for historization)
    * @param ignoreOldDeletedColumns if true, remove no longer existing columns in result DataFrame's
    * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns in result DataFrame's. Keeping deleted
    *                                      columns in complex data types has performance impact as all new data in the future

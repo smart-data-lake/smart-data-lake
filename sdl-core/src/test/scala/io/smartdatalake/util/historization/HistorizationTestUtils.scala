@@ -19,7 +19,7 @@
 
 package io.smartdatalake.util.historization
 
-import io.smartdatalake.definitions.{Environment, TechnicalTableColumn}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import org.apache.spark.sql.{Encoder, SparkSession}
@@ -65,30 +65,30 @@ object HistorizationTestUtils {
     var dfHist = phase match {
       case HistorizationPhase.Existing =>
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(erfasstTimestampOldHistTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(ersetztTimestampOldHistTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldHistTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(ersetztTimestampOldHistTs))
       case HistorizationPhase.UpdatedOld =>
         operation = Some(HistorizationRecordOperations.updateClose)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(erfasstTimestampOldHistTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(referenceTimestampOldTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldHistTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(referenceTimestampOldTs))
       case HistorizationPhase.UpdatedNew =>
         operation = Some(HistorizationRecordOperations.insertNew)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(referenceTimestampNew))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(doomsdayTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(referenceTimestampNew))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(doomsdayTs))
       case HistorizationPhase.NewlyAdded =>
         operation = Some(HistorizationRecordOperations.insertNew)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(referenceTimestampNewTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(doomsdayTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(referenceTimestampNewTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(doomsdayTs))
       case HistorizationPhase.TechnicallyDeleted =>
         operation = Some(HistorizationRecordOperations.updateClose)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(erfasstTimestampOldDeletedHistTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(ersetztTimestampOldDeletedHistTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldDeletedHistTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(ersetztTimestampOldDeletedHistTs))
     }
-    if (withHashCol) dfHist = Historization.addHashCol(dfHist, None, None, useHash = true, colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+    if (withHashCol) dfHist = Historization.addHashCol(dfHist, None, None, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
     if (withOperation) dfHist = dfHist.withColumn(Historization.historizeOperationColName, operation.map(lit).getOrElse(lit(null)))
     dfHist
   }

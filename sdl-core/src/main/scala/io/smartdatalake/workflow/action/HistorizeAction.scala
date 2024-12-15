@@ -146,24 +146,24 @@ case class HistorizeAction(
     _saveModeOptions = if (mergeModeEnable && mergeModeDeletedRecordsConditionExpr.isDefined) {
       // customize update/insert condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = Seq(TechnicalTableColumn.delimited)
+      val updateCols = Seq(Environment.delimitedColumnName)
       val insertCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
       val insertColsToIgnore = Seq(Historization.historizeOperationColName, mergeModeCDCColumn.get)
       val insertValuesOverride = Map(Historization.historizeDummyColName -> "true")
       val sqlReferenceTimestamp = Timestamp.valueOf(getReferenceTimestamp)
-      val additionalMergePredicate = Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND timestamp'$sqlReferenceTimestamp' between existing.${TechnicalTableColumn.captured} AND existing.${TechnicalTableColumn.delimited}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      //val additionalMergePredicate = Some((s"timestamp'$sqlReferenceTimestamp' between existing.${TechnicalTableColumn.captured} AND existing.${TechnicalTableColumn.delimited}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " AND " + _))
+      val additionalMergePredicate = Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName} AND existing.${Environment.delimitedColumnName}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
+      //val additionalMergePredicate = Some((s"timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName} AND existing.${Environment.delimitedColumnName}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " AND " + _))
       Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, insertValuesOverride = insertValuesOverride, additionalMergePredicate = additionalMergePredicate))
 
     } else if (mergeModeEnable) {
       // customize update condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = if (output.isTableExisting && output.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(TechnicalTableColumn.delimited)
-      else Seq(TechnicalTableColumn.delimited, Historization.historizeHashColName)
+      val updateCols = if (output.isTableExisting && output.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(Environment.delimitedColumnName)
+      else Seq(Environment.delimitedColumnName, Historization.historizeHashColName)
       val updateExistingCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateExisting}'")
       val insertCondition =  Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
       val insertColsToIgnore = Seq(Historization.historizeOperationColName)
-      val additionalMergePredicate = Some((s"new.${TechnicalTableColumn.captured} = existing.${TechnicalTableColumn.captured}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
+      val additionalMergePredicate = Some((s"new.${Environment.capturedColumnName} = existing.${Environment.capturedColumnName}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
       Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, updateExistingCondition = updateExistingCondition, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
     } else {
       // force SDLSaveMode.Overwrite otherwise
@@ -270,11 +270,11 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), TechnicalTableColumn.captured)
+      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), Environment.capturedColumnName)
       // apply schema evolution
       val (modifiedExistingDf, modifiedNewFeedDf) = SchemaEvolution.process(existingDf.get, newFeedDf,
         ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns,
-        colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited)
+        colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName)
       )
       // filter existing data to be excluded from historize operation
       val (filteredExistingDf, filteredExistingRemainingDf) =
@@ -302,7 +302,7 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
+      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, Environment.capturedColumnName)
       // historize
 
       val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
@@ -317,7 +317,7 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
+      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, Environment.capturedColumnName)
       // historize
       // note that schema evolution is done by output DataObject
       Historization.incrementalCDCHistorize(newDf, mergeModeDeletedRecordsConditionExpr, refTimestamp, timeAxisUnitOpt)
