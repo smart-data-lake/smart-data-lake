@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 
 import java.sql.Timestamp
+import java.time.Duration
 
 /**
  * Functions for historization
@@ -36,10 +37,6 @@ object Historization extends SmartDataLakeLogger {
   private[smartdatalake] val historizeOperationColName = "dl_operation" // incrementalHistorize needs operation col for merge statement. It is temporary and is not added to target schema.
   private[smartdatalake] val historizeDummyColName = "dl_dummy" // incrementalCDCHistorize needs a dummy col for avoiding deduplication in merge statements join condition.
 
-  // "Tick" offset used to delimit timestamps of old and new values
-  val offsetNs = 1000000L
-
-
   /**
    * Historizes data by merging the current load with the existing history
    *
@@ -48,12 +45,15 @@ object Historization extends SmartDataLakeLogger {
    * @param dfHistory exsisting history of data
    * @param dfNew current load of feed
    * @param primaryKeyColumns Primary keys to join history with current load
+   * @param referenceTimestamp The valid from timestamp for new records
+   * @param timeAxisUnit Time between ticks on the timestamp. Used to create valid to timestamp for existing/old records.
+   * Set to empta to create a history with half-open intervals (e.g. valid to timestamp is exclusive)
    * @param historizeBlacklist optional list of columns to ignore when comparing two records. Can not be used together with historizeWhitelist.
    * @param historizeWhitelist optional final list of columns to use when comparing two records. Can not be used together with historizeBlacklist.
    * @return current feed merged with history
   */
   def fullHistorize(dfHistory: GenericDataFrame, dfNew: GenericDataFrame, primaryKeyColumns: Seq[String],
-                    referenceTimestamp: Timestamp,
+                    referenceTimestamp: Timestamp, timeAxisUnit: Option[Duration],
                     historizeWhitelist: Option[Seq[String]],
                     historizeBlacklist: Option[Seq[String]]
                    ): GenericDataFrame = {
@@ -71,9 +71,8 @@ object Historization extends SmartDataLakeLogger {
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)
 
-    // Shortly before the current timestamp ("Tick") used for existing, old records
-    // TODO: open/closed should be made configurable!
-    val timestampOld = lit(Timestamp.from(referenceTimestamp.toInstant.minusNanos(offsetNs)))
+    // Previous entry on time axis before the reference timestamp ("Tick"). This is used to delimit existing old records.
+    val timestampOld = lit(timeAxisUnit.map(getPreviousTimeAxisEntry(referenceTimestamp, _)).getOrElse(referenceTimestamp))
 
     // make sure history schema is equal to new feed schema
     val colsToIgnore = Seq(lastUpdateCol, expiryDateCol, "dl_dt")
@@ -172,11 +171,15 @@ object Historization extends SmartDataLakeLogger {
    *
    *  Note that the use of hashColumn to detect changed records will create new version for every record on schema evolution.
    *  This behaviour is different from fullHistorize.
+   *
+   * @param referenceTimestamp The valid from timestamp for new records
+   * @param timeAxisUnit       Time between ticks on the timestamp. Used to create valid to timestamp for existing/old records.
+   *                           Set to empty to create a history with half-open intervals (e.g. valid to timestamp is exclusive)
    */
   def incrementalHistorize(dfExisting: GenericDataFrame,
                            dfNew: GenericDataFrame,
                            primaryKey: Seq[String],
-                           referenceTimestamp: Timestamp,
+                           referenceTimestamp: Timestamp, timeAxisUnit: Option[Duration],
                            historizeWhitelist: Option[Seq[String]],
                            historizeBlacklist: Option[Seq[String]],
                            addExistingDfHashColumn: Boolean): GenericDataFrame = {
@@ -185,9 +188,8 @@ object Historization extends SmartDataLakeLogger {
 
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)
-    // Shortly before the current timestamp ("Tick") used for existing, old records
-    // TODO: open/closed should be made configurable!
-    val timestampOld = lit(Timestamp.from(referenceTimestamp.toInstant.minusNanos(offsetNs)))
+    // Previous entry on time axis before the reference timestamp ("Tick"). This is used to delimit existing old records.
+    val timestampOld = lit(timeAxisUnit.map(getPreviousTimeAxisEntry(referenceTimestamp, _)).getOrElse(referenceTimestamp))
     // prepare columns
     val existingCapturedCol = col(s"existing.${TechnicalTableColumn.captured}")
     val existingDelimitedCol = col(s"existing.${TechnicalTableColumn.delimited}")
@@ -256,19 +258,22 @@ object Historization extends SmartDataLakeLogger {
    * Compared with incrementalHistorize the following performance optimizations are implemented:
    *  - current existing data is not read
    *  - no hash column is needed as we know from the CDC event that something has changed
+   *
+   * @param referenceTimestamp The valid from timestamp for new records
+   * @param timeAxisUnit       Time between ticks on the timestamp. Used to create valid to timestamp for existing/old records.
+   *                           Set to empty to create a history with half-open intervals (e.g. valid to timestamp is exclusive)
    */
   def incrementalCDCHistorize(dfNew: GenericDataFrame,
                               deletedRecordsCondition: GenericColumn,
-                              referenceTimestamp: Timestamp
+                              referenceTimestamp: Timestamp, timeAxisUnit: Option[Duration],
                              ): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfNew.subFeedType)
     import functions._
 
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)
-    // Shortly before the current timestamp ("Tick") used for existing, old records
-    // TODO: open/closed should be made configurable!
-    val timestampOld = lit(Timestamp.from(referenceTimestamp.toInstant.minusNanos(offsetNs)))
+    // Previous entry on time axis before the reference timestamp ("Tick"). This is used to delimit existing old records.
+    val timestampOld = lit(timeAxisUnit.map(getPreviousTimeAxisEntry(referenceTimestamp, _)).getOrElse(referenceTimestamp))
     // join existing with new and determine operations needed
     val dfOperations = dfNew
       .withColumn("_operations",
@@ -382,6 +387,8 @@ object Historization extends SmartDataLakeLogger {
     val colsToCompare = getCompareColumns(df.columns.diff(colsToIgnore), historizeWhitelist, historizeBlacklist)
     df.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare, useHash))
   }
+
+  private def getPreviousTimeAxisEntry(ts: Timestamp, unit: Duration) = Timestamp.from(ts.toInstant.minus(unit))
 }
 
 object HistorizationRecordOperations {

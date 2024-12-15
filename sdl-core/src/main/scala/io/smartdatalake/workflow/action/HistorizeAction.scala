@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanMergeDataFra
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataObjectState, SubFeed}
 
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 import scala.reflect.runtime.universe.Type
 import scala.util.{Failure, Success, Try}
 
@@ -41,6 +41,10 @@ import scala.util.{Failure, Success, Try}
  * This [[Action]] historizes data between an input and output DataObject using DataFrames.
  * Historization creates a technical history of data by creating valid-from/to columns.
  * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
+ *
+ * By default the a history with closed intervals is created, e.g. valid-from and valid-to is inclusive.
+ * The time axis unit can be set by configuration attribute `timeAxisUnit`. It is used as the offset between valid-to of the previous record and valid-from of the current record.
+ * A history with half-open intervals can be created by setting timeAxisUnit=0. In a half-open interval valid-from is inclusive and valid-to is exclusive.
  *
  * HistorizeAction needs a transactional table (e.g. implementation of [[TransactionalTableDataObject]]) as output with defined primary keys.
  *
@@ -82,6 +86,10 @@ import scala.util.{Failure, Success, Try}
  *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
  *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode is no longer needed.
  * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
+ * @param timeAxisUnit             Time between ticks on the time axis. Used to create valid to timestamp for existing/old records.
+ *                                 Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is exclusive).
+ *                                 Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d.
+ *                                 Default is 1ms.
  */
 case class HistorizeAction(
                             override val id: ActionId,
@@ -99,6 +107,7 @@ case class HistorizeAction(
                             mergeModeAdditionalJoinPredicate: Option[String] = None,
                             mergeModeCDCColumn: Option[String] = None,
                             mergeModeCDCDeletedValue: Option[String] = None,
+                            timeAxisUnit: Duration = Duration.ofMillis(1),
                             override val breakDataFrameLineage: Boolean = false,
                             override val persist: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
@@ -178,6 +187,11 @@ case class HistorizeAction(
   private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
 
   override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // historize transformer can be ignored as it is generic
+
+  private val timeAxisUnitOpt = {
+    assert(!timeAxisUnit.isNegative, s"($id) timeAxisUnit must be 0 or a positive duration, but is $timeAxisUnit")
+    Some(timeAxisUnit).filter(!_.isZero)
+  }
 
   validateConfig()
 
@@ -269,7 +283,7 @@ case class HistorizeAction(
           case None => (modifiedExistingDf, None)
         }
       // historize
-      val historizedDf = Historization.fullHistorize(filteredExistingDf, modifiedNewFeedDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist)
+      val historizedDf = Historization.fullHistorize(filteredExistingDf, modifiedNewFeedDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist)
       // union with filter remaining df and return
       if (filteredExistingRemainingDf.isDefined) historizedDf.unionByName(filteredExistingRemainingDf.get)
       else historizedDf
@@ -293,7 +307,7 @@ case class HistorizeAction(
 
       val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
       // note that schema evolution is done by output DataObject
-      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
+      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
     } else Historization.getInitialHistoryWithHashCol(newFeedDf, refTimestamp, historizeWhitelist, historizeBlacklist)
   }
 
@@ -306,7 +320,7 @@ case class HistorizeAction(
       if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, TechnicalTableColumn.captured)
       // historize
       // note that schema evolution is done by output DataObject
-      Historization.incrementalCDCHistorize(newDf, mergeModeDeletedRecordsConditionExpr, refTimestamp)
+      Historization.incrementalCDCHistorize(newDf, mergeModeDeletedRecordsConditionExpr, refTimestamp, timeAxisUnitOpt)
     } else Historization.getInitialHistoryWithDummyCol(newDf, refTimestamp)
   }
 

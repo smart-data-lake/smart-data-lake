@@ -31,6 +31,8 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
+import java.time.Duration
+
 /**
  * Unit tests for historization
  *
@@ -56,7 +58,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val (oldEvolvedDf, newEvolvedDf) = SchemaEvolution.process(dfOldHist, dfNewFeed,
       colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
 
-    val dfHistorized = Historization.fullHistorize(oldEvolvedDf, newEvolvedDf, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(oldEvolvedDf, newEvolvedDf, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     //ID 123 has new value and so old record is closed with newcol1=null
@@ -90,7 +92,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeedWithDeletedCols = dfNewFeed.drop("health_state")
     logger.debug(s"New feed:\n${dfNewFeedWithDeletedCols.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeedWithDeletedCols, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeedWithDeletedCols, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUpdatedOld = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
@@ -110,7 +112,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUnchanged = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
@@ -133,7 +135,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeed = toDataDf(baseColumnsNewFeed).select(Seq(col("age"), col("health_state"), col("id"), col("name")))
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUnchanged = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
@@ -156,7 +158,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUpdatedOld = List((123, "Egon", 23, "healthy"))
@@ -184,7 +186,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUpdatedOld = List((123, "Egon", 23, "healthy"))
@@ -210,7 +212,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUnchanged = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
@@ -240,7 +242,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUnchangedExistingHist = List((123, "Egon", 23, "healthy"))
@@ -274,7 +276,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val existingData = Seq(Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHistTs, doomsdayTs)))
     val newData = Seq(Row.fromSeq(Seq(1, "value", null)))
     val expectedResult = Seq(
-      Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHistTs, referenceTimestampOldTs)),
+      Row.fromSeq(Seq(1, null, "value", erfasstTimestampOldHistTs, getReferenceTimestampOldTs())),
       Row.fromSeq(Seq(1, "value", null, referenceTimestampNewTs, doomsdayTs))
     )
 
@@ -282,7 +284,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = SparkDataFrame(session.createDataFrame(session.sparkContext.parallelize(expectedResult), StructType(schemaHistory)))
     val dfNew = SparkDataFrame(session.createDataFrame(session.sparkContext.parallelize(newData), StructType(schemaValues)))
 
-    val dfHistorized = Historization.fullHistorize(dfHistory, dfNew, Seq("id"), referenceTimestampNewTs, None, None)
+    val dfHistorized = Historization.fullHistorize(dfHistory, dfNew, Seq("id"), referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
 
     val result = dfExpected.isEqual(dfHistorized)
     if (!result) TestUtil.printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
@@ -306,6 +308,41 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, "value", null))) // switched field content
     assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value", "test"))) // additional field
     assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value", null))) // additional null field
+  }
+
+  test("When timeAxisUnit=0, history with half-open intervals should be created") {
+    val timeAxisUnitNone: Option[Duration] = None
+
+    val baseColumnsOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
+    val dfOldHist = toHistorizedDf(baseColumnsOldHist, HistorizationPhase.Existing)
+    logger.debug(s"History at beginning:\n${dfOldHist.showString()}")
+
+    val baseColumnsNewFeed = List((123, "Egon", 23, "sick"), (124, "Erna", 27, "healthy"))
+    val dfNewFeed = toDataDf(baseColumnsNewFeed)
+    logger.debug(s"New feed:\n${dfNewFeed.showString()}")
+
+    val dfHistorized = Historization.fullHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, timeAxisUnitNone, None, None)
+      .cache
+    logger.debug(s"Historization result:\n${dfHistorized.showString()}")
+
+    val baseColumnsUpdatedOld = List((123, "Egon", 23, "healthy"))
+    val dfUpdatedOld = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld, timeUnitAxis = timeAxisUnitNone)
+
+    val baseColumnsUpdatedNew = List((123, "Egon", 23, "sick"))
+    val dfUpdatedNew = toHistorizedDf(baseColumnsUpdatedNew, HistorizationPhase.UpdatedNew, timeUnitAxis = timeAxisUnitNone)
+
+    val baseColumnsUnchanged = List((124, "Erna", 27, "healthy"))
+    val dfUnchanged = toHistorizedDf(baseColumnsUnchanged, HistorizationPhase.Existing, timeUnitAxis = timeAxisUnitNone)
+
+    val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld).unionByName(dfUnchanged)
+      .cache
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) TestUtil.printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
+    assert(result)
+
+    println(dfHistorized.showString(Map("truncate" -> "100")))
+    assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + TechnicalTableColumn.delimited) === col("b." + TechnicalTableColumn.captured), "inner").count == 1)
   }
 
 }

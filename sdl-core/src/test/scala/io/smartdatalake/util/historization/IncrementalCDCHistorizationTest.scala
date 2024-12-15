@@ -45,12 +45,12 @@ class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with 
     val dataNewFeed = List((123, "Egon", 23, "healthy", "new"))
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "operation")
 
-    val dfHistorized = Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs)
+    val dfHistorized = Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
       .drop("operation")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val dataExpected = Seq(
-      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, referenceTimestampOldTs),
+      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs()),
       (123, "Egon", 23, "healthy", false, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs),
     )
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
@@ -64,12 +64,12 @@ class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with 
     val dataNewFeed = List((123, "Egon", 23, "healthy", "deleted"))
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "operation")
 
-    val dfHistorized = Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs)
+    val dfHistorized = Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
       .drop("operation")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val dataExpected = Seq(
-      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, referenceTimestampOldTs),
+      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs()),
     )
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
       .withColumn(TechnicalTableColumn.captured, col(TechnicalTableColumn.captured).cast(SparkSimpleDataType(TimestampType)))
