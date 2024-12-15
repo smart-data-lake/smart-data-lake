@@ -20,9 +20,10 @@
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
- import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.Historization
+import io.smartdatalake.util.historization.HistorizationTestUtils.defaultTimeAxisUnit
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -60,7 +61,6 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val context = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val feed = "historize"
     val srcTable = Table(Some("default"), "historize_input")
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable(context)
@@ -108,7 +108,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
 
     {
       val expected = Seq(
-        ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+        ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
@@ -132,8 +132,8 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
 
     {
       val expected = Seq(
-        ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-        ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
+        ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minus(defaultTimeAxisUnit.get))),
         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
@@ -154,7 +154,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val tgtDO = TickTockHiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(tgtDO)
 
-    // prepare & start 1st load
+    // check primary key missing
     intercept[IllegalArgumentException]{HistorizeAction("hist1", srcDO.id, tgtDO.id)}
   }
 }

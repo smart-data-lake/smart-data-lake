@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame
 import org.apache.spark.sql.{Encoder, SparkSession}
 
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.{Duration, LocalDateTime}
 
 object HistorizationTestUtils {
 
@@ -37,6 +37,8 @@ object HistorizationTestUtils {
     val NewlyAdded: HistorizationPhase = Value
     val TechnicallyDeleted: HistorizationPhase = Value
   }
+
+  private[smartdatalake] val defaultTimeAxisUnit = Some(Duration.ofMillis(1))
 
   private[historization] val doomsday = Environment.historizationUpperHorizonTimestamp.toLocalDateTime
   private[historization] val doomsdayTs = Environment.historizationUpperHorizonTimestamp
@@ -52,13 +54,13 @@ object HistorizationTestUtils {
   private[historization] val primaryKeyColumns = Array("id", "name")
   private[historization] val referenceTimestampNew = LocalDateTime.now
   private[historization] val referenceTimestampNewTs = Timestamp.valueOf(referenceTimestampNew)
-  private[historization] val offsetNs = 1000000L
-  private[historization] val referenceTimestampOld = referenceTimestampNew.minusNanos(offsetNs)
-  private[historization] val referenceTimestampOldTs = Timestamp.valueOf(referenceTimestampOld)
 
-  def toHistorizedDf[T <: Product : Encoder](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false)
+  private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit) = Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
+
+  def toHistorizedDf[T <: Product : Encoder](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false, timeUnitAxis: Option[Duration] = defaultTimeAxisUnit)
                                             (implicit session: SparkSession, functions: DataFrameFunctions): GenericDataFrame = {
     import functions._
+    val referenceTimestampOldTs = getReferenceTimestampOldTs(timeUnitAxis)
     var operation: Option[String] = None
     var dfHist = phase match {
       case HistorizationPhase.Existing =>

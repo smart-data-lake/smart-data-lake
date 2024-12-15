@@ -41,6 +41,7 @@ case class TestDataObject( id: DataObjectId,
                            arg1: String,
                            args: Seq[String],
                            connectionId: Option[ConnectionId] = None,
+                           primaryKey: Option[Seq[String]] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with TransactionalTableDataObject with CanReceiveScriptNotification {
@@ -52,7 +53,7 @@ case class TestDataObject( id: DataObjectId,
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = Map()
 
-  override var table: Table = Table(db=Some("testdb"), name="testtable")
+  override var table: Table = Table(db = Some("testdb"), name = "testtable", primaryKey = primaryKey)
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = true
 
