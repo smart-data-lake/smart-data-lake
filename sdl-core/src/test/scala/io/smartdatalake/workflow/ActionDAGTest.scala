@@ -1368,6 +1368,15 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())
   }
 
+  test("dataFrameReuseStatistics shared between ActionPipelineContext when cloning") {
+    val context1 = TestUtil.getDefaultActionPipelineContext
+    context1.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1"))
+    val context2 = context1.copy(phase = ExecutionPhase.Init)
+    assert(context2.dataFrameReuseStatistics.apply(("test", Seq())).size == 1)
+    context2.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1", "action2"))
+    assert(context1.dataFrameReuseStatistics.apply(("test", Seq())).size == 2)
+  }
+
 }
 
 class TestActionDagTransformer extends CustomDfsTransformer {
