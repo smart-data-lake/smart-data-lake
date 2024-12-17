@@ -123,6 +123,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
 
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+  }
+
   // Get a Spark DataFrame with the table contents for Spark transformations
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> table.fullName))

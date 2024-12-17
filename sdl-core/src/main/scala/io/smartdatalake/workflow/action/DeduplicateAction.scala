@@ -24,7 +24,6 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
@@ -179,10 +178,10 @@ case class DeduplicateAction(override val id: ActionId,
 
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     checkRecordChangedColumns = inputSubFeed.dataFrame
-      .map(df => SchemaUtil.prepareSchemaForDiff(df.schema.fields, ignoreNullable = false, caseSensitive = Environment.caseSensitive).map(_.name))
+      .map(_.columns.map(c => if (!Environment.caseSensitive) c.toLowerCase else c))
       .getOrElse(Seq())
     if (output.isTableExisting && mergeModeEnable && updateCapturedColumnOnlyWhenChanged) {
-      outputCols = SchemaUtil.prepareSchemaForDiff(output.getDataFrame(Seq(), outputSubFeed.tpe).schema.fields, ignoreNullable = false, caseSensitive = Environment.caseSensitive).map(_.name).toSet
+      outputCols = output.getDataFrame(Seq(), outputSubFeed.tpe).columns.map(c => if (!Environment.caseSensitive) c.toLowerCase else c).toSet
     }
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }

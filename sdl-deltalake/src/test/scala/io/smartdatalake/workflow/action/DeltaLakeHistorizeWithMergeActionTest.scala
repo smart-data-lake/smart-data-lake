@@ -232,6 +232,8 @@ import java.time.LocalDateTime
      val tgtTable = Table(Some(deltaDb), "historize_output", primaryKey = Some(Seq("id")))
      val tgtPath = tempPath + s"/${tgtTable.fullName}"
      val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tgtPath), table = tgtTable, allowSchemaEvolution = true)
+     val context = TestUtil.getDefaultActionPipelineContext
+     tgtDO.dropTable(context)
      instanceRegistry.register(tgtDO)
 
      // prepare & start 1st load

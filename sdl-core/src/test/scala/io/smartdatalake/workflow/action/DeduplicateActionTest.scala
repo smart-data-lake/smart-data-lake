@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.generic.transformer.FilterTransformer
+import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -193,6 +193,59 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     )))
 
     assertDataFramesEqualGeneric(dfExpected, dfResult2)
+  }
+
+  test("deduplicate 1st 2nd load with transformer changing schema") {
+
+    // setup DataObjects
+    val srcTable = Table(Some("default"), "deduplicate_input")
+    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)
+    tgtDO.dropTable
+    instanceRegistry.register(tgtDO)
+
+    // prepare & start 1st load
+    val refTimestamp1 = LocalDateTime.now()
+    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id,
+      transformers = Seq(SQLDfTransformer(code = "select lastname, firstname, rating as Rating from %{inputViewName}"))
+    )
+    val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())(context1)
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
+    assert(tgtSubFeed.dataObjectId == tgtDO.id)
+
+    {
+      val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
+        .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
+      val actual = tgtDO.getSparkDataFrame().cache()
+      actual.show
+      val resultat = expected.isEqual(actual)
+      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      assert(resultat)
+    }
+
+    // prepare & start 2nd load
+    val refTimestamp2 = LocalDateTime.now()
+    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l2, Seq())(context1)
+    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
+
+    {
+      // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
+      val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
+        .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
+      val actual = tgtDO.getSparkDataFrame().cache()
+      actual.show
+      val resultat = expected.isEqual(actual)
+      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      assert(resultat)
+    }
   }
 
 }

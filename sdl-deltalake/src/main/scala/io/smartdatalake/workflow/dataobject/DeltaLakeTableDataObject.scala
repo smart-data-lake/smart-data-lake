@@ -206,6 +206,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -276,8 +277,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-
+    validateSchemaHasPrimaryKeyCols(df, "write")
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -302,7 +302,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 

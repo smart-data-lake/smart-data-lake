@@ -167,6 +167,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       val missingPartitionColumns = partitions.toSet.diff(getExistingSchema.get.fieldNames.toSet)
       assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
+
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -235,7 +237,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val genericDf = SparkDataFrame(df)
     validateSchemaMin(genericDf.schema, "write")
     validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(df, "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     if (isTableExisting) {
       if (allowSchemaEvolution) evolveTableSchema(saveModeTargetDf.schema)
@@ -302,7 +304,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val targetSchema = targetDf.schema
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
     if (!allowSchemaEvolution) validateSchemaOnWrite(targetDf)
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)

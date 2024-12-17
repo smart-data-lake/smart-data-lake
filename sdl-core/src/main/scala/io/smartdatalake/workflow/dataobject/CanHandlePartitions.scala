@@ -119,19 +119,6 @@ trait CanHandlePartitions { this: DataObject =>
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
   }
 
-  /**
-   * Validate the schema of a given Spark Data Frame `df` that it contains the specified primary key columns
-   *
-   * @param df The data frame to validate.
-   * @param role role used in exception message. Set to read or write.
-   * @throws SchemaViolationException if the partitions columns are not included.
-   */
-  def validateSchemaHasPrimaryKeyCols(df: DataFrame, primaryKeyCols: Seq[String], role: String): Unit = {
-    val missingCols = if (Environment.caseSensitive) primaryKeyCols.diff(df.columns)
-    else primaryKeyCols.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
-    if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing primary key cols ${missingCols.mkString(", ")} on $role")
-  }
-
   private[smartdatalake] def getPartitionStats(implicit context: ActionPipelineContext): Map[String,Any] = {
     if (partitions.nonEmpty) {
       val partitionValues = PartitionValues.sort(partitions, listPartitions)
