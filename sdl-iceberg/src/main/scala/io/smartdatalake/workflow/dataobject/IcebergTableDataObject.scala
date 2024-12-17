@@ -239,6 +239,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) Dropped existing Iceberg table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -331,7 +332,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
     if (isTableExisting) {
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), existingSchema, "write")
@@ -360,7 +361,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
