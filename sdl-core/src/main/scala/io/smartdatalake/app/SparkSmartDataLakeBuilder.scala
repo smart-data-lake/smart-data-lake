@@ -59,8 +59,11 @@ object SparkSmartDataLakeBuilder extends SmartDataLakeBuilder {
         require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null, "Env variable HADOOP_HOME needs to be set in local mode in Windows!")
         require(!config.master.contains("yarn") || System.getenv("SPARK_HOME") != null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!")
 
+        // set master default value
+        val updatedConfig = config.copy(master = config.master.orElse(Some("local[*]")))
+
         // run
-        val stats = run(config)
+        val stats = run(updatedConfig)
         logStats(stats)
 
       case None =>
