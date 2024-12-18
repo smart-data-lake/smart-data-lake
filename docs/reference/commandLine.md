@@ -54,17 +54,23 @@ Usage:  [options]
 ```
 
 The **DefaultSmartDataLakeBuilder** class should be fine in most situations. 
-If a Spark Session needs to be created, it will use the default for Spark master, e.g. `local[*]`.
+It tries to use an existing Spark session of the environment, e.g. Databricks Cluster. It will not create a new Spark session. See SparkSmartDataLakeBuilder below to create a new Spark session.
 
 There are two additional, adapted application versions you can use:
 
-- **SparkSmartDataLakeBuilder**:
+- **SparkSmartDataLakeBuilder** is used to create a new Spark session.
 Allows to explicitly override master and deploy-mode settings of Spark using the command-line.
-This entrypoint should be used when there is no existing Spark-Settings on the environment where SDLB is running, and you want to customize the Spark default settings for `master=local[*]` and `deploy-mode=client`.
+It should be used when there is no existing Spark session from the environment where SDLB is running, and you want to create a new Spark session, e. g. when working locally on your laptop or in an isolated container.
+
+SparkSmartDataLakeBuilder has the following additional arguments:
+- `--master <spark-master-url>`: configuration of the Spark sessions master Url, default is `local[*]`
+- `--deploy-mode <client|cluster>`: configuration of the Spark sessions deploy-mode. The default used by Spark is `client`.
+
+See [Submitting Spark Applications](https://spark.apache.org/docs/3.5.3/submitting-applications.html) for details.
 
 - **GlueSmartDataLakeBuilder**:
 For running SDLB on AWS Glue.
-Background: Glue passes many additional job parameters (command line arguments) down to the application. GlueSmartDataLakeBuilder removes the Glue specific ones, in order to allow proper validation by SDLB afterwards..
+Background: Glue passes many additional job parameters (command line arguments) down to the application. GlueSmartDataLakeBuilder removes the Glue specific ones, in order to allow proper command line validation by SDLB afterwards..
 
 # Launching SDL container
 Depending on the container definition, especially the entrypoint the arguments may vary. Furthermore, we distinguish starting the container using *docker* or *podman*. 
