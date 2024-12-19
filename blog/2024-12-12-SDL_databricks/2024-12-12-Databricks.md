@@ -20,7 +20,7 @@ In this article, we describe the seamless integration of Smart Data Lake Builder
 - Use code completion to browse through Actions and DataObjects
 - Execute individual Actions from a Notebook Cell
 
-We will use our [getting-started guide](../docs/getting-started/setup) as an example data pipeline. This will download data about airports and plane departures and do some calculations.
+We will use our [getting-started guide](../../docs/getting-started/setup) as an example data pipeline. This will download data about airports and plane departures and do some calculations.
 Feel free to check out our guide for a step-by-step walkthrough on what it does.
 
 Before jumping in, it should be mentioned that there are also many other methods to deploy SDLB in the cloud, e.g. using containers on Azure, Azure Kubernetes Service, Azure Synapse Clusters, Google Dataproc...
@@ -79,7 +79,7 @@ and select `getting-started-with-dependencies.jar` in the `getting-started` volu
 - When finished, all cells in the noebook will be working.
 
 7. **Results**
-- You can observe the available DataObjects and Actions using our [UI Demo](https://ui-demo.smartdatalake.ch/#/config). Feel free to checkout out [our blog post](../blog/sdl-uidemo) for more information on the UI.
+- You can observe the available DataObjects and Actions using our [UI Demo](https://ui-demo.smartdatalake.ch/#/config). Feel free to checkout out [our blog post](../sdl-uidemo) for more information on the UI.
 - Feel free to browse through the DataObjects and Actions as illustrated in the Notebook. From now on, it's enough to execute the current cell to get immediate feedback. All the necessary setup steps only need to be done when the cluster is started.
 - If you want to use code completion, start typing something and hit CTRL + SPACE:
  ![img.png](code_completion.png)
