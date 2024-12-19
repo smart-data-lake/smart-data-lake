@@ -44,15 +44,15 @@ Note that only the major and minor versions must match, patch versions can diffe
     ```
 3. **Catalog Setup**
       - Setup the Catalog were we will store our data. For this, go to the `Catalog` menu and create a new catalog called `my_catalog`.
- You can pick catalog, schema and volume names to your liking but just make sure that they are in sync with the contents of [https://github.com/smart-data-lake/getting-started/blob/feature/databricks-blog/envConfig/databricks.conf.template#L7](https://github.com/smart-data-lake/getting-started/blob/feature/databricks-blog/envConfig/databricks.conf.template#L7) file.  
+ You can pick catalog, schema and volume names to your liking but just make sure that they are in sync with the contents of [the environment config template file](https://github.com/smart-data-lake/getting-started/blob/feature/databricks-blog/envConfig/databricks.conf.template#L7).  
       - In the `default` schema, create a new `managed volume` called `getting-started`.
       - Why do we need a volume? Because we need a place to store the JAR of SDLB, as well as state files. 
 This place needs to be accessible from the Spark Driver, the Spark Executors,  as well as from any Databricks Notebook. 
 Volumes are great for sharing data like that.
 4. **Run Part 1 of the Notebook**         
-       - In your Workspace, click on Create -> Git folder. In the field called `Git repository URL`, enter `https://github.com/smart-data-lake/getting-started.git` and select `Github` as `Git Provider`. Check out the code of our `getting started (for now branch feature/databricks) 
+       - In your Workspace, click on Create -> Git folder. In the field called `Git repository URL`, enter `https://github.com/smart-data-lake/getting-started.git` and select `Github` as `Git Provider`. Check out the code of our `getting started` (TODO for now branch feature/databricks-blog, change to master when merged) 
    - Open the notebook called DatabricksDemo. You will notice that the first cell lets you set some parameters: 
-     - REPODIR: The location in Databricks were you checked out your repository. You can simply copy/paste the path of the `getting-started` folder that you checked out.
+     - REPODIR: The location in Databricks were you checked out your repository. You can simply copy/paste the path of the `getting-started` folder that you checked out using the button in the Databricks UI as follows: ![copy_path.png](copy_path.png)
      - TMPDIR: A location for temporary files, needed by maven when running the Notebook the first time. You can keep the default.
      - VOLDIR: The Databricks Path to the `getting-started` volume that you just created.
    - Run the first cell to have the buttons appear. Then, fill the 3 parameters REPODIR, TMPDIR, VOLDIR with your values and click on `Run All`.
@@ -64,7 +64,7 @@ and select `getting-started-with-dependencies.jar` in the `getting-started` volu
 - Restart the Cluster so that the new Library gets imported.
 - Now, the cell should run. The final 2 cells are still not working, because there is no data to display yet. Let's change that.
 6. **Run getting-started as a Databricks Job**:
-    -Let's get some data. In the `Workflows` tab, click on `Create Job` and unser `Tasks` click on `+ Add task`.
+    Let's get some data. In the `Workflows` tab, click on `Create Job` and unser `Tasks` click on `+ Add task`.
 	- **Task Name** : Run_all_actions
     - **Type**: `JAR`
 	- **Main Class**: `io.smartdatalake.app.DefaultSmartDataLakeBuilder`
@@ -80,7 +80,7 @@ and select `getting-started-with-dependencies.jar` in the `getting-started` volu
 
 7. **Results**
 - You can observe the available DataObjects and Actions using our [UI Demo](https://ui-demo.smartdatalake.ch/#/config). Feel free to checkout out [our blog post](../blog/sdl-uidemo) for more information on the UI.
-- Feel free to use Code Completion to browse through the DataObjects and Actions.
+- Feel free to browse through the DataObjects and Actions as illustrated in the Notebook. From now on, it's enough to execute the current cell to get immediate feedback. All the necessary setup steps only need to be done when the cluster is started.
 - If you want to use code completion, start typing something and hit CTRL + SPACE:
  ![img.png](code_completion.png)
 - Finally, you can directly edit the config files under REPODIR/config und re-run your job with your changes, directly within the databricks environment. 
