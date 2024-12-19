@@ -79,7 +79,7 @@ and select `getting-started-with-dependencies.jar` in the `getting-started` volu
 - When finished, all cells in the noebook will be working.
 
 7. **Results**
-- You can observe the available DataObjects and Actions using our [UI Demo](https://ui-demo.smartdatalake.ch/#/config). Feel free to checkout out [our blog post](../sdl-uidemo) for more information on the UI.
+- You can observe the available DataObjects and Actions using our [UI Demo](https://ui-demo.smartdatalake.ch/#/config). Feel free to checkout out [our blog post](sdl-uidemo) for more information on the UI.
 - Feel free to browse through the DataObjects and Actions as illustrated in the Notebook. From now on, it's enough to execute the current cell to get immediate feedback. All the necessary setup steps only need to be done when the cluster is started.
 - If you want to use code completion, start typing something and hit CTRL + SPACE:
  ![img.png](code_completion.png)
