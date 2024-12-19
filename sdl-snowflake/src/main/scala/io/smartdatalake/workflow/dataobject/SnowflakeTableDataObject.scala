@@ -36,6 +36,7 @@ import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, Snowpar
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.SnowflakeUtils._
+import io.smartdatalake.workflow.dataobject.SnowparkUtils.snowparkCastIntegralTypesToDecimal
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
@@ -365,13 +366,15 @@ object SnowflakeUtils {
     }
     df.select(targetCols: _*)
   }
+}
 
-  // Attention: snowpark.types.DecimalType implements scala.Serializable.
-  // This might result in "ClassNotFoundException: scala.Serializable" when parsing SnowflakeTableDataObject on some Environments.
-  // Workaround: move it from object SnowflakeTableDataObject to separate object SnowflakeUtils.
+object SnowparkUtils {
+  // Attention: Snowpark is not available for Scala 2.13!
+  // Using this object on Scala 2.13 results in "ClassNotFoundException: scala.Serializable"!
   def snowparkCastIntegralTypesToDecimal(df: snowpark.DataFrame): snowpark.DataFrame = {
     val targetCols = df.schema.fields.map { f =>
       val targetType = f.dataType match {
+        //avoid NoClassDefFoundError: scala/Serializable
         case snowpark.types.ByteType => snowpark.types.DecimalType(3, 0)
         case snowpark.types.ShortType => snowpark.types.DecimalType(5, 0)
         case snowpark.types.IntegerType => snowpark.types.DecimalType(10, 0)

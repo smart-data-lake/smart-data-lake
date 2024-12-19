@@ -453,8 +453,8 @@
         <monix.version>3.4.0</monix.version>
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
-        <snowflake-spark.version>3.0.0</snowflake-spark.version>
-        <snowflake-snowpark.version>1.13.2</snowflake-snowpark.version>
+        <snowflake-spark.version>3.1.1</snowflake-spark.version>
+        <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
         <delta.version>3.2.0</delta.version>
         <iceberg.version>1.6.1</iceberg.version>
 
