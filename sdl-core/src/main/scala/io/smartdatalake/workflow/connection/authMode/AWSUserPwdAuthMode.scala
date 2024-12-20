@@ -46,9 +46,12 @@ import scala.concurrent.duration.FiniteDuration
  * @param user       user to login
  * @param password   password to use for login.
  * @param useIdToken If true, id_token is used for Http Authorization header, otherwise access_token. Default is false.
- * @param timeouts   configuration of HTTP timeouts. Default is connectionTimeout=200ms, readTimeout=800ms.
+ * @param timeouts   configuration of HTTP timeouts. Default is connectionTimeout=500ms, readTimeout=1s.
  */
-case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: StringOrSecret, user: StringOrSecret, password: StringOrSecret, useIdToken: Boolean = false, timeouts: HttpTimeoutConfig = HttpTimeoutConfig(200, 800), proxy: Option[HttpProxyConfig] = None) extends HttpAuthMode with SmartDataLakeLogger {
+case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: StringOrSecret, user: StringOrSecret, password: StringOrSecret, useIdToken: Boolean = false,
+                              timeouts: HttpTimeoutConfig = HttpTimeoutConfig(500, 1000),
+                              proxy: Option[HttpProxyConfig] = None
+                             ) extends HttpAuthMode with SmartDataLakeLogger {
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   val cognitoUrl = s"https://cognito-idp.$region.amazonaws.com"

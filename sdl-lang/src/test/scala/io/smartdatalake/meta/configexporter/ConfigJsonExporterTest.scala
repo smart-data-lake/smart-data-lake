@@ -74,6 +74,6 @@ class ConfigJsonExporterTest extends FunSuite {
   }
 
   ignore("test aws ui upload") {
-    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-t", "uibackend", "-d", descriptionPath))
+    ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-t", "uibackend", "-d", descriptionPath, "--uploadDescriptions"))
   }
 }
