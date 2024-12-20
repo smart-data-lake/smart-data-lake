@@ -23,9 +23,9 @@ import io.smartdatalake.util.misc.{SmartDataLakeLogger, StateUploader}
 import io.smartdatalake.util.webservice.SttpUtil.getContent
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
-import sttp.client3.{HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, basicRequest, multipart}
+import sttp.client3.{BasicRequestBody, HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, basicRequest}
 import sttp.model.Uri.PathSegment
-import sttp.model.{Header, MediaType, Method, Uri}
+import sttp.model._
 
 import java.sql.Timestamp
 import java.util.concurrent.TimeUnit
@@ -97,16 +97,17 @@ case class UIBackendConfig(
 
   def getUploadService: UploadService = {
     new UploadService() {
-      override def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Map[String, Array[Byte]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
+      override def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
+        assert(body.isEmpty || multipartBody.isEmpty, "Only body or multipartBody can be set.")
         logger.debug(s"operation=$operation method=$method params=$params additionalParams=$additionalParams mediaType=$mediaType bodyLength=${body.map(_.length).getOrElse(0)}")
         var request = basicRequest
           .method(method, Uri.unsafeParse(baseUrl).addPathSegment(PathSegment(operation)).addParams(params ++ additionalParams))
-          .header(Header.contentType(MediaType.ApplicationJson))
+          .header(Header.contentType(mediaType))
           .headers(authMode.map(_.getHeaders).getOrElse(Map()))
           .readTimeout(FiniteDuration(timeouts.readTimeoutMs, TimeUnit.MILLISECONDS))
           .followRedirects(true)
         body.foreach(b => request = request.body(b))
-        multipartBody.foreach(mp => request = request.multipartBody(mp.map(p => multipart(p._1, p._2)).toSeq))
+        multipartBody.foreach(mp => request = request.multipartBody(mp.head, mp.tail: _*))
         val response = request.send(httpBackend)
         Option(getContent(response, s"$method $operation")).filter(_.nonEmpty)
       }
@@ -115,14 +116,14 @@ case class UIBackendConfig(
 }
 
 trait UploadService extends SmartDataLakeLogger {
-  def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Map[String, Array[Byte]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String]
+  def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String]
 
   def send(operation: String, body: Option[String] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
     sendBytes(operation, body = body.map(_.getBytes("UTF-8")), method = method, additionalParams = additionalParams, mediaType = mediaType)
   }
 }
 
-case class FileDescriptor(file: String, mediaType: String, size: Long, modifiedAt: Timestamp)
+case class FileDescriptor(name: String, mediaType: String, size: Long, lastModified: Timestamp)
 
 private[smartdatalake] object UploadDefaults {
   val versionDefault = "latest"
