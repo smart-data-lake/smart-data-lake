@@ -20,14 +20,17 @@
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.OAuth2Service.sendRequest
 import io.smartdatalake.util.webservice.SttpUtil.getContent
+import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, NoTypeHints}
-import sttp.client3.{HttpClientSyncBackend, Identity, Request, SttpBackend, basicRequest}
+import sttp.client3.{HttpClientSyncBackend, Identity, Request, SttpBackend, SttpBackendOptions, basicRequest}
 import sttp.model.Header.unapply
 import sttp.model.{Header, MediaType, Uri}
+
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 
 /**
  * OAuth2 service handles refreshing OAuth2 tokens when they are expired.
@@ -36,7 +39,7 @@ import sttp.model.{Header, MediaType, Uri}
  * @param clientId     optional application client id to add to refresh request
  * @param tokenInitFun function to create initial OAuth2 token
  */
-case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFun: () => OAuth2Response) extends SmartDataLakeLogger {
+case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFun: () => OAuth2Response, timeouts: HttpTimeoutConfig, proxy: Option[HttpProxyConfig]) extends SmartDataLakeLogger {
 
   private var currentToken: Option[OAuth2Response] = None
 
@@ -58,6 +61,7 @@ case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFu
       .post(Uri.unsafeParse(tokenUrl))
       .header(Header.contentType(MediaType.ApplicationXWwwFormUrlencoded))
       .header(Header.accept(MediaType.ApplicationJson))
+      .readTimeout(FiniteDuration(timeouts.readTimeoutMs, TimeUnit.MILLISECONDS))
       .followRedirects(true)
       .body(Map(
         "grant_type" -> "refresh_token",
@@ -65,10 +69,11 @@ case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFu
       ) ++ clientId.map("client_id" -> _))
     parse(sendRequest(request, "refresh token")).extract[OAuth2Response]
   }
-}
 
-object OAuth2Service extends SmartDataLakeLogger {
-  @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend()
+  private val sttpBackendOptions = Seq(proxy, Some(timeouts)).flatten.foldLeft(SttpBackendOptions.Default) {
+    case (options, config) => config.sttpConfig(options)
+  }
+  @transient private lazy implicit val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(sttpBackendOptions)
 
   def sendRequest(request: Request[Either[String, String], Any], context: String): String = {
     val response = request.send(httpBackend)
