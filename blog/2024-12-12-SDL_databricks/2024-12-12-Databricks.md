@@ -56,7 +56,7 @@ Setup a Catalog to store our data.
       Volumes are great for managing data like that.
 
 4. **Get the code and run Part 1 of the Notebook**         
-      - In your `Workspace`, click on `Create` -> `Git folder`. In the field called `Git repository URL`, enter `https://github.com/smart-data-lake/getting-started.git` and select `Github` as `Git Provider`. Check out the code of our `getting started` (TODO for now branch feature/databricks-blog, change to master when merged) 
+      - In your `Workspace`, click on `Create` -> `Git folder`. In the field called `Git repository URL`, enter `https://github.com/smart-data-lake/getting-started.git` and select `Github` as `Git Provider`. Check out the code of our `getting started` on the `master` branch. 
       - Open the notebook called DatabricksDemo. You will notice that the first cell lets you set some parameters: 
       - `REPODIR`: The location in Databricks were you checked out your repository. You can simply copy/paste the path of the `getting-started` folder that you checked out using the button in the Databricks UI as follows: ![copy_path.png](copy_path.png)
       - `TMPDIR`: A location for temporary files, needed by maven (Java build tool) when running the Notebook the first time. You can keep the default.
