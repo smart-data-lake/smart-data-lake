@@ -35,7 +35,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
-import org.json4s.{JObject, JValue}
+import org.json4s.{JArray, JObject, JValue}
 import sttp.client3.{HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, asByteArray, basicRequest}
 import sttp.model.{MediaType, Uri}
 
@@ -81,6 +81,9 @@ import scala.concurrent.duration.FiniteDuration
  *                                  The JsonPath expression should return a String or a list of Strings as result.
  *                                  If a link for the next page is not found, it is assumed that it is the last page and no further queries will be made.
  *                                  Example JsonPath expression: "$._links[?(@.rel == 'next')].href"
+ * @param schemaMatchJsonPath       The response schema of an operation in the OpenApi specification should describe the structure of the entire response body.
+ *                                  If that's not the case, define schemaMatchJsonPath to extract the response part that matches the schema.
+ *                                  Example JsonPath expression: "$.data"
  * @param maxPagesPerPartition      Only relevant together pagingLinkRegex.
  *                                  Sets maximum number of pages to put into one Spark partition.
  *                                  Default is 10. Remember that a page normally includes multiple records and can already be quite large.
@@ -99,6 +102,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
                              additionalHeaders: Map[String, String] = Map(),
                              timeouts: Option[HttpTimeoutConfig] = None,
                              pagingLinkJsonPath: Option[String] = None,
+                             schemaMatchJsonPath: Option[String] = None,
                              maxPagesPerPartition: Int = 10,
                              override val metadata: Option[DataObjectMetadata] = None
                             )
@@ -116,7 +120,8 @@ case class OpenApiDataObject(override val id: DataObjectId,
   // these variables will be initialized in prepare phase
   private var spec: Option[OpenApiSpec] = None
   private var operation: Option[OpenApiOperation] = None
-  private var operationContentType: Option[String] = None
+  private var responseContentTypeEvaluated: Option[String] = None
+  private var responseSchema: Option[DataType] = None
   private var schema: Option[StructType] = None
 
   private val sttpBackendOptions = Seq(proxy, timeouts).flatten.foldLeft(SttpBackendOptions.Default) {
@@ -130,10 +135,11 @@ case class OpenApiDataObject(override val id: DataObjectId,
     spec = Some(OpenApiUtil.getAndParseSpec(specUrl))
     operation = spec.flatMap(_.operations.find(_.operationId == operationId))
     assert(operation.nonEmpty, s"($id) operation $operationId not found")
-    val (contentType, sparkSchema) = operation.get.responseSchema(responseContentType)
-    schema = sparkSchema match {
+    val (contentType, responseSchema) = operation.get.responseSchema(responseContentType)
+    schema = responseSchema match {
       // supported cases
       case schema: StructType if mediaType.equalsIgnoreParameters(MediaType.ApplicationJson) => Some(schema)
+      case schema: ArrayType if schema.elementType.isInstanceOf[StructType] && mediaType.equalsIgnoreParameters(MediaType.ApplicationJson) => Some(schema.elementType.asInstanceOf[StructType])
       case StringType if mediaType.isText => Some(StructType(Seq(StructField("content", StringType))))
       case BinaryType if mediaType.isApplication || mediaType.isImage || mediaType.isAudio || mediaType.isVideo => Some(StructType(Seq(StructField("content", BinaryType))))
       // unsupported cases
@@ -142,7 +148,8 @@ case class OpenApiDataObject(override val id: DataObjectId,
       case BinaryType => throw new IllegalStateException(s"($id) Got schema of Binary type, but responseContentType is not Application|Image|Audio|Video. Configured responseContentType=$responseContentType.")
       case dataType => throw new IllegalStateException(s"($id) Schema of $dataType not supported together with responseContentType=$responseContentType")
     }
-    operationContentType = Some(contentType)
+    responseContentTypeEvaluated = Some(contentType)
+    this.responseSchema = Some(responseSchema)
     logger.info(s"($id) got schema: ${schema.get.simpleString}")
   }
 
@@ -170,28 +177,38 @@ case class OpenApiDataObject(override val id: DataObjectId,
       // exec phase -> read: return data
       case ExecutionPhase.Exec =>
         val targetUrl = s"$baseUrl/${operation.get.path.dropWhile(_ == '/')}"
-        if (pagingLinkJsonPath.isDefined) {
-          assert(mediaType.equalsIgnoreParameters(MediaType.ApplicationJson))
+        if (mediaType.equalsIgnoreParameters(MediaType.ApplicationJson)) {
+          def getResponse(url: String, idx: Int): JValue = {
+            val response = new String(getContent(url, responseContentTypeEvaluated.get, withUrlParameters = idx == 0))
+            if (logger.isDebugEnabled) logger.debug(s"response: $response")
+            parse(response)
+          }
 
-          def getResponse(url: String, idx: Int) = parse(new String(getContent(url, operationContentType.get, withUrlParameters = idx == 0)))
-
-          val data = SttpUtil.getPagedResponseIterator(targetUrl, createPagingLinkJsonPathExtractor(pagingLinkJsonPath.get), getResponse)
-          val rows = data.map(r => JsonUtils.convertObjectToCatalyst(r.asInstanceOf[JObject], schema.get))
-          DatasetHelper.parallelizeInternalRows(rows, schema.get, maxPagesPerPartition)
-        } else operation.get.responseSchema(responseContentType) match {
-          case (contentType, _: StructType) =>
-            val data = new String(getContent(targetUrl, contentType))
-            if (logger.isDebugEnabled) logger.debug(s"response: $data")
-            val row = JsonUtils.convertObjectToCatalyst(parse(data).asInstanceOf[JObject], schema.get)
-            DatasetHelper.parallelizeInternalRows(Iterator(row), schema.get, maxPagesPerPartition)
-          case (contentType, StringType) =>
-            val data = new String(getContent(targetUrl, contentType))
-            if (logger.isDebugEnabled) logger.debug(s"response: $data")
-            Seq(new String(data)).toDF(schema.get.fieldNames: _*)
-          case (contentType, BinaryType) =>
-            val data = getContent(targetUrl, contentType)
-            if (logger.isDebugEnabled) logger.debug(s"response: binary length=${data.length}")
-            Seq(data).toDF(schema.get.fieldNames: _*)
+          var jsonData = if (pagingLinkJsonPath.isDefined) {
+            SttpUtil.getPagedResponseIterator(targetUrl, createPagingLinkJsonPathExtractor(pagingLinkJsonPath.get), getResponse)
+          } else {
+            Iterator(getResponse(targetUrl, 0))
+          }
+          schemaMatchJsonPath.foreach(p => jsonData = jsonData.map(JsonUtils.evaluateJsonPath(_, p)))
+          val sparkRows = responseSchema.get match {
+            case _: StructType =>
+              jsonData.map(e => JsonUtils.convertObjectToCatalyst(e.asInstanceOf[JObject], schema.get))
+            case responseSchema: ArrayType if responseSchema.elementType.isInstanceOf[StructType] && schema.get.isInstanceOf[StructType] =>
+              val jsonRows = jsonData.flatMap(_.asInstanceOf[JArray].arr)
+              jsonRows.map(e => JsonUtils.convertObjectToCatalyst(e.asInstanceOf[JObject], schema.get))
+          }
+          DatasetHelper.parallelizeInternalRows(sparkRows, schema.get, maxPagesPerPartition)
+        } else {
+          responseSchema.get match {
+            case StringType =>
+              val data = new String(getContent(targetUrl, responseContentTypeEvaluated.get))
+              if (logger.isDebugEnabled) logger.debug(s"response: $data")
+              Seq(new String(data)).toDF(schema.get.fieldNames: _*)
+            case BinaryType =>
+              val data = getContent(targetUrl, responseContentTypeEvaluated.get)
+              if (logger.isDebugEnabled) logger.debug(s"response: binary length=${data.length}")
+              Seq(data).toDF(schema.get.fieldNames: _*)
+          }
         }
     }
 
@@ -200,10 +217,11 @@ case class OpenApiDataObject(override val id: DataObjectId,
 
   private def createPagingLinkJsonPathExtractor(jsonPath: String): JValue => Option[String] = response => {
     try {
-      val result = JsonUtils.evaluateJsonPath(response, jsonPath).values
-      val link = result match {
+      val result = JsonUtils.evaluateJsonPath(response, jsonPath)
+      val link = result.values match {
         case x: Seq[String] => x.headOption
         case x: String => Some(x)
+        case null => None
         case x => throw new IllegalStateException(s"($id) pagingLinkJsonPathExtractor expects a String or a list of Strings as result, but got $x")
       }
       link.foreach(l => logger.debug(s"next pagingLink found: $l"))

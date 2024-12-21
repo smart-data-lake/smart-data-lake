@@ -32,7 +32,7 @@ class OpenApiDataObjectIT extends FunSuite {
   val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
-  test("get data.sbb.ch datasets") {
+  test("get data.sbb.ch datasets with struct return type") {
     import session.implicits._
     val do1 = OpenApiDataObject(
       id = "do1",
@@ -65,4 +65,33 @@ class OpenApiDataObjectIT extends FunSuite {
       .show(false)
   }
 
+  test("get catfact.ninja breeds with array return type") {
+    val do1 = OpenApiDataObject(
+      id = "do1",
+      baseUrl = "https://catfact.ninja",
+      apiDocsUrl = "docs/api-docs.json",
+      operationId = "getBreeds",
+      schemaMatchJsonPath = Some("$.data"),
+      urlParameters = Map("limit" -> "5")
+    )
+    do1.prepare
+    val df = do1.getSparkDataFrame()
+    df.printSchema
+    df.show(false)
+  }
+
+  test("get catfact.ninja breeds with paging and array return type") {
+    val do1 = OpenApiDataObject(
+      id = "do1",
+      baseUrl = "https://catfact.ninja",
+      apiDocsUrl = "docs/api-docs.json",
+      operationId = "getBreeds",
+      schemaMatchJsonPath = Some("$.data"),
+      pagingLinkJsonPath = Some("$.next_page_url")
+    )
+    do1.prepare
+    val df = do1.getSparkDataFrame()
+    df.printSchema
+    df.show(false)
+  }
 }
