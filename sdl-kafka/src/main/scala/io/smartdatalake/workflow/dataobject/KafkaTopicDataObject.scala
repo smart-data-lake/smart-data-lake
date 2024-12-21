@@ -229,9 +229,10 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def decodeKeyValue(dfRaw: DataFrame): DataFrame = {
+    assert(dfRaw.schema("value").dataType == BinaryType)
     dfRaw
       .withColumn("key", convertFromKafka(keyType, col("key"), SubjectType.key, keySchema))
-      .withColumn("value", when(col("value").isNotNull or length(col("value")) > 0, convertFromKafka(valueType, col("value"), SubjectType.value, valueSchema)))
+      .withColumn("value", when(col("value").isNotNull and length(col("value")) > 0, convertFromKafka(valueType, col("value"), SubjectType.value, valueSchema)))
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -353,9 +354,10 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     require(df.columns.toSet == Set("key","value"), s"($id) Expects columns key, value in DataFrame for writing to Kafka. Given: ${df.columns.mkString(", ")}")
     keySchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("key").dataType.asInstanceOf[StructType]), "write (keySchema)"))
     valueSchema.foreach(schema => validateSchema(schema, SparkSchema(df.schema("value").dataType.asInstanceOf[StructType]), "write (valueSchema)"))
+    val valueIsBinary = df.schema("value").dataType == BinaryType
     df.select(
       convertToKafka(keyType, col("key"), SubjectType.key, keySchema).as("key"),
-      when(col("value").isNotNull, convertToKafka(valueType, col("value"), SubjectType.value, valueSchema)).as("value")
+      when(col("value").isNotNull and (if (valueIsBinary) length(col("value") > 0) else lit(true)), convertToKafka(valueType, col("value"), SubjectType.value, valueSchema)).as("value")
     )
   }
 
