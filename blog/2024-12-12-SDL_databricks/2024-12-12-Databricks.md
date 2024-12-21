@@ -65,13 +65,13 @@ Setup a Catalog to store our data.
       - Now click on `Run All` and use the Cluster created above.
       - The next cells in the notebook should run correctly. Maven will create the `getting-started-with-dependencies.jar` in the volume.
       - Then the Cell below `Convert the HOCON Config Files to Scala Classes` will fail with the message `error: object smartdatalake is not a member of package io`. 
-      This is because the Cluster does not yet have access to the SDLB Jar-File created...
+      This is because the Cluster does not yet have access to the SDLB Jar-File...
 
 5. **Install getting-started-with-dependencies.jar**
       - Back on the `Compute` page, select your cluster and edit it. Under `Libraries`, select `Install new`, 
       then choose `getting-started-with-dependencies.jar` in the `getting-started` volume.
       - `Restart` the Cluster so that the new Library gets imported.
-      - Now, the next cell in the notebook should `Run`.
+      - Now, the next cell in the notebook should run succesfully.
       - The final 2 cells are still not working, because there is no data to display yet.
 
 6. **Run getting-started as a Databricks Job** \
@@ -90,15 +90,15 @@ Let's get some data. In the `Workflows` tab, click on `Create Job` and under `Ta
 
 7. **Results**
       - You can observe the available DataObjects and Actions using our [UI Demo](https://ui-demo.smartdatalake.ch/#/config). Feel free to checkout out [our blog post](../../blog/sdl-uidemo) for more information on the UI.
-      - You can alos browse through the DataObjects and Actions as illustrated in the Notebook. From now on, it's enough to execute the current cell to get immediate feedback. All the setup steps only need to be done once to create the cluster.
+      - You can also browse through the DataObjects and Actions as illustrated in the Notebook. From now on, it's enough to execute the current cell to get immediate feedback. You don't need to run the steps before `Try SDLB Lab interface` again.
       - If you want to use code completion, start typing something and hit CTRL + SPACE. Like that you can browse the DataObjects and Actions of SDLB.
       ![img.png](code_completion.png)
-      - Finally, you can directly edit the config files in the `Workspace` under REPODIR/config und re-run your job with your changes, directly within the databricks environment. 
+      - Finally, you can directly edit the config files in the `Workspace` under REPODIR/config und re-run your job with your changes, directly within the databricks environment. If you want the SDLB Interface to reflect your changes to the config, simply re-run the cell `Convert the HOCON Config Files to Scala Classes`.
       Note that the files that end with .*solution are ignored by SDLB, they are just there for people following the `getting-started` guide.
 
 ## Summary
 
-We have seen how fast it is to get a working Analytics environment with Databricks and how easy SDLB is integrated.
+We have seen how fast it is to get a working Analytics Environment with Databricks and how easy SDLB is integrated.
 
 SDLB Job scheduling, Configuration changes and interactive Development in Notebooks with SDLBs DataObjects and Actions is easily accessible through the Databricks Workspace!
 
