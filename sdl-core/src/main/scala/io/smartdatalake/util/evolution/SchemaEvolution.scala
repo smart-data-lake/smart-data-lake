@@ -86,9 +86,9 @@ object SchemaEvolution extends SmartDataLakeLogger {
       // same complex type
       case (left: GenericDataType, right: GenericDataType) if left.typeName == right.typeName =>
         val tgtType = TypeConsolidation.consolidateType(left, right, ignoreOldDeletedNestedColumns)
-        val udf_convertLeft = functions.schemaEvolutionUdf(left, tgtType)
-        val udf_convertRight = functions.schemaEvolutionUdf(right, tgtType)
-        Some(udf_convertLeft.convert(column), udf_convertRight.convert(column), tgtType)
+        val convertLeftUdf = functions.schemaEvolutionUdf(left, tgtType)
+        val convertRightUdf = functions.schemaEvolutionUdf(right, tgtType)
+        Some(convertLeftUdf.convert(column), convertRightUdf.convert(column), tgtType)
       // default
       case _ => None
     }

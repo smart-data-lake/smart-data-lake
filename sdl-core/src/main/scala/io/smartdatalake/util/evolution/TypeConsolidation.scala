@@ -43,7 +43,7 @@ private[smartdatalake] object TypeConsolidation extends SmartDataLakeLogger {
         consolidateStructType(leftType, rightType, ignoreOldDeletedColumns, path)
       case (leftType: GenericDataType with GenericArrayDataType, rightType: GenericDataType with GenericArrayDataType) => // array type -> recursion on element type
         functions.arrayType(consolidateType(leftType.elementDataType, rightType.elementDataType, ignoreOldDeletedColumns, path))
-      case (leftType: GenericDataType with GenericMapDataType, rightType: GenericDataType with GenericMapDataType) => // array type -> recursion on element type
+      case (leftType: GenericDataType with GenericMapDataType, rightType: GenericDataType with GenericMapDataType) => // map type -> consolidate key + consolidate value
         val consolidatedKeyType = consolidateType(leftType.keyDataType, rightType.keyDataType, ignoreOldDeletedColumns, path :+ "key")
         val consolidatedValueType = consolidateType(leftType.valueDataType, rightType.valueDataType, ignoreOldDeletedColumns, path :+ "value")
         functions.mapType(consolidatedKeyType, consolidatedValueType)

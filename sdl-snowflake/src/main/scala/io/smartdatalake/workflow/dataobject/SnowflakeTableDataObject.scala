@@ -233,15 +233,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   // cache response to avoid schema query.
   private var cachedExistingSchema: Option[SnowparkSchema] = None
 
-  private def getExistingSchema(implicit context: ActionPipelineContext): Option[SnowparkSchema] = {
-    if (isTableExisting && cachedExistingSchema.isEmpty) {
-      cachedExistingSchema = Some(SnowparkSchema(getSnowparkDataFrame().schema))
-      // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = cachedExistingSchema.map(convertColNamesLowercase)
-    }
-    cachedExistingSchema
-  }
-
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
