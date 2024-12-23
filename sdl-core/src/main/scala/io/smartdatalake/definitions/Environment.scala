@@ -539,7 +539,7 @@ object Environment extends SmartDataLakeLogger {
 
   /**
    * Name of column that marks the creation date of a record.
-   * Used in Historize- and DeduplicateAction.
+   * Used in HistorizeAction and DeduplicateAction.
    * Default is `dl_ts_captured`.
    */
   def capturedColumnName: String = {

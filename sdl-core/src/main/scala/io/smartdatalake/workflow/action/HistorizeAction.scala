@@ -42,7 +42,7 @@ import scala.util.{Failure, Success, Try}
  * Historization creates a technical history of data by creating valid-from/to columns.
  * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
  *
- * By default the a history with closed intervals is created, e.g. valid-from and valid-to is inclusive.
+ * By default, a history with closed intervals is created, e.g. valid-from and valid-to is inclusive.
  * The time axis unit can be set by configuration attribute `timeAxisUnit`. It is used as the offset between valid-to of the previous record and valid-from of the current record.
  * A history with half-open intervals can be created by setting timeAxisUnit=0. In a half-open interval valid-from is inclusive and valid-to is exclusive.
  *
