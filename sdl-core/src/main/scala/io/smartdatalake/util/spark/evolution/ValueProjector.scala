@@ -92,7 +92,7 @@ private[smartdatalake] object ValueProjector {
       case (_: ShortType, _: IntegerType) => (x => x.asInstanceOf[Short].toInt)
       case (_: ByteType, _: ShortType) => (x => x.asInstanceOf[Byte].toShort)
       case (_: FloatType, _: DoubleType) => (x => x.asInstanceOf[Float].toDouble)
-      // TODO: make non-strict, e.g converting decimal 255 to byte. Also for lines below...
+      // TODO #936: make non-strict, e.g converting decimal 255 to byte. Also for lines below...
       case (d: DecimalType, _: ByteType) if d.scale == 0 && d.precision <= 2 => (x => x.asInstanceOf[BigDecimal].toByte)
       case (d: DecimalType, _: ShortType) if d.scale == 0 && d.precision <= 4 => (x => x.asInstanceOf[BigDecimal].toShort)
       case (d: DecimalType, _: IntegerType) if d.scale == 0 && d.precision <= 9 => (x => x.asInstanceOf[BigDecimal].toInt)

@@ -151,8 +151,10 @@ case class HistorizeAction(
       val insertColsToIgnore = Seq(Historization.historizeOperationColName, mergeModeCDCColumn.get)
       val insertValuesOverride = Map(Historization.historizeDummyColName -> "true")
       val sqlReferenceTimestamp = Timestamp.valueOf(getReferenceTimestamp)
-      val additionalMergePredicate = Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName} AND existing.${Environment.delimitedColumnName}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      //val additionalMergePredicate = Some((s"timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName} AND existing.${Environment.delimitedColumnName}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " AND " + _))
+      // different condition for closed and half-closed intervals
+      val mergeTimePredicate = if (timeAxisUnitOpt.isDefined) s"timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName} AND existing.${Environment.delimitedColumnName}"
+      else s"existing.${Environment.capturedColumnName} <= timestamp'$sqlReferenceTimestamp' AND timestamp'$sqlReferenceTimestamp' < existing.${Environment.delimitedColumnName}"
+      val additionalMergePredicate = Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND $mergeTimePredicate" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
       Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, insertValuesOverride = insertValuesOverride, additionalMergePredicate = additionalMergePredicate))
 
     } else if (mergeModeEnable) {

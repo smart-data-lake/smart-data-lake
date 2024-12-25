@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.dataframe.snowflake
 
-import com.snowflake.snowpark.types._
 import com.snowflake.snowpark._
+import com.snowflake.snowpark.types._
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -254,7 +254,6 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
   }
 
   override def hash(column: GenericColumn): GenericColumn = {
-    val udfRaiseError = functions.udf((msg: String) => throw new RuntimeException(msg)) // Spark raise_error functions also creates a RuntimeException
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.hash(snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)

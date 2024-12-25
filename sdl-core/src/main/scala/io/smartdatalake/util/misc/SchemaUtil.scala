@@ -94,7 +94,7 @@ object SchemaUtil {
    * @param ignoreNullable whether to ignore differences in nullability.
    * @return The set of fields in `right` that are not contained in `left`.
    *
-   *         TODO: probably doesnt work for structs nested in arrays...
+   *         TODO #935: probably doesnt work for structs nested in arrays...
    */
   private def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)

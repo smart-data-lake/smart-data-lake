@@ -522,8 +522,9 @@ object Environment extends SmartDataLakeLogger {
   var _analyzeTableColumnMaxBytesThreshold: Option[Int] = None
 
   /**
-   * Threshold for analyzing table columns.
-   * If table size is bigger than analyzeTableColumnMaxThresholdBytes, table columns are not analyzed.
+   * Upper horizon timestamp for historization.
+   * This is the end validity for current records, e.g. records that are currently valid.
+   * Default is 9999-12-31 00:00:00.0
    */
   def historizationUpperHorizonTimestamp: Timestamp = {
     if (_historizationUpperHorizonTimestamp.isEmpty) {
