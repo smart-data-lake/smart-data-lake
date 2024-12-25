@@ -5922,7 +5922,7 @@
           },
           "updateCapturedColumnOnlyWhenChanged" : {
             "type" : "boolean",
-            "description" : "Set to true to enable update Column[[TechnicalTableColumn.captured]] only if Record has changed in the source, instead of updating it with every execution (default=false).\nThis results in much less records updated with saveMode.Merge."
+            "description" : "Set to true to enable update Column[[Environment.capturedColumnName]] only if Record has changed in the source, instead of updating it with every execution (default=false).\nThis results in much less records updated with saveMode.Merge."
           },
           "mergeModeEnable" : {
             "type" : "boolean",
@@ -5992,7 +5992,7 @@
         "title" : "DeduplicateAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This [[Action]] copies and deduplicates data between an input and output DataObject using DataFrames.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column [[TechnicalTableColumn.captured]] . It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set [[TechnicalTableColumn.captured]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]] ) as output with defined primary keys.\nIf output implements [[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.\n\nDeduplicateAction's input data must be unique across the primary key, otherwise the merge statement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .\nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is not included by default in DeduplicateAction, as it is a performance intensive operation."
+        "description" : "This [[Action]] copies and deduplicates data between an input and output DataObject using DataFrames.\nDeduplication keeps the last record for every key, also after it has been deleted in the source.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column [[Environment.capturedColumnName]] . It contains the timestamp of the last occurrence of the record in the source.\nThis creates lots of updates. Especially when using saveMode.Merge it is better to set [[Environment.capturedColumnName]] to the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to enable this optimization.\n\nDeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]] ) as output with defined primary keys.\nIf output implements [[CanMergeDataFrame]] , saveMode.Merge can be enabled by setting mergeModeEnable = true. This allows for much better performance.\n\nDeduplicateAction's input data must be unique across the primary key, otherwise the merge statement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .\nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is not included by default in DeduplicateAction, as it is a performance intensive operation."
       },
       "FileTransferAction" : {
         "type" : "object",
@@ -6145,7 +6145,7 @@
                 "$ref" : "#/definitions/GenericDfTransformer/WhitelistTransformer"
               } ]
             },
-            "description" : "optional list of transformations to apply before historization. See[[sparktransformer]] for a list of included Transformers.\nThe transformations are applied according to the lists ordering."
+            "description" : "optional list of transformations to apply before historization. The transformations are applied according to the lists ordering."
           },
           "filterClause" : {
             "type" : "string",
@@ -6188,6 +6188,11 @@
           "mergeModeCDCDeletedValue" : {
             "type" : "string",
             "description" : "Optional value of mergeModeCDCColumn that marks a record as deleted."
+          },
+          "timeAxisUnit" : {
+            "type" : "string",
+            "description" : "Time between ticks on the time axis. Used to create valid to timestamp for existing/old records.\nSet to 0 to create a history with half-open intervals (e.g. valid to timestamp is exclusive).\nFormat is`x(ns|us|ms|s|m|h|d)` , e.g. 1d.\nDefault is 1ms.",
+            "existingJavaType" : "java.time.Duration"
           },
           "breakDataFrameLineage" : {
             "type" : "boolean",
@@ -6249,7 +6254,7 @@
         "title" : "HistorizeAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This [[Action]] historizes data between an input and output DataObject using DataFrames.\nHistorization creates a technical history of data by creating valid-from/to columns.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nHistorizeAction needs a transactional table (e.g. implementation of [[TransactionalTableDataObject]] ) as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports [[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective."
+        "description" : "This [[Action]] historizes data between an input and output DataObject using DataFrames.\nHistorization creates a technical history of data by creating valid-from/to columns.\nThe DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.\n\nBy default, a history with closed intervals is created, e.g. valid-from and valid-to is inclusive.\nThe time axis unit can be set by configuration attribute `timeAxisUnit` . It is used as the offset between valid-to of the previous record and valid-from of the current record.\nA history with half-open intervals can be created by setting timeAxisUnit=0. In a half-open interval valid-from is inclusive and valid-to is exclusive.\n\nHistorizeAction needs a transactional table (e.g. implementation of [[TransactionalTableDataObject]] ) as output with defined primary keys.\n\nNormal historization join new with all existing data, and rewrites all data in output table. This is not optimal from\na performance perspective.\nIt can be optimized if output object supports [[CanMergeDataFrame]] . In that case you can\nset mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to\njoin new data with all existing data, but uses hash values to minimize data transfer.\nIf you have change-data-capture (CDC) information available to identify deleted records, you can set\nmergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from\na performance perspective."
       }
     },
     "SaveModeOptions" : {
