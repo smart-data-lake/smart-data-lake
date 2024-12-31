@@ -109,6 +109,10 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     }
   }
 
+  override def withColumnRenamed(colName: String, newName: String): SparkDataFrame = {
+      SparkDataFrame(inner.withColumnRenamed(colName, newName))
+  }
+
   override def drop(colName: String): SparkDataFrame = SparkDataFrame(inner.drop(colName))
 
   override def drop(col: GenericColumn): GenericDataFrame = {

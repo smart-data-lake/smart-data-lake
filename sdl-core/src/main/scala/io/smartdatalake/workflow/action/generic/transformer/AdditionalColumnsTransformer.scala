@@ -37,7 +37,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param additionalDerivedColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
  *                                 The spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns.
  */
-case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String] = Map(), additionalDerivedColumns: Map[String,String] = Map()) extends GenericDfTransformer {
+case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String] = Map(), additionalDerivedColumns: Map[String,String] = Map(), renamedColumns: Map[String,String] = Map(), droppedColumns: Seq[String] = Seq()) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
@@ -54,7 +54,21 @@ case class AdditionalColumnsTransformer(override val name: String = "additionalC
         case e: Exception => throw ConfigurationException(s"""($actionId) Creating additional derived column $colName using expression "$deriveExpr" failed: ${e.getMessage}""", Some(s"$name.$colName"), e)
       }
     }
-    dfDerived
+    val dfRenamed = renamedColumns.foldLeft(dfDerived){
+      case (df, (colName, newName)) => try {
+        df.withColumnRenamed(colName, newName)
+      } catch {
+        case e: Exception => throw ConfigurationException(s"""($actionId) Renaming column $colName to $newName failed: ${e.getMessage}""", Some(s"$name.$colName"), e)
+      }
+    }
+    val dfDropped = droppedColumns.foldLeft(dfRenamed){
+      case (df, colName) => try {
+        df.drop(colName)
+      } catch {
+        case e: Exception => throw ConfigurationException(s"""($actionId) Dropping column $colName failed: ${e.getMessage}""", Some(s"$name.$colName"), e)
+      }
+    }
+    dfDropped
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = AdditionalColumnsTransformer
 }
