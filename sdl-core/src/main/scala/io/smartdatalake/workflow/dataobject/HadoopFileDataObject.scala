@@ -21,11 +21,12 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
-import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem, Path}
+import org.apache.hadoop.fs._
 
 import java.io.{FileNotFoundException, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
@@ -81,16 +82,32 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * Check if the input files exist.
    * Note that hadoopDir can be a specific file or a directory.
    */
-  private[smartdatalake] def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
+  def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
     val status = try {
       filesystem.getFileStatus(hadoopPath)
     } catch {
       case _: FileNotFoundException => return false
     }
-    status.isFile || {
-      val globPath = if (partitions.nonEmpty) new Path(hadoopPath, PartitionValues(Map()).getPartitionString(partitionLayout().get)) else hadoopPath
-      status.isDirectory && filesystem.globStatus(new Path(globPath, fileName)).exists(_.isFile)
-    }
+    status.isFile || (status.isDirectory && listDataFiles().nonEmpty)
+  }
+
+  def listDataFiles(pv: PartitionValues = PartitionValues(Map()))(implicit context: ActionPipelineContext): Iterator[Path] = {
+    val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)), fileName).toString)
+    else new GlobPattern(new Path(hadoopPath, fileName).toString)
+    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, partitions.nonEmpty /*recursive*/))
+      .filter(_.isFile)
+      .map(_.getPath)
+      .filter(p => pathPattern.matches(p.toString))
+  }
+
+  def listPartitionPathsStatus(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[FileStatus] = {
+    assert(partitions.nonEmpty)
+    val pathPattern = new Path(hadoopPath, pv.getPartitionString(partitionLayoutParam))
+    filesystem.globStatus(pathPattern).filter(_.isDirectory)
+  }
+
+  def listPartitionPaths(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[Path] = {
+    listPartitionPathsStatus(pv, partitionLayoutParam).map(_.getPath)
   }
 
   override def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = {
@@ -154,11 +171,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     } else {
       // prepare partitions to include in path search
       val partitionsToInclude = partitions.reverse.dropWhile(!pv.keys.contains(_)).reverse // get all partition columns until last given partition value
-      // create path with wildcards
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitionsToInclude)
-      val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout))
       logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}")
-      filesystem.globStatus(globPartitionPath).filter(_.isDirectory).map(_.getPath)
+      listPartitionPaths(pv, partitionLayout).toSeq
     }
   }
 
@@ -171,15 +186,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     assert(partitions.nonEmpty)
     // check partitions completely defined -> then we can read all at once, otherwise we need to search with globs as DataFrameReader.load doesnt support wildcards
     if (pv.isComplete(partitions)) {
-      val path = new Path(hadoopPath, pv.getPartitionString(partitionLayout().get))
-      if (returnFiles) filesystem.globStatus(new Path(path, fileName)).filter(_.isFile).map(_.getPath).toSeq
-      else Seq(path)
+      if (returnFiles) listDataFiles(pv).toSeq
+      else Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)))
     } else {
       // create path with wildcards
       val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout().get))
       logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} does not define all partition columns ${partitions.mkString(",")}")
-      if (returnFiles) filesystem.globStatus(new Path(globPartitionPath, fileName)).filter(_.isFile).map(_.getPath)
-      else filesystem.globStatus(globPartitionPath).filter(_.isDirectory).map(_.getPath)
+      if (returnFiles) listDataFiles(pv).toSeq
+      else listPartitionPaths(pv).toSeq
     }
   }
 
@@ -188,19 +202,12 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     getPartitionPathsStatus
-      .map(path => extractPartitionValuesFromDirPath(path.getPath.toString))
+      .map(s => extractPartitionValuesFromDirPath(s.getPath.toString))
   }
 
   def getPartitionPathsStatus(implicit context: ActionPipelineContext): Seq[FileStatus] = {
-    partitionLayout().map {
-      partitionLayout =>
-        // get search pattern for root directory
-        val pattern = PartitionLayout.replaceTokens(partitionLayout, PartitionValues(Map()))
-        // list directories and extract partition values
-        filesystem.globStatus(new Path(hadoopPath, pattern))
-          .filter { fs => fs.isDirectory }
-          .toSeq
-    }.getOrElse(Seq())
+    if (partitions.nonEmpty) listPartitionPathsStatus().toSeq
+    else Seq()
   }
 
   override def relativizePath(path: String)(implicit context: ActionPipelineContext): String = {
@@ -302,14 +309,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   /**
-   * delete all files inside given path recursively
+   * delete all files inside given path recursively, but keep main directory
    */
   def deleteAllFiles(path: Path)(implicit context: ActionPipelineContext): Unit = {
     logger.info(s"($id) deleteAllFiles $path")
-    val dirEntries = filesystem.globStatus(new Path(path, "*")).map(_.getPath)
-    dirEntries.foreach { p =>
-      if (filesystem.isDirectory(p)) deleteAllFiles(p)
-      else filesystem.delete(p, /*recursive*/ false)
+    val dirEntries = RemoteIteratorWrapper(filesystem.listFiles(path, false))
+    dirEntries.foreach { s =>
+      if (s.isDirectory) filesystem.delete(hadoopPath, /*recursive*/ true)
+      else filesystem.delete(s.getPath, false)
     }
   }
 
