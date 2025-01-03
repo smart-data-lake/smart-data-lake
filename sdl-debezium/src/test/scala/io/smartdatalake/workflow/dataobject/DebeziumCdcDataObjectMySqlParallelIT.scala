@@ -23,13 +23,15 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.connection.{DebeziumConnection, DebeziumDatabaseEngine}
-import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlIT.{COMMIT_TIMESTAMP_COLUMN_NAME, COMMIT_TYPE_COLUMN_NAME, connection, df, instanceRegistry, jdbcConnection, sparkSession}
+import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlIT.{COMMIT_TIMESTAMP_COLUMN_NAME, COMMIT_TYPE_COLUMN_NAME, connection, df, instanceRegistry, jdbcConnection, sparkSession, statePath}
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit}
 
 import java.nio.file.Files
@@ -71,6 +73,8 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
   val feedName = "debezium-test"
   val tempDir = Files.createTempDirectory(feedName)
   val statePath = "target/stateTest/"
+  implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
+  HdfsUtil.deleteFiles(new Path(statePath), doWarn = false)
 
   instanceRegistry.register(connection)
 
