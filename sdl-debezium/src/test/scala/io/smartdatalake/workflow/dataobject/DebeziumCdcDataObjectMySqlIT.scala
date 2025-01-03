@@ -31,6 +31,10 @@ import org.apache.spark.sql.functions.{col, lit}
 
 object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
+  /*
+   * Integration test to test basic debezium source db operations (initial read, insert, update, delete, no changes).
+   */
+
 
   /**
    * Init tests
