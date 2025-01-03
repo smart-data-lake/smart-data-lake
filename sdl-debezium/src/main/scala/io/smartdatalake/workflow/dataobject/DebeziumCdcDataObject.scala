@@ -194,7 +194,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       .withColumn("event_data", coalesce(col("after"), col("before")))
       .withColumn(COMMIT_TYPE_COLUMN_NAME,
         when(col("op") === "c", lit("create"))
-        .when(col("op") === "d", lit("delete"))
+          .when(col("op") === "d", lit("delete"))
           .otherwise(lit("read")))
 
     val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
@@ -250,12 +250,12 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
-      if (state.isDefined) {
-        state.get.split(",").foreach { pair =>
-          val Array(key, value) = pair.split(":")
-          incrementalState.put(key, value)
-        }
+    if (state.isDefined) {
+      state.get.split(",").foreach { pair =>
+        val Array(key, value) = pair.split(":")
+        incrementalState.put(key, value)
       }
+    }
   }
 
   /**
@@ -365,7 +365,7 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
   }
 
   override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] = {
-   CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).asJava)
+    CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).asJava)
   }
 
   override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
