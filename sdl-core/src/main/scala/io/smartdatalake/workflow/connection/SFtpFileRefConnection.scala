@@ -21,9 +21,9 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import io.smartdatalake.util.filetransfer.SshUtil
 import io.smartdatalake.util.misc.WithResourcePool
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool}

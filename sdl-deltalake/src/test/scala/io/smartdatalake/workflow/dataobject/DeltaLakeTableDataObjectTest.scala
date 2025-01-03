@@ -18,25 +18,28 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
+import io.smartdatalake.workflow.dataobject.expectation.SQLExpectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
-import org.apache.spark.sql.delta.DeltaAnalysisException
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.scalatest.Matchers.convertToAnyShouldWrapper
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import java.nio.file.Files
 
-class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
+class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
   // set additional spark options for delta lake
   protected implicit val session : SparkSession = DeltaLakeTestUtils.session
@@ -49,6 +52,12 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
   val contextInit: ActionPipelineContext = context.copy(phase = ExecutionPhase.Init)
+
+  override def beforeAll(): Unit = {
+    val warehousePath = new Path("spark-warehouse/delta.db")
+    implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(warehousePath)(session)
+    HdfsUtil.deletePath(warehousePath, false)
+  }
 
   before {
     instanceRegistry.clear()
@@ -136,6 +145,30 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(resultat2)
   }
 
+  test("SaveMode overwrite with different schema on managed table") {
+    val targetTable = Table(db = Some(deltaDb), name = "test_overwrite_managed", query = None)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val resultat: Boolean = df1.isEqual(actual)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(resultat)
+
+    // 2nd load: overwrite all with different schema
+    val df2 = Seq(("ext","doe","john",10,"test"),("ext","smith","peter",1,"test"))
+      .toDF("type", "lastname", "firstname", "rating2", "test")
+    targetDO.writeSparkDataFrame(df2)
+    val actual2 = targetDO.getSparkDataFrame()
+    val resultat2: Boolean = df2.isEqual(actual2)
+    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite",Seq())(actual2)(df2)
+    assert(resultat2)
+  }
+
   test("SaveMode append with different schema") {
     val targetTable = Table(db = Some(deltaDb), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
@@ -161,10 +194,95 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(result2)
   }
 
+  test("SaveMode append with different schema on managed table") {
+    val targetTable = Table(db = Some(deltaDb), name = "test_append_managed", query = None)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
+
+    // 2nd load: append all with different schema
+    val df2 = Seq(("ext","doe","john",10,"test"),("ext","smith","peter",1,"test"))
+      .toDF("type", "lastname", "firstname", "rating2", "test")
+    targetDO.writeSparkDataFrame(df2)
+    val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
+    val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
+    if (!result2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
+    assert(result2)
+  }
+
   test("SaveMode overwrite and delete partition") {
     val targetTable = Table(db = Some(deltaDb), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite)
+    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static"))
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val resultat: Boolean = df1.isEqual(actual)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(resultat)
+
+    assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
+
+    // 2nd load: overwrite partition type=ext
+    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
+      .toDF("type", "lastname", "firstname", "rating")
+    intercept[ProcessingLogicException](targetDO.writeSparkDataFrame(df2)) // not allowed to overwrite all partitions
+    targetDO.writeSparkDataFrame(df2, partitionValues = Seq(PartitionValues(Map("type"->"ext"))))
+    val expected2 = df2.union(df1.where($"type"=!="ext"))
+    val actual2 = targetDO.getSparkDataFrame()
+    val resultat2: Boolean = expected2.isEqual(actual2)
+    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
+    assert(resultat2)
+
+    // delete partition
+    targetDO.deletePartitions(Seq(PartitionValues(Map("type"->"int"))))
+    assert(targetDO.listPartitions == Seq(PartitionValues(Map("type"->"ext"))))
+  }
+
+  test("SaveMode overwrite partitions dynamically") {
+    val targetTable = Table(db = Some(deltaDb), name = "test_overwrite", query = None)
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type")
+      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "dynamic"))
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
+
+    assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
+
+    // 2nd load: dynamically overwrite partition type=ext
+    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df2) // allowed overwriting partitions because of partitionOverwriteMode=dynamic
+    val expected2 = df2.union(df1.where($"type"=!="ext"))
+    val actual2 = targetDO.getSparkDataFrame()
+    val resul2 = expected2.isEqual(actual2)
+    if (!resul2) TestUtil.printFailedTestResult("SaveMode overwrite partitions dynamically",Seq())(actual2)(expected2)
+    assert(resul2)
+  }
+
+  test("SaveMode overwrite and delete partition on managed table") {
+    val targetTable = Table(db = Some(deltaDb), name = "test_overwrite_managed", query = None)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static"))
     targetDO.dropTable
 
     // first load
@@ -198,6 +316,31 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     val targetTable = Table(db = Some(deltaDb), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, saveMode = SDLSaveMode.Append)
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val resultat = df1.isEqual(actual)
+    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(resultat)
+
+    // 2nd load: append data
+    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df2)
+    val actual2 = targetDO.getSparkDataFrame()
+    val expected2 = df2.union(df1)
+    val resultat2: Boolean = expected2.isEqual(actual2)
+    if (!resultat2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(expected2)
+    assert(resultat2)
+  }
+
+  test("SaveMode append on managed table") {
+    val targetTable = Table(db = Some(deltaDb), name = "test_append_managed", query = None)
+    val targetDO = DeltaLakeTableDataObject(id="target", table=targetTable, saveMode = SDLSaveMode.Append)
     targetDO.dropTable
 
     // first load
@@ -276,7 +419,7 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(resultat2)
   }
 
-  // Note that this is not possible with DeltaLake <= 2.3.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
+  // Note that this is not possible with DeltaLake <= 3.2.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
   // Unfortunately this is needed by HistorizeAction with merge.
   // We test for failure to be notified once it is working...
   test("SaveMode merge with updateCols and schema evolution - fails in deltalake <= 3.2.0") {
@@ -463,6 +606,44 @@ class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter {
 
   }
 
+  test("copy load expectations test") {
+    val sdlb = DefaultSmartDataLakeBuilder
+    implicit val instanceRegistry = sdlb.instanceRegistry
+
+    // setup DataObjects
+    val src1Table = Table(db = Some(deltaDb), name = "test_expectations_src1")
+    val src1TablePath = tempPath + s"/${src1Table.fullName}"
+    val srcDO1 = DeltaLakeTableDataObject("srcDO1", table = src1Table, path = Some(src1TablePath))
+    srcDO1.dropTable
+    instanceRegistry.register(srcDO1)
+    val src2Table = Table(db = Some(deltaDb), name = "test_expectations_src2")
+    val src2TablePath = tempPath + s"/${src2Table.fullName}"
+    val srcDO2 = DeltaLakeTableDataObject("srcDO2", table = src2Table, path = Some(src2TablePath))
+    srcDO2.dropTable
+    instanceRegistry.register(srcDO2)
+    val targetTable = Table(db = Some(deltaDb), name = "test_expectations")
+    val targetTablePath = tempPath + s"/${targetTable.fullName}"
+    val tgtDO1 = DeltaLakeTableDataObject("deltaDO1", table = targetTable, path = Some(targetTablePath), expectations = Seq(
+      SQLExpectation("maxRating", aggExpression = "max(rating)"),
+    ))
+    tgtDO1.dropTable
+    instanceRegistry.register(tgtDO1)
+
+    // prepare
+    val customTransformerConfig1 = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from %{inputViewName_srcDO1}"))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id),
+      transformers = Seq(customTransformerConfig1),
+      //expectations = Seq(TransferRateExpectation())
+    )
+    instanceRegistry.register(action1)
+    val dfInput = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(dfInput, Seq())
+    srcDO2.writeSparkDataFrame(dfInput, Seq())
+
+    // run
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:.*", applicationName = Some("test"))
+    sdlb.run(sdlConfig)
+  }
 
 
 }

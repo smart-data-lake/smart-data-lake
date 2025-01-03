@@ -35,7 +35,7 @@ import scala.util.{Try, Using}
 /**
  * Provides utility functions for HDFS.
  */
-private[smartdatalake] object HdfsUtil extends SmartDataLakeLogger {
+object HdfsUtil extends SmartDataLakeLogger {
 
   /**
    * Returns size information about existing files in HDFS

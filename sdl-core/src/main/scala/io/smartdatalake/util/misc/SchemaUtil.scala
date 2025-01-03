@@ -31,11 +31,12 @@ import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
+import scaladoc.Tag
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
 import java.util.stream.Collectors
-import scala.reflect.runtime.universe.{Type, TypeTag}
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 object SchemaUtil {
 
@@ -51,23 +52,37 @@ object SchemaUtil {
     if (deep) {
       deepPartialMatchDiffFields(schemaLeft.fields, schemaRight.fields, ignoreNullable, caseSensitive)
     } else {
-      val left = prepareSchemaForDiff(schemaLeft, ignoreNullable, caseSensitive)
-      val right = prepareSchemaForDiff(schemaRight, ignoreNullable, caseSensitive)
-      left.fields.toSet.diff(right.fields.toSet)
+      val left = prepareSchemaForDiff(schemaLeft.fields, ignoreNullable, caseSensitive)
+      val right = prepareSchemaForDiff(schemaRight.fields, ignoreNullable, caseSensitive)
+      left.toSet.diff(right.toSet)
     }
   }
 
-  def prepareSchemaForDiff(schemaIn: GenericSchema, ignoreNullable: Boolean, caseSensitive: Boolean, ignoreMetadata: Boolean = true): GenericSchema = {
-    var schema = schemaIn
-    if (ignoreNullable) schema = schema.makeNullable
-    if (!caseSensitive) schema = schema.toLowerCase
-    if (ignoreMetadata) schema = schema.removeMetadata
-    schema
+  /**
+   * Computes the set difference between the columns of `schemaLeft` and of the columns of `schemaRight` in both directions:
+   * 1st return value is `Set(schemaLeft) \ Set(schemaRight)`, 2nd return value is `Set(schemaRight) \ Set(schemaLeft)`.
+   *
+   * @return Tuple `Set(schemaLeft) \ Set(schemaRight), `Set(schemaRight) \ Set(schemaLeft)`
+   */
+  def schemaDiff2(schemaLeft: Seq[GenericField], schemaRight: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false, deep: Boolean = false): (Set[GenericField], Set[GenericField]) = {
+    if (deep) {
+      (
+        deepPartialMatchDiffFields(schemaLeft, schemaRight, ignoreNullable, caseSensitive),
+        deepPartialMatchDiffFields(schemaRight, schemaLeft, ignoreNullable, caseSensitive),
+      )
+    } else {
+      val left = prepareSchemaForDiff(schemaLeft, ignoreNullable, caseSensitive).toSet
+      val right = prepareSchemaForDiff(schemaRight, ignoreNullable, caseSensitive).toSet
+      (left.diff(right), right.diff(left))
+    }
   }
 
-  def prepareColumnsForDiff(schemaIn: GenericSchema, caseSensitive: Boolean): Seq[String] = {
-    if (caseSensitive) schemaIn.columns
-    else schemaIn.columns.map(_.toLowerCase)
+  def prepareSchemaForDiff(schemaIn: Seq[GenericField], ignoreNullable: Boolean, caseSensitive: Boolean, ignoreMetadata: Boolean = true): Seq[GenericField] = {
+    var schema = schemaIn
+    if (ignoreNullable) schema = schema.map(_.makeNullable)
+    if (!caseSensitive) schema = schema.map(_.toLowerCase)
+    if (ignoreMetadata) schema = schema.map(_.removeMetadata)
+    schema
   }
 
   /**
@@ -78,6 +93,8 @@ object SchemaUtil {
    *
    * @param ignoreNullable whether to ignore differences in nullability.
    * @return The set of fields in `right` that are not contained in `left`.
+   *
+   *         TODO #935: probably doesnt work for structs nested in arrays...
    */
   private def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
@@ -129,7 +146,40 @@ object SchemaUtil {
   }
 
   def getSchemaFromCaseClass(tpe: Type): StructType = {
-    ProductUtil.createEncoder(tpe).schema
+    val schema = ProductUtil.createSchema(tpe)
+    enrichSchemaCommentsFromCaseClass(schema, tpe)
+  }
+
+  def enrichSchemaCommentsFromCaseClass(schema: StructType, tpe: Type): StructType = {
+    if (tpe <:< typeOf[Product]) {
+      val tpeAccessors = ProductUtil.classAccessors(tpe)
+      val scaladocParamTags = ScaladocUtil.extractScalaDoc(tpe.typeSymbol.annotations)
+        .toSeq.flatMap(_.tags.collect { case x: Tag.Param => x }).toSeq
+      val newFields = schema.fields.map { field =>
+        var newField = field
+        // enrich complex type
+        newField.dataType match {
+          case dt: StructType =>
+            val accessor = tpeAccessors.find(a => a.name.toString == field.name)
+            accessor.foreach { a =>
+              newField = newField.copy(dataType = enrichSchemaCommentsFromCaseClass(dt, a.returnType))
+            }
+          case dt: ArrayType if dt.elementType.isInstanceOf[StructType] =>
+            val accessor = tpeAccessors.find(a => a.name.toString == field.name)
+            accessor.foreach { a =>
+              val elementTpe = a.returnType.typeArgs.head
+              newField = newField.copy(dataType = dt.copy(elementType = enrichSchemaCommentsFromCaseClass(dt.elementType.asInstanceOf[StructType], elementTpe)))
+            }
+          case _ => () // nothing to do otherwise
+        }
+        // enrich comment
+        val comment = scaladocParamTags.find(p => p.name == field.name)
+        comment.foreach(c => newField = newField.withComment(ScaladocUtil.formatScaladocMarkup(c.markup)))
+        // return
+        newField
+      }
+      StructType(newFields)
+    } else schema
   }
 
   def getSchemaFromJavaBean(beanClass: Class[_]): StructType = {

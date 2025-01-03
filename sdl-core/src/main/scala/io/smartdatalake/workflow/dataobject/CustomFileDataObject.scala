@@ -29,6 +29,10 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileCreatorConfig
 
+/**
+ * The CustomFileDataObject can be used to read custom data and handle it like a file by creating an InputStream from the data.
+ * For example it can be used with a FileTransferAction to write the custom data to a Filesystem.
+ */
 case class CustomFileDataObject(override val id: DataObjectId,
                                 creator: CustomFileCreatorConfig,
                                 override val metadata: Option[DataObjectMetadata] = None

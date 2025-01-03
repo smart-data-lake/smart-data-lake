@@ -18,12 +18,14 @@
  */
 package io.smartdatalake.config
 
-import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import io.smartdatalake.workflow.action.Action
+import io.smartdatalake.config.SdlConfigObject.{ConfigObjectId, DataObjectId}
+import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, ExpectationValidation}
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
 /**
  * Registers instantiated SDL first class objects ([[io.smartdatalake.workflow.action.Action]]s,
@@ -38,7 +40,10 @@ class InstanceRegistry {
    *
    * @param instancesToAdd the instances to add.
    */
-  def register[A <: ConfigObjectId, B <: SdlConfigObject](instancesToAdd: Map[A, B]): Unit = instances ++= instancesToAdd
+  def register[A <: ConfigObjectId, B <: SdlConfigObject](instancesToAdd: Map[A, B]): Unit = {
+    instances ++= instancesToAdd
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+  }
 
   /**
    * Add all instances from `instancesToAdd` to this instance registry, overwriting existing entries the same ids.
@@ -53,6 +58,7 @@ class InstanceRegistry {
    * @param instance the instance to register
    */
   def register(instance: SdlConfigObject): Unit = {
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
     instances(instance.id) = instance
   }
 
@@ -62,7 +68,14 @@ class InstanceRegistry {
    * @param objectId the id of the instance.
    * @return the instance registered with this id
    */
-  def get[A <: SdlConfigObject](objectId: ConfigObjectId): A = instances(objectId).asInstanceOf[A]
+  def get[A <: SdlConfigObject : TypeTag : ClassTag](objectId: ConfigObjectId): A = {
+    instances(objectId) match {
+      case x: A => x
+      case x =>
+        val expectedType = typeOf[A].toString.replaceAll(classOf[DataObject].getPackage.getName + ".", "")
+        throw TypeMismatchException(s"Cannot cast $objectId to ${typeOf[A]}", x.getClass, expectedType)
+    }
+  }
 
   /**
    * Remove a registered instance from the registry.
@@ -71,7 +84,10 @@ class InstanceRegistry {
    * @return  an option value with the instance that was registered with this id
    *          or `None` if no instance was registered with this id.
    */
-  def remove(objectId: ConfigObjectId): Option[SdlConfigObject] = instances.remove(objectId)
+  def remove(objectId: ConfigObjectId): Option[SdlConfigObject] = {
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+    instances.remove(objectId)
+  }
 
   /**
    * Empty the registry.
@@ -79,7 +95,10 @@ class InstanceRegistry {
    * Use this to clean up the registry and avoid memory leaks.
    * Registered instances can not be garbage collected by the JVM.
    */
-  def clear(): Unit = instances.clear()
+  def clear(): Unit = {
+    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+    instances.clear()
+  }
 
   /**
    * Returns registered Actions
@@ -95,4 +114,28 @@ class InstanceRegistry {
    * Returns registered Connections
    */
   def getConnections: Seq[Connection] = instances.values.collect{ case c: Connection => c}.toSeq
+
+  /**
+   * Returns Ids of DataObjects for which expectations and constraints should be validated on read, e.g. there is no DataFrame-Action having these DataObjects as output.
+   * Value is precomputed to avoid evaluation for every Action.
+   */
+  def getDataObjectIdsToValidateOnRead: Seq[DataObjectId] = {
+    if (_dataObjectIdsToValidateOnRead.isEmpty) {
+      // only DataObjects that can Create/Write DataFrames with ExpectationValidation are relevant
+      val expectationValidationDataObjects = getDataObjects.collect{case x: CanCreateDataFrame with CanWriteDataFrame with ExpectationValidation => x}
+      // get DataObjects that are written by an Action using DataFrames
+      val dataFrameActions = getActions.collect{case x: DataFrameActionImpl => x}.flatMap(_.outputs)
+      // all DataObjects which are not used as an output should be validated on read
+      _dataObjectIdsToValidateOnRead = Some(expectationValidationDataObjects.map(_.id).diff(dataFrameActions.map(_.id)))
+    }
+    _dataObjectIdsToValidateOnRead.get
+  }
+  private var _dataObjectIdsToValidateOnRead: Option[Seq[DataObjectId]] = None
+
+  /**
+   * Check if this is DataObject should be validated on read
+   */
+  def shouldValidateDataObjectOnRead(id: DataObjectId): Boolean = getDataObjectIdsToValidateOnRead.contains(id)
 }
+
+case class TypeMismatchException(msg: String, currentClass: Class[_], expectedType: String) extends Exception(msg)

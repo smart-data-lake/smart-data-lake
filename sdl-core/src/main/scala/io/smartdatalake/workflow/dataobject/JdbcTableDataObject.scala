@@ -33,6 +33,7 @@ import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions._
@@ -166,6 +167,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       val missingPartitionColumns = partitions.toSet.diff(getExistingSchema.get.fieldNames.toSet)
       assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
+
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -231,10 +234,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
-    validateSchemaMin(SparkSchema(df.schema), "write")
+    val genericDf = SparkDataFrame(df)
+    validateSchemaMin(genericDf.schema, "write")
     validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
+    validateSchemaHasPrimaryKeyCols(df, "write")
+    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     if (isTableExisting) {
       if (allowSchemaEvolution) evolveTableSchema(saveModeTargetDf.schema)
       else validateSchemaOnWrite(saveModeTargetDf)
@@ -251,7 +255,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     val existingSchema = SparkSchema(getExistingSchema.get)
-    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema]
+    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SparkSchema(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     // prepare changes
     val newColumns = newSchema.columns.diff(existingSchema.columns) // add new column
     val missingNotNullColumns = existingSchema.columns.diff(newSchema.columns) // make missing columns nullable
@@ -295,11 +299,13 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                              (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
-    validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
-    if (!allowSchemaEvolution) validateSchemaOnWrite(saveModeTargetDf)
+    val genericDf = SparkDataFrame(df)
+    val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
+    val targetSchema = targetDf.schema
+    validateSchemaMin(SparkSchema(targetSchema), "write")
+    validateSchemaHasPartitionCols(targetDf, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
+    if (!allowSchemaEvolution) validateSchemaOnWrite(targetDf)
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
@@ -444,7 +450,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema].inner)
+      if (!Environment.caseSensitive) cachedExistingSchema = Some(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     }
     cachedExistingSchema
   }

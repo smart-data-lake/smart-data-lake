@@ -24,7 +24,7 @@ import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, IcebergModulePlugin, IcebergTableDataObject, IcebergTestUtils, Table}
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -69,11 +69,12 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l1, Seq())(context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
      action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+     action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
      action1.exec(Seq(srcSubFeed))(context1)
 
      {
-       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)))
+       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp))
          .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
          .drop(Historization.historizeHashColName)
@@ -90,13 +91,14 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l2, Seq())(context1)
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
      action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
+     action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
      action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
      action2.exec(Seq(srcSubFeed2))(context2)
 
      {
        val expected = Seq(
          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
          .drop(Historization.historizeHashColName)
@@ -117,6 +119,7 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l3, Seq())(context3)
      val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())
      action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
+     action3.preInit(Seq(srcSubFeed), Seq())(context3.copy(phase = ExecutionPhase.Init))
      action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
      action3.exec(Seq(srcSubFeed3))(context3)
 
@@ -124,7 +127,7 @@ import java.time.LocalDateTime
        val expected = Seq(
          ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
          ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context3)
          .drop(Historization.historizeHashColName)
@@ -153,13 +156,14 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l1, Seq())(context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
      action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+     action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
      action1.exec(Seq(srcSubFeed))(context1)
 
      {
        val expected = Seq(
-         ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
-         ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+         ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp),
+         ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
          .drop(Historization.historizeDummyColName)
@@ -176,13 +180,14 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l2, Seq())(context1)
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
      action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
+     action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
      action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
      action2.exec(Seq(srcSubFeed2))(context2)
 
      {
        val expected = Seq(
          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
+         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp),
          ("pan","peter", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
@@ -204,6 +209,7 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l3, Seq())(context3)
      val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())
      action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
+     action3.preInit(Seq(srcSubFeed), Seq())(context3.copy(phase = ExecutionPhase.Init))
      action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
      action3.exec(Seq(srcSubFeed3))(context3)
 
@@ -211,7 +217,7 @@ import java.time.LocalDateTime
        val expected = Seq(
          ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
          ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
+         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp),
          ("pan","peter", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
        ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context3)
@@ -248,6 +254,7 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l1)(context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
      action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+     action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
      action1.exec(Seq(srcSubFeed))(context1)
 
@@ -267,6 +274,7 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l2)(context2)
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
      action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
+     action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
      action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
      action2.exec(Seq(srcSubFeed2))(context2)
 
@@ -299,6 +307,7 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l1)(context1)
      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
      action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+     action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
      action1.exec(Seq(srcSubFeed))(context1)
 
@@ -311,6 +320,7 @@ import java.time.LocalDateTime
      srcDO.writeSparkDataFrame(l2)(context2)
      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
      action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
+     action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
      action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
      action2.exec(Seq(srcSubFeed2))(context2)
 

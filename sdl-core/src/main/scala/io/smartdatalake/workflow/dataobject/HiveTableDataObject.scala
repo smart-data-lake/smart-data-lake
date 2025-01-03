@@ -32,11 +32,11 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
-import java.sql.Timestamp
 import scala.jdk.CollectionConverters._
 
 /**
@@ -253,7 +253,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     implicit val session: SparkSession = context.sparkSession
-    if(isTableExisting) HiveUtil.listPartitions(table, partitions)
+    if (isTableExisting) HiveUtil.listPartitions(table, partitions)
     else Seq()
   }
 

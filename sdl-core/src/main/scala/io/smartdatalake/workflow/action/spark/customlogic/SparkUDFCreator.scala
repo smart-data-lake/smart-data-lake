@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import org.apache.spark.sql.expressions.UserDefinedFunction
 
 

@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.json4s.JsonAST.{JInt, JNothing, JObject}
+import org.json4s.JsonAST.{JField, JInt, JNothing, JObject}
 import org.json4s.{JArray, JValue}
 
 /**
@@ -99,6 +99,35 @@ class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
               id => id \ "id"
             }))
         })
+    }.asInstanceOf[JObject]
+
+    // update version and return
+    updateVersion(migratedJson, versionTo)
+  }
+}
+
+/**
+ * Migrate state from format version 4 to 5:
+ * - buildVersionInfo is renamed to sdlbVersionInfo
+ * - appVersion: String is converted to appVersionInfo: Map[String,Any]
+ */
+class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
+  override val versionFrom = 4
+  override val versionTo = 5
+  override def migrate(json: JObject): JObject = {
+    assert(json \ "runStateFormatVersion" match {
+      case JInt(version) => version <= versionFrom
+      case JNothing => true // first state files did not have an attribute runStateFormatVersion
+    }, s"Version should be equals or less than $versionFrom")
+
+    // migrate json
+    val migratedJson = json.transformField {
+      case (name, buildVersionInfo) if name == "buildVersionInfo" =>
+        if (logger.isDebugEnabled) logger.debug(s"migrating buildVersionInfo $buildVersionInfo")
+        ("sdlbVersionInfo", buildVersionInfo)
+      case (name, appVersion) if name == "appVersion" =>
+        if (logger.isDebugEnabled) logger.debug(s"migrating appVersion $appVersion")
+        ("appVersionInfo", JObject(JField("version", appVersion)))
     }.asInstanceOf[JObject]
 
     // update version and return

@@ -178,6 +178,6 @@ trait FileRefDataObject extends FileDataObject {
   def saveMode: SDLSaveMode
 }
 
-private[smartdatalake] case class FileRef( fullPath:String, fileName: String, partitionValues: PartitionValues) {
+case class FileRef( fullPath:String, fileName: String, partitionValues: PartitionValues) {
   def toStringShort: String = if (fullPath != "") fullPath else fileName
 }

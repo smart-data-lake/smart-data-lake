@@ -24,8 +24,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.json4s.{JArray, JLong, JNothing, JNull, JString, JValue}
-import org.json4s.JsonAST.{JBool, JObject, JValue}
+import org.json4s.JsonAST.{JBool, JObject}
+import org.json4s.{JArray, JNothing, JString, JValue}
 
 import scala.reflect.runtime.universe.Type
 
@@ -43,7 +43,11 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def schema: GenericSchema
 
-  def join(other: GenericDataFrame, joinCols: Seq[String]): GenericDataFrame
+  def columns: Seq[String] = schema.columns
+
+  def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String = "inner"): GenericDataFrame
+
+  def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): GenericDataFrame
 
   def select(columns: Seq[GenericColumn]): GenericDataFrame
   def select(column: GenericColumn): GenericDataFrame = select(Seq(column))
@@ -67,8 +71,16 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def drop(colName: String): GenericDataFrame
 
+  def drop(col: GenericColumn): GenericDataFrame
+
   def createOrReplaceTempView(viewName: String): Unit
 
+  def dropDuplicates(cols: Seq[String]): GenericDataFrame
+
+  /**
+   * isEmpty evaluates the DataFrame and checks if the result size = 0.
+   * @return
+   */
   def isEmpty: Boolean
 
   def count: Long
@@ -76,6 +88,8 @@ trait GenericDataFrame extends GenericTypedObject {
   def cache: GenericDataFrame
 
   def uncache: GenericDataFrame
+
+  def as(alias: String): GenericDataFrame
 
   // instantiate subfeed helper
   private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
@@ -99,6 +113,15 @@ trait GenericDataFrame extends GenericTypedObject {
    * @return an Observation object which can return observed metrics after execution
    */
   def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation)
+
+  /**
+   * Observe metrics on this DataFrame.
+   * Note that this doesn't create a listener. These metrics will only be collected together using setupObservation.
+   * @param name name of the observation
+   * @param aggregateColumns aggregate columns to observe on the DataFrame
+   * @return the modified DataFrame
+   */
+  def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame
 
   /**
    * returns data frame which consists of those rows which contain at least a null in the specified columns
@@ -210,7 +233,8 @@ trait GenericDataFrame extends GenericTypedObject {
    * @return true if both data frames have the same cardinality, schema (ignoring nullability) and an empty symmetric difference
    */
   def isSchemaEqualIgnoreNullabilty(other: GenericDataFrame): Boolean = {
-    SchemaUtil.schemaDiff(this.schema, other.schema, ignoreNullable = true).isEmpty && SchemaUtil.schemaDiff(other.schema, this.schema, ignoreNullable = true).isEmpty
+    val (thisMinusOther, otherMinusThis) = SchemaUtil.schemaDiff2(this.schema.fields, other.schema.fields, ignoreNullable = true)
+    thisMinusOther.isEmpty && otherMinusThis.isEmpty
   }
 
   /**
@@ -263,7 +287,8 @@ trait GenericSchema extends GenericTypedObject {
     GenericSchemaUtil.columnExists(this, colName)
   }
   def toJson: JArray = JArray(fields.map(_.toJson).toList)
-  def treeString(level: Int): String
+
+  def treeString(level: Int = Int.MaxValue): String
 }
 
 /**
@@ -271,6 +296,8 @@ trait GenericSchema extends GenericTypedObject {
  */
 trait GenericColumn extends GenericTypedObject {
   def ===(other: GenericColumn): GenericColumn
+
+  def =!=(other: GenericColumn): GenericColumn
   def >(other: GenericColumn): GenericColumn
   def <(other: GenericColumn): GenericColumn
   def +(other: GenericColumn): GenericColumn
@@ -282,6 +309,8 @@ trait GenericColumn extends GenericTypedObject {
   @scala.annotation.varargs
   def isin(list: Any*): GenericColumn
   def isNull: GenericColumn
+
+  def isNotNull: GenericColumn
   def as(name: String): GenericColumn
   def cast(dataType: GenericDataType): GenericColumn
   /**
@@ -290,6 +319,7 @@ trait GenericColumn extends GenericTypedObject {
   def exprSql: String
   def desc: GenericColumn
   def apply(extraction: Any): GenericColumn
+  def getName: Option[String]
 }
 
 /**
@@ -318,14 +348,31 @@ trait GenericField extends GenericTypedObject {
  */
 trait GenericDataType extends GenericTypedObject {
   def isSortable: Boolean
-  def isSimpleType: Boolean
+
+  def isSimpleType: Boolean = this.isInstanceOf[GenericSimpleDataType]
+
+  def isSameType(other: GenericDataType): Boolean
   def typeName: String
   def sql: String
   def makeNullable: GenericDataType
   def toLowerCase: GenericDataType
   def removeMetadata: GenericDataType
-  def isNumeric: Boolean
   def toJson: JValue
+
+  protected def standardizeTypeName(name: String) = name.toLowerCase match {
+    case "integer" => "int"
+    case d if d.startsWith("decimal") => "decimal"
+    case x => x
+  }
+}
+
+/**
+ * Mixin trait for a SimpleDataType in addition to interface GenericDataType.
+ */
+trait GenericSimpleDataType {
+  def isNumeric: Boolean
+
+  def getDecimalSpec: Option[(Int, Int)]
 }
 
 /**
@@ -333,11 +380,19 @@ trait GenericDataType extends GenericTypedObject {
  */
 trait GenericStructDataType { this: GenericDataType =>
   def fields: Seq[GenericField]
+
+  def fieldIndex(fieldName: String): Int
+
+  def fieldNames: Seq[String] = fields.map(_.name)
   def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField],Seq[GenericField]) => T): T
   def toJson: JValue = JObject(
     "dataType" -> JString("struct"),
     "fields" -> JArray(fields.map(_.toJson).toList)
   )
+
+  def size: Int = fields.size
+
+  def getDataType(fieldName: String): GenericDataType = fields.find(_.name == fieldName).map(_.dataType).get
 }
 
 /**
@@ -374,7 +429,18 @@ trait GenericMapDataType { this: GenericDataType =>
  */
 trait GenericRow extends GenericTypedObject {
   def get(index: Int): Any
+
+  def getStruct(index: Int): GenericRow
   def getAs[T](index: Int): T
   //Note: getAs[T](fieldName: String) can not be implemented as in Snowpark a Row does not know the names of its fields!
   def toSeq: Seq[Any]
+
+  def size: Int = toSeq.size
+}
+
+/**
+ * Interface to define a GenericUdf
+ */
+trait GenericUnaryUdf extends GenericTypedObject {
+  def convert(genericColumn: GenericColumn): GenericColumn
 }

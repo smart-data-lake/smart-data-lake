@@ -53,8 +53,6 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
       this.copy(partitionValues = updatedPartitionValues).breakLineage
     } else this.copy(partitionValues = updatedPartitionValues)
   }
-  override def clearDAGStart(): InitSubFeed = throw new NotImplementedException() // calling clearDAGStart makes no sense on InitSubFeed
-  override def clearSkipped(): InitSubFeed = throw new NotImplementedException() // calling clearSkipped makes no sense on InitSubFeed
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped)
@@ -65,8 +63,4 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
   def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
   }
-  override def withMetrics(metrics: MetricsMap): InitSubFeed = {
-    this.copy(metrics = Some(metrics))
-  }
-  def appendMetrics(metrics: MetricsMap): InitSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 }

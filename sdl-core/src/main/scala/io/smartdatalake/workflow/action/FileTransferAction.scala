@@ -22,11 +22,11 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
-import io.smartdatalake.util.filetransfer.{FileTransfer, StreamFileTransfer}
+import io.smartdatalake.util.filetransfer.StreamFileTransfer
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 
 /**
  * [[Action]] to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.
@@ -43,10 +43,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
  * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
  *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
  *                               Default is None which keeps the whole filename (without path).
- * @param executionMode optional execution mode for this Action
- * @param executionCondition optional spark sql expression evaluated against [[SubFeedsExpressionData]]. If true Action is executed, otherwise skipped. Details see [[Condition]].
- * @param metricsFailCondition optional spark sql expression evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
- *                             If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
  * @param breakFileRefLineage If set to true, file references passed on from previous action are ignored by this action.
  *                            The action will detect on its own what files it is going to process.
  */
@@ -92,10 +88,10 @@ case class FileTransferAction(override val id: ActionId,
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->filesWritten) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    subFeed.withMetrics(metrics)
+    subFeed.withMetrics(metrics).asInstanceOf[FileSubFeed]
   }
 
-  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
+  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
     // create output sample file in init-phase
     if (context.phase == ExecutionPhase.Init) {
       subFeed.fileRefMapping.flatMap(_.headOption).foreach {

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.dag.DAGResult
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 
@@ -48,9 +48,11 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
 
   def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): SubFeed
 
-  def clearDAGStart(): SubFeed
+  def clearDAGStart(): SubFeed = ProductUtil.dynamicCopy(this, "isDAGStart", false)
 
-  def clearSkipped(): SubFeed
+  def clearSkipped(): SubFeed = ProductUtil.dynamicCopy(this, "isSkipped", false)
+
+  def setSkipped(): SubFeed = ProductUtil.dynamicCopy(this, "isSkipped", true)
 
   def toOutput(dataObjectId: DataObjectId): SubFeed
 
@@ -67,9 +69,9 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed
   def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed
 
-  def withMetrics(metrics: MetricsMap): SubFeed
+  def withMetrics(metrics: MetricsMap): SubFeed = ProductUtil.dynamicCopy(this, "metrics", Some(metrics))
 
-  def appendMetrics(metrics: MetricsMap): SubFeed
+  def appendMetrics(metrics: MetricsMap): SubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 
 }
 object SubFeed {

@@ -18,13 +18,17 @@
  */
 package io.smartdatalake.util.historization
 
-import io.smartdatalake.definitions.TechnicalTableColumn
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.dataframe.DataFrameFunctions
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
+
+import java.time.Duration
 
 /**
  * Unit tests for historization
@@ -34,6 +38,9 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
 
   private implicit val session: SparkSession = TestUtil.session
   import session.implicits._
+
+  implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
+  import functions._
 
   // here fullHistorize and incrementalHistorize differ:
   // - incrementalHistorize closes existing record and creates new record if schema changes (but only for current records).
@@ -47,20 +54,20 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "new_col1")
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = false)
-      .drop($"dl_hash")
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
+      .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val dataExpected = Seq(
-      (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, referenceTimestampOldTs),
+      (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
       (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs),
-      (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, referenceTimestampOldTs),
+      (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
       (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs)
     )
-    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResult("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) TestUtil.printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -73,7 +80,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     // nothing to do if unchanged
@@ -86,10 +93,10 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     if (logger.isDebugEnabled) logger.debug(s"History at beginning:\n${dfOldHist.showString()}")
 
     val baseColumnsNewFeed = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
-    val dfNewFeed = toDataDf(baseColumnsNewFeed).select($"age", $"health_state", $"id", $"name")
+    val dfNewFeed = toDataDf(baseColumnsNewFeed).select(Seq(col("age"), col("health_state"), col("id"), col("name")))
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     // nothing to do if unchanged
@@ -106,18 +113,18 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = true)
-      .drop($"dl_hash")
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+      .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUpdatedOld = List((123, "Egon", 23, "sick")) // note that incremental historization uses attribute values of the new records (health_state=sick) for UpdatedOld, but it will only update dl_delimited in the target table (and not use the value of health_state).
     val dfUpdatedOld = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld, withOperation = true)
     val baseColumnsUpdatedNew = List((123, "Egon", 23, "sick"))
     val dfUpdatedNew = toHistorizedDf(baseColumnsUpdatedNew, HistorizationPhase.UpdatedNew, withOperation = true)
-    val dfExpected = dfUpdatedNew.union(dfUpdatedOld)
+    val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResult("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
+    if (!result) TestUtil.printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -130,15 +137,15 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = true)
-      .drop($"dl_hash")
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+      .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsUpdatedOld: List[(Int, String, java.lang.Integer, String)] = List((123, "Egon", null, null)) // note that incremental historization has no attribute values for UpdatedOld, but it will only update dl_delimited in the target table.
     val dfExpected = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResult("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
+    if (!result) TestUtil.printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -151,15 +158,15 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = true)
-      .drop($"dl_hash")
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+      .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsAdded = List((125, "Edeltraut", 54, "healthy"))
     val dfExpected = toHistorizedDf(baseColumnsAdded, HistorizationPhase.NewlyAdded, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResult("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
+    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -170,22 +177,22 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val baseColumnsOldDeletedHist = List((124, "Erna", 27, "healthy"))
     val dfOldDeletedHist = toHistorizedDf(baseColumnsOldDeletedHist, HistorizationPhase.TechnicallyDeleted, withHashCol = true)
 
-    val dfOldHist = dfOldExistingHist.union(dfOldDeletedHist)
+    val dfOldHist = dfOldExistingHist.unionByName(dfOldDeletedHist)
     if (logger.isDebugEnabled) logger.debug(s"History at beginning:\n${dfOldHist.showString()}")
 
     val baseColumnsNewFeed = List((123, "Egon", 23, "healthy"), (124, "Erna", 28, "healthy"))
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNew, None, None, addExistingDfHashColumn = true)
-      .drop($"dl_hash")
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+      .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val baseColumnsAdded = List((124, "Erna", 28, "healthy"))
     val dfExpected = toHistorizedDf(baseColumnsAdded, HistorizationPhase.NewlyAdded, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResult("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
+    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -197,15 +204,43 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val baseColumnsNewFeed: List[(Int, String, java.lang.Integer, String)] = List((123, "Egon", 23, null))
     val dfNew = toDataDf(baseColumnsNewFeed)
 
-    val dfHistorized = Historization.incrementalHistorize(dfHistory, dfNew, Seq("id"), referenceTimestampNew, None, None, addExistingDfHashColumn = false)
-      .drop($"dl_hash")
+    val dfHistorized = Historization.incrementalHistorize(dfHistory, dfNew, Seq("id"), referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
+      .drop("dl_hash")
 
     val dfExpected = toHistorizedDf(baseColumnsNewFeed, HistorizationPhase.UpdatedOld, withOperation = true) // note that incremental historization uses attribute values of the new records for UpdatedOld, but it will only update dl_delimited in the target table (and not use the value of health_state).
-      .union(toHistorizedDf(baseColumnsNewFeed, HistorizationPhase.NewlyAdded, withOperation = true))
+      .unionByName(toHistorizedDf(baseColumnsNewFeed, HistorizationPhase.NewlyAdded, withOperation = true))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResult("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
+    if (!result) TestUtil.printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
     assert(result)
+  }
+
+  test("When timeAxisUnit=0, history with half-open intervals should be created") {
+    val timeAxisUnitNone: Option[Duration] = None
+
+    val baseColumnsOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
+    val dfOldHist = toHistorizedDf(baseColumnsOldHist, HistorizationPhase.Existing, withHashCol = true)
+    if (logger.isDebugEnabled) logger.debug(s"History at beginning:\n${dfOldHist.showString()}")
+
+    val baseColumnsNewFeed = List((123, "Egon", 23, "sick"), (124, "Erna", 27, "healthy"))
+    val dfNewFeed = toDataDf(baseColumnsNewFeed)
+    if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
+
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, timeAxisUnitNone, None, None, addExistingDfHashColumn = true)
+      .drop("dl_hash")
+    if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
+
+    val baseColumnsUpdatedOld = List((123, "Egon", 23, "sick")) // note that incremental historization uses attribute values of the new records (health_state=sick) for UpdatedOld, but it will only update dl_delimited in the target table (and not use the value of health_state).
+    val dfUpdatedOld = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld, withOperation = true, timeUnitAxis = timeAxisUnitNone)
+    val baseColumnsUpdatedNew = List((123, "Egon", 23, "sick"))
+    val dfUpdatedNew = toHistorizedDf(baseColumnsUpdatedNew, HistorizationPhase.UpdatedNew, withOperation = true, timeUnitAxis = timeAxisUnitNone)
+    val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld)
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) TestUtil.printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
+    assert(result)
+
+    assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + Environment.delimitedColumnName) === col("b." + Environment.capturedColumnName), "inner").count == 1)
   }
 
 }

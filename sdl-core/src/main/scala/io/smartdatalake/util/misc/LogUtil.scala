@@ -53,4 +53,25 @@ private[smartdatalake] object LogUtil {
     if (s == null) return Seq()
     s.split("(\r)?\n").toSeq.filter(_.nonEmpty)
   }
+
+  /**
+   * Get Exception class simple name and message, and the same for the root cause.
+   */
+  def getExceptionSummary(ex: Exception): String = {
+    val rootCause = Option(ex.getCause).map(getRootCause)
+    val rootCauseString = rootCause.map(c => s", RootCause: ${getSimpleExceptionStr(c)}")
+    s"Exception: ${getSimpleExceptionStr(ex)}${rootCauseString.getOrElse("")}"
+  }
+
+  /**
+   * Get Exception class simple name and message, e.g. 'ConfigurationException: test msg'
+   */
+  def getSimpleExceptionStr(ex: Throwable) = s"${ex.getClass.getSimpleName}: ${ex.getMessage}"
+
+  /**
+   * recursively get root cause of exception
+   */
+  def getRootCause(cause: Throwable): Throwable = {
+    Option(cause.getCause).map(getRootCause).getOrElse(cause)
+  }
 }

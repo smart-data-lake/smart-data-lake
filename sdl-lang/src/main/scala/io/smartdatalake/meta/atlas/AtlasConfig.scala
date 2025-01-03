@@ -20,8 +20,8 @@
 package io.smartdatalake.meta.atlas
 
 import com.typesafe.config.Config
-import io.smartdatalake.definitions.{AuthMode, BasicAuthMode}
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.connection.authMode.{BasicAuthMode, HttpAuthMode}
 
 //TODO: use kxbmap configs to read Hocon Config into case class, as done in SDL...
 case class AtlasConfig(config: Config) {
@@ -48,7 +48,7 @@ case class AtlasConfig(config: Config) {
     config.get[String]("typeDefPrefix").value
   }
 
-  def getAtlasAuth: Option[AuthMode] = {
+  def getAtlasAuth: Option[HttpAuthMode] = {
     val auth = config.get[Map[String, String]]("atlasServer.auth").value
     //Some(TokenAuthMode(auth("token")))
     Some(BasicAuthMode(Some(StringOrSecret(auth("user"))), Some(StringOrSecret(auth("password")))))

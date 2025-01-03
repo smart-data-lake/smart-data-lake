@@ -18,21 +18,17 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.sql.Timestamp
-import java.time.LocalDateTime
-import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, InitSubFeed, SubFeed}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
+import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitSubFeed, SubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
 
+import java.sql.Timestamp
+import java.time.LocalDateTime
 import scala.reflect.runtime.universe.Type
 
 /**
@@ -80,14 +76,14 @@ object ActionHelper extends SmartDataLakeLogger {
    * @param df [[DataFrame]] to compare with
    * @param tstmpColName the timestamp column of the dataframe
    */
-  def checkDataFrameNotNewerThan(timestamp: LocalDateTime, df: DataFrame, tstmpColName: String)(implicit session: SparkSession): Unit = {
-    import session.implicits._
-
+  def checkDataFrameNotNewerThan(timestamp: Timestamp, df: GenericDataFrame, tstmpColName: String): Unit = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
     logger.info("starting checkDataFrameNotNewerThan")
-    session.sparkContext.setJobDescription("checkDataFrameNotNewerThan")
-    val existingLatestCaptured = df.agg(max(col(tstmpColName))).as[Timestamp].collect().find(_ != null)
+    val existingLatestCaptured = df.agg(Seq(max(col(tstmpColName)))).collect.headOption
+      .map(_.getAs[Timestamp](0)).filter(_ != null)
     if (existingLatestCaptured.isDefined) {
-      if (timestamp.compareTo(existingLatestCaptured.get.toLocalDateTime) < 0) {
+      if (timestamp.compareTo(existingLatestCaptured.get) < 0) {
         throw new TimeOrderLogicException(
           s"""
              | When using historize, the timestamp of the current load mustn't be older
@@ -147,11 +143,15 @@ object ActionHelper extends SmartDataLakeLogger {
     sql.replaceAll("\\s"+inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX)+"(\\s|\\.|$)", s" $inputViewName" + "$1")
   }
 
+  def createSkippedSubFeed(output: DataObject): SubFeed = {
+    InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true)
+  }
+
   /**
    * Create results for skipped actions, e.g. InitSubFeeds with isSkipped = true
    */
   def createSkippedSubFeeds(outputs: Seq[DataObject]): Seq[SubFeed] = {
-    outputs.map(output => InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true))
+    outputs.map(output => createSkippedSubFeed(output))
   }
 
   val TEMP_VIEW_POSTFIX = "_sdltemp"

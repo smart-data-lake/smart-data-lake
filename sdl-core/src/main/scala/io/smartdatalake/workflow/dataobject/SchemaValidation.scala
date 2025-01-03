@@ -71,7 +71,7 @@ trait SchemaValidation { this: DataObject =>
    * @param schema The schema to validate.
    * @param schemaExpected The expected schema to validate against.
    * @param role role used in exception message. Set to read or write.
-   * @throws SchemaViolationException is the `schemaMin` does not validate.
+   * @throws SchemaViolationException if the `schema` does not validate.
    */
   def validateSchema(schema: GenericSchema, schemaExpected: GenericSchema, role: String): Unit = {
     val missingCols = schemaExpected.diffSchema(schema)

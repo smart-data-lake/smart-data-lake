@@ -126,7 +126,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       schemaMin = Some(schemaMin),
       tableName = "source_table",
       dirPath = tempPath,
-      df = DataFrameUtil.getEmptyDataFrame(schema),
+      df = TestUtil.arbitraryDataFrame(schema,1),
       primaryKeyColumns = Some(Seq("id"))
     )
 
@@ -142,7 +142,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       schemaMin = Some(schemaMin),
       tableName = "source_table",
       dirPath = tempPath,
-      df = DataFrameUtil.getEmptyDataFrame(schema),
+      df = TestUtil.arbitraryDataFrame(schema,1),
       primaryKeyColumns = Some(Seq("id"))
     )
 
@@ -158,7 +158,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       schemaMin = Some(schemaMin),
       tableName = "source_table",
       dirPath = tempPath,
-      df = DataFrameUtil.getEmptyDataFrame(schema),
+      df = TestUtil.arbitraryDataFrame(schema,1),
       primaryKeyColumns = Some(Seq("id"))
     )
 
@@ -178,7 +178,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       schemaMin = Some(schemaMin),
       tableName = "source_table",
       dirPath = tempPath,
-      df = DataFrameUtil.getEmptyDataFrame(schema),
+      df = TestUtil.arbitraryDataFrame(schema,1),
       primaryKeyColumns = Some(Seq("id"))
     )
 
@@ -198,7 +198,7 @@ class HiveTableSchemaViolationTest extends FunSuite with Matchers with BeforeAnd
       schemaMin = Some(schemaMin),
       tableName = "source_table",
       dirPath = tempPath,
-      df = DataFrameUtil.getEmptyDataFrame(schema),
+      df = TestUtil.arbitraryDataFrame(schema,1),
       primaryKeyColumns = Some(Seq("id"))
     )
 

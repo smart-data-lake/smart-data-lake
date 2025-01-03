@@ -20,12 +20,11 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.dag.TaskFailedException.getRootCause
+import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 
 /**
  * Configuration to notify interested parties about action results & metric
@@ -63,13 +62,13 @@ trait StateListener {
   def init(context: ActionPipelineContext): Unit = ()
 
   /**
-   * notifyState is called whenever an action is finished (succeeded or failed) and at the end of the DAG execution (success or failure).
+   * notifyState is called whenever the state of an action changes, and at the end of the DAG execution (success or failure).
    * It always includes the state of all actions of the DAG.
    * At the end of the DAG execution notifyState is called with the final state. In this case state.isFinal = true and changedActionId is empty.
    *
    * @param state of the currently active part of the DAG
    * @param context information
-   * @param changedActionId : if notification is triggered by an action state changes, this is the action corresponding.
+   * @param changedActionId : if notification is triggered by an action state changes, this is the Id of the changed action
    */
   def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit
 }

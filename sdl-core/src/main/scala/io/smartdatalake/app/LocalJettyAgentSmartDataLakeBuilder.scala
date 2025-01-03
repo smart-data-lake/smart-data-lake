@@ -20,11 +20,9 @@ package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
 import io.smartdatalake.communication.agent.{AgentServerController, JettyAgentServer, JettyAgentServerConfig}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
-
-import java.io.File
 
 /**
  * Smart Data Lake Builder application for agent mode using simple, unsecure websocket communication with Jetty.
@@ -33,7 +31,7 @@ import java.io.File
  */
 object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
-  val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
+  private val agentParser: OParser[_, LocalJettyAgentSmartDataLakeBuilderConfig] = {
     val builder = OParser.builder[LocalJettyAgentSmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
@@ -50,12 +48,12 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
    * @param args Command-line arguments.
    */
   def main(args: Array[String]): Unit = {
-    logger.info(s"Starting Program $appType v$appVersion")
+    logProgramStart()
 
     val envconfig = LocalJettyAgentSmartDataLakeBuilderConfig(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',')),
+      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',').toSeq).getOrElse(Seq()),
       parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
       statePath = sys.env.get("SDL_STATE_PATH"),
       applicationName = Some("AgentServer")
@@ -65,57 +63,24 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
       case Some(agentServerConfig) =>
         val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
         JettyAgentServer.start(agentServerConfig, agentController)
-      case None => logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+      case None =>
+        throwOParserError()
     }
   }
 }
+
 case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
                                                      override val applicationName: Option[String] = None,
-                                                     override val configuration: Option[Seq[String]] = None,
+                                                     override val configuration: Seq[String] = Seq(),
+                                                     override val configurationValueOverwrite: Map[String, String] = Map(),
                                                      override val master: Option[String] = None,
                                                      override val deployMode: Option[String] = None,
-                                                     override val username: Option[String] = None,
-                                                     override val kerberosDomain: Option[String] = None,
-                                                     override val keytabPath: Option[File] = None,
                                                      override val partitionValues: Option[Seq[PartitionValues]] = None,
-                                                     override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                                      override val parallelism: Int = 1,
                                                      override val statePath: Option[String] = None,
-                                                     override val overrideJars: Option[Seq[String]] = None,
                                                      override val test: Option[TestMode.Value] = None,
                                                      override val streaming: Boolean = false,
                                                      port: Int = DefaultPort,
                                                      maxPortRetries: Int = MaxPortRetries
                                                     )
-
-  extends SmartDataLakeBuilderConfigTrait[LocalJettyAgentSmartDataLakeBuilderConfig] {
-  override def withfeedSel(value: String): LocalJettyAgentSmartDataLakeBuilderConfig = copy(feedSel = value)
-
-  override def withapplicationName(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(keytabPath = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): LocalJettyAgentSmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): LocalJettyAgentSmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): LocalJettyAgentSmartDataLakeBuilderConfig = copy(streaming = value)
-}
+  extends CanBuildSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig]

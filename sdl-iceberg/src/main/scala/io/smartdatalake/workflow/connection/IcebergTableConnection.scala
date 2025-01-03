@@ -31,7 +31,10 @@ import io.smartdatalake.util.misc.AclDef
  * @param db database to be used for this connection
  * @param pathPrefix schema, authority and base path for tables directory on hadoop
  * @param acl permissions for files created with this connection
- * @param metadata
+ * @param checkIcebergSparkOptions if true check if IcebergSparkSessionExtensions is registered through spark.sql.extensions property.
+ * Default is true.
+ * @param addFilesParallelism Number of thread to use for file reading when migrating table from parquet to iceberg using procedure 'system.add_files'.
+ * Icberg Default value is 1, but should be increased for acceptable performance with larger tables.
  */
 case class IcebergTableConnection(override val id: ConnectionId,
                                   catalog: Option[String] = None,
@@ -39,6 +42,7 @@ case class IcebergTableConnection(override val id: ConnectionId,
                                   pathPrefix: String,
                                   acl: Option[AclDef] = None,
                                   checkIcebergSparkOptions: Boolean = true,
+                                  addFilesParallelism: Option[Int] = None,
                                   override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {
 

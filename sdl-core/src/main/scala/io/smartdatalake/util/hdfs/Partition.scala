@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.hdfs
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.DataFrameSubFeedCompanion
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 
@@ -156,7 +157,7 @@ object PartitionValues {
    * @param df DataFrame with partition columns only selected. All columns will be handled as string.
    */
   def fromDataFrame(df: GenericDataFrame): Seq[PartitionValues] = {
-    val cols = df.schema.columns
+    val cols = if (Environment.caseSensitive) df.schema.columns else df.schema.columns.map(_.toLowerCase)
     df.distinct.collect.map {
       row => PartitionValues(cols.zipWithIndex.map{ case (c,idx) => (c,row.getAs[Any](idx).toString)}.toMap)
     }

@@ -56,8 +56,8 @@ case class DebugTransformer(override val name: String = "debug", override val de
                            , logLevel: String = "info"
                            , titleMarker: String = "###"
                            ) extends GenericDfTransformer with SmartDataLakeLogger {
-  private val logEvent = logger.atLevel(Level.valueOf(logLevel.toUpperCase))
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val logEvent = logger.atLevel(Level.valueOf(logLevel.toUpperCase))
     def getLogMsg(logType: String, content: String) = {
       s"($actionId.$name) '$logType' debug output for $titleMarker $dataObjectId $titleMarker" + System.lineSeparator() + content
     }

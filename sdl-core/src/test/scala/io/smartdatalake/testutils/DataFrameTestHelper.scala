@@ -20,6 +20,8 @@
 package io.smartdatalake.testutils
 
 import io.circe.yaml
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, count, to_timestamp}
@@ -222,6 +224,12 @@ object DataFrameTestHelper {
       }
       val messageColumns = if (colsWhichDiff.nonEmpty) s"The difference is probably in columns : ${colsWhichDiff.mkString(",")}" else ""
       assert(assertion = false, Seq(messageRows, messageColumns).filter(message => !message.isEmpty).mkString("\n"))
+    }
+  }
+
+  def assertDataFramesEqualGeneric(dfExpected: GenericDataFrame, dfActual: GenericDataFrame, ignoreColumnOrder: Boolean = true, ignoreNullability: Boolean = true): Unit = {
+    (dfExpected, dfActual) match {
+      case (dfExpected: SparkDataFrame, dfActual: SparkDataFrame) => assertDataFramesEqual(dfExpected.inner, dfActual.inner, ignoreColumnOrder, ignoreNullability)
     }
   }
 

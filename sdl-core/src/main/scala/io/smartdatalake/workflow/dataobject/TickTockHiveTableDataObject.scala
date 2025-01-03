@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 

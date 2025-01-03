@@ -19,24 +19,24 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.testutils.TestUtil
-import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.scalatest.FunSuite
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
 import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
-import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB}
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
-import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB}
 import io.smartdatalake.workflow.action.SDLExecutionId
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.scalatest.FunSuite
 
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -59,7 +59,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
   val test_key = "A%D*G-KaPdSgVkYp"
 
   def run_test(enc_type: String): sql.DataFrame = {
-    val sdlb = new DefaultSmartDataLakeBuilder()
+    val sdlb = DefaultSmartDataLakeBuilder
 
     val config = ConfigFactory.parseString(
       s"""
@@ -114,7 +114,7 @@ class EncryptColumnsTransformerTest extends FunSuite {
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = s"ids:actenc,ids:actdec")
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = s"ids:actenc,ids:actdec")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")

@@ -20,9 +20,10 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{DataFrame, DataFrameWriterV2, Row, SaveMode}
+import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
 
 import scala.language.implicitConversions
 
@@ -87,12 +88,13 @@ object SDLSaveMode extends Enumeration {
    */
   val Merge: Value = Value("Merge")
 
-  private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues]): Unit = {
+  private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     saveMode match {
       case SDLSaveMode.Append => writer.append()
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
       case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty => writer.overwrite(expr(partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql))
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty && partitionOverwriteModeDynamic => writer.overwritePartitions()
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
     }
   }
 }
@@ -102,7 +104,8 @@ object SDLSaveMode extends Enumeration {
  */
 sealed trait SaveModeOptions {
   private[smartdatalake] def saveMode: SDLSaveMode
-  private[smartdatalake] def convertToTargetSchema(df: DataFrame): DataFrame = df
+
+  private[smartdatalake] def convertToTargetSchema[D <: GenericDataFrame](df: D): D = df
 }
 
 /**
@@ -139,8 +142,9 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
   private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
   private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)
   private[smartdatalake] val updateColumnsOpt = if (updateColumns.nonEmpty) Some(updateColumns) else None
-  override private[smartdatalake] def convertToTargetSchema(df: DataFrame) = insertColumnsToIgnore.foldLeft(df){
-    case (df, col) => df.drop(col)
+
+  override private[smartdatalake] def convertToTargetSchema[D <: GenericDataFrame](df: D): D = insertColumnsToIgnore.foldLeft(df) {
+    case (df, col) => df.drop(col).asInstanceOf[D]
   }
 }
 object SaveModeMergeOptions {

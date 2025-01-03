@@ -20,14 +20,14 @@ package io.smartdatalake.config
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.definitions.{DateColumnType, KeycloakClientSecretAuthMode, SDLSaveMode}
+import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
-import io.smartdatalake.workflow.connection.JavaNetProxyConfig
+import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.{FlatSpec, Matchers}
@@ -322,12 +322,9 @@ class DataObjectImplTests extends FlatSpec with Matchers {
          |  type = WebserviceFileDataObject
          |  url = "http://test"
          |  auth-mode = {
-         |    type = KeycloakClientSecretAuthMode
-         |    ssoServer = server
-         |    ssoRealm = realm
-         |    ssoGrantType = client_token
-         |    clientId = "foo"
-         |    clientSecret = "secret"
+         |    type = BasicAuthMode
+         |    user = "###CLEAR#test###"
+         |    password = "###CLEAR#test###"
          |  }
          | }
          |}
@@ -337,8 +334,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
     registry.instances.values.head shouldBe WebserviceFileDataObject(
       id = "123",
       url = "http://test",
-      authMode = Some(KeycloakClientSecretAuthMode(ssoServer = "server", ssoRealm = "realm", ssoGrantType = "client_token",
-        clientId = Some(StringOrSecret("foo")), clientSecret= Some(StringOrSecret("secret"))))
+      authMode = Some(BasicAuthMode(user = Some(StringOrSecret("###CLEAR#test###")), password = Some(StringOrSecret("###CLEAR#test###"))))
     )
   }
 

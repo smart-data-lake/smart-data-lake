@@ -173,13 +173,13 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
   testsFor(validateSchemaMinOnRead(createDataObjectWithSchemaMin, ".json"))
 
   private def createDataObject(path: String, schemaOpt: Option[StructType]): JsonFileDataObject = {
-    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt.map(SparkSchema))
+    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt.map(SparkSchema.apply))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   private def createDataObjectWithSchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): JsonFileDataObject = {
-    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
+    val dataObj = JsonFileDataObject(id = "schemaTestJsonDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply))
     instanceRegistry.register(dataObj)
     dataObj
   }

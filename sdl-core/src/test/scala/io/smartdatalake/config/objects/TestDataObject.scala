@@ -21,15 +21,13 @@ package io.smartdatalake.config.objects
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject._
-import jdk.jshell.spi.ExecutionControl.NotImplementedException
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /**
  * A dummy [[DataObject]] for unit tests.
@@ -43,6 +41,7 @@ case class TestDataObject( id: DataObjectId,
                            arg1: String,
                            args: Seq[String],
                            connectionId: Option[ConnectionId] = None,
+                           primaryKey: Option[Seq[String]] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with TransactionalTableDataObject with CanReceiveScriptNotification {
@@ -54,7 +53,7 @@ case class TestDataObject( id: DataObjectId,
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = Map()
 
-  override var table: Table = Table(db=Some("testdb"), name="testtable")
+  override var table: Table = Table(db = Some("testdb"), name = "testtable", primaryKey = primaryKey)
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = true
 

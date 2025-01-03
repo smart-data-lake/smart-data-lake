@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -84,18 +84,37 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def outputs: Seq[DataObject]
 
   /**
-   * execution condition for this action.
+   * Optional execution condition for this action.
+   * By default, an Action is executed if all inputs are available, e.g. no input from a previous Action is skipped.
+   * Override the default behaviour by specifying an executionCondition in Spark SQL expression syntax.
+   * It is evaluated against the properties available in [[SubFeedsExpressionData]].
+   * If true, the Action is executed, otherwise it is skipped.
+   *
+   * Example:
+   * {{{
+   *     executionCondition = {
+   *       description = "execute if input stg-src1 is not skipped"
+   *       expression = "!inputSubFeeds.stg-src1.isSkipped"
+   *     }
+   * }}}
    */
   def executionCondition: Option[Condition]
 
   /**
-   * execution mode for this action.
+   * Optional execution mode for this action.
    */
   def executionMode: Option[ExecutionMode]
 
   /**
-   * Spark SQL condition evaluated as where-clause against dataframe of metrics. Available columns are dataObjectId, key, value.
+   * Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.
    * If there are any rows passing the where clause, a MetricCheckFailed exception is thrown.
+   *
+   * To check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject.
+   *
+   * Example - fail an action writing to output int-tgt in case there are no records written:
+   * {{{
+   *   dataObjectId = 'int-tgt' and key = 'no_data' and value = true"
+   * }}}
    */
   def metricsFailCondition: Option[String]
 
@@ -137,7 +156,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   def prepare(implicit context: ActionPipelineContext): Unit = {
     inputs.foreach(_.prepare)
-    outputs.foreach(_.prepare)
+    outputs.foreach(_.prepare) // this also includes recursiveInputs
     executionMode.foreach(_.prepare(id))
 
     // Make sure that data object names are still unique when replacing special characters with underscore
@@ -211,7 +230,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     // init spark jobGroupId to identify metrics
     setSparkJobMetadata() // TODO: this triggers creating spark session
     // otherwise continue processing
-    inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
+    (inputs ++ recursiveInputs).foreach(input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
   }
 
@@ -234,14 +253,21 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     // evaluate metrics fail condition if defined
     metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c, outputSubFeeds))
     // process postRead/Write hooks
-    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
+    (inputs ++ recursiveInputs).foreach(input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
   }
 
   /**
-   * Executes operations needed to cleanup after executing an action failed.
+   * Executes operations needed to cleanup after executing an action failed (this includes NoDataToProcessWarning).
    */
-  def postExecFailed(implicit context: ActionPipelineContext): Unit = ()
+  def postExecFailed(ex: Exception)(implicit context: ActionPipelineContext): Unit = {
+    ex match {
+      case ex: NoDataToProcessWarning if ex.results.isDefined =>
+        // evaluate metrics fail condition if defined
+        metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c, ex.results.get))
+      case _ => ()
+    }
+  }
 
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
@@ -261,9 +287,12 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
-    val metrics = subFeeds.map(subFeed => (subFeed.dataObjectId, subFeed.metrics)).flatMap {
-      case (dataObjectId, Some(metrics)) => metrics.map{ case (k,v) => Metric(dataObjectId.id, Some(k), Some(v.toString))}.toSeq
-      case (dataObjectId, _) => Seq(Metric(dataObjectId.id, None, None))
+    val metrics = subFeeds.flatMap{ subFeed =>
+      val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric
+      metricsRaw.map{
+        case (k, v: Option[_]) => Metric(subFeed.dataObjectId.id, Option(k), v.map(_.toString))
+        case (k, v) => Metric(subFeed.dataObjectId.id, Option(k), Option(v).map(_.toString))
+      }.toSeq
     }
     metrics.filter( metric => Option(conditionEvaluator(metric)).getOrElse(false))
       .foreach( failedMetric => throw MetricsCheckFailed(s"""($id) metrics check failed: $failedMetric matched expression "$condition""""))
@@ -290,25 +319,20 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Helper to find partition values for a specific DataObject in list of subFeeds
    */
-  private def findSubFeedPartitionValues(dataObjectId: DataObjectId, subFeeds: Seq[SubFeed]): Seq[PartitionValues] = subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).get
+  private def findSubFeedPartitionValues(dataObjectId: DataObjectId, subFeeds: Seq[SubFeed]): Seq[PartitionValues] = {
+    subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).getOrElse(Seq())
+  }
 
   /**
    * Handle class cast exception when getting objects from instance registry
    */
-  private def getDataObject[T <: DataObject](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val dataObject = try {
+  private def getDataObject[T <: DataObject : ClassTag : TypeTag](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry): T = {
+    try {
       registry.get[T](dataObjectId)
     } catch {
       case _: NoSuchElementException => throw new NoSuchElementException(s"($id) key not found in instance registry for $role: $dataObjectId")
-    }
-    try {
-      // force class cast on generic type (otherwise the ClassCastException is thrown later)
-      ct.runtimeClass.cast(dataObject).asInstanceOf[T]
-    } catch {
-      case _: ClassCastException =>
-        val objClass = dataObject.getClass.getSimpleName
-        val expectedClass = tt.tpe.toString.replaceAll(classOf[DataObject].getPackage.getName+".", "")
-        throw ConfigurationException(s"$toStringShort needs $expectedClass as $role but $dataObjectId is of type $objClass")
+      case TypeMismatchException(_, currentClass, expectedType) =>
+        throw ConfigurationException(s"($id) $role $dataObjectId of type ${currentClass.getSimpleName} does not implement expected DataObject type $expectedType")
     }
   }
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
@@ -356,7 +380,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * @param executionId ExecutionId to get runtime information for. If empty runtime information for last ExecutionId are returned.
    */
   def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = {
-    runtimeData.getRuntimeInfo(inputs.map(_.id), outputs.map(_.id), getDataObjectsState, executionId)
+    runtimeData.getRuntimeInfo((inputs ++ recursiveInputs).map(_.id), outputs.map(_.id), getDataObjectsState, executionId)
   }
 
   /**

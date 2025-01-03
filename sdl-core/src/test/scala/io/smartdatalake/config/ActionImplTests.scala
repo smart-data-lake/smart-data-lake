@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.config
 
-import com.typesafe.config.{Config, ConfigException, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.action.TestDfTransformer
@@ -27,6 +27,8 @@ import io.smartdatalake.workflow.action.script.CmdScript
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import org.scalatest.{FlatSpec, Matchers}
+
+import java.time.Duration
 
 
 private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
@@ -43,6 +45,7 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       |   type = io.smartdatalake.config.objects.TestDataObject
       |   arg1 = goo
       |   args = [bar]
+      |   primaryKey = [bar]
       | }
       | tdo3 = {
       |   type = CsvFileDataObject
@@ -190,6 +193,29 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
       inputIds = Seq("tdo1"),
       outputIds = Seq("tdo2"),
       scripts = Seq(CmdScript(winCmd = Some("test"), linuxCmd = Some("test")))
+    )
+  }
+
+  "HistorizeAction" should "be parsable" in {
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        | 123 = {
+        |   type = HistorizeAction
+        |   inputId = tdo1
+        |   outputId = tdo2
+        |   timeAxisUnit = 1d
+        | }
+        |}
+        |""".stripMargin).withFallback(dataObjectConfig).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    registry.getActions.head shouldBe action.HistorizeAction(
+      id = "123",
+      inputId = "tdo1",
+      outputId = "tdo2",
+      timeAxisUnit = Duration.ofDays(1)
     )
   }
 

@@ -21,14 +21,16 @@ package io.smartdatalake.workflow.dataobject
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.{AuthMode, SDLSaveMode}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import org.apache.tika.Tika
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
@@ -46,7 +48,7 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  * @param host proxy host
  * @param port proxy port
  */
-case class HttpProxyConfig(host: String, port: Int)
+case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None)
 
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
 
@@ -82,7 +84,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     url: String,
                                     additionalHeaders: Map[String, String] = Map(),
                                     timeouts: Option[HttpTimeoutConfig] = None,
-                                    authMode: Option[AuthMode] = None,
+                                    authMode: Option[HttpAuthMode] = None,
                                     mimeType: Option[String] = None,
                                     writeMethod: WebserviceMethod = WebserviceMethod.Post,
                                     proxy: Option[HttpProxyConfig] = None,

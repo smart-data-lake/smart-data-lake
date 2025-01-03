@@ -19,12 +19,13 @@
 
 package io.smartdatalake.util.historization
 
-import io.smartdatalake.definitions.{HiveConventions, TechnicalTableColumn}
-import io.smartdatalake.util.historization.Historization.{localDateTimeToCol, localDateTimeToTstmp}
-import org.apache.spark.sql.{DataFrame, Encoder, SparkSession}
-import org.apache.spark.sql.functions.lit
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
+import org.apache.spark.sql.{Encoder, SparkSession}
 
-import java.time.LocalDateTime
+import java.sql.Timestamp
+import java.time.{Duration, LocalDateTime}
 
 object HistorizationTestUtils {
 
@@ -37,62 +38,65 @@ object HistorizationTestUtils {
     val TechnicallyDeleted: HistorizationPhase = Value
   }
 
-  private[historization] val doomsday = HiveConventions.getHistorizationSurrogateTimestamp
-  private[historization] val doomsdayTs = localDateTimeToTstmp(HiveConventions.getHistorizationSurrogateTimestamp)
+  private[smartdatalake] val defaultTimeAxisUnit = Some(Duration.ofMillis(1))
+
+  private[historization] val doomsday = Environment.historizationUpperHorizonTimestamp.toLocalDateTime
+  private[historization] val doomsdayTs = Environment.historizationUpperHorizonTimestamp
   private[historization] val erfasstTimestampOldHist = LocalDateTime.now.minusDays(2)
-  private[historization] val erfasstTimestampOldHistTs = localDateTimeToTstmp(erfasstTimestampOldHist)
+  private[historization] val erfasstTimestampOldHistTs = Timestamp.valueOf(erfasstTimestampOldHist)
   private[historization] val ersetztTimestampOldHist = doomsday
-  private[historization] val ersetztTimestampOldHistTs = localDateTimeToTstmp(ersetztTimestampOldHist)
+  private[historization] val ersetztTimestampOldHistTs = Timestamp.valueOf(ersetztTimestampOldHist)
   private[historization] val erfasstTimestampOldDeletedHist = LocalDateTime.now.minusDays(30)
-  private[historization] val erfasstTimestampOldDeletedHistTs = localDateTimeToTstmp(erfasstTimestampOldDeletedHist)
+  private[historization] val erfasstTimestampOldDeletedHistTs = Timestamp.valueOf(erfasstTimestampOldDeletedHist)
   private[historization] val ersetztTimestampOldDeletedHist = LocalDateTime.now.minusDays(23)
-  private[historization] val ersetztTimestampOldDeletedHistTs = localDateTimeToTstmp(ersetztTimestampOldDeletedHist)
+  private[historization] val ersetztTimestampOldDeletedHistTs = Timestamp.valueOf(ersetztTimestampOldDeletedHist)
   private[historization] val colNames = Seq("id", "name", "age", "health_state")
   private[historization] val primaryKeyColumns = Array("id", "name")
   private[historization] val referenceTimestampNew = LocalDateTime.now
-  private[historization] val referenceTimestampNewTs = localDateTimeToTstmp(referenceTimestampNew)
-  private[historization] val offsetNs = 1000000L
-  private[historization] val referenceTimestampOld = referenceTimestampNew.minusNanos(offsetNs)
-  private[historization] val referenceTimestampOldTs = localDateTimeToTstmp(referenceTimestampOld)
+  private[historization] val referenceTimestampNewTs = Timestamp.valueOf(referenceTimestampNew)
 
-  def toHistorizedDf[T <: Product : Encoder](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false)
-                                            (implicit session: SparkSession): DataFrame = {
+  private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit) = Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
+
+  def toHistorizedDf[T <: Product : Encoder](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false, timeUnitAxis: Option[Duration] = defaultTimeAxisUnit)
+                                            (implicit session: SparkSession, functions: DataFrameFunctions): GenericDataFrame = {
+    import functions._
+    val referenceTimestampOldTs = getReferenceTimestampOldTs(timeUnitAxis)
     var operation: Option[String] = None
     var dfHist = phase match {
       case HistorizationPhase.Existing =>
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(erfasstTimestampOldHistTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(ersetztTimestampOldHistTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldHistTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(ersetztTimestampOldHistTs))
       case HistorizationPhase.UpdatedOld =>
         operation = Some(HistorizationRecordOperations.updateClose)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(erfasstTimestampOldHistTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(referenceTimestampOldTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldHistTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(referenceTimestampOldTs))
       case HistorizationPhase.UpdatedNew =>
         operation = Some(HistorizationRecordOperations.insertNew)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", localDateTimeToCol(referenceTimestampNew))
-          .withColumn(s"${TechnicalTableColumn.delimited}", localDateTimeToCol(doomsday))
+          .withColumn(s"${Environment.capturedColumnName}", lit(referenceTimestampNew))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(doomsdayTs))
       case HistorizationPhase.NewlyAdded =>
         operation = Some(HistorizationRecordOperations.insertNew)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(referenceTimestampNewTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(doomsdayTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(referenceTimestampNewTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(doomsdayTs))
       case HistorizationPhase.TechnicallyDeleted =>
         operation = Some(HistorizationRecordOperations.updateClose)
         toDataDf(records, colNames)
-          .withColumn(s"${TechnicalTableColumn.captured}", lit(erfasstTimestampOldDeletedHistTs))
-          .withColumn(s"${TechnicalTableColumn.delimited}", lit(ersetztTimestampOldDeletedHistTs))
+          .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldDeletedHistTs))
+          .withColumn(s"${Environment.delimitedColumnName}", lit(ersetztTimestampOldDeletedHistTs))
     }
-    if (withHashCol) dfHist = Historization.addHashCol(dfHist, None, None, useHash = true, colsToIgnore = Seq(TechnicalTableColumn.captured, TechnicalTableColumn.delimited))
+    if (withHashCol) dfHist = Historization.addHashCol(dfHist, None, None, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
     if (withOperation) dfHist = dfHist.withColumn(Historization.historizeOperationColName, operation.map(lit).getOrElse(lit(null)))
     dfHist
   }
 
   def toDataDf[T <: Product : Encoder](records: Seq[T], colNames: Seq[String] = this.colNames)
-                                      (implicit session: SparkSession): DataFrame = {
+                                      (implicit session: SparkSession): GenericDataFrame = {
     import session.sqlContext.implicits._
-    records.toDF(colNames: _*)
+    SparkDataFrame(records.toDF(colNames: _*))
   }
 
 }

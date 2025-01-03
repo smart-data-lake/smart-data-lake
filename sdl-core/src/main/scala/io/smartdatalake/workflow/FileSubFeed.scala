@@ -68,16 +68,8 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
     partitionValues.forall(pvs => partitions.diff(pvs.keys).isEmpty)
   }
 
-  override def clearDAGStart(): FileSubFeed = {
-    this.copy(isDAGStart = false)
-  }
-
-  override def clearSkipped(): FileSubFeed = {
-    this.copy(isSkipped = false)
-  }
-
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId)
+    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None)
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
@@ -97,13 +89,6 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): FileSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = None, fileRefMapping = None)
   }
-
-  override def withMetrics(metrics: MetricsMap): FileSubFeed = {
-    this.copy(metrics = Some(metrics))
-  }
-
-  def appendMetrics(metrics: MetricsMap): FileSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
-
 }
 object FileSubFeed extends SubFeedConverter[FileSubFeed] {
   /**

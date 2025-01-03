@@ -33,13 +33,13 @@ class AvroFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
   testsFor(validateSchemaMinOnRead(createDataObjectWithchemaMin, fileExtension = ".avro"))
 
   def createDataObject(path: String, schemaOpt: Option[StructType]): AvroFileDataObject = {
-    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt.map(SparkSchema))
+    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt.map(SparkSchema.apply))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   def createDataObjectWithchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): AvroFileDataObject = {
-    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt.map(SparkSchema), schemaMin = schemaMinOpt.map(SparkSchema))
+    val dataObj = AvroFileDataObject(id = "schemaTestAvroDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply))
     instanceRegistry.register(dataObj)
     dataObj
   }

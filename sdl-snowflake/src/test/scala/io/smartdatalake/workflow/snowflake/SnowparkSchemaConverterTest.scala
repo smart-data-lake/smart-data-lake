@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.{types => snowpark}
-import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkSchema, SnowparkSubFeed}
+import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkSchema, SnowparkSimpleDataType, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.sql.{types => spark}
 import org.scalatest.FunSuite
@@ -95,9 +95,9 @@ class SnowparkSchemaConverterTest extends FunSuite {
       ))
     )
 
-    assert(expectedSnowparkSchema.getDataType("a").isNumeric == false)
-    assert(expectedSnowparkSchema.getDataType("b").isNumeric == true)
-    assert(expectedSnowparkSchema.getDataType("c").isNumeric == true)
+    assert(!expectedSnowparkSchema.getDataType("a").asInstanceOf[SnowparkSimpleDataType].isNumeric)
+    assert(expectedSnowparkSchema.getDataType("b").asInstanceOf[SnowparkSimpleDataType].isNumeric)
+    assert(expectedSnowparkSchema.getDataType("c").asInstanceOf[SnowparkSimpleDataType].isNumeric)
 
   }
 }

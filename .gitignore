@@ -9,6 +9,8 @@ venv
 *.log
 /sdl-core/src/main/resources/application.conf
 spark-warehouse
+**/spark-warehouse
+*.versionsBackup
 
 # User-specific stuff
 .idea/**/workspace.xml

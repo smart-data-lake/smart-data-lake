@@ -19,21 +19,26 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
+import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
-import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
-import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.action.{CopyAction, NoDataToProcessWarning}
+import io.smartdatalake.workflow.connection.{HadoopFileConnection, IcebergTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
 
-class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
+class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   protected implicit val session : SparkSession = IcebergTestUtils.session
   import session.implicits._
@@ -156,7 +161,9 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
   test("SaveMode overwrite and delete partition") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite)
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type")
+      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static")
+    )
     targetDO.dropTable
 
     // first load
@@ -186,6 +193,36 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     assert(targetDO.listPartitions == Seq(PartitionValues(Map("type"->"ext"))))
   }
 
+  test("SaveMode overwrite partitions dynamically") {
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite_dynamic", query = None)
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type")
+      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "dynamic")
+    )
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
+
+    assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
+
+    // 2nd load: dynamically overwrite partition type=ext
+    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df2) // allowed overwriting partitions because of partitionOverwriteMode=dynamic
+    val expected2 = df2.union(df1.where($"type"=!="ext"))
+    val actual2 = targetDO.getSparkDataFrame()
+    val resul2 = expected2.isEqual(actual2)
+    if (!resul2) TestUtil.printFailedTestResult("SaveMode overwrite partitions dynamically",Seq())(actual2)(expected2)
+    assert(resul2)
+  }
+
   test("SaveMode append") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_append", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
@@ -211,6 +248,35 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     if (!resultat2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(expected2)
     assert(resultat2)
   }
+
+
+  test("throw NoDataToProcessWarning if no new snapshot created (no data)") {
+    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_nodata", query = None)
+    val targetTablePath = tempPath+s"/${targetTable.fullName}"
+    // Iceberg doesnt create a new snapshot if no data is written with dynamic partition mode
+    val targetDO = IcebergTableDataObject(id="target", path=Some(targetTablePath), table=targetTable, partitions = Seq("type"))
+    targetDO.dropTable
+
+    // first load
+    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7))
+      .toDF("type", "lastname", "firstname", "rating")
+    targetDO.writeSparkDataFrame(df1)
+    val actual = targetDO.getSparkDataFrame()
+    val result = df1.isEqual(actual)
+    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    assert(result)
+
+    // 2nd load: no data -> NoDataToProcessWarning
+    val df2 = Seq(("ext","doe","john",10),("ext","smith","peter",1))
+      .toDF("type", "lastname", "firstname", "rating")
+    Environment._enableSparkPlanNoDataCheck = Some(false) // disable triggering SparkPlanNoDataWarning, as this test is about another case
+    intercept[NoDataToProcessWarning](targetDO.writeSparkDataFrame(df2.where(lit(false))))
+    Environment._enableSparkPlanNoDataCheck = Some(true)
+
+    // 3nd load: write data
+    targetDO.writeSparkDataFrame(df2)
+  }
+
 
   test("SaveMode merge") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
@@ -433,5 +499,246 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter {
     testDf.collect() sameElements resultDf.collect()
 
   }
+
+
+  // TODO: addFilesParallelism > 1 results in Iceberg NotSerializableException, see https://github.com/apache/iceberg/issues/11147
+  test("Create from parquet files") {
+    // Define Iceberg Table
+    val icebergTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "parquet_to_iceberg", query = None)
+    val icebergConnection = IcebergTableConnection(id = "iceberg", db = "default", pathPrefix = tempPath, addFilesParallelism = Some(1))
+    instanceRegistry.register(icebergConnection)
+    val targetPath = icebergTable.name
+    val icebergDO = IcebergTableDataObject(id = "iceberg", path = Some(targetPath), table = icebergTable, connectionId = Some(icebergConnection.id))
+
+    // Create parquet files
+    val parquetConnection = HadoopFileConnection(id = "parquet", pathPrefix = tempPath)
+    instanceRegistry.register(parquetConnection)
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = targetPath, connectionId = Some(parquetConnection.id))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    // Initialize Iceberg table
+    icebergDO.prepare // does the table conversion
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions.isEmpty)
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions.isEmpty)
+    }
+  }
+
+  test("Create from parquet files of legacy hive tables (c000 file ending)") {
+    // Define Iceberg Table
+    val icebergTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "parquet_legacy_to_iceberg", query = None)
+    val icebergConnection = IcebergTableConnection(id = "iceberg", db = "default", pathPrefix = tempPath, addFilesParallelism = Some(1))
+    instanceRegistry.register(icebergConnection)
+    val targetPath = icebergTable.name
+    val icebergDO = IcebergTableDataObject(id = "iceberg", path = Some(targetPath), table = icebergTable, connectionId = Some(icebergConnection.id))
+
+    // Create parquet files
+    val parquetConnection = HadoopFileConnection(id = "parquet", pathPrefix = tempPath)
+    instanceRegistry.register(parquetConnection)
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = targetPath, connectionId = Some(parquetConnection.id))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    parquetDO.filesystem.listStatus(parquetDO.hadoopPath)
+      .filter(s => s.isFile && s.getPath.getName.endsWith(".snappy.parquet"))
+      .map(_.getPath.toString)
+      .foreach { p =>
+        parquetDO.renameFile(p, p.stripSuffix(".snappy.parquet"))
+      }
+
+    // Initialize Iceberg table
+    icebergDO.prepare // does the table conversion
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions.isEmpty)
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions.isEmpty)
+    }
+  }
+
+  test("Create from parquet files partitioned of legacy hive tables (c000 file ending)") {
+    // Define Iceberg Table
+    val icebergTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "parquet_partitioned_legacy_to_iceberg", query = None)
+    val icebergConnection = IcebergTableConnection(id = "iceberg", db = "default", pathPrefix = tempPath, addFilesParallelism = Some(1))
+    instanceRegistry.register(icebergConnection)
+    val targetPath = icebergTable.name
+    val icebergDO = IcebergTableDataObject(id = "iceberg", path = Some(targetPath), table = icebergTable, partitions = Seq("tpe"), connectionId = Some(icebergConnection.id))
+
+    // Create parquet files
+    val parquetConnection = HadoopFileConnection(id = "parquet", pathPrefix = tempPath)
+    instanceRegistry.register(parquetConnection)
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = targetPath, partitions = Seq("tpe"), connectionId = Some(parquetConnection.id))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    RemoteIteratorWrapper(parquetDO.filesystem.listFiles(parquetDO.hadoopPath, true))
+      .filter(s => s.isFile && s.getPath.getName.endsWith(".snappy.parquet"))
+      .map(_.getPath.toString)
+      .foreach { p =>
+        parquetDO.renameFile(p, p.stripSuffix(".snappy.parquet"))
+      }
+
+    // Initialize Iceberg table
+    icebergDO.prepare // does the table conversion
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+  }
+
+  test("Create from parquet files partitioned") {
+
+    // Define Iceberg table
+    val icebergTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "parquet_to_iceberg_partitioned")
+    val targetPath = tempPath + s"/${icebergTable.name}"
+    val icebergDO = IcebergTableDataObject(id = "iceberg", path = Some(targetPath), table = icebergTable, partitions = Seq("tpe"))
+
+    // Create parquet files
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = targetPath, partitions = Seq("tpe"))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    // Initialize Iceberg table
+    icebergDO.prepare
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+  }
+
+  test("Write data with hadoop catalog to non-default db") {
+
+    // setup DataObjects
+    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val targetTable = Table(catalog = Some("iceberg_hadoop"), db = Some("test"), name = "custom_df_copy", query = None)
+    val targetDO = IcebergTableDataObject(id = "target", path = None, table = targetTable)
+    instanceRegistry.register(sourceDO)
+    instanceRegistry.register(targetDO)
+
+    // create hadoop catalog 'test' database
+    val warehouseDir = new Path(session.conf.get(s"spark.sql.catalog.${targetTable.catalog.get}.warehouse"))
+    val fs = HdfsUtil.getHadoopFsFromSpark(warehouseDir)
+    fs.mkdirs(new Path(warehouseDir, targetTable.db.get))
+
+    // prepare DataObject
+    targetDO.prepare
+
+    // prepare & start load
+    val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
+    val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
+    testAction.exec(Seq(srcSubFeed))(contextExec)
+
+    val expected = sourceDO.getSparkDataFrame()
+    val actual = targetDO.getSparkDataFrame()
+    assert(expected.isEqual(actual))
+  }
+
+  test("Create from parquet files on hadoop catalog") {
+
+    // Setup Iceberg table
+    val icebergTable = Table(catalog = Some("iceberg_hadoop"), db = Some("default"), name = "parquet_to_iceberg")
+    val icebergDO = IcebergTableDataObject(id = "iceberg", table = icebergTable)
+
+    // Create parquet files
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = icebergDO.hadoopPath.toString)
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    // initialize Iceberg table
+    icebergDO.prepare
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+    }
+  }
+
+  test("Create from parquet files partitioned on hadoop catalog") {
+
+    // Setup Iceberg table
+    val icebergTable = Table(catalog = Some("iceberg_hadoop"), db = Some("default"), name = "parquet_to_iceberg_partitioned")
+    val icebergDO = IcebergTableDataObject(id = "iceberg", table = icebergTable, partitions = Seq("tpe"))
+
+    // Create parquet files
+    val parquetDO = ParquetFileDataObject(id = "parquet", path = icebergDO.hadoopPath.toString, partitions = Seq("tpe"))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("tpe", "lastname", "firstname", "rating")
+    parquetDO.writeSparkDataFrame(df1)
+
+    // initialize Iceberg table
+    icebergDO.prepare
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+
+    icebergDO.initSparkDataFrame(df1, Seq())
+    icebergDO.writeSparkDataFrame(df1, Seq())(contextExec)
+
+    {
+      val df = icebergDO.getSparkDataFrame()
+      assert(df.isEqual(df1))
+      assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
+    }
+  }
+
 
 }
