@@ -142,4 +142,19 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
   assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
 
+  // 5. No new data test
+
+  testDO.setState(newState)
+  df = testDO.getSparkDataFrame()
+
+  newState = testDO.getState
+
+  assert(df.columns.contains("id") &&
+    df.columns.contains("value") &&
+    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
+  )
+
+  assert(df.isEmpty)
+
 }
