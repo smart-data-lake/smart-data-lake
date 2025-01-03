@@ -27,11 +27,7 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.connection.{DebeziumConnection, DebeziumDatabaseEngine}
-import org.apache.spark.sql.{Row, functions}
-import org.apache.spark.sql.functions.{col, lit, when}
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-
-import scala.collection.JavaConverters._
+import org.apache.spark.sql.functions.{col, lit}
 
 object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
