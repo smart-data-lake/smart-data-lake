@@ -3426,7 +3426,7 @@
           },
           "schema" : {
             "type" : "string",
-            "description" : ": Schema of the expected output in the form of <<array< struct< columnA:string, columnB: integer ... >>"
+            "description" : ": Schema of the expected output. It can be provided as a string in the form of <<array< struct< columnA:string, columnB: integer ... >>,\nas ddl-File, caseClass, java Bean, XSD-File, JSON-Schema-File or Avro-Schema File. For more information, please see the SDLB-docuemntation\non specifying schemas (https://smartdatalake.ch/docs/reference/schema#specifying-schema)."
           },
           "baseUrl" : {
             "type" : "string",
