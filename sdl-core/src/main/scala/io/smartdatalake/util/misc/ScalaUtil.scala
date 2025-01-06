@@ -86,4 +86,15 @@ object ScalaUtil {
 
   def arrayToSeq[T](arr: Array[T]): Seq[T] = if (arr == null) Seq() else arr.toSeq
 
+  /**
+   * ATTENTION: mutating scala vals using reflection should only be done in rare exception,
+   * e.g. if there is no other way to integrate a library!!!
+   */
+  def mutateVal(obj: Product, fieldName: String, newVal: Any): Unit = {
+    val m = runtimeMirror(getClass.getClassLoader)
+    val im = m.reflect(obj)
+    val decl = im.symbol.asType.toType.decls.find(_.name.toString == fieldName).get.asTerm
+    val fm = im.reflectField(decl)
+    fm.set(newVal)
+  }
 }

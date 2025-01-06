@@ -21,6 +21,8 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
+import io.smartdatalake.util.webservice.OpenApiUtil
+import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
@@ -33,9 +35,6 @@ import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import scaladoc.Tag
 
-import java.io.{BufferedReader, InputStreamReader}
-import java.nio.charset.StandardCharsets
-import java.util.stream.Collectors
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 object SchemaUtil {
@@ -202,14 +201,17 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
+  def getSchemaFromOpenApi(specUrl: String, operationId: String, responseContentType: String = "application/json")(implicit hadoopConfiguration: Configuration): StructType = {
+    OpenApiUtil.queryOperationSchema(specUrl, operationId, responseContentType) match {
+      case (contentType, x: StructType) => x
+      case (contentType, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema for $operationId, but needs StructType ($specUrl)")
+    }
+  }
+
   def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
     val path = addHadoopDefaultSchemaAuthority(inputPath)
-    if (ResourceUtil.canHandleScheme(path)) {
-      val inputStream = ResourceUtil.readResource(path)
-      new BufferedReader(
-        new InputStreamReader(inputStream, StandardCharsets.UTF_8)
-      ).lines().collect(Collectors.joining())
-    } else {
+    if (ResourceUtil.canHandleScheme(path)) ResourceUtil.readResourceAsString(path)
+    else {
       val filesystem = getHadoopFsWithConf(path)
       readHadoopFile(path)(filesystem)
     }
@@ -273,6 +275,19 @@ object SchemaUtil {
           val content = readFromPath(new Path(path))
           val schema = getSchemaFromAvroSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+        } else LazyGenericSchema(schemaConfig)
+      case OpenApi =>
+        val valueElements = value.split(";")
+        assert(2 <= valueElements.size && valueElements.size <= 3, s"OpenApi schema provider configuration error. Configuration format is '<apiDocsUrl>;<operationId>;<responseContentType>', but received $value.")
+        val apiDocsUrl = valueElements(1)
+        val operationId = valueElements(2)
+        val responseContentType = if (valueElements.size >= 3) valueElements(3) else defaultResponseContentType
+        if (!lazyFileReading) {
+          val (contentType, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
+          dataType match {
+            case schema: StructType => SparkSchema(schema)
+            case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed, but got dataType $dataType for operation $operationId")
+          }
         } else LazyGenericSchema(schemaConfig)
     }
   }
@@ -413,5 +428,15 @@ object SchemaProviderType extends Enumeration {
    *   To extract a nested row tag, split the elements by slash (/).
    */
   val AvroSchemaFile: SchemaProviderType.Value = Value("avroschemafile")
+
+  /**
+   * Get schema from OpenApi specification operation
+   * Parameters (semicolon separated):
+   * - baseUrl
+   * - operationId
+   * - optional apiDocsPath, default is v3/api-docs
+   * - optional responseContentType, default is application/json
+   */
+  val OpenApi: SchemaProviderType.Value = Value("openapi")
 
 }

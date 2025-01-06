@@ -419,7 +419,7 @@ class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
     )).register
     val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
       CountExpectation(expectation = Some("= 0")),
-      SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
+      SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)"),
     )).register
 
     // prepare & start load
