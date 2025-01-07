@@ -3571,6 +3571,45 @@
                 "useIdToken" : {
                   "type" : "boolean",
                   "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                },
+                "timeouts" : {
+                  "type" : "object",
+                  "properties" : {
+                    "connectionTimeoutMs" : {
+                      "type" : "integer"
+                    },
+                    "readTimeoutMs" : {
+                      "type" : "integer"
+                    }
+                  },
+                  "title" : "HttpTimeoutConfig",
+                  "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+                  "additionalProperties" : false
+                },
+                "proxy" : {
+                  "type" : "object",
+                  "properties" : {
+                    "host" : {
+                      "type" : "string",
+                      "description" : "proxy host"
+                    },
+                    "port" : {
+                      "type" : "integer",
+                      "description" : "proxy port"
+                    },
+                    "user" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                    },
+                    "password" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                    }
+                  },
+                  "title" : "HttpProxyConfig",
+                  "required" : [ "host", "port" ],
+                  "additionalProperties" : false,
+                  "description" : "Proxy configuration used to make HTTP-connection."
                 }
               },
               "title" : "AWSUserPwdAuthMode",
@@ -5145,6 +5184,45 @@
                 "useIdToken" : {
                   "type" : "boolean",
                   "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                },
+                "timeouts" : {
+                  "type" : "object",
+                  "properties" : {
+                    "connectionTimeoutMs" : {
+                      "type" : "integer"
+                    },
+                    "readTimeoutMs" : {
+                      "type" : "integer"
+                    }
+                  },
+                  "title" : "HttpTimeoutConfig",
+                  "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+                  "additionalProperties" : false
+                },
+                "proxy" : {
+                  "type" : "object",
+                  "properties" : {
+                    "host" : {
+                      "type" : "string",
+                      "description" : "proxy host"
+                    },
+                    "port" : {
+                      "type" : "integer",
+                      "description" : "proxy port"
+                    },
+                    "user" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                    },
+                    "password" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                    }
+                  },
+                  "title" : "HttpProxyConfig",
+                  "required" : [ "host", "port" ],
+                  "additionalProperties" : false,
+                  "description" : "Proxy configuration used to make HTTP-connection."
                 }
               },
               "title" : "AWSUserPwdAuthMode",
@@ -7702,6 +7780,45 @@
           "useIdToken" : {
             "type" : "boolean",
             "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+          },
+          "timeouts" : {
+            "type" : "object",
+            "properties" : {
+              "connectionTimeoutMs" : {
+                "type" : "integer"
+              },
+              "readTimeoutMs" : {
+                "type" : "integer"
+              }
+            },
+            "title" : "HttpTimeoutConfig",
+            "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+            "additionalProperties" : false
+          },
+          "proxy" : {
+            "type" : "object",
+            "properties" : {
+              "host" : {
+                "type" : "string",
+                "description" : "proxy host"
+              },
+              "port" : {
+                "type" : "integer",
+                "description" : "proxy port"
+              },
+              "user" : {
+                "type" : "string",
+                "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+              },
+              "password" : {
+                "type" : "string",
+                "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+              }
+            },
+            "title" : "HttpProxyConfig",
+            "required" : [ "host", "port" ],
+            "additionalProperties" : false,
+            "description" : "Proxy configuration used to make HTTP-connection."
           }
         },
         "title" : "AWSUserPwdAuthMode",
@@ -8558,6 +8675,45 @@
                   "useIdToken" : {
                     "type" : "boolean",
                     "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                  },
+                  "timeouts" : {
+                    "type" : "object",
+                    "properties" : {
+                      "connectionTimeoutMs" : {
+                        "type" : "integer"
+                      },
+                      "readTimeoutMs" : {
+                        "type" : "integer"
+                      }
+                    },
+                    "title" : "HttpTimeoutConfig",
+                    "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+                    "additionalProperties" : false
+                  },
+                  "proxy" : {
+                    "type" : "object",
+                    "properties" : {
+                      "host" : {
+                        "type" : "string",
+                        "description" : "proxy host"
+                      },
+                      "port" : {
+                        "type" : "integer",
+                        "description" : "proxy port"
+                      },
+                      "user" : {
+                        "type" : "string",
+                        "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                      },
+                      "password" : {
+                        "type" : "string",
+                        "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                      }
+                    },
+                    "title" : "HttpProxyConfig",
+                    "required" : [ "host", "port" ],
+                    "additionalProperties" : false,
+                    "description" : "Proxy configuration used to make HTTP-connection."
                   }
                 },
                 "title" : "AWSUserPwdAuthMode",
@@ -8695,6 +8851,45 @@
             "processUpdates" : {
               "type" : "boolean",
               "description" : "optional; if false, only initial & final state is uploaded, otherwise all state updates are uploaded as partial updates.\nDefault is processUpdates=true."
+            },
+            "timeouts" : {
+              "type" : "object",
+              "properties" : {
+                "connectionTimeoutMs" : {
+                  "type" : "integer"
+                },
+                "readTimeoutMs" : {
+                  "type" : "integer"
+                }
+              },
+              "title" : "HttpTimeoutConfig",
+              "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+              "additionalProperties" : false
+            },
+            "proxy" : {
+              "type" : "object",
+              "properties" : {
+                "host" : {
+                  "type" : "string",
+                  "description" : "proxy host"
+                },
+                "port" : {
+                  "type" : "integer",
+                  "description" : "proxy port"
+                },
+                "user" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                },
+                "password" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```###<PROVIDERID>#<SECRETNAME>###```\n ,\ne.g.\n```###ENV#<ENV_VARIABLE_NAME>###```\n\n\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "HttpProxyConfig",
+              "required" : [ "host", "port" ],
+              "additionalProperties" : false,
+              "description" : "Proxy configuration used to make HTTP-connection."
             }
           },
           "title" : "UIBackendConfig",
