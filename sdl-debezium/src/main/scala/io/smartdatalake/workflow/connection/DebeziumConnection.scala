@@ -23,12 +23,12 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.postgresql.PostgresConnector
-import io.smartdatalake.workflow.connection.DebeziumDatabaseEngine.DebeziumDatabaseEngine
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 
 case class DebeziumConnection(override val id: ConnectionId,
                               uniqueConnectorName: String = java.util.UUID.randomUUID().toString,
-                              dbEngine: DebeziumDatabaseEngine,
+                              dbEngine: String,
                               hostname: String,
                               port: Int,
                               authMode: AuthMode,
@@ -40,20 +40,37 @@ case class DebeziumConnection(override val id: ConnectionId,
   require(supportedAuthModes.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuthModes.map(_.getSimpleName).mkString(", ")}.")
 
 
+  private val dbEngineHelper = DbEngineHelper.getDbEngineProperties(dbEngine).get
+
   private[smartdatalake] def connectionPropertiesMap: Map[String, String] = {
 
     authMode match {
-      case m: BasicAuthMode =>
+      case m: BasicAuthMode => {
+
         Map(
-          "connector.class" -> dbEngine.toString,
+          "connector.class" -> dbEngineHelper.debeziumConnectorClassName,
           "database.hostname" -> hostname,
           "database.port" -> port.toString,
           "database.user" -> m.userSecret.resolve(), // TODO: Check with Zach regarding security
           "database.password" -> m.passwordSecret.resolve() // TODO: Check with Zach regarding security
         )
+      }
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Debezium connection.")
     }
 
+  }
+
+  private[smartdatalake] def getJdbcTableConnection: JdbcTableConnection = {
+
+    val urlPrefix = dbEngineHelper.jdbcUrlPrefix
+    val driverClassName = dbEngineHelper.jdbcDriverClassName
+
+    JdbcTableConnection(
+      id = ConnectionId(s"${id.id}-jdbc"),
+      url = s"$urlPrefix://${hostname}:${port}",
+      driver = driverClassName,
+      authMode = Some(authMode)
+    )
   }
 
   /**
@@ -73,10 +90,24 @@ object DebeziumConnection extends FromConfigFactory[Connection] {
   }
 }
 
-object DebeziumDatabaseEngine extends Enumeration {
-  type DebeziumDatabaseEngine = Value
+private object DbEngineHelper {
 
-  val MySql: Value = Value(classOf[MySqlConnector].getName)
-  val PostgreSql: Value = Value(classOf[PostgresConnector].getName)
+  case class DbEngineProperty(debeziumConnectorClassName: String, jdbcUrlPrefix: String, jdbcDriverClassName: String)
 
+  private val dbEngineProperties: Map[String, DbEngineProperty] = Map(
+    "mysql" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[MySqlConnector].getName,
+      jdbcUrlPrefix = "jdbc:mysql",
+      jdbcDriverClassName = "com.mysql.cj.jdbc.Driver"
+    ),
+    "postgresql" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[PostgresConnector].getName,
+      jdbcUrlPrefix = "jdbc:postgresql",
+      jdbcDriverClassName = "org.postgresql.Driver"
+    )
+  )
+
+  def getDbEngineProperties(dbName: String): Option[DbEngineProperty] = {
+    dbEngineProperties.get(dbName.toLowerCase)
+  }
 }
