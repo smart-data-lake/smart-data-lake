@@ -28,6 +28,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
+import io.smartdatalake.workflow.connection.jdbc.{JdbcCatalog, JdbcTableConnection}
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.runtime.WorkerConfig
@@ -55,6 +56,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
   extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   val connection: DebeziumConnection = getConnection[DebeziumConnection](connectionId)
+
+  private val jdbcCatalog: JdbcCatalog = connection.getJdbcTableConnection.catalog
 
   private def getConfigPropertiesMap: Map[String, String] = {
 
@@ -111,37 +114,60 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
+
     val spark = context.sparkSession
 
-    import spark.implicits._
+    def createEmptyDataFrame(): DataFrame = {
 
-    val changeConsumer = new DebeziumChangeConsumer
-    val executorService = Executors.newSingleThreadExecutor
-    val completionCallback = new DebeziumCompletionCallback(executorService)
+      val schemaCdcColumns = Seq(
+        StructField(COMMIT_TYPE_COLUMN_NAME, StringType),
+        StructField(COMMIT_TIMESTAMP_COLUMN_NAME, TimestampType)
+      )
 
-    val engine = DebeziumEngine.create(classOf[Connect])
-      .using(properties)
-      .notifying(changeConsumer)
-      .using(completionCallback)
-      .build()
+      val schema = StructType(jdbcCatalog.getSchemaFromTable(table.fullName) ++ schemaCdcColumns)
+      spark.createDataFrame(new util.ArrayList[Row](), schema)
+    }
 
+    if (context.isExecPhase) {
 
-    executorService.execute(engine)
+      val changeConsumer = new DebeziumChangeConsumer
+      val executorService = Executors.newSingleThreadExecutor
+      val completionCallback = new DebeziumCompletionCallback(executorService)
 
-    Thread.sleep(10000)
-    engine.close()
-    executorService.shutdown()
-
-    completionCallback.error.foreach(err => throw new Exception(err))
-
-    val records = changeConsumer.records
-    val sparkSchema = inferSparkSchema(records.head.valueSchema())
-    val rows = records.map{DebeziumRowConverter.convert}
+      val engine = DebeziumEngine.create(classOf[Connect])
+        .using(properties)
+        .notifying(changeConsumer)
+        .using(completionCallback)
+        .build()
 
 
-    val df = spark.createDataFrame(rows.asJava, sparkSchema)
+      executorService.execute(engine)
 
-    extractCdcEvents(df)
+      Thread.sleep(10000)
+      engine.close()
+      executorService.shutdown()
+
+      completionCallback.error.foreach(err => throw new Exception(err))
+
+      val records = changeConsumer.records
+
+      records.headOption match {
+        case Some(record) => {
+          val sparkSchema = inferSparkSchema(record.valueSchema())
+          val rows = records.map {
+            DebeziumRowConverter.convert
+          }
+
+          val df = spark.createDataFrame(rows.asJava, sparkSchema)
+
+          extractCdcEvents(df)
+        }
+        case None => createEmptyDataFrame()
+      }
+
+    } else {
+      createEmptyDataFrame()
+    }
 
   }
 
