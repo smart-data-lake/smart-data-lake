@@ -198,7 +198,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
           .otherwise(lit("read")))
 
     val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
-      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000))
+      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000).cast(TimestampType))
       .drop("before", "after", "source", "op", "ts_ms", "transaction")
       .orderBy(col(COMMIT_TIMESTAMP_COLUMN_NAME).desc)
 
