@@ -29,7 +29,7 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.connection.{DebeziumConnection, DebeziumDatabaseEngine}
+import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlParallelIT.statePath
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit}
@@ -164,7 +164,8 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
   sdlb.run(sdlConfig)
 
-  df = tgtDO1.getSparkDataFrame()
+  df = srcDO1.getSparkDataFrame() // check src because copyAction will be skipped and target will contain the data from previous test step
+
 
   assert(df.columns.contains("id") &&
     df.columns.contains("value") &&
