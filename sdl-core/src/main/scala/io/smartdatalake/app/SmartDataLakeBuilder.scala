@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.app
 
+import com.typesafe.config.Config
 import io.smartdatalake.app
 import io.smartdatalake.communication.statusinfo.StatusInfoServer
 import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
@@ -34,7 +35,6 @@ import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.SparkSession
 import scopt.{OParser, OParserBuilder}
 
 import java.time.{Duration, LocalDateTime}
