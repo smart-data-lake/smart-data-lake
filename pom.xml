@@ -307,7 +307,7 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
-        <spark.version>3.5.2</spark.version>
+        <spark.version>3.5.4</spark.version>
         <spark-extensions.version>3.5.2
         </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.5</spark.minor.version>
@@ -442,21 +442,21 @@
         <!-- SPARK-PARENT finished -->
 
         <!-- other dependency versions -->
-        <scopt.version>4.0.1</scopt.version>
+        <scopt.version>4.1.0</scopt.version>
         <databricks.spark-xml.version>0.18.0</databricks.spark-xml.version>
         <spark.excel.version>${spark.version331}_0.18.6-beta1</spark.excel.version>
         <hsqldb.version>2.7.2</hsqldb.version>
         <jackcess.version>4.0.5</jackcess.version>
         <!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
-        <typesafe.config.version>1.4.1</typesafe.config.version>
+        <typesafe.config.version>1.4.3</typesafe.config.version>
         <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
-        <monix.version>3.4.0</monix.version>
+        <monix.version>3.4.1</monix.version>
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>3.1.1</snowflake-spark.version>
         <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
-        <delta.version>3.2.0</delta.version>
-        <iceberg.version>1.6.1</iceberg.version>
+        <delta.version>3.3.0</delta.version>
+        <iceberg.version>1.7.1</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
