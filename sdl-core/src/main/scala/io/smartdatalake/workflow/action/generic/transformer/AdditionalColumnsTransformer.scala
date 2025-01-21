@@ -28,14 +28,17 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Add additional columns to the DataFrame by extracting information from the context or derived from input columns.
- * @param name         name of the transformer
+ * Add, Rename or Drop columns from the Input DataFrame. The order of execution of the operations is the same as the parameters of the transformer: (1. add context info, 2. add custom sql, 3. rename, 4. drop).
+ * Note that you can mix and match these operations to your liking and reference the same column from a previous operation if needed.
+  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
+ * @param additionalColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe. This allows you to include commonly used context information available at runtime.
  *                          The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]] and added to the DataFrame as literal columns.
  *                          [[DefaultExpressionData]] contains informations from the context of the SDLB job, like runId or feed name.
- * @param additionalDerivedColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.
- *                                 The spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns.
+ * @param additionalDerivedColumns optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe. This allows you to run custom sql code on the input DataFrame and save the result into a new column for which you define the name.
+ * @param renamedColumns optional tuples of [old column name, new column name]. For each tuple, a column is renamed. A RuntimeError will occur if the column does not exist after applying all previous operations.
+ * @param droppedColumns optional list of column names to be dropped. A RuntimeError will occur if a column does not exist after applying all previous operations.
+ *
  */
 case class AdditionalColumnsTransformer(override val name: String = "additionalColumns", override val description: Option[String] = None, additionalColumns: Map[String,String] = Map(), additionalDerivedColumns: Map[String,String] = Map(), renamedColumns: Map[String,String] = Map(), droppedColumns: Seq[String] = Seq()) extends GenericDfTransformer {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
