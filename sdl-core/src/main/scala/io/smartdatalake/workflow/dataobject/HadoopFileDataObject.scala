@@ -94,7 +94,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   def listDataFiles(pv: PartitionValues = PartitionValues(Map()))(implicit context: ActionPipelineContext): Iterator[Path] = {
     val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)), fileName).toString)
     else new GlobPattern(new Path(hadoopPath, fileName).toString)
-    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, partitions.nonEmpty /*recursive*/))
+    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, partitions.nonEmpty))
       .filter(_.isFile)
       .map(_.getPath)
       .filter(p => pathPattern.matches(p.toString))
@@ -103,7 +103,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   def listPartitionPathsStatus(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[FileStatus] = {
     assert(partitions.nonEmpty)
     val pathPattern = new Path(hadoopPath, pv.getPartitionString(partitionLayoutParam))
-    filesystem.globStatus(pathPattern).filter(_.isDirectory)
+    filesystem.globStatus(pathPattern).filter(_.isDirectory).toSeq
   }
 
   def listPartitionPaths(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[Path] = {
@@ -173,7 +173,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       val partitionsToInclude = partitions.reverse.dropWhile(!pv.keys.contains(_)).reverse // get all partition columns until last given partition value
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitionsToInclude)
       logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} is not an init of partition columns ${partitions.mkString(",")}")
-      listPartitionPaths(pv, partitionLayout).toSeq
+      listPartitionPaths(pv, partitionLayout)
     }
   }
 
@@ -189,11 +189,9 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       if (returnFiles) listDataFiles(pv).toSeq
       else Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)))
     } else {
-      // create path with wildcards
-      val globPartitionPath = new Path(hadoopPath, pv.getPartitionString(partitionLayout().get))
       logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} does not define all partition columns ${partitions.mkString(",")}")
       if (returnFiles) listDataFiles(pv).toSeq
-      else listPartitionPaths(pv).toSeq
+      else listPartitionPaths(pv)
     }
   }
 
@@ -206,7 +204,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   def getPartitionPathsStatus(implicit context: ActionPipelineContext): Seq[FileStatus] = {
-    if (partitions.nonEmpty) listPartitionPathsStatus().toSeq
+    if (partitions.nonEmpty) listPartitionPathsStatus()
     else Seq()
   }
 
@@ -220,7 +218,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
     new Path(parent, child).toString
   }
 
-  override def isAbsolutePath(path: String) = {
+  override def isAbsolutePath(path: String): Boolean = {
     new Path(path).isAbsolute
   }
 
