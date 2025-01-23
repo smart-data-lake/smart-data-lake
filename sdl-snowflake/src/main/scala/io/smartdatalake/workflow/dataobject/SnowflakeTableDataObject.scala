@@ -132,17 +132,21 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   // Get a Spark DataFrame with the table contents for Spark transformations
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> table.fullName))
-    val df = context.sparkSession
-      .read
-      .format(SNOWFLAKE_SOURCE_NAME)
-      .options(connection.getJdbcAuthOptions(table.db.get))
-      .options(instanceSparkOptions)
-      .options(queryOrTable)
-      .load()
+    val df = sparkLoad(queryOrTable)
     // convert case-insensitive column names to lowercase
     val dfLower = if (!Environment.caseSensitive) convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
     applyReadTransformer(partitionValues, dfLower)
       .asInstanceOf[SparkDataFrame].inner
+  }
+
+  private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
+    context.sparkSession
+      .read
+      .format(SNOWFLAKE_SOURCE_NAME)
+      .options(connection.getJdbcAuthOptions(table.db.get))
+      .options(instanceSparkOptions)
+      .options(queryOrTableOption)
+      .load()
   }
 
   // Write a Spark DataFrame to the Snowflake table
@@ -300,7 +304,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      if (isTableExisting) PartitionValues.fromDataFrame(SnowparkDataFrame(getSnowparkDataFrame().select(partitions.map(snowpark.functions.col)).distinct()))
+      if (isTableExisting) PartitionValues.fromDataFrame(SparkDataFrame(sparkLoad(Map("query" -> s"select distinct ${partitions.mkString(",")} from ${table.fullName}"))))
       else Seq()
     } else Seq()
   }
