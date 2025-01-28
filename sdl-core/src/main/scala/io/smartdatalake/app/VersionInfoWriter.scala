@@ -179,7 +179,7 @@ object BuildVersionInfo extends SmartDataLakeLogger {
     try {
       s"git rev-parse --verify --short=$gitRevisionLength HEAD" !!
     } catch {
-      case e: Exception =>
+      case e: Throwable =>
         logger.warn(s"Could not get Git revision number: ${e.getClass.getSimpleName} ${e.getMessage}")
         "unknown"
     }
