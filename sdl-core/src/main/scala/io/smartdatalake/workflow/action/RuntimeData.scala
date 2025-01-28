@@ -21,8 +21,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 
 import java.time.{Duration, LocalDateTime}
 import scala.collection.mutable
@@ -195,6 +195,13 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     }
     metrics.map(GenericMetrics("latest", 1, _))
   }
+
+  private def calcDuration(start: Option[RuntimeEvent], end: Option[RuntimeEvent]) = {
+    (start, end) match {
+      case (Some(start), Some(end)) => Some(Duration.between(start.tstmp, end.tstmp))
+      case _ => None
+    }
+  }
   def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState]): Option[RuntimeInfo] = {
     assert(events.nonEmpty, "Cannot getRuntimeInfo if events are empty")
     val lastEvent = events.last
@@ -209,20 +216,18 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     val initEndEvent = if(initEvents.nonEmpty && initEvents.lastOption!=initStartEvent) initEvents.lastOption else None
     val execStartEvent = execEvents.headOption
     val execEndEvent = if(execEvents.nonEmpty && execEvents.lastOption!=execStartEvent) execEvents.lastOption else None
-    val startEventLastPhase = events.reverseIterator.find(event => event.state == RuntimeEventState.STARTED && event.phase == lastEvent.phase)
     // Duration of last successful phase
-    val duration = startEventLastPhase.map(start => Duration.between(start.tstmp, lastEvent.tstmp))
+    val duration = calcDuration(execStartEvent, execEndEvent).orElse(calcDuration(initStartEvent, initEndEvent)).orElse(calcDuration(prepareStartEvent, prepareEndEvent))
     val outputSubFeeds = if (lastEvent.state != RuntimeEventState.SKIPPED) {
       // enrich with potential metrics
       lastResults.toSeq.flatten.map(subFeed => subFeed.appendMetrics(getLatestMetrics(subFeed.dataObjectId).map(_.getMainInfos).getOrElse(Map())))
     }
-    // TODO: why fake results? partitionValues should be preserved!
     else outputIds.map(outputId => InitSubFeed(outputId, partitionValues = Seq(), isSkipped = true)) // fake results for skipped actions for state information
     Some(RuntimeInfo(id, lastEvent.state,
-      startTstmp = execStartEvent.map(_.tstmp), endTstmp = execEndEvent.map(_.tstmp),
-      duration = duration,
       startTstmpPrepare = prepareStartEvent.map(_.tstmp), endTstmpPrepare = prepareEndEvent.map(_.tstmp),
       startTstmpInit = initStartEvent.map(_.tstmp), endTstmpInit = initEndEvent.map(_.tstmp),
+      startTstmp = execStartEvent.map(_.tstmp), endTstmp = execEndEvent.map(_.tstmp),
+      duration = duration,
       msg = lastEvent.msg, results = outputSubFeeds, dataObjectsState = dataObjectsState, inputIds = inputIds, outputIds = outputIds))
   }
 }
@@ -233,7 +238,7 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
 case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
-  val STARTED, PREPARED, INITIALIZED, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING, STREAMING = Value
+  val PREPARING, PREPARED, INITIALIZING, INITIALIZED, RUNNING, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING, STREAMING = Value
   def isFinal(runtimeEventState: RuntimeEventState): Boolean = Seq(SUCCEEDED, FAILED, CANCELLED, SKIPPED).contains(runtimeEventState)
 }
 
