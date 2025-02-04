@@ -37,6 +37,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, S
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
+import org.apache.iceberg
 import org.apache.iceberg.catalog.{Catalog, Namespace, TableIdentifier}
 import org.apache.iceberg.hadoop.HadoopCatalog
 import org.apache.iceberg.spark.Spark3Util.{CatalogAndIdentifier, identifierToTableIdentifier}
@@ -78,30 +79,30 @@ import scala.util.Try
  * - [[CanEvolveSchema]] by using internal Iceberg API.
  * - Overwriting partitions is implemented by using DataFrameWriterV2.overwrite(condition) API in one transaction.
  *
- * @param path hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
- *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
- *             If Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure.
- * @param options Options for Iceberg tables see: [[https://iceberg.apache.org/docs/latest/configuration/]]
- * @param table Iceberg table to be written by this output
- * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
- * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
+ * @param path                   hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
+ *                               If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
+ *                               If Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure.
+ * @param options                Options for Iceberg tables see: [[https://iceberg.apache.org/docs/latest/configuration/]]
+ * @param table                  Iceberg table to be written by this output
+ * @param saveMode               [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
+ * @param allowSchemaEvolution   If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param historyRetentionPeriod Optional Iceberg retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
- * @param acl override connection permissions for files created tables hadoop directory with this connection
- * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
- * @param metadata meta data
- * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
- *                   explicitly defined, the ones present in the configured "table" object are used.
- * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not
- *                   explicitly defined, the ones present in the configured "table" object are used.
- * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not
- *                   explicitly defined, the ones present in the configured "table" object are used.
- * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
- *                   explicitly defined, the ones present in the configured "table" object are used.
+ * @param acl                    override connection permissions for files created tables hadoop directory with this connection
+ * @param connectionId           optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
+ * @param metadata               meta data
+ * @param preReadSql             SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
+ *                               explicitly defined, the ones present in the configured "table" object are used.
+ * @param postReadSql            SQL-statement to be executed in exec phase after reading input table and before action is finished. If the catalog and/or schema are not
+ *                               explicitly defined, the ones present in the configured "table" object are used.
+ * @param preWriteSql            SQL-statement to be executed in exec phase before writing output table. If the catalog and/or schema are not
+ *                               explicitly defined, the ones present in the configured "table" object are used.
+ * @param postWriteSql           SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
+ *                               explicitly defined, the ones present in the configured "table" object are used.
  */
 case class IcebergTableDataObject(override val id: DataObjectId,
                                   path: Option[String] = None,
                                   override val partitions: Seq[String] = Seq(),
-                                  override val options: Map[String,String] = Map(),
+                                  override val options: Map[String, String] = Map(),
                                   override val schemaMin: Option[GenericSchema] = None,
                                   override var table: Table,
                                   override val constraints: Seq[Constraint] = Seq(),
@@ -152,7 +153,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path $hadoopPathHolder. New path definition $getAbsolutePath is ignored!")
       }
     }
     hadoopPathHolder
@@ -174,9 +175,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite, Append and Merge supported for now.")
 
-  def getMetadataPath(implicit context: ActionPipelineContext) = {
+  def getMetadataPath(implicit context: ActionPipelineContext): Path = {
     options.get("write.metadata.path").map(new Path(_))
-      .getOrElse(new Path(hadoopPath,"metadata"))
+      .getOrElse(new Path(hadoopPath, "metadata"))
   }
 
   @tailrec
@@ -287,18 +288,19 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     getIcebergCatalog.createTable(getTableIdentifier, schema, partitionSpec, hadoopPath.toString, options.asJava)
   }
 
-  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq.empty)
+                                (implicit context: ActionPipelineContext): DataFrame = {
 
     val df = incrementalOutputExpr match {
       case Some(snapshotId) =>
         require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
-        val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
-          else {
+        val icebergTable = if (snapshotId == "0") context.sparkSession.table(table.fullName)
+        else {
 
           // activate temporary cdc view
           context.sparkSession.sql(
             s"""CALL ${getIcebergCatalog.name}.system.create_changelog_view(table => '${getIdentifier.toString}'
-               |, options => map('start-snapshot-id', '${snapshotId}')
+               |, options => map('start-snapshot-id', '$snapshotId')
                |, compute_updates => true
                |, identifier_columns => array('${table.primaryKey.get.mkString("','")}')
                |)""".stripMargin)
@@ -424,12 +426,12 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     // add all summary entries except spark application id to metrics
     val icebergMetrics = (summary - "spark.app.id")
       // normalize names lowercase with underscore
-      .map{case(k,v) => (k.replace("-","_"), Try(v.toLong).getOrElse(v))}
+      .map { case (k, v) => (k.replace("-", "_"), Try(v.toLong).getOrElse(v)) }
       // standardize naming
       // Unfortunately this is not possible yet for merge operation, as we only get added/deleted records. Added records contain inserted + updated rows, deleted records probably updated + deleted rows...
-      .map{
+      .map {
         case ("added_records", v) if finalSaveMode != SDLSaveMode.Merge => ("rows_inserted", v)
-        case (k,v) => (k,v)
+        case (k, v) => (k, v)
       }
 
     // vacuum iceberg table
@@ -445,13 +447,13 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     // check if temp-table existing
-    if(getIcebergCatalog.tableExists(getTableIdentifier)) {
+    if (getIcebergCatalog.tableExists(getTableIdentifier)) {
       logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be replaced.")
     }
     // write to temp-table
     df.write
       .format("iceberg")
-      .option("path", hadoopPath.toString+"_sdltmp")
+      .option("path", hadoopPath.toString + "_sdltmp")
       .saveAsTable(tmpTable.fullName)
   }
 
@@ -472,7 +474,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
       // update existing does not work with SQL merge stmt
       val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, SQLUtil.sparkQuoteCaseSensitiveColumn(_))
-      updateExistingStatement.foreach{stmt =>
+      updateExistingStatement.foreach { stmt =>
         logger.info(s"($id) executing update existing statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
         context.sparkSession.sql(stmt)
       }
@@ -488,22 +490,22 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       // note that we pass all target cols instead of new df columns as parameter, but with customized saveModeOptionsExt
       val mergeStmt = SQLUtil.createMergeStatement(table, targetCols, tmpTable.fullName, saveModeOptionsExt, SQLUtil.sparkQuoteCaseSensitiveColumn(_))
       // execute
-      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptionsExt).map(e => e._1+"="+e._2).mkString(" ")}")
+      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptionsExt).map(e => e._1 + "=" + e._2).mkString(" ")}")
       logger.debug(s"($id) merge statement: $mergeStmt")
       context.sparkSession.sql(mergeStmt)
       // return
       metrics
     } finally {
       // cleanup temp table
-      val tmpTableIdentifier = TableIdentifier.of((getIdentifier.namespace :+ tmpTable.name):_*)
+      val tmpTableIdentifier = TableIdentifier.of(getIdentifier.namespace :+ tmpTable.name: _*)
       getIcebergCatalog.dropTable(tmpTableIdentifier)
     }
   }
 
-  def updateTableProperty(name: String, value: String, default: String)(implicit context: ActionPipelineContext) = {
+  def updateTableProperty(name: String, value: String, default: String)(implicit context: ActionPipelineContext): Unit = {
     val currentValue = getIcebergTable.properties.asScala.getOrElse(name, default)
     if (currentValue != value) {
-      getIcebergTable.updateProperties.set(name, value).commit
+      getIcebergTable.updateProperties().set(name, value).commit()
     }
     logger.info(s"($id) updated Iceberg table property $name to $value")
   }
@@ -522,7 +524,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val newSchema = SparkSchemaUtil.convertWithFreshIds(table.schema, dsSchema, caseSensitive)
 
     // update the table to get final id assignments and validate the changes
-    val update = table.updateSchema.caseSensitive(caseSensitive).unionByNameWith(newSchema)
+    val update = table.updateSchema().caseSensitive(caseSensitive).unionByNameWith(newSchema)
     val mergedSchema = update.apply
 
     // reconvert the dsSchema without assignment to use the ids assigned by UpdateSchema
@@ -549,30 +551,36 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   def getIcebergCatalog(implicit context: ActionPipelineContext): Catalog = {
     getSparkCatalog.icebergCatalog
   }
+
   def getSparkCatalog(implicit context: ActionPipelineContext): TableCatalog with SupportsNamespaces with HasIcebergCatalog = {
     getCatalogAndIdentifier.catalog match {
       case c: TableCatalog with HasIcebergCatalog with SupportsNamespaces => c
       case c => throw new IllegalStateException(s"($id) ${c.name}:${c.getClass.getSimpleName} is not a TableCatalog with SupportsNamespaces with HasIcebergCatalog implementation")
     }
   }
+
   def getIdentifier(implicit context: ActionPipelineContext): Identifier = {
     getCatalogAndIdentifier.identifier
   }
+
   def getTableIdentifier(implicit context: ActionPipelineContext): TableIdentifier = {
     convertToTableIdentifier(getIdentifier)
   }
+
   def convertToTableIdentifier(identifier: Identifier): TableIdentifier = {
-    TableIdentifier.of(Namespace.of(identifier.namespace:_*), identifier.name)
+    TableIdentifier.of(Namespace.of(identifier.namespace: _*), identifier.name)
   }
+
   private def getCatalogAndIdentifier(implicit context: ActionPipelineContext): CatalogAndIdentifier = {
     if (_catalogAndIdentifier.isEmpty) {
       _catalogAndIdentifier = Some(Spark3Util.catalogAndIdentifier(context.sparkSession, table.nameParts.asJava))
     }
     _catalogAndIdentifier.get
   }
+
   private var _catalogAndIdentifier: Option[CatalogAndIdentifier] = None
 
-  def getIcebergTable(implicit context: ActionPipelineContext) = {
+  def getIcebergTable(implicit context: ActionPipelineContext): iceberg.Table = {
     // Note: loadTable is cached by default in Iceberg catalog
     getIcebergCatalog.loadTable(identifierToTableIdentifier(getIdentifier))
   }
@@ -640,7 +648,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     getIcebergCatalog.dropTable(getTableIdentifier, true) // purge
-    HdfsUtil.deletePath(hadoopPath, false)(filesystem)
+    HdfsUtil.deletePath(hadoopPath, doWarn = false)(filesystem)
   }
 
   override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
@@ -662,7 +670,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
+  override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = {
     try {
       val session = context.sparkSession
       import session.implicits._
@@ -701,7 +709,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     incrementalOutputExpr = state.orElse(Some("0"))
   }
 
-   /**
+  /**
    * Return the state of the last increment or empty if no increment was processed.
    */
   override def getState: Option[String] = {
