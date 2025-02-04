@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
@@ -290,7 +290,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq.empty)
                                 (implicit context: ActionPipelineContext): DataFrame = {
-
+    implicit val helper: SparkSubFeed.type = SparkSubFeed
     val df = incrementalOutputExpr match {
       case Some(snapshotId) =>
         require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
@@ -324,10 +324,16 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
 
-    df
+    if (partitionValues.isEmpty) df else {
+      val partitionFilter = partitionValues.map(_.getFilterExpr).reduce(_ or _).asInstanceOf[SparkColumn]
+      df.where(partitionFilter.inner)
+    }
   }
 
-  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame,
+                                  partitionValues: Seq[PartitionValues],
+                                  saveModeOptions: Option[SaveModeOptions] = None)
+                                 (implicit context: ActionPipelineContext): Unit = {
     val genericDf = SparkDataFrame(df)
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     val targetSchema = targetDf.schema
@@ -352,10 +358,12 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   /**
    * Writes DataFrame to HDFS/Parquet and creates Iceberg table.
    */
-  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeSparkDataFrame(df: DataFrame,
+                                   partitionValues: Seq[PartitionValues] = Seq(),
+                                   isRecursiveInput: Boolean = false,
+                                   saveModeOptions: Option[SaveModeOptions] = None)
                                   (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
-    implicit val helper: SparkSubFeed.type = SparkSubFeed
 
     val genericDf = SparkDataFrame(df)
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
