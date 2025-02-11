@@ -44,6 +44,13 @@ Utilizing a Maven container, the getting-started project with the required SDLB 
 This might take some time, but it's only needed at the beginning or if Scala code has changed.
 :::
 
+:::caution
+In case you get an error stating that the dev.conf file is not existing please do the following: 
+- Navigate into the folder envConfig
+- Copy the file dev.conf.part-2-solution as dev.conf (`cp dev.conf.part-2-solution dev.conf`)
+- Rerun `./buildJob.sh`
+:::
+
 ## Run SDLB with Spark docker image
 
 Now let's see Smart Data Lake in action!
