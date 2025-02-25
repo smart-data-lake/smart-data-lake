@@ -58,11 +58,12 @@ class ColumnTransformerTest extends FunSuite with BeforeAndAfter {
 
   test("only columns where the names match are removed") {
     // prepare
-    val colTransformer = AdditionalColumnsTransformer(
+
+    val colTransformer = ColumnsTransformer(
       additionalColumns = Map("run_id" -> "runId"),
       additionalDerivedColumns = Map(
         "col_1_plus_col2" -> """col_1 + col_2"""
-//        ,"sum_col_1" -> """select sum(col_1) group by col_2""" TODO ask zzeekk
+        ,"sum_col_1" -> """sum(col_1) over (partition by 'whatever')"""
       ),
       renamedColumns = Map("col_1" -> "new_col_1"),
       droppedColumns = Seq("col_2")
@@ -71,18 +72,16 @@ class ColumnTransformerTest extends FunSuite with BeforeAndAfter {
     val df = SparkDataFrame(Seq(
       (1, 11),
       (2, 22)).toDF("col_1", "col_2"))
+
     // execute
     val transformed = colTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    val resultShow = transformed.asInstanceOf[SparkDataFrame].showString().stripMargin
-    val expectedShow =
-      """+---------+------+---------------+
-new_col_1|run_id|col_1_plus_col2|
-+---------+------+---------------+
-        1|     1|             12|
-        2|     1|             24|
-+---------+------+---------------+
-""".filter(_ !='\r') //makes the test run on windows due to local windows CRLF format of the source file
-    // check
-    assert(resultShow == expectedShow)
+    val resultDF = transformed.asInstanceOf[SparkDataFrame]
+    val expectedSeq: Seq[(Option[Int], Option[Int], Option[Int], Option[Int])] = Seq(
+      (Some(1), Some(1), Some(12), Some(3)),
+      (Some(2), Some(1), Some(24), Some(3))
+    )
+    val expectedDf = SparkDataFrame(expectedSeq.toDF("new_col_1", "run_id", "col_1_plus_col2", "sum_col_1"))
+    resultDF.inner.show(false)
+    assert(expectedDf.collect == resultDF.collect)
   }
 }

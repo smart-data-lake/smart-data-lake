@@ -30,7 +30,7 @@ import io.smartdatalake.util.misc.StateUploader
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
-import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -634,11 +634,11 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
     // start first dag run
     val action1 = CopyAction( "a", srcDO1.id, tgt1DO.id, executionMode = Some(DataObjectStateIncrementalMode())
-      , transformers = Seq(AdditionalColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
+      , transformers = Seq(ColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
       , metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1)
     val action2 = CopyAction( "b", srcDO2.id, tgt2DO.id, executionMode = Some(DataObjectStateIncrementalMode())
-      , transformers = Seq(AdditionalColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
+      , transformers = Seq(ColumnsTransformer(additionalColumns = Map("run_id"-> "runId")))
       , metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
