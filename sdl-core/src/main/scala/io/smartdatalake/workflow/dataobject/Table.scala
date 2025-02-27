@@ -30,7 +30,6 @@ import org.apache.spark.sql.catalyst.TableIdentifier
  *           Called db for backwards-compatibility because for hive tables, db and schema mean the same thing.
  * @param name        table name
  * @param query       optional select query
- * @param commentOnTable  An optional comment to add to the table after writing a DataFrame to it. As of now, this is only possible for Delta Lake and Snowflake tables.
  * @param commentsOnColumns Optional sequence of comments to add to the columns of the table as metadata. They must be written as follows:
  *                          commentsOnColumns = {
  *                            colname1 = "Comment or description for column colname1"
@@ -71,7 +70,6 @@ case class Table(
                   createAndReplacePrimaryKey: Boolean = false,
                   primaryKeyConstraintName: Option[String] = None,
                   foreignKeys: Option[Seq[ForeignKey]] = None,
-                  commentOnTable: Option[String] = None,
                   commentsOnColumns: Option[Map[String, String]] = None,
                   catalog: Option[String] = None
                 ) {

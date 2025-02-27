@@ -292,7 +292,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
     if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
-    if (table.commentOnTable.isDefined) addTableComment(table.commentOnTable.get)
+    metadata.flatMap(_.description).foreach {addTableComment}
     if (table.commentsOnColumns.isDefined) addColumnComments(table.commentsOnColumns.get)
 
   }
