@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.meta
+package io.smartdatalake.util.misc
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
-import scaladoc.Markup.{CodeBlock, Document, Heading, Paragraph, Span}
+import scaladoc.Markup._
 import scaladoc.{Markup, Scaladoc, Tag}
 
 import scala.reflect.runtime.universe.Annotation

@@ -59,8 +59,8 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
    * @param timeoutSec max wait time in seconds. Throws NoMetricsReceivedException if metrics were not received in time.
    * @return the observed metrics as a `Map[String, Any]`
    */
-  @throws[InterruptedException]
-  def waitFor(timeoutSec: Int = 10): Map[String, _] = {
+  @throws[NoMetricsReceivedException]
+  def waitFor(timeoutSec: Int = 1): Map[String, _] = {
     synchronized {
       // we need to loop as wait might return without us calling notify
       // https://en.wikipedia.org/w/index.php?title=Spurious_wakeup&oldid=992601610
@@ -95,14 +95,21 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
     metrics.getOrElse(Map())
       .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
-      .flatMap{case (name,r) => r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(otherObservationsPrefix.map(name.stripPrefix).getOrElse(name).stripSuffix(pushDownTolerantMetricsMarker), e))}
+      .flatMap { case (metricName, r) =>
+        val namePostfix = if (metricName != name) {
+          Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
+        } else None
+        val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
+        logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
+        metricEntries
+      }
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {
     synchronized {
       val observedMetrics = qe.observedMetrics
       if (metrics.isEmpty && observedMetrics.isDefinedAt(name)) {
-        logger.debug(s"got observations: ${observedMetrics.keys.mkString(", ")}")
+        logger.debug(s"($name) onFinish got observations: ${observedMetrics.keys.mkString(", ")}")
         metrics = Some(qe.observedMetrics)
         notifyAll()
         sparkSession.foreach(_.listenerManager.unregister(listener))
@@ -110,9 +117,9 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
     }
   }
 
-  private def createMetric(observationName: String, observation: (String,Any)) = {
+  private def createMetric(namePostfix: Option[String], observation: (String, Any)) = {
     val (k,v) = observation
-    val metricName = if (observationName==name) k else s"$k#${observationName.takeWhile(_!='#')}"
+    val metricName = namePostfix.map(p => s"$k#$p").getOrElse(k)
     (metricName, Option(v).getOrElse(None)) // if value is null convert to None
   }
 }

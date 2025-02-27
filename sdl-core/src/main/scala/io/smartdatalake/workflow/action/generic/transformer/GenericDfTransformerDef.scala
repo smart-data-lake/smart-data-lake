@@ -60,7 +60,8 @@ trait PartitionValueTransformer extends Transformer {
  */
 trait GenericDfTransformerDef extends PartitionValueTransformer {
   def name: String
-  def description: Option[String]
+
+  def description: Option[String] = None
   /**
    * Optional function to implement validations in prepare phase.
    */

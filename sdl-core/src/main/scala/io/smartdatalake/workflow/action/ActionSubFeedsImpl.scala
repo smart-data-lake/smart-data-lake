@@ -144,6 +144,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
+  protected def convertToOutputSubFeed(subFeed: S): S = subFeed
+
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
     // This way metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
@@ -165,20 +167,20 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
             // remember NoDataToProcessWarning on main output for later
             case ex: NoDataToProcessWarning if mainOutputId.isEmpty || mainOutputId.contains(output.id) =>
               logNoData(subFeed, isMainSubFeed = true)
-              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, Some(ex))
+              (outputSubFeeds ++ ex.results.toSeq.flatten.map(_.setSkipped().asInstanceOf[S]), taskFailedException, Some(ex))
             // ignore NoDataToProcessWarning if not main output
             case ex: NoDataToProcessWarning =>
               logNoData(subFeed, isMainSubFeed = false)
-              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], taskFailedException, noDataWarning)
+              (outputSubFeeds ++ ex.results.toSeq.flatten.map(_.setSkipped().asInstanceOf[S]), taskFailedException, noDataWarning)
             // remember taskedFailedException for next iteration and ignore processing of further feeds.
             case ex: TaskFailedException =>
               ex.results.flatMap(_.headOption.flatMap(_.metrics)).foreach{ metrics =>
                 val metricsLog = orderMetricsDefault(metrics).map( x => x._1+"="+x._2).mkString(" ")
                 logger.warn(s"($id) failed writing to ${subFeed.dataObjectId.id}: " + metricsLog)
               }
-              (outputSubFeeds :+ ex.results.map(_.head).getOrElse(subFeed).asInstanceOf[S], Some(ex), noDataWarning)
+              (outputSubFeeds ++ ex.results.toSeq.flatten.map(_.asInstanceOf[S]), Some(ex), noDataWarning)
           }
-        } else (outputSubFeeds :+ subFeed, taskFailedException, noDataWarning)
+        } else (outputSubFeeds :+ convertToOutputSubFeed(subFeed), taskFailedException, noDataWarning)
     }
     // if there is a TaskFailedException, enrich it with all results and throw it.
     taskFailedException.foreach(ex => throw ex.copy(results = Some(outputSubFeeds)))
@@ -241,7 +243,11 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   } catch {
     // throw exception with skipped output subfeeds if "no data"
-    case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
+    case ex: NoDataToProcessWarning =>
+      val subFeeds = ex.results.toSeq.flatten
+      val allSubFeeds = outputs.map(o => subFeeds.find(_.dataObjectId == o.id)
+        .getOrElse(ActionHelper.createSkippedSubFeed(o)))
+      throw ex.copy(results = Some(allSubFeeds))
   }
 
   override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {

@@ -19,7 +19,7 @@
 
 package io.smartdatalake.meta.configexporter
 
-import io.smartdatalake.app.GlobalConfig
+import io.smartdatalake.app.{FileDescriptor, GlobalConfig}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigurationException}
 import io.smartdatalake.util.misc.FileUtil.readFile
@@ -27,9 +27,15 @@ import io.smartdatalake.util.misc.{SmartDataLakeLogger, URIUtil}
 import io.smartdatalake.util.webservice.ScalaJWebserviceClient
 import org.apache.commons.lang.NotImplementedException
 import org.apache.hadoop.conf.Configuration
-import sttp.model.Method
+import org.apache.spark.util.Json4sCompat
+import org.json4s.jackson.JsonMethods
+import org.json4s.{DefaultFormats, Formats, JString}
+import sttp.client3.multipart
+import sttp.model.{MediaType, Method}
 
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import java.sql.Timestamp
+import java.time.OffsetDateTime
 import scala.io.Source
 import scala.util.Using
 
@@ -38,6 +44,8 @@ trait ExportWriter {
   def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit
   def writeStats(document: String, dataObjectId: DataObjectId, version: Long): Unit
   def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = throw new NotImplementedException()
+  def deleteFile(filename: String, version: Option[String]): Unit = throw new NotImplementedException()
+  def listFiles(version: Option[String]): Seq[FileDescriptor] = throw new NotImplementedException()
 }
 
 object ExportWriter {
@@ -133,12 +141,42 @@ case class UIExportWriter(configPaths: Seq[String]) extends ExportWriter with Sm
   }
 
   override def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = {
-    upload(content, "description", additionalParams = Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
+    val additionalParams = Seq(version.map("version" -> _)).flatten.toMap
+    logger.info(s"Uploading descriptions/$filename " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
+    uploader.sendBytes(s"descriptions/$filename", multipartBody = Some(Seq(multipart("file", content).fileName(filename))), method = Method.POST, additionalParams = additionalParams, mediaType = MediaType.MultipartFormData)
+  }
+
+  override def deleteFile(filename: String, version: Option[String]): Unit = {
+    val additionalParams = Seq(version.map("version" -> _)).flatten.toMap
+    logger.info(s"Deleting descriptions/$filename " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
+    uploader.sendBytes(s"descriptions/$filename", method = Method.DELETE, additionalParams = additionalParams)
+  }
+
+  override def listFiles(version: Option[String]): Seq[FileDescriptor] = {
+    val additionalParams = Seq(version.map("version" -> _)).flatten.toMap
+    logger.info(s"get descriptions " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
+    val response = uploader.sendBytes("descriptions/list", method = Method.GET, additionalParams = additionalParams)
+      .getOrElse(throw new IllegalStateException("Got empty response for 'descriptions/list'"))
+    parseFileDescriptors(response)
   }
 
   private def upload(content: Array[Byte], subPath: String, method: Method = Method.PUT, additionalParams: Map[String, String] = Map()): Unit = {
     logger.info(s"Uploading $subPath " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
-    uploader.sendBytes(subPath, content, method, additionalParams = additionalParams)
+    uploader.sendBytes(subPath, body = Some(content), method = method, additionalParams = additionalParams)
+  }
+
+  implicit private val formats: Formats = DefaultFormats + Json4sCompat.getCustomSerializer[Timestamp](formats => ( {
+    case json: JString => Timestamp.from(OffsetDateTime.parse(json.s).toInstant)
+  }, {
+    case obj: Timestamp => JString(obj.toLocalDateTime.toString)
+  }
+  ))
+
+  private def parseFileDescriptors(jsonStr: String): Seq[FileDescriptor] = {
+    val json = JsonMethods.parse(jsonStr).camelizeKeys.transformField {
+      case ("type", x) => ("mediaType", x)
+    }
+    json.extract[Seq[FileDescriptor]]
   }
 }
 
@@ -157,7 +195,7 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
   }
 
   override def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = {
-    upload(content, "description",  Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
+    upload(content, "descriptions", Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
   }
 
   private def upload(content: Array[Byte], subPath: String, additionalParams: Map[String,String] = Map()): Unit = {

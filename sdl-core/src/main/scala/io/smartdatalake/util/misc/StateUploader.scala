@@ -36,7 +36,7 @@ class StateUploader(uploader: UploadService, stagePath: Option[String], processU
         try { // stop on first upload error
           stagedStates.foreach { file =>
             val body = HdfsUtil.readHadoopFile(file.path)
-            uploader.send(operation, body)
+            uploader.send(operation, Some(body))
             filesystem.delete(file.path, false)
           }
         } catch {
@@ -53,7 +53,7 @@ class StateUploader(uploader: UploadService, stagePath: Option[String], processU
       uploadedExecutionIds.add(context.executionId)
       logger.info(s"Uploading ${if (isFirst) "first" else "final"} state for executionId=${context.executionId}")
       try {
-        uploader.send(operation, state.toJson)
+        uploader.send(operation, Some(state.toJson))
       } catch {
         case ex: Exception =>
           stageStateStore match {
@@ -79,7 +79,7 @@ class StateUploader(uploader: UploadService, stagePath: Option[String], processU
         val body = ActionDAGRunState.toJson(state.actionsState(changedActionId.get))
         logger.debug(s"Uploading state update for ${changedActionId.get} executionId=${context.executionId}")
         try {
-          uploader.send(operation, body, Method.PATCH, runParams)
+          uploader.send(operation, Some(body), Method.PATCH, runParams)
         } catch {
           // just warn if update fails
           case ex: Exception => logger.warn(s"Failed uploading state update for $changedActionId. ${getExceptionSummary(ex)}")

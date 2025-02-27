@@ -114,13 +114,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
   def getSchema(implicit context: ActionPipelineContext): Option[SparkSchema] = {
     _schemaHolder = _schemaHolder.orElse(
         // get defined schema, add potentially missing partition columns as type string
-        schema.map(_.convert(typeOf[SparkSubFeed])).map { s =>
-          val missingPartitions = partitions.filterNot(s.columnExists)
-          if (missingPartitions.nonEmpty) {
-            logger.info(s"($id) adding missing partition columns ${missingPartitions.mkString(", ")} to schema")
-            missingPartitions.foldLeft(s){ case (s,c) => s.add(c, SparkSimpleDataType(StringType))}.asInstanceOf[SparkSchema]
-          } else s.asInstanceOf[SparkSchema]
-        }
+        schema.map(_.convert(typeOf[SparkSubFeed]))
+          .map(schema => addPartitionCols(schema.asInstanceOf[SparkSchema]))
       )
       .orElse (
         // or try reading schema file
@@ -135,6 +130,11 @@ trait SparkFileDataObject extends HadoopFileDataObject
           logger.info(s"($id) Inferring schema from sample data file")
           Some(inferSchemaFromPath(sampleFile.toString))
         } else None
+      )
+      .orElse(
+        // use schemaMin if defined
+        schemaMin.map(_.convert(typeOf[SparkSubFeed]))
+          .map(schema => addPartitionCols(schema.asInstanceOf[SparkSchema]))
       )
     // return
     _schemaHolder
@@ -156,6 +156,14 @@ trait SparkFileDataObject extends HadoopFileDataObject
       case (df, p) => df.withColumn(p, functions.lit("dummyString"))
     }
     SparkSchema(dfWithPartitions.schema)
+  }
+
+  private def addPartitionCols(schema: SparkSchema): SparkSchema = {
+    val missingPartitions = partitions.filterNot(schema.columnExists)
+    if (missingPartitions.nonEmpty) {
+      logger.info(s"($id) adding missing partition columns ${missingPartitions.mkString(", ")} to schema")
+      missingPartitions.foldLeft(schema) { case (s, c) => s.add(c, SparkSimpleDataType(StringType)) }
+    } else schema
   }
 
   /**

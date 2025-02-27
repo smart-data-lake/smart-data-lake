@@ -240,7 +240,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))
     }
-    stateListeners.foreach(_.notifyState(runState, context, changedActionId))
+    if (!context.appConfig.isDryRun) {
+      stateListeners.foreach(_.notifyState(runState, context, changedActionId))
+    }
     // return
     runState
   }

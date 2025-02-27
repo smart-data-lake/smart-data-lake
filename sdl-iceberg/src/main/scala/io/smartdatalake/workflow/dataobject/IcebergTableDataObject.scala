@@ -28,12 +28,12 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
+import io.smartdatalake.util.spark.SparkQueryUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
@@ -129,7 +129,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
 
-  val filetype: String = "." + options.getOrElse("write.format.default", "parquet") // Iceberg also supports avro or orc by setting this option, but default is parquet
+  val filetypePattern: String = ".*(\\.parquet|\\.avro|\\.orc|c\\d\\d\\d)$" // Iceberg supports to read mixed tables! 'c000' can be the file ending for parquet files of legacy hive tables!
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = context.sparkSession
@@ -223,14 +223,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           logger.info(s"($id) Creating Iceberg table ${table.fullName} for existing path $hadoopPath")
         } else {
           // if path has existing parquet files, convert to iceberg table
-          require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset Iceberg table.")
+          require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no data files. Delete whole base path to reset Iceberg table.")
           convertPathToIceberg
         }
       }
     } else if (filesystem.exists(hadoopPath)) {
       if (!filesystem.exists(getMetadataPath)) {
         // if path has existing parquet files but not in iceberg format, convert to iceberg format
-        require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no parquet files. Delete whole base path to reset Iceberg table.")
+        require(checkFilesExisting, s"($id) Path $hadoopPath exists but contains no data files. Delete whole base path to reset Iceberg table.")
         convertTableToIceberg
         logger.info(s"($id) Converted existing table ${table.fullName} to Iceberg table")
       }
@@ -239,6 +239,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) Dropped existing Iceberg table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -252,32 +253,38 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * converts an existing path with parquet files to an iceberg table
    */
   private[smartdatalake] def convertPathToIceberg(implicit context: ActionPipelineContext): Unit = {
-    // get schema by using Parquet DataObject
-    val parquetDataObject = ParquetFileDataObject(id.id + "-convertion", hadoopPath.toString)
-    val sparkSchema = parquetDataObject.schema.map(_.asInstanceOf[SparkSchema].inner)
-      .getOrElse(parquetDataObject.getSparkDataFrame().schema)
-    val schema = SparkSchemaUtil.convert(sparkSchema)
-    // move parquet files and partitions from table root folder to data subfolder (Iceberg standard)
-    val filesToMove = filesystem.listStatus(hadoopPath)
-      .filter(f => (f.isFile && f.getPath.getName.endsWith(filetype)) || (f.isDirectory && f.getPath.getName.contains("=")))
-    logger.info(s"($id) convertPathToIceberg: moving ${filesToMove.length} files to ./data subdirectory")
-    filesToMove.foreach { f =>
-      val newPath = new Path(new Path(hadoopPath, "data"), f.getPath.getName)
-      filesystem.rename(f.getPath, newPath)
+    val dataPath = new Path(hadoopPath, "data")
+    if (!filesystem.exists(dataPath)) {
+      // move parquet files and partitions from table root folder to data subfolder (Iceberg standard)
+      val filesToMove = filesystem.listStatus(hadoopPath)
+        .filter(f => (f.isFile && f.getPath.getName.matches(filetypePattern)) || (f.isDirectory && f.getPath.getName.contains("=")))
+      logger.info(s"($id) convertPathToIceberg: moving ${filesToMove.length} files to ./data subdirectory")
+      filesystem.mkdirs(dataPath)
+      filesToMove.foreach { f =>
+        val newPath = new Path(dataPath, f.getPath.getName)
+        if (!filesystem.rename(f.getPath, newPath)) throw new IllegalStateException(s"($id) Failed to rename ${f.getPath} -> $newPath")
+      }
     }
     // create table
     logger.info(s"($id) convertPathToIceberg: creating iceberg table")
-    val partitionSpec = partitions.foldLeft(PartitionSpec.builderFor(schema)){
-      case (partitionSpec, colName) => partitionSpec.identity(colName)
-    }.build
-    getIcebergCatalog.createTable(getTableIdentifier, schema, partitionSpec, hadoopPath.toString, options.asJava)
+    // get schema using Spark. Note that this only work for parquet files.
+    val sparkSchema = context.sparkSession.read.parquet(dataPath.toString).schema
+    createIcebergTable(sparkSchema)
     // add files
     logger.info(s"($id) convertPathToIceberg: add_files")
     val parallelismStr = connection.flatMap(_.addFilesParallelism.map(", parallelism => " + _)).getOrElse("")
-    context.sparkSession.sql(s"CALL ${getIcebergCatalog.name}.system.add_files(table => '${getIdentifier.toString}', source_table => '`parquet`.`$hadoopPath/data`'$parallelismStr)")
+    context.sparkSession.sql(s"CALL ${getIcebergCatalog.name}.system.add_files(table => '${getIdentifier.toString}', source_table => '`parquet`.`$dataPath`'$parallelismStr)")
     // cleanup potential SDLB .schema directory
     HdfsUtil.deletePath(new Path(hadoopPath, ".schema"), doWarn = false)(filesystem)
     logger.info(s"($id) convertPathToIceberg: succeeded")
+  }
+
+  private def createIcebergTable(sparkSchema: StructType)(implicit context: ActionPipelineContext) = {
+    val schema = SparkSchemaUtil.convert(sparkSchema)
+    val partitionSpec = partitions.foldLeft(PartitionSpec.builderFor(schema)) {
+      case (partitionSpec, colName) => partitionSpec.identity(colName)
+    }.build
+    getIcebergCatalog.createTable(getTableIdentifier, schema, partitionSpec, hadoopPath.toString, options.asJava)
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -319,13 +326,16 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
-    validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+    val genericDf = SparkDataFrame(df)
+    val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
+    val targetSchema = targetDf.schema
+
+    validateSchemaMin(SparkSchema(targetSchema), "write")
+    validateSchemaHasPartitionCols(targetDf, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
     if (isTableExisting) {
-      val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
-      if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), existingSchema, "write")
+      if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), existingSchema, "write")
     }
   }
 
@@ -337,54 +347,50 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): MetricsMap = {
-    validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-    writeDataFrame(df, createTableOnly = false, partitionValues, saveModeOptions)
-  }
-
   /**
    * Writes DataFrame to HDFS/Parquet and creates Iceberg table.
    */
-  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
-                    (implicit context: ActionPipelineContext): MetricsMap = {
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+                                  (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
-    val dfPrepared = if (createTableOnly) {
-      // create empty df with existing df's schema
-      DataFrameUtil.getEmptyDataFrame(df.schema)
-    } else df
+
+    val genericDf = SparkDataFrame(df)
+    val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
+    val targetSchema = targetDf.schema
+
+    validateSchemaMin(SparkSchema(targetSchema), "write")
+    validateSchemaHasPartitionCols(targetDf, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
+
     // remember previous snapshot timestamp
     val previousSnapshotId: Option[Long] = if (isTableExisting) Option(getIcebergTable.currentSnapshot()).map(_.snapshotId()) else None
     // V1 writer is needed to create external table
-    var dfWriter = saveModeTargetDf.write
+    var dfWriter = targetDf.write
       .format("iceberg")
       .options(options)
     if (isPathBasedCatalog(getIcebergCatalog)) dfWriter = dfWriter.option("location", hadoopPath.toString)
     else dfWriter = dfWriter.option("path", hadoopPath.toString)
     val sparkMetrics = if (isTableExisting) {
       // check scheme
-      if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
+      if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), SparkSchema(session.table(table.fullName).schema), "write")
       // apply
       if (finalSaveMode == SDLSaveMode.Merge) {
         // handle schema evolution on merge because this is not yet supported in Spark <=3.5
         val existingSchema = SparkSchema(getSparkDataFrame().schema)
-        if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(saveModeTargetDf.schema))) evolveTableSchema(saveModeTargetDf.schema)
+        if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(targetSchema))) evolveTableSchema(targetSchema)
         // make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=false with SQL merge, because this is not supported in Spark 3.5. See also https://github.com/apache/iceberg/issues/9827.
         // TODO: This might be solved with Spark 4.0, as there will be a Spark API for merge.
         updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, "false", TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
-        mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
+        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         // Make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=true for schema evolution
         updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, allowSchemaEvolution.toString, TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
         // V2 writer can be used if table is existing, it supports overwriting given partitions
-        val dfWriterV2 = saveModeTargetDf
+        val dfWriterV2 = targetDf
           .writeTo(table.fullName)
           .option(SparkWriteOptions.MERGE_SCHEMA, allowSchemaEvolution.toString)
         if (partitions.isEmpty) {
@@ -600,7 +606,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    */
   protected def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
     val hasFiles = filesystem.exists(hadoopPath.getParent) &&
-      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.endsWith(filetype))
+      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.matches(filetypePattern))
     if (!hasFiles) {
       logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")

@@ -207,6 +207,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -277,8 +278,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
     validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-
+    validateSchemaHasPrimaryKeyCols(df, "write")
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -297,33 +297,28 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   }
 
-  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): MetricsMap = {
-    validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
-    writeDataFrame(df, createTableOnly = false, partitionValues, saveModeOptions)
-  }
 
   /**
    * Writes DataFrame to HDFS/Parquet and creates DeltaLake table.
-   * DataFrames are repartitioned in order not to write too many small files
-   * or only a few HDFS files that are too large.
    */
-  def writeDataFrame(df: DataFrame, createTableOnly: Boolean, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])
-                    (implicit context: ActionPipelineContext): MetricsMap = {
+  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+                             (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
-    val dfPrepared = if (createTableOnly) {
-      // create empty df with existing df's schema
-      DataFrameUtil.getEmptyDataFrame(df.schema)
-    } else df
+
+    val genericDf = SparkDataFrame(df)
+    val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
+    val targetSchema = targetDf.schema
+
+    validateSchemaMin(SparkSchema(targetSchema), "write")
+    validateSchemaHasPartitionCols(targetDf, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
-    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(dfPrepared)).getOrElse(dfPrepared)
+
     val userMetadata = s"${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}"
     session.conf.set("spark.databricks.delta.commitInfo.userMetadata", userMetadata)
-    val dfWriter = saveModeTargetDf.write
+    val dfWriter = targetDf.write
       .format("delta")
       .options(options)
       .conditionalOption("path", path.isDefined, () => hadoopPath.toString) // evaluate hadoopPath only for external tables
@@ -331,10 +326,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       .option("mergeSchema", allowSchemaEvolution) // allow schema evolution for SaveMode.Append
 
     val sparkMetrics = if (isTableExisting) {
-      if (!allowSchemaEvolution) validateSchema(SparkSchema(saveModeTargetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
+      if (!allowSchemaEvolution) validateSchema(SparkSchema(targetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
         // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
-        mergeDataFrameByPrimaryKey(dfPrepared, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
+        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         if (partitions.isEmpty) {
           // overwrite all

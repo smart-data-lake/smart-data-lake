@@ -24,11 +24,11 @@ import io.smartdatalake.communication.statusinfo.StatusInfoServer
 import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
 import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Prepare}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
@@ -38,73 +38,71 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
 import scopt.{OParser, OParserBuilder}
 
-import java.io.File
 import java.time.{Duration, LocalDateTime}
 import scala.annotation.tailrec
 import scala.util.Try
 
-trait SmartDataLakeBuilderConfigTrait[R] {
-  //All builder functions for all fields
-  def withfeedSel(value: String): R
+trait CanBuildSmartDataLakeBuilderConfig[R] {
 
-  def withapplicationName(value: Option[String]): R
+  //All builder functions for all fields of the common SmartDataLakeBuilderConfig
+  def withFeedSel(value: String): R = ProductUtil.dynamicCopy(this, "feedSel", value).asInstanceOf[R]
+  def withApplicationName(value: Option[String]): R = ProductUtil.dynamicCopy(this, "applicationName", value).asInstanceOf[R]
 
-  def withconfiguration(value: Option[Seq[String]]): R
+  def addConfiguration(value: Seq[String]): R = ProductUtil.dynamicCopy(this, "configuration", configuration ++ value).asInstanceOf[R]
 
-  def withmaster(value: Option[String]): R
+  def addConfigurationValueOverwrite(value: (String, String)): R = ProductUtil.dynamicCopy(this, "configurationValueOverwrite", configurationValueOverwrite + value).asInstanceOf[R]
+  def addPartitionValues(value: Seq[PartitionValues]): R = ProductUtil.dynamicCopy(this, "partitionValues", Some(partitionValues.getOrElse(Seq()) ++ value)).asInstanceOf[R]
+  def withParallelism(value: Int): R = ProductUtil.dynamicCopy(this, "parallelism", value).asInstanceOf[R]
+  def withStatePath(value: Option[String]): R = ProductUtil.dynamicCopy(this, "statePath", value).asInstanceOf[R]
+  def withTest(value: Option[TestMode.Value]): R = ProductUtil.dynamicCopy(this, "test", value).asInstanceOf[R]
+  def withStreaming(value: Boolean): R = ProductUtil.dynamicCopy(this, "streaming", value).asInstanceOf[R]
+  def withMaster(value: Option[String]): R = ProductUtil.dynamicCopy(this, "master", value).asInstanceOf[R]
+  def withDeployMode(value: Option[String]): R = ProductUtil.dynamicCopy(this, "deployMode", value).asInstanceOf[R]
 
-  def withdeployMode(value: Option[String]): R
+  // abstract instance variables
+  def feedSel: String
 
-  def withusername(value: Option[String]): R
+  def applicationName: Option[String]
 
-  def withkerberosDomain(value: Option[String]): R
+  def configuration: Seq[String]
 
-  def withkeytabPath(value: Option[File]): R
+  def configurationValueOverwrite: Map[String, String]
 
-  def withpartitionValues(value: Option[Seq[PartitionValues]]): R
+  def partitionValues: Option[Seq[PartitionValues]]
 
-  def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): R
+  def parallelism: Int
 
-  def withparallelism(value: Int): R
+  def statePath: Option[String]
 
-  def withstatePath(value: Option[String]): R
+  def test: Option[TestMode.Value]
 
-  def withoverrideJars(value: Option[Seq[String]]): R
+  def streaming: Boolean
 
-  def withtest(value: Option[TestMode.Value]): R
+  def master: Option[String]
 
-  def withstreaming(value: Boolean): R
+  def deployMode: Option[String]
 
-  //All fieldnames of the corresponding case class
-  def feedSel: String = null
+  // helper methods
+  def validate(): Unit = {
+    assert(!applicationName.exists(_.contains({
+      HadoopFileActionDAGRunStateStore.fileNamePartSeparator
+    })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
+    assert(configuration.nonEmpty, "Configuration files are empty")
+    assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
+    assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
+  }
 
-  def applicationName: Option[String] = None
+  val appName: String = applicationName.getOrElse(feedSel)
 
-  def configuration: Option[Seq[String]] = None
+  def isDryRun: Boolean = test.contains(TestMode.DryRun)
 
-  def master: Option[String] = None
-
-  def deployMode: Option[String] = None
-
-  def username: Option[String] = None
-
-  def kerberosDomain: Option[String] = None
-
-  def keytabPath: Option[File] = None
-
-  def partitionValues: Option[Seq[PartitionValues]] = None
-
-  def multiPartitionValues: Option[Seq[PartitionValues]] = None
-
-  def parallelism: Int = 1
-
-  def statePath: Option[String] = None
-
-  def overrideJars: Option[Seq[String]] = None
-
-  def test: Option[TestMode.Value] = None
-
-  def streaming: Boolean = false
+  def getHoconConfig(implicit hadoopConfiguration: Configuration): Config = {
+    val config = ConfigLoader.loadConfigFromFilesystem(configuration, hadoopConfiguration, configurationValueOverwrite)
+    require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
+    require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
+    config
+  }
 }
 
 /**
@@ -112,80 +110,20 @@ trait SmartDataLakeBuilderConfigTrait[R] {
  * It is populated by parsing command-line arguments.
  * It also specifies default values.
  *
- * @param feedSel         Expressions to select the actions to execute. See [[AppUtil.filterActionList()]] or commandline help for syntax description.
- * @param applicationName Application name.
- * @param configuration   One or multiple configuration files or directories containing configuration files, separated by comma.
- * @param master          The Spark master URL passed to SparkContext when in local mode.
- * @param deployMode      The Spark deploy mode passed to SparkContext when in local mode.
- * @param username        Kerberos user name (`username`@`kerberosDomain`) for local mode.
- * @param kerberosDomain  Kerberos domain (`username`@`kerberosDomain`) for local mode.
- * @param keytabPath      Path to Kerberos keytab file for local mode.
- * @param test            Run in test mode:
- *                        - "config": validate configuration
- *                        - "dry-run": execute "prepare" and "init" phase to check environment
+ * See command line help for a description of the parameters.
  */
 case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
                                       override val applicationName: Option[String] = None,
-                                      override val configuration: Option[Seq[String]] = None,
+                                      override val configuration: Seq[String] = Seq(),
+                                      override val configurationValueOverwrite: Map[String, String] = Map(),
                                       override val master: Option[String] = None,
                                       override val deployMode: Option[String] = None,
-                                      override val username: Option[String] = None,
-                                      override val kerberosDomain: Option[String] = None,
-                                      override val keytabPath: Option[File] = None,
                                       override val partitionValues: Option[Seq[PartitionValues]] = None,
-                                      override val multiPartitionValues: Option[Seq[PartitionValues]] = None,
                                       override val parallelism: Int = 1,
                                       override val statePath: Option[String] = None,
-                                      override val overrideJars: Option[Seq[String]] = None,
                                       override val test: Option[TestMode.Value] = None,
                                       override val streaming: Boolean = false
-                                     ) extends SmartDataLakeBuilderConfigTrait[SmartDataLakeBuilderConfig] {
-
-  def validate(): Unit = {
-    assert(!applicationName.exists(_.contains({
-      HadoopFileActionDAGRunStateStore.fileNamePartSeparator
-    })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
-    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
-    assert(partitionValues.isEmpty || multiPartitionValues.isEmpty, "partitionValues and multiPartitionValues cannot be defined at the same time")
-    assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
-    assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
-  }
-
-  def getPartitionValues: Option[Seq[PartitionValues]] = partitionValues.orElse(multiPartitionValues)
-
-  val appName: String = applicationName.getOrElse(feedSel)
-
-  def isDryRun: Boolean = test.contains(TestMode.DryRun)
-  override def withfeedSel(value: String): SmartDataLakeBuilderConfig = copy(feedSel = value)
-
-  override def withapplicationName(value: Option[String]): SmartDataLakeBuilderConfig = copy(applicationName = value)
-
-  override def withconfiguration(value: Option[Seq[String]]): SmartDataLakeBuilderConfig = copy(configuration = value)
-
-  override def withmaster(value: Option[String]): SmartDataLakeBuilderConfig = copy(master = value)
-
-  override def withdeployMode(value: Option[String]): SmartDataLakeBuilderConfig = copy(deployMode = value)
-
-  override def withusername(value: Option[String]): SmartDataLakeBuilderConfig = copy(username = value)
-
-  override def withkerberosDomain(value: Option[String]): SmartDataLakeBuilderConfig = copy(kerberosDomain = value)
-
-  override def withkeytabPath(value: Option[File]): SmartDataLakeBuilderConfig = copy(keytabPath = value)
-
-  override def withpartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(partitionValues = value)
-
-  override def withmultiPartitionValues(value: Option[Seq[PartitionValues]]): SmartDataLakeBuilderConfig = copy(multiPartitionValues = value)
-
-  override def withparallelism(value: Int): SmartDataLakeBuilderConfig = copy(parallelism = value)
-
-  override def withstatePath(value: Option[String]): SmartDataLakeBuilderConfig = copy(statePath = value)
-
-  override def withoverrideJars(value: Option[Seq[String]]): SmartDataLakeBuilderConfig = copy(overrideJars = value)
-
-  override def withtest(value: Option[TestMode.Value]): SmartDataLakeBuilderConfig = copy(test = value)
-
-  override def withstreaming(value: Boolean): SmartDataLakeBuilderConfig = copy(streaming = value)
-}
+                                     ) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig]
 
 object TestMode extends Enumeration {
   type TestMode = Value
@@ -223,13 +161,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Subclasses SmartDataLakeBuilder can define additional options to be extracted.
    */
 
-  protected def parserGeneric[R <: SmartDataLakeBuilderConfigTrait[R]](feedSelRequired: Boolean = true): OParser[_, R] = {
+  protected def parserGeneric[R <: CanBuildSmartDataLakeBuilderConfig[R]](feedSelRequired: Boolean = true): OParser[_, R] = {
     val builder: OParserBuilder[R] = OParser.builder[R]
     import builder._
 
     val nonRequiredFeedselParser =
       opt[String]('f', "feed-sel")
-        .action((arg, config) => config.withfeedSel(arg))
+        .action((arg, config) => config.withFeedSel(arg))
         .valueName("<operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]")
         .text(
           """Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
@@ -255,37 +193,42 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       head(appType, s"$appVersion"),
       if(feedSelRequired) requiredFeedselParser else nonRequiredFeedselParser,
       opt[String]('n', "name")
-        .action((arg, config) => config.withapplicationName(Some(arg)))
+        .action((arg, config) => config.withApplicationName(Some(arg)))
         .text("Optional name of the application. If not specified feed-sel is used."),
       opt[Seq[String]]('c', "config")
-        .action((arg, config) => config.withconfiguration(Some(arg)))
+        .action((arg, config) => config.addConfiguration(arg.map(_.trim)))
         .valueName("<file1>[,<file2>...]")
+        .unbounded()
+        .required()
         .text("One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."),
-      opt[String]("partition-values")
-        .action((arg, config) => config.withpartitionValues(Some(PartitionValues.parseSingleColArg(arg))))
+      opt[String]('o', "config-value-overwrite")
+        .action((arg, config) => config.addConfigurationValueOverwrite(parseKeyValue(arg)))
+        .valueName("<nested.key>=<value>")
+        .unbounded()
+        .text("Overwrite configuration value at given nested key. Note that it is not recommended to overwrite array values. Use overwrite together with hocon substitution for this."),
+      opt[String]('p', "partition-values")
+        .action((arg, config) => config.addPartitionValues(PartitionValues.parseSingleColArg(arg)))
         .valueName(PartitionValues.singleColFormat)
+        .unbounded()
         .text(s"Partition values to process for one single partition column."),
-      opt[String]("multi-partition-values")
-        .action((arg, config) => config.withpartitionValues(Some(PartitionValues.parseMultiColArg(arg))))
+      opt[String]('m', "multi-partition-values")
+        .action((arg, config) => config.addPartitionValues(PartitionValues.parseMultiColArg(arg)))
         .valueName(PartitionValues.multiColFormat)
+        .unbounded()
         .text(s"Partition values to process for multiple partition columns."),
       opt[Unit]('s', "streaming")
-        .action((_, config) => config.withstreaming(true))
+        .action((_, config) => config.withStreaming(true))
         .text(s"Enable streaming mode for continuous processing."),
       opt[Int]("parallelism")
-        .action((arg, config) => config.withparallelism(arg))
+        .action((arg, config) => config.withParallelism(arg))
         .valueName("<int>")
-        .text(s"Max number of parallel executed SDLB actions"),
+        .text(s"Max number of parallel executed SDLB actions."),
       opt[String]("state-path")
-        .action((arg, config) => config.withstatePath(Some(arg)))
+        .action((arg, config) => config.withStatePath(Some(arg)))
         .valueName("<path>")
-        .text(s"Path to save run state files. Must be set to enable recovery in case of failures."),
-      opt[Seq[String]]("override-jars")
-        .action((arg, config) => config.withoverrideJars(Some(arg)))
-        .valueName("<jar1>[,<jar2>...]")
-        .text("Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath."),
+        .text(s"Hadoop path to save run state files. Must be set to enable recovery in case of failures."),
       opt[String]("test")
-        .action((arg, config) => config.withtest(Some(TestMode.withName(arg))))
+        .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
         .valueName("<config|dry-run>")
         .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage"),
       help("help").text("Display the help text."),
@@ -294,10 +237,15 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   }
 
+  def parseKeyValue(arg: String): (String, String) = {
+    val keyValues = arg.split("=")
+    if (keyValues.size != 2) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
+    val Array(key, value) = keyValues
+    (key, value)
+  }
+
   protected val parser: OParser[_, SmartDataLakeBuilderConfig] = {
-
     val builder = OParser.builder[SmartDataLakeBuilderConfig]
-
     import builder._
 
     OParser.sequence(
@@ -305,6 +253,26 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       head(appType, s"$appVersion"),
       parserGeneric()
     )
+  }
+
+  /**
+   * Default command line parsing method
+   */
+  private[smartdatalake] def parse(args: Seq[String], parserToUse: OParser[_, SmartDataLakeBuilderConfig] = parser): Option[SmartDataLakeBuilderConfig] = {
+    OParser.parse(parserToUse, args, SmartDataLakeBuilderConfig())
+  }
+
+  private[smartdatalake] def logProgramStart(): Unit = {
+    logger.info(s"Starting Program $appType $appVersion")
+  }
+
+  private[smartdatalake] def logStats(stats: Map[RuntimeEventState, Int]): Unit = {
+    val statsStr = stats.toSeq.sortBy(_._1).map(x => x._1 + "=" + x._2).mkString(" ") // convert stats to string
+    logger.info(s"$appType finished successfully: $statsStr")
+  }
+
+  private[smartdatalake] def throwOParserError(): Unit = {
+    logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
   }
 
   /**
@@ -332,7 +300,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           val latestRunState = stateStore.recoverRunState(latestStateId)
           if (!latestRunState.isFinal || latestRunState.isFailed) {
             // start recovery
-            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state fail or the command line parameters given must match the parameters of the run to be recovered: ConfigToRecover=${latestRunState.appConfig} ConfigGiven=${appConfig}")
+            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state file or the command line parameters given must match the parameters of the run to be recovered: ConfigToRecover=${latestRunState.appConfig} ConfigGiven=${appConfig}")
             recoverRun(appConfig, stateStore, latestRunState)._2
           } else {
             val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
@@ -426,8 +394,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, session: SparkSession): Unit = {
-    val config = ConfigLoader.loadConfigFromFilesystem(appConfig.configuration.get, session.sparkContext.hadoopConfiguration)
-    ConfigParser.parse(config, this.instanceRegistry)
+    ConfigParser.parse(appConfig.getHoconConfig(session.sparkContext.hadoopConfiguration), this.instanceRegistry)
   }
 
   /**
@@ -441,17 +408,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     appConfig.validate()
 
     // log start parameters
-    logger.info(s"Starting run: runId=${executionId.runId} attemptId=${executionId.attemptId} feedSel=${appConfig.feedSel} appName=${appConfig.appName} streaming=${appConfig.streaming} test=${appConfig.test} givenPartitionValues=${appConfig.getPartitionValues.map(x => "(" + x.mkString(",") + ")").getOrElse("None")}")
+    logger.info(s"Starting run: runId=${executionId.runId} attemptId=${executionId.attemptId} feedSel=${appConfig.feedSel} appName=${appConfig.appName} streaming=${appConfig.streaming} test=${appConfig.test} givenPartitionValues=${appConfig.partitionValues.map(x => "(" + x.mkString(",") + ")").getOrElse("None")}")
     logger.debug(s"Environment: " + sys.env.map(x => x._1 + "=" + x._2).mkString(" "))
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
     // load config
-    val config: Config = appConfig.configuration match {
-      case Some(configuration) => ConfigLoader.loadConfigFromFilesystem(configuration.map(_.trim), hadoopConf)
-      case None => ConfigLoader.loadConfigFromClasspath
-    }
-    require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
-    require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
+    val config = appConfig.getHoconConfig
 
     // parse global config
     val globalConfig = GlobalConfig.from(config)
@@ -504,7 +466,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
     val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
     val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
-    val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
+    val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
         // check action type
@@ -542,7 +504,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
     val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
     val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
-    val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.getPartitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
+    val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {
       case Prepare =>
@@ -570,7 +532,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val nextExec: Option[(ActionDAGRun, ActionPipelineContext, Option[LocalDateTime])] = if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
       // we have to recreate the action DAG if there are skipped actions in the original DAG
       val newContext = context.copy(actionsSkipped = Seq())
-      val newDag = ActionDAGRun(actionsSelected, Map[ActionId, RuntimeInfo](), context.appConfig.getPartitionValues.getOrElse(Seq()), context.appConfig.parallelism, actionDAGRun.initialSubFeeds, actionDAGRun.initialDataObjectsState, actionDAGRun.stateStore, actionDAGRun.stateListeners)(newContext)
+      val newDag = ActionDAGRun(actionsSelected, Map[ActionId, RuntimeInfo](), context.appConfig.partitionValues.getOrElse(Seq()), context.appConfig.parallelism, actionDAGRun.initialSubFeeds, actionDAGRun.initialDataObjectsState, actionDAGRun.stateStore, actionDAGRun.stateListeners)(newContext)
       Some(newDag, newContext, None)
     } else {
 

@@ -35,7 +35,7 @@ private[smartdatalake] class SDLSparkExtension extends (SparkSessionExtensions =
     e.injectPlannerStrategy(_ => AssertNotEmptyStrategy)
 
     // Check logical plan if it has data, otherwise throw SparkPlanNoDataWarning
-    e.injectPreCBORule(SparkPlanNoDataCheckRule) // this is for checking final optimized and simplied plan, e.g. PropagateEmptyRelation rule has been executed.
+    e.injectPreCBORule(SparkPlanNoDataCheckRule) // this is for checking final optimized and simplified plan, e.g. PropagateEmptyRelation rule has been executed.
     e.injectRuntimeOptimizerRule(SparkPlanNoDataCheckRule) // this is for checking runtime statistics with Spark AQE
 
     // Allow filter push-down over CollectMetrics for observations with special marker.

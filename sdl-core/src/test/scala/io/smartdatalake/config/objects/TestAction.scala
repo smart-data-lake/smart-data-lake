@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, HousekeepingMode, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
@@ -41,6 +42,7 @@ case class TestAction(override val id: ActionId,
                       arg1: Option[String],
                       executionMode: Option[ExecutionMode] = None,
                       housekeepingMode: Option[HousekeepingMode] = None,
+                      transformers: Seq[GenericDfTransformer] = Seq(),
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
@@ -50,8 +52,8 @@ case class TestAction(override val id: ActionId,
   override def init(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
   override def exec(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }
 
-  private[config] val input = instanceRegistry.get[DataObject with CanCreateDataFrame](inputId)
-  private[config] val output = instanceRegistry.get[TransactionalTableDataObject](outputId)
+  private[config] val input = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
+  private[config] val output = getOutputDataObject[TestDataObject](outputId)
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
   override val recursiveInputs:Seq[DataObject with CanCreateDataFrame] = Seq()

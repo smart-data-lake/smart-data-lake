@@ -20,6 +20,7 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers.{a, be}
 
@@ -78,10 +79,16 @@ class SchemaUtilTest extends FunSuite {
     assert(schema.columns == Seq("a", "b"))
   }
 
-  test("parse schema from case class") {
+  test("parse schema from case class, enrich with comments") {
     val schemaConfig = s"${SchemaProviderType.CaseClass.toString}#${classOf[TestSchema].getName}"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
-    assert(schema.columns == Seq("a", "b"))
+    assert(schema.columns == Seq("a", "b", "c"))
+    assert(schema.fields.find(_.name == "a").flatMap(_.comment).contains("TestA"))
+    assert(schema.fields.find(_.name == "b").flatMap(_.comment).contains("TestB"))
+    val structB = schema.fields.find(_.name == "b").map(_.dataType).collect { case x: GenericStructDataType => x }.get
+    assert(structB.fields.find(_.name == "x").flatMap(_.comment).contains("TestX"))
+    val elementStructC = schema.fields.find(_.name == "c").map(_.dataType).collect { case x: GenericArrayDataType => x }.get.elementDataType.asInstanceOf[GenericStructDataType]
+    assert(elementStructC.fields.find(_.name == "y").flatMap(_.comment).contains("TestY"))
   }
 
   test("parse xsd schema with row tag") {
@@ -134,4 +141,18 @@ class SchemaUtilTest extends FunSuite {
 
 }
 
-case class TestSchema(a: Int, b: String)
+/**
+ * This is a test schema.
+ *
+ * @param a TestA
+ * @param b TestB
+ */
+case class TestSchema(a: Int, b: TestSubType, c: Seq[TestSubType])
+
+/**
+ * This is a test schema.
+ *
+ * @param x TestX
+ * @param y TestY
+ */
+case class TestSubType(x: String, y: String)

@@ -20,9 +20,10 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{DataFrame, DataFrameWriterV2, Row, SaveMode}
+import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
 
 import scala.language.implicitConversions
 
@@ -103,7 +104,8 @@ object SDLSaveMode extends Enumeration {
  */
 sealed trait SaveModeOptions {
   private[smartdatalake] def saveMode: SDLSaveMode
-  private[smartdatalake] def convertToTargetSchema(df: DataFrame): DataFrame = df
+
+  private[smartdatalake] def convertToTargetSchema[D <: GenericDataFrame](df: D): D = df
 }
 
 /**
@@ -140,8 +142,9 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
   private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
   private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)
   private[smartdatalake] val updateColumnsOpt = if (updateColumns.nonEmpty) Some(updateColumns) else None
-  override private[smartdatalake] def convertToTargetSchema(df: DataFrame) = insertColumnsToIgnore.foldLeft(df){
-    case (df, col) => df.drop(col)
+
+  override private[smartdatalake] def convertToTargetSchema[D <: GenericDataFrame](df: D): D = insertColumnsToIgnore.foldLeft(df) {
+    case (df, col) => df.drop(col).asInstanceOf[D]
   }
 }
 object SaveModeMergeOptions {

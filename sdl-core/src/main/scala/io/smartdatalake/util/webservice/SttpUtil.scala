@@ -19,20 +19,69 @@
 
 package io.smartdatalake.util.webservice
 
-import sttp.client3.Response
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import sttp.client3.{Identity, Request, Response, SttpBackend}
 
-object SttpUtil {
+import java.io.ByteArrayInputStream
+import java.net.URLConnection
+import javax.ws.rs.core.MediaType
 
-  def getContent(response: Response[Either[String, String]], context: String): String = {
+object SttpUtil extends SmartDataLakeLogger {
+
+  /**
+   * Validates if the a provided uri has the scheme/protocol 'http' or 'https'
+   */
+  def canHandleScheme(uri: String): Boolean = uri.matches("https?:.*")
+
+  def sendRequest[T](request: Request[Either[String, T], Any], context: String)(implicit httpBackend: SttpBackend[Identity, Any]): T = {
+    logger.info(s"${request.method} ${request.uri}")
+    val response = request.send(httpBackend)
+    getContent(response, context)
+  }
+
+  def getContent[T](response: Response[Either[String, T]], context: String): T = {
     validateResponse(response, context)
     response.body.right.get
   }
 
-  def validateResponse(response: Response[Either[String, String]], context: String): Unit = {
+  def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
     if (response.body.isLeft) {
       throw HttpRequestError(context, response.code.code, response.body.left.get)
     }
     assert(response.isSuccess, throw HttpRequestError(context, response.code.code, "StatusCode is not successfull, but there is no error message!"))
+  }
+
+  def guessMimeType(content: Array[Byte]): Option[String] = {
+    Option(URLConnection.guessContentTypeFromStream(new ByteArrayInputStream(content)))
+      .orElse {
+        // manually detect type as guessContentTypeFromStream doesnt work for Json and Text...
+        val str = new String(content)
+        if (str.take(100).matches("(?:\\P{Cntrl}|\\p{Space})+")) { // is text
+          if (str.matches("\\s*[{\\[]")) Some(MediaType.APPLICATION_JSON)
+          else Some(MediaType.TEXT_PLAIN)
+        } else None
+      }
+  }
+
+  /**
+   * Create an Iterator that query paged Webservices.
+   * The Iterator queries the initial URL and extract next URL from response until all pages have been queried.
+   */
+  def getPagedResponseIterator[R](url: String, pagingLinkExtractor: R => Option[String], getResponse: (String, Int) => R): Iterator[R] = {
+    new Iterator[R]() {
+      var nextLink: Option[String] = Some(url)
+      var idx = 0
+
+      override def hasNext: Boolean = nextLink.isDefined
+
+      override def next(): R = {
+        assert(nextLink.nonEmpty)
+        val response = getResponse(nextLink.get, idx)
+        nextLink = pagingLinkExtractor(response)
+        idx = idx + 1
+        response
+      }
+    }
   }
 }
 

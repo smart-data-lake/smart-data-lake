@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -156,7 +156,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   def prepare(implicit context: ActionPipelineContext): Unit = {
     inputs.foreach(_.prepare)
-    outputs.foreach(_.prepare)
+    outputs.foreach(_.prepare) // this also includes recursiveInputs
     executionMode.foreach(_.prepare(id))
 
     // Make sure that data object names are still unique when replacing special characters with underscore
@@ -230,7 +230,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     // init spark jobGroupId to identify metrics
     setSparkJobMetadata() // TODO: this triggers creating spark session
     // otherwise continue processing
-    inputs.foreach( input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
+    (inputs ++ recursiveInputs).foreach(input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
   }
 
@@ -253,7 +253,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     // evaluate metrics fail condition if defined
     metricsFailCondition.foreach( c => evaluateMetricsFailCondition(c, outputSubFeeds))
     // process postRead/Write hooks
-    inputs.foreach( input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
+    (inputs ++ recursiveInputs).foreach(input => input.postRead(findSubFeedPartitionValues(input.id, inputSubFeeds)))
     outputs.foreach( output => output.postWrite(findSubFeedPartitionValues(output.id, outputSubFeeds)))
   }
 
@@ -319,25 +319,20 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Helper to find partition values for a specific DataObject in list of subFeeds
    */
-  private def findSubFeedPartitionValues(dataObjectId: DataObjectId, subFeeds: Seq[SubFeed]): Seq[PartitionValues] = subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).get
+  private def findSubFeedPartitionValues(dataObjectId: DataObjectId, subFeeds: Seq[SubFeed]): Seq[PartitionValues] = {
+    subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).getOrElse(Seq())
+  }
 
   /**
    * Handle class cast exception when getting objects from instance registry
    */
-  private def getDataObject[T <: DataObject](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
-    val dataObject = try {
+  private def getDataObject[T <: DataObject : ClassTag : TypeTag](dataObjectId: DataObjectId, role: String)(implicit registry: InstanceRegistry): T = {
+    try {
       registry.get[T](dataObjectId)
     } catch {
       case _: NoSuchElementException => throw new NoSuchElementException(s"($id) key not found in instance registry for $role: $dataObjectId")
-    }
-    try {
-      // force class cast on generic type (otherwise the ClassCastException is thrown later)
-      ct.runtimeClass.cast(dataObject).asInstanceOf[T]
-    } catch {
-      case _: ClassCastException =>
-        val objClass = dataObject.getClass.getSimpleName
-        val expectedClass = tt.tpe.toString.replaceAll(classOf[DataObject].getPackage.getName+".", "")
-        throw ConfigurationException(s"$toStringShort needs $expectedClass as $role but $dataObjectId is of type $objClass")
+      case TypeMismatchException(_, currentClass, expectedType) =>
+        throw ConfigurationException(s"($id) $role $dataObjectId of type ${currentClass.getSimpleName} does not implement expected DataObject type $expectedType")
     }
   }
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
@@ -385,7 +380,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * @param executionId ExecutionId to get runtime information for. If empty runtime information for last ExecutionId are returned.
    */
   def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = {
-    runtimeData.getRuntimeInfo(inputs.map(_.id), outputs.map(_.id), getDataObjectsState, executionId)
+    runtimeData.getRuntimeInfo((inputs ++ recursiveInputs).map(_.id), outputs.map(_.id), getDataObjectsState, executionId)
   }
 
   /**

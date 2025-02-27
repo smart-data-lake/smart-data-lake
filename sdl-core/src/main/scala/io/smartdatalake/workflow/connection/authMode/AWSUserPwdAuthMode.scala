@@ -24,11 +24,15 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.{OAuth2Response, OAuth2Service}
+import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
 import org.json4s._
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.jackson.Serialization
 import sttp.client3._
 import sttp.model.{Header, MediaType, Uri}
+
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 
 
 /**
@@ -42,14 +46,18 @@ import sttp.model.{Header, MediaType, Uri}
  * @param user       user to login
  * @param password   password to use for login.
  * @param useIdToken If true, id_token is used for Http Authorization header, otherwise access_token. Default is false.
+ * @param timeouts   configuration of HTTP timeouts. Default is connectionTimeout=500ms, readTimeout=1s.
  */
-case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: StringOrSecret, user: StringOrSecret, password: StringOrSecret, useIdToken: Boolean = false) extends HttpAuthMode with SmartDataLakeLogger {
+case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: StringOrSecret, user: StringOrSecret, password: StringOrSecret, useIdToken: Boolean = false,
+                              timeouts: HttpTimeoutConfig = HttpTimeoutConfig(500, 1000),
+                              proxy: Option[HttpProxyConfig] = None
+                             ) extends HttpAuthMode with SmartDataLakeLogger {
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   val cognitoUrl = s"https://cognito-idp.$region.amazonaws.com"
   val userPoolTokenUrl = s"https://$userPool.auth.$region.amazoncognito.com/oauth2/token"
 
-  private lazy val oAuth2Service = OAuth2Service(userPoolTokenUrl, Some(clientId.resolve()), awsInitiateAuth)
+  private lazy val oAuth2Service = OAuth2Service(userPoolTokenUrl, Some(clientId.resolve()), awsInitiateAuth, timeouts, proxy)
 
   override def prepare(): Unit = {
     // initialize oAuth2Service
@@ -69,6 +77,7 @@ case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: String
       .header("X-Amz-Target", "AWSCognitoIdentityProviderService.InitiateAuth")
       .header("Content-Type", "application/x-amz-json-1.1")
       .header(Header.accept(MediaType.ApplicationJson))
+      .readTimeout(FiniteDuration(timeouts.readTimeoutMs, TimeUnit.MILLISECONDS))
       .followRedirects(true)
       .body(Serialization.write(
         Map(
@@ -77,7 +86,7 @@ case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: String
           "AuthParameters" -> Map("USERNAME" -> user.resolve(), "PASSWORD" -> password.resolve())
         )
       ))
-    val response = parse(OAuth2Service.sendRequest(request, "AWS initiate auth")).extract[AWSAuthResponse]
+    val response = parse(oAuth2Service.sendRequest(request, "AWS initiate auth")).extract[AWSAuthResponse]
 
     // map to OAuth2 response
     response.toOAuth2Response

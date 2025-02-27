@@ -30,7 +30,8 @@ import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, replaceNonSqlWithUnders
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, ParquetFileDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
@@ -167,6 +168,7 @@ object TestUtil extends SmartDataLakeLogger {
           .bindAddress(host)
           .keystorePath(wiremockKeyStoreFile)
           .keystorePassword("mytruststorepassword")
+          .asynchronousResponseEnabled(false)
       )
     wireMockServer
       .start()
@@ -200,6 +202,14 @@ object TestUtil extends SmartDataLakeLogger {
     stubFor(get(urlMatching("/bad/*/"))
       .willReturn(aResponse.withStatus(404))
     )
+  }
+
+  def printFailedTestResultGeneric(testName: String, arguments: Seq[GenericDataFrame] = Seq())(actual: GenericDataFrame)(expected: GenericDataFrame): Unit = {
+    (actual, expected) match {
+      case (actual: SparkDataFrame, expected: SparkDataFrame) =>
+        assert(arguments.forall(_.isInstanceOf[SparkDataFrame]))
+        printFailedTestResult(testName, arguments.map(_.asInstanceOf[SparkDataFrame].inner))(actual.inner)(expected.inner)
+    }
   }
 
   def printFailedTestResult(testName: String, arguments: Seq[DataFrame] = Seq())(actual: DataFrame)(expected: DataFrame): Unit = {

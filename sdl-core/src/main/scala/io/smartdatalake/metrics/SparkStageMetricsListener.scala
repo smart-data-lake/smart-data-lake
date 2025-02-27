@@ -20,6 +20,7 @@
 package io.smartdatalake.metrics
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -117,7 +118,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
    * Waits until all jobs are ended, and returns relevant metrics.
    * Note that this should be called when Spark Jobs are finished, but through the asynchronous nature of Spark listeners this might be a little bit late.
    */
-  def waitForSparkMetrics(timeoutSec: Int = 10): Seq[SparkStageMetrics] = try {
+  def waitForSparkMetrics(timeoutSec: Int = 1): Seq[SparkStageMetrics] = try {
     synchronized {
       // we need to loop as wait might return without us calling notify
       // https://en.wikipedia.org/w/index.php?title=Spurious_wakeup&oldid=992601610
@@ -125,7 +126,11 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
       while (runningJobs.nonEmpty) {
         logger.debug(s"waiting for jobIds=${runningJobs.keys.mkString(",")}")
         wait(timeoutSec * 1000L)
-        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw SparkJobNotEndedException(s"SparkStageMetricsListener didn't get onJobEnd notification for jobIds=${runningJobs.keys.mkString(",")} within timeout of $timeoutSec seconds.")
+        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) {
+          val msg = s"($actionId) SparkStageMetricsListener didn't get onJobEnd notification for jobIds=${runningJobs.keys.mkString(",")} within timeout of $timeoutSec seconds."
+          if (Environment.throwExceptionOnSparkListenerError) throw SparkJobNotEndedException(msg)
+          else logger.warn(msg)
+        }
       }
     }
     metrics.toSeq

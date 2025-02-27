@@ -109,7 +109,7 @@ case class CustomFileAction(override val id: ActionId,
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->fileRefMapping.size.toLong) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    subFeed.withMetrics(metrics)
+    subFeed.withMetrics(metrics).asInstanceOf[FileSubFeed]
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {

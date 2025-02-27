@@ -2,22 +2,23 @@ package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config._
 import configs.ConfigObject
-import io.smartdatalake.app.{AppUtil, UploadDefaults}
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
+import io.smartdatalake.app.{AppUtil, FileDescriptor, UploadDefaults}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.meta.ScaladocUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
-import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import org.apache.commons.lang.NotImplementedException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
 
+import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
@@ -70,7 +71,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    *                             <id>parse-export-config</id>
    *                             <phase>package</phase>
    *                             <goals>
-   *                                 <!-- use exec instead of java, so sdlb runs in a separate jvm from mvn -->
+   * <!-- use exec instead of java, so that the exporter runs in a separate jvm from mvn -->
    *                                 <goal>exec</goal>
    *                             </goals>
    *                             <configuration>
@@ -100,6 +101,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    *     </profile>
    * ```
    *
+   *
    * The new profile can then be executed by the following maven command line: `mvn exec:exec@parse-export-config -Dorg.slf4j.simpleLogger.log.org.apache=ERROR -Pexport-config`
    */
   def main(args: Array[String]): Unit = {
@@ -119,30 +121,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         writer.writeConfig(configAsJson, version)
 
         // write descriptions
-        if (config.uploadDescriptions) {
-          require(config.descriptionPath.nonEmpty, "descriptionPath must be set if uploadDescriptions=true")
-          implicit val filesystem: FileSystem = Environment.fileSystemFactory.getFileSystem(new Path(config.descriptionPath.get), hadoopConf)
-          val configSections: Seq[(String,String => ConfigObjectId)] = Seq(
-            (ConfigParser.CONFIG_SECTION_DATAOBJECTS, DataObjectId),
-            (ConfigParser.CONFIG_SECTION_ACTIONS, ActionId),
-            (ConfigParser.CONFIG_SECTION_CONNECTIONS, ConnectionId)
-          )
-          configSections.foreach{
-            case (section, idFactory)  =>
-              val path = new Path(config.descriptionPath.get, section)
-              if (filesystem.exists(path)) {
-                logger.info(s"Searching $section files in $path")
-                RemoteIteratorWrapper(filesystem.listStatusIterator(path))
-                  .filterNot(_.isDirectory)
-                  .foreach { p =>
-                    val content = Using.resource(filesystem.open(p.getPath)) {
-                      is =>is.readAllBytes
-                    }
-                    writer.writeFile(content, p.getPath.getName, version)
-                  }
-              }
-          }
-        }
+        if (config.uploadDescriptions) uploadDescriptions(config, writer, version)
 
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
@@ -153,7 +132,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     var sdlConfig = ConfigLoader.loadConfigFromFilesystem(config.configPaths, hadoopConf)
     // remove additional config paths introduced by system properties...
     val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
-    sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config,key) => config.withoutPath(key))
+    sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config, key) => config.withoutPath(key))
     // enrich origin of first class config objects
     if (config.enrichOrigin) sdlConfig = enrichOrigin(config.configPaths, sdlConfig)
     // enrich optional column description from description files
@@ -164,6 +143,42 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     sdlConfig = enrichCustomTransformerParameters(sdlConfig)
     // render config as json
     sdlConfig.root.render(ConfigRenderOptions.concise())
+  }
+
+  def uploadDescriptions(config: ConfigJsonExporterConfig, writer: ExportWriter, version: Option[String])(implicit hadoopConf: Configuration): Unit = {
+    require(config.descriptionPath.nonEmpty, "descriptionPath must be set if uploadDescriptions=true")
+    implicit val filesystem: FileSystem = Environment.fileSystemFactory.getFileSystem(new Path(config.descriptionPath.get), hadoopConf)
+    val path = new Path(config.descriptionPath.get)
+    if (filesystem.exists(path)) {
+      val existingFiles = try {
+        writer.listFiles(version).map(f => (f.name.dropWhile(_ == '/'), f)).toMap
+      } catch {
+        case _: NotImplementedException =>
+          logger.info(s"Target ${writer.getClass.getSimpleName} does not support listing existing files.")
+          Map[String, FileDescriptor]()
+      }
+      val filesToDelete = mutable.Set(existingFiles.keySet.toSeq: _*)
+      logger.info(s"Searching description files in $path")
+      RemoteIteratorWrapper(filesystem.listFiles(path, true))
+        .filterNot(_.isDirectory)
+        .foreach { p =>
+          val relativePath = p.getPath.toString.substring(p.getPath.toString.lastIndexOf(path.toString) + path.toString.length + 1)
+          // initialize delete list
+          val existingFile = existingFiles.get(relativePath)
+          if (existingFile.exists(f => f.size == p.getLen && f.lastModified.getTime > p.getModificationTime)) {
+            logger.info(s"File $relativePath already uploaded")
+          } else {
+            val content = Using.resource(filesystem.open(p.getPath)) {
+              is => is.readAllBytes
+            }
+            writer.writeFile(content, relativePath, version)
+          }
+          // remove from delete list
+          filesToDelete -= relativePath
+        }
+      // delete no longer existing files
+      filesToDelete.foreach(f => writer.deleteFile(f, version))
+    } else throw new IllegalArgumentException(s"Description path $path not found!")
   }
 
   private def enrichCustomClassScalaDoc(config: Config): Config = {

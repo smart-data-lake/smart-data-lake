@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.evolution.SchemaEvolution.listFind
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.DataFrameUtil
@@ -29,7 +30,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.execution.ExplainMode
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.json4s.JString
 import org.json4s.JsonAST.JValue
@@ -42,9 +42,16 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def schema: SparkSchema = SparkSchema(inner.schema)
 
-  override def join(other: GenericDataFrame, joinCols: Seq[String]): SparkDataFrame = {
+  override def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String): SparkDataFrame = {
     other match {
-      case sparkOther: SparkDataFrame => SparkDataFrame(inner.join(sparkOther.inner, joinCols))
+      case sparkOther: SparkDataFrame => SparkDataFrame(inner.join(sparkOther.inner, joinCols, joinType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): SparkDataFrame = {
+    (other, condition) match {
+      case (sparkOther: SparkDataFrame, sparkCondition: SparkColumn) => SparkDataFrame(inner.join(sparkOther.inner, sparkCondition.inner, joinType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -104,8 +111,19 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def drop(colName: String): SparkDataFrame = SparkDataFrame(inner.drop(colName))
 
+  override def drop(col: GenericColumn): GenericDataFrame = {
+    col match {
+      case sparkCol: SparkColumn => SparkDataFrame(inner.drop(sparkCol.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(col)
+    }
+  }
+
   override def createOrReplaceTempView(viewName: String): Unit = {
     inner.createOrReplaceTempView(viewName)
+  }
+
+  override def dropDuplicates(cols: Seq[String]): SparkDataFrame = {
+    SparkDataFrame(inner.dropDuplicates(cols))
   }
 
   override def isEmpty: Boolean = inner.isEmpty
@@ -115,6 +133,8 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def cache: GenericDataFrame = SparkDataFrame(inner.cache())
 
   override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist())
+
+  override def as(alias: String): GenericDataFrame = SparkDataFrame(inner.as(alias))
 
   override def showString(options: Map[String, String] = Map()): String = {
     val numRows = options.get("numRows").map(_.toInt).getOrElse(10)
@@ -164,7 +184,7 @@ case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends Generi
 }
 
 case class SparkSchema(inner: StructType) extends GenericSchema {
-  val caseSensitive: Boolean = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
+  val caseSensitive: Boolean = Environment.caseSensitive
 
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
 
@@ -210,12 +230,9 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getDataType(colName: String): SparkDataType = {
-    val structField: StructField =
-      if (caseSensitive)
-        inner.apply(colName)
-      else
-        toLowerCase.inner.apply(colName.toLowerCase)
-    SparkDataType(structField.dataType)
+    SparkDataType(listFind[StructField](inner, colName, _.name, Environment.caseSensitive)
+      .getOrElse(throw new IllegalArgumentException(s"Column $colName does not exists. Available: ${inner.fieldNames.mkString(", ")}")).dataType
+    )
   }
 
   override def makeNullable: SparkSchema = SparkSchema(StructType(fields.map(_.makeNullable.inner)))
@@ -233,6 +250,13 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def ===(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner === sparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def =!=(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner =!= sparkColumn.inner)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -297,6 +321,8 @@ case class SparkColumn(inner: Column) extends GenericColumn {
 
   override def isNull: GenericColumn = SparkColumn(inner.isNull)
 
+  override def isNotNull: GenericColumn = SparkColumn(inner.isNotNull)
+
   override def as(name: String): GenericColumn = SparkColumn(inner.as(name))
 
   override def cast(dataType: GenericDataType): GenericColumn = {
@@ -347,7 +373,7 @@ trait SparkDataType extends GenericDataType {
     case _ => false
   }
 
-  override def typeName: String = inner.typeName
+  override def typeName: String = standardizeTypeName(inner.typeName.toLowerCase)
 
   override def sql: String = inner.sql
 
@@ -357,19 +383,27 @@ trait SparkDataType extends GenericDataType {
 
   override def removeMetadata: SparkDataType
 
-  override def isSimpleType: Boolean = false
-
-  override def isNumeric: Boolean = inner.isInstanceOf[NumericType]
+  override def isSameType(other: GenericDataType): Boolean = {
+    other match {
+      case sparkOther: SparkDataType => DataType.equalsIgnoreNullability(inner, sparkOther.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
 }
 
-case class SparkSimpleDataType(inner: DataType) extends SparkDataType {
+case class SparkSimpleDataType(inner: DataType) extends SparkDataType with GenericSimpleDataType {
   override def makeNullable: SparkDataType = this
 
   override def toLowerCase: SparkDataType = this
 
   override def removeMetadata: SparkDataType = this
 
-  override def isSimpleType: Boolean = true
+  override def isNumeric: Boolean = inner.isInstanceOf[NumericType]
+
+  override def getDecimalSpec: Option[(Int, Int)] = inner match {
+    case d: DecimalType => Some((d.precision, d.scale))
+    case _ => None
+  }
 
   def toJson: JValue = JString(inner.typeName)
 }
@@ -389,6 +423,8 @@ case class SparkStructDataType(override val inner: StructType) extends SparkData
   }
 
   override def fields: Seq[SparkField] = inner.fields.map(SparkField)
+
+  override def fieldIndex(fieldName: String): Int = inner.fieldIndex(fieldName)
 }
 
 case class SparkArrayDataType(inner: ArrayType) extends SparkDataType with GenericArrayDataType {
@@ -452,7 +488,15 @@ case class SparkRow(inner: Row) extends GenericRow {
 
   override def get(index: Int): Any = inner.get(index)
 
+  override def getStruct(index: Int): GenericRow = SparkRow(inner.getStruct(index))
+
   override def getAs[T](index: Int): T = inner.getAs[T](index)
 
   override def toSeq: Seq[Any] = inner.toSeq
+}
+
+case class SparkUnaryUdf(inner: Column => Column) extends GenericUnaryUdf {
+  override def subFeedType: universe.Type = typeOf[SparkSubFeed]
+
+  override def convert(genericColumn: GenericColumn): GenericColumn = SparkColumn(inner(genericColumn.asInstanceOf[SparkColumn].inner))
 }

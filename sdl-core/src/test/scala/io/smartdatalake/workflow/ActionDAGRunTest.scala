@@ -32,7 +32,6 @@ import org.scalatest.FunSuite
 
 import java.nio.file.Files
 import java.time.{Duration, LocalDateTime}
-import scala.jdk.CollectionConverters._
 
 class ActionDAGRunTest extends FunSuite {
 

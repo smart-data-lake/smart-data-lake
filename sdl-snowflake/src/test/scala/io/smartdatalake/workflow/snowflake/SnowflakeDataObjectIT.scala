@@ -19,14 +19,15 @@
 
 package io.smartdatalake.workflow.snowflake
 
+import com.snowflake.snowpark
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
-import org.scalatest.FunSuite
-import org.scalatest.Matchers.intercept
+import org.apache.spark
+
 
 /**
  * This is an integration test to read & write to Snowflake with Spark and Snowpark.
@@ -57,7 +58,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
       (3, "c", "C", "20210201"),
       (4, "d", "D", "20210201"),
       (5, "e", "E", "20210202")
-    ).toDF("id","s1", "s2", "dt")
+    ).toDF("id", "s1", "s2", "dt")
     val metrics = testDO.writeSnowparkDataFrame(df, partitionValues = Seq(PartitionValues(Map("dt"->"20210201")),PartitionValues(Map("dt"->"20210202"))))
     logger.info("Finished writing using Snowpark " + metrics)
 
@@ -70,11 +71,18 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
     val dfTestSnowpark = testDO.getSnowparkDataFrame()
     dfTestSnowpark.select("id","s1","S2","dt").show
     assert(dfTestSnowpark.count() == 5)
+    // Interestingly, Snowpark converts a Scala Int to a LongType in the Snowpark DataFrame written to Snowflake
+    assert(dfTestSnowpark.schema("id").dataType == snowpark.types.LongType)
+    assert(dfTestSnowpark.schema.names == Seq("ID","S1","S2","DT"))
 
     println("SPARK")
     val dfTestSpark = testDO.getSparkDataFrame()
     dfTestSpark.select("id","s1","S2","dt").show
     assert(dfTestSpark.count() == 5)
+    // Interestingly, Snowpark converts a Scala Int to a LongType in the Snowpark DataFrame written to Snowflake
+    // This becomes a Decimal(19,0) in the Snowflake table.
+    assert(dfTestSpark.schema("id").dataType == spark.sql.types.DecimalType(19,0))
+    assert(dfTestSpark.schema.names.toSeq == Seq("id","s1","s2","dt"))
   }
 
   // overwrite virtualPartition dt=20210201, add dt=20210203
@@ -90,9 +98,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
     // read data with Snowpark
     println("SNOWPARK: 20210201 overwritten, 20210203 added")
     val dfTestSnowpark = testDO.getSnowparkDataFrame()
-    dfTestSnowpark.select("id","s1","S2","dt").show
     assert(dfTestSnowpark.count() == 3)
-    assert(dfTestSnowpark.schema.names == Seq("ID","S1","S2","DT")) // note that non-case-sensitive column names are uppercased by Snowflake.
   }
 
   // cleanup

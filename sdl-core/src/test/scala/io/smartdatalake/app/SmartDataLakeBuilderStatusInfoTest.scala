@@ -44,18 +44,23 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
 
   import session.implicits._
 
+  val sdlb = DefaultSmartDataLakeBuilder
+
+  before {
+    sdlb.instanceRegistry.clear
+  }
+
   // Note that this test produces a StackOverflowError in the Log with JDK11. The test succeeds nevertheless. Details see below.
   test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
 
     val feedName = "test"
-    val sdlb = new DefaultSmartDataLakeBuilder()
     // setup input DataObject
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Some(Seq(
-      getClass.getResource("/configstatusinfo/application.conf").getPath))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(
+      getClass.getResource("/configstatusinfo/application.conf").getPath)
     )
     //Run SDLB
     sdlb.run(sdlConfig)

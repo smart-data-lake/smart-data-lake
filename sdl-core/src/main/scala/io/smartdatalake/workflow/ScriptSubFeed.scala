@@ -51,12 +51,6 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
     val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
     this.copy(partitionValues = updatedPartitionValues)
   }
-  override def clearDAGStart(): ScriptSubFeed = {
-    this.copy(isDAGStart = false)
-  }
-  override def clearSkipped(): ScriptSubFeed = {
-    this.copy(isSkipped = false)
-  }
   override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
     this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None)
   }
@@ -74,10 +68,6 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): ScriptSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, parameters = None)
   }
-
-  def withMetrics(metrics: MetricsMap): ScriptSubFeed = this.copy(metrics = Some(metrics))
-  def appendMetrics(metrics: MetricsMap): ScriptSubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
-
 }
 object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {
   /**

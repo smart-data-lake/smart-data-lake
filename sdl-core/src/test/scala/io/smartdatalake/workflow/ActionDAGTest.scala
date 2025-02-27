@@ -26,7 +26,7 @@ import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode._
-import io.smartdatalake.workflow.action.generic.transformer.{DebugTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -261,8 +261,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(CopyAction("d", srcADO.id, tgtDDO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
 
     // exec dag
-    val sdlb = new DefaultSmartDataLakeBuilder
-    val appConfig = SmartDataLakeBuilderConfig(feedSel=feed)
+    val sdlb = DefaultSmartDataLakeBuilder
+    val appConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feed)
     sdlb.exec(appConfig, SDLExecutionId.executionId1, LocalDateTime.now(), LocalDateTime.now(), Map(), Seq(), Seq(), None, Seq(), simulation = false, globalConfig = GlobalConfig())
 
     val r1 = tgtBDO.getSparkDataFrame()
@@ -1366,6 +1366,15 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // and cleanup special config again
     Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())
+  }
+
+  test("dataFrameReuseStatistics shared between ActionPipelineContext when cloning") {
+    val context1 = TestUtil.getDefaultActionPipelineContext
+    context1.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1"))
+    val context2 = context1.copy(phase = ExecutionPhase.Init)
+    assert(context2.dataFrameReuseStatistics.apply(("test", Seq())).size == 1)
+    context2.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1", "action2"))
+    assert(context1.dataFrameReuseStatistics.apply(("test", Seq())).size == 2)
   }
 
 }

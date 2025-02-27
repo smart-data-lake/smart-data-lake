@@ -24,6 +24,8 @@ import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, ExpectationValidation}
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
 /**
  * Registers instantiated SDL first class objects ([[io.smartdatalake.workflow.action.Action]]s,
@@ -66,7 +68,14 @@ class InstanceRegistry {
    * @param objectId the id of the instance.
    * @return the instance registered with this id
    */
-  def get[A <: SdlConfigObject](objectId: ConfigObjectId): A = instances(objectId).asInstanceOf[A]
+  def get[A <: SdlConfigObject : TypeTag : ClassTag](objectId: ConfigObjectId): A = {
+    instances(objectId) match {
+      case x: A => x
+      case x =>
+        val expectedType = typeOf[A].toString.replaceAll(classOf[DataObject].getPackage.getName + ".", "")
+        throw TypeMismatchException(s"Cannot cast $objectId to ${typeOf[A]}", x.getClass, expectedType)
+    }
+  }
 
   /**
    * Remove a registered instance from the registry.
@@ -128,3 +137,5 @@ class InstanceRegistry {
    */
   def shouldValidateDataObjectOnRead(id: DataObjectId): Boolean = getDataObjectIdsToValidateOnRead.contains(id)
 }
+
+case class TypeMismatchException(msg: String, currentClass: Class[_], expectedType: String) extends Exception(msg)

@@ -21,19 +21,23 @@ package io.smartdatalake.workflow.dataobject
 
 import com.snowflake.snowpark
 import com.snowflake.snowpark.SaveMode
+import com.snowflake.snowpark.types.StructType
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
+import io.smartdatalake.util.misc.SQLUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
+import io.smartdatalake.workflow.dataobject.SnowflakeUtils._
+import io.smartdatalake.workflow.dataobject.SnowparkUtils.snowparkCastIntegralTypesToDecimal
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
@@ -48,6 +52,17 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Can be used both for interacting with Snowflake through Spark with JDBC,
  * as well as for actions written in the Snowpark API that run directly on Snowflake
  *
+ * Note 1: Snowflake does not support partitioning.
+ * But SDLB emulates partitions through the `virtualPartitions` attribute.
+ *
+ * Note 2: Snowflake is tricky with Datatypes.
+ * As Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.
+ * SDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).
+ * For adapting types on read, use the `readTransformer` attribute.
+ *
+ * Note 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive`)
+ * If `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector.
+ *
  * @param id           unique name of this data object
  * @param table        Snowflake table to be written by this output
  * @param constraints  List of row-level [[Constraint]]s to enforce when writing to this data object.
@@ -59,12 +74,10 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
+ * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- * @param comment      An optional comment to add to the table after writing a DataFrame to it.
- *                     This option is deprecated and one should instead use the "commentOnTable" field in the "table" definition.
- *                     If both options are provided, "commentOnTable" will be used.
  * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
  *                     These options override connection.options.
  * @param metadata     meta data
@@ -82,8 +95,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     connectionId: ConnectionId,
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
+                                    readTransformer: Option[GenericDfTransformer] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
-                                    comment: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
@@ -111,28 +124,42 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
 
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+  }
+
   // Get a Spark DataFrame with the table contents for Spark transformations
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): spark.DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> table.fullName))
-    val df = context.sparkSession
+    val df = sparkLoad(queryOrTable)
+    // convert case-insensitive column names to lowercase
+    val dfLower = if (!Environment.caseSensitive) convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
+    applyReadTransformer(partitionValues, dfLower)
+      .asInstanceOf[SparkDataFrame].inner
+  }
+
+  private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
+    context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getJdbcAuthOptions(table.db.get))
       .options(instanceSparkOptions)
-      .options(queryOrTable)
+      .options(queryOrTableOption)
       .load()
-    df
   }
 
   // Write a Spark DataFrame to the Snowflake table
   override def writeSparkDataFrame(df: spark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
                                   (implicit context: ActionPipelineContext): MetricsMap = {
-    assert(partitionValues.isEmpty, s"($id) SnowflakeTableDataObject can not handle partitions for now")
     validateSchemaMin(SparkSchema(df.schema), role = "write")
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented
     assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
+
+    // convert IntegralTypes to Decimal (Snowflake does not support IntegralTypes)
+    val dfPrep = sparkCastIntegralTypesToDecimal(df)
 
     // Handle overwrite partitions: delete partitions data and then append data
     if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite) {
@@ -141,7 +168,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
 
     val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
-      df.write
+      dfPrep.write
         .format(SNOWFLAKE_SOURCE_NAME)
         .options(connection.getJdbcAuthOptions(table.db.get))
         .options(instanceSparkOptions)
@@ -149,11 +176,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         .mode(SparkSaveMode.from(finalSaveMode))
         .save()
     )
-
+    
     //table comment
-    (table.commentOnTable.isDefined, comment.isDefined) match {
-      case (true, _) => connection.execJdbcStatement(s"comment on table ${table.fullName} is '${table.commentOnTable.get}';")
-      case (false, true) => connection.execJdbcStatement(s"comment on table ${table.fullName} is '${comment.get}';")
+    metadata.flatMap(_.description).foreach { comment =>
+      val sql = s"comment on table ${table.fullName} is '$comment';"
+      connection.execJdbcStatement(sql)
     }
 
     //columns comment
@@ -215,16 +242,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       existing
     }
   }
-  // cache response to avoid jdbc query.
-  private var cachedExistingSchema: Option[GenericSchema] = None
-  private def getExistingSchema(implicit context: ActionPipelineContext): Option[GenericSchema] = {
-    if (isTableExisting && cachedExistingSchema.isEmpty) {
-      cachedExistingSchema = Some(SnowparkSchema(getSnowparkDataFrame().schema))
-      // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(cachedExistingSchema.get, ignoreNullable = false, caseSensitive = false))
-    }
-    cachedExistingSchema
-  }
+  // cache response to avoid schema query.
+  private var cachedExistingSchema: Option[SnowparkSchema] = None
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
@@ -232,12 +251,20 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
+  private def applyReadTransformer(partitionValues: Seq[PartitionValues], df: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    readTransformer.map { t =>
+      t.transform(context.currentAction.map(_.id).getOrElse(ActionId("undefined")), partitionValues, df, this.id, previousTransformerName = None, executionModeResultOptions = Map())
+    }.getOrElse(df)
+  }
+
   /**
    * Read the contents of a table as a Snowpark DataFrame
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
-    this.snowparkSession.table(table.fullName)
+    val df = SnowparkDataFrame(snowparkSession.table(table.fullName))
+    applyReadTransformer(partitionValues, df)
+      .asInstanceOf[SnowparkDataFrame].inner
   }
 
   /**
@@ -245,10 +272,14 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                             (implicit context: ActionPipelineContext): MetricsMap = {
+    validateSchemaMin(SnowparkSchema(df.schema), role = "write")
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented
     assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
+
+    // convert IntegralTypes to Decimal (Snowflake does not support IntegralTypes)
+    val dfPrep = snowparkCastIntegralTypesToDecimal(df)
 
     // Handle overwrite partitions: delete partitions data and then append data
     if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite && isTableExisting) {
@@ -257,7 +288,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
 
     // use asynchronous writer to get query id
-    val asyncWriter = df.write.mode(SnowparkSaveMode.from(finalSaveMode)).async.saveAsTable(table.fullName)
+    val asyncWriter = dfPrep.write.mode(SnowparkSaveMode.from(finalSaveMode)).async.saveAsTable(table.fullName)
     asyncWriter.getResult()
 
     // retrieve metrics from result scan
@@ -281,7 +312,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (partitions.nonEmpty) {
-      if (isTableExisting) PartitionValues.fromDataFrame(SnowparkDataFrame(getSnowparkDataFrame().select(partitions.map(snowpark.functions.col)).distinct()))
+      if (isTableExisting) PartitionValues.fromDataFrame(SparkDataFrame(sparkLoad(Map("query" -> s"select distinct ${partitions.mkString(",")} from ${table.fullName}"))))
       else Seq()
     } else Seq()
   }
@@ -329,6 +360,66 @@ object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)
                          (implicit instanceRegistry: InstanceRegistry): SnowflakeTableDataObject = {
     extract[SnowflakeTableDataObject](config)
+  }
+}
+
+object SnowflakeUtils {
+
+  def convertColNamesLowercase(df: GenericDataFrame): GenericDataFrame = {
+    val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
+    import functions._
+    val targetCols = df.schema.columns.map { n =>
+      // if name is all uppercase, SDLB assumes it is not case sensitive and will convert it to lowercase.
+      if (isAllUppercase(n)) col(n.toLowerCase)
+      else col(n)
+    }
+    df.select(targetCols)
+  }
+
+  def convertColNamesLowercase(schema: SnowparkSchema): SnowparkSchema = {
+    SnowparkSchema(StructType(
+      schema.fields.map(f =>
+        // if name is all uppercase, SDLB assumes it is not case sensitive and will convert it to lowercase.
+        if (isAllUppercase(f.name)) f.toLowerCase.inner
+        else f.inner
+      )))
+  }
+
+  def isAllUppercase(str: String): Boolean = str.matches("[A-Z0-9_]+")
+
+  def sparkCastIntegralTypesToDecimal(df: spark.DataFrame): spark.DataFrame = {
+    val targetCols = df.schema.fields.map { f =>
+      val targetType = f.dataType match {
+        case spark.types.ByteType => spark.types.DecimalType(3, 0)
+        case spark.types.ShortType => spark.types.DecimalType(5, 0)
+        case spark.types.IntegerType => spark.types.DecimalType(10, 0)
+        case spark.types.LongType => spark.types.DecimalType(19, 0)
+        case _ => f.dataType
+      }
+      if (f.dataType != targetType) spark.functions.col(f.name).cast(targetType)
+      else spark.functions.col(f.name)
+    }
+    df.select(targetCols: _*)
+  }
+}
+
+object SnowparkUtils {
+  // Attention: Snowpark is not available for Scala 2.13!
+  // Using this object on Scala 2.13 results in "ClassNotFoundException: scala.Serializable"!
+  def snowparkCastIntegralTypesToDecimal(df: snowpark.DataFrame): snowpark.DataFrame = {
+    val targetCols = df.schema.fields.map { f =>
+      val targetType = f.dataType match {
+        //avoid NoClassDefFoundError: scala/Serializable
+        case snowpark.types.ByteType => snowpark.types.DecimalType(3, 0)
+        case snowpark.types.ShortType => snowpark.types.DecimalType(5, 0)
+        case snowpark.types.IntegerType => snowpark.types.DecimalType(10, 0)
+        case snowpark.types.LongType => snowpark.types.DecimalType(19, 0)
+        case _ => f.dataType
+      }
+      if (f.dataType != targetType) snowpark.functions.col(f.name).cast(targetType).as(f.name)
+      else snowpark.functions.col(f.name)
+    }
+    df.select(targetCols)
   }
 }
 

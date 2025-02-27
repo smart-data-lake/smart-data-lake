@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ReflectionUtil, ScalaUtil}
+import io.smartdatalake.util.misc.{ProductUtil, ReflectionUtil, ScalaUtil}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
 import org.reflections.Reflections
@@ -44,17 +44,47 @@ trait DataFrameSubFeed extends SubFeed {
   def hasReusableDataFrame: Boolean
   def isDummy: Boolean
   def filter: Option[String]
-  def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed
-  override def breakLineage(implicit context: ActionPipelineContext): DataFrameSubFeed
-  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed
-  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): DataFrameSubFeed
-  override def clearDAGStart(): DataFrameSubFeed
-  override def clearSkipped(): DataFrameSubFeed
+
+  def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    // if filter is removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
+    if (breakLineageOnChange && filter.isDefined) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilter")
+      ProductUtil.dynamicCopy(ProductUtil.dynamicCopy(this, "filter", None), "observation", None).breakLineage
+    } else ProductUtil.dynamicCopy(ProductUtil.dynamicCopy(this, "filter", None), "observation", None)
+  }
+
+  override def breakLineage(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
+    // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
+    if (dataFrame.isDefined && !isDummy && !context.simulation) convertToDummy(dataFrame.get.schema) else this
+  }
+
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    if (breakLineageOnChange && partitionValues.nonEmpty) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
+      withPartitionValues(Seq()).breakLineage
+    } else withPartitionValues(Seq())
+  }
+
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
+    withPartitionValues(updatedPartitionValues)
+  }
   def isStreaming: Option[Boolean]
   def withDataFrame(dataFrame: Option[GenericDataFrame]): DataFrameSubFeed
-  def withObservation(observation: Option[DataFrameObservation]): DataFrameSubFeed
-  def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed
-  def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
+
+  def withObservation(observation: Option[DataFrameObservation]): DataFrameSubFeed = {
+    ProductUtil.dynamicCopy(this, "observation", observation)
+  }
+
+  def withPartitionValues(partitionValues: Seq[PartitionValues]): DataFrameSubFeed = {
+    ProductUtil.dynamicCopy(this, "partitionValues", partitionValues)
+  }
+
+  def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
+    ProductUtil.dynamicCopy(withPartitionValues(partitionValues), "filter", filter)
+      .applyFilter
+  }
   def applyFilter: DataFrameSubFeed = {
     // apply partition filter
     val partitionValuesColumn = partitionValues.flatMap(_.keys).distinct
@@ -74,9 +104,18 @@ trait DataFrameSubFeed extends SubFeed {
     // return updated SubFeed
     withDataFrame(dfResult)
   }
-  def asDummy(): DataFrameSubFeed
+
+  def asDummy(): DataFrameSubFeed = ProductUtil.dynamicCopy(this, "isDummy", true)
   def transform(transformer: GenericDataFrame => GenericDataFrame): DataFrameSubFeed = withDataFrame(dataFrame.map(transformer))
-  def movePartitionColumnsLast(partitions: Seq[String]): DataFrameSubFeed
+
+  def movePartitionColumnsLast(partitions: Seq[String]): DataFrameSubFeed = {
+    withDataFrame(dataFrame.map(x => x.movePartitionColsLast(partitions)))
+  }
+
+  private[smartdatalake] def convertToDummy(schema: GenericSchema)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val dummyDf = dataFrame.map(_ => schema.getEmptyDataFrame(dataObjectId))
+    withDataFrame(dataFrame = dummyDf).asDummy()
+  }
 }
 
 trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with DataFrameFunctions {

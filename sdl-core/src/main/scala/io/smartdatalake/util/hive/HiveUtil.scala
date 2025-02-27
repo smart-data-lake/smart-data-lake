@@ -32,6 +32,8 @@ import java.net.URI
 import java.time.Instant
 import scala.sys.process.{ProcessLogger, _}
 import scala.util.{Failure, Success, Try}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 
 /**
  * Provides utility functions for Hive.
@@ -232,7 +234,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val (df_newColsSorted, withSchemaEvolution) = if (tableExists) {
       // check if schema evolution
       val df_existing = session.table(table.fullName)
-      val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(df_existing, dfNew)
+      val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(SparkDataFrame(df_existing), SparkDataFrame(dfNew))
       if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${dfNew.schema.treeString}")
 
       // Schema evolution with Partitions can only be done with Tick-Tock
@@ -360,7 +362,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val (df_newColsSorted, withSchemaEvolution) = if (tableExists) {
       // check if schema evolution
       val df_existing = session.table(table.fullName)
-      val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(df_existing, df_new)
+      val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(SparkDataFrame(df_existing), SparkDataFrame(df_new))
       if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${df_new.schema.treeString}")
 
       // if schema evolution with partitioning, make sure old partitions data is included within new dataframe

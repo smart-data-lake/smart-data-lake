@@ -20,15 +20,15 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.{EnvironmentUtil, GraphUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.spark.SparkEnv
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.util.ChildFirstURLClassLoader
+import org.apache.spark.{SparkEnv, SparkException}
 import org.slf4j.MDC
 
 import java.net.{InetAddress, URL, URLClassLoader}
@@ -54,7 +54,8 @@ object AppUtil extends SmartDataLakeLogger {
                          sparkOptionsOpt: Map[String,StringOrSecret] = Map(),
                          enableHive: Boolean = true
                         ): SparkSession = {
-    logger.info(s"Creating spark session: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive")
+    if (masterOpt.isDefined) logger.info(s"Get or create spark session with parameters: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt")
+    else logger.info(s"Trying to get spark session from environment (master=None)")
 
     // prepare extensions
     val noDataExtension = if (Environment.enableSparkPlanNoDataCheck) Some(new SDLSparkExtension) else None
@@ -73,7 +74,14 @@ object AppUtil extends SmartDataLakeLogger {
       .optionalExtension(noDataExtension)
 
     // create session
-    val session = sessionBuilder.getOrCreate()
+    val session = try {
+      sessionBuilder.getOrCreate()
+    } catch {
+      case e: SparkException if masterOpt.isEmpty && e.getMessage.startsWith("A master URL must be set in your configuration") =>
+        throw new IllegalArgumentException(s"This is not an environment with an existing Spark Session. Use SparkSmartDataLakeBuilder instead of e.g. DefaultSmartDataLakeBuilder to configure and create a new Spark session and '--master' and '--deploy-mode' parameter to customize the Spark session.")
+    }
+
+    // check partitionOverwriteMode
     if (!Try(session.conf.get("spark.sql.sources.partitionOverwriteMode")).toOption.contains("dynamic"))
       logger.warn("Spark property 'spark.sql.sources.partitionOverwriteMode' is not set to 'dynamic'. Overwriting Hadoop/Hive partitions will always overwrite the whole path/table and you might experience data loss!")
 

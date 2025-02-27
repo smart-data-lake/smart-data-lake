@@ -23,13 +23,12 @@ import configs.syntax._
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{PerformanceUtils, ReflectionUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.action.Action
-import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.{Action, ProxyAction}
 import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
+import org.reflections.scanners.SubTypesScanner
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe._
@@ -95,6 +94,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   final val CONFIG_SECTION_ACTIONS = "actions"
   final val CONFIG_SECTION_GLOBAL = "global"
 
+  final val WORKFLOW_PACKAGE = "io.smartdatalake.workflow"
+
   def getConnectionEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_CONNECTIONS)
 
   def getDataObjectsEntries(config: Config): Seq[String] = extractConfigKeys(config, CONFIG_SECTION_DATAOBJECTS)
@@ -140,6 +141,10 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
       .mapError(error => throw ConfigurationException(s"Required configuration setting 'type' is missing.", None, error.configException))
       .value
     val clazz = Environment.classLoader().loadClass(className(configuredType))
+    val tpe = ReflectionUtil.classToType(clazz)
+    if (!(tpe <:< typeOf[A])) {
+      throw throw TypeMismatchException(s"Class $configuredType does not implement expected interface ${symbolOf[A].name}: ${clazz.getName} implements ${tpe.baseClasses.filter(_.fullName.contains(WORKFLOW_PACKAGE)).map(_.name.toString).mkString(", ")}", clazz, typeOf[A].toString)
+    }
     val mirror = runtimeMirror(clazz.getClassLoader)
     val classSymbol = mirror.classSymbol(clazz)
     require(classSymbol.companion.isModule, s"Can not instantiate ${classOf[DataObject].getSimpleName} of class '${clazz.getTypeName}'. It does not have a companion object.")
@@ -245,12 +250,22 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   private def className[A <: ParsableFromConfig[_] : TypeTag](configuredType: String): String = {
     // if no package name is given, we search for an implementation with simple class name <configuredType> of the abstract type [A] inside package "io.smartdatalake.workflow"
     if (!configuredType.contains('.')) {
-      implicit val reflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
+      implicit val reflections: Reflections = ReflectionUtil.getReflections(WORKFLOW_PACKAGE)
       val implClasses = ReflectionUtil.getTraitImplClasses[A]
         .filter(_.getSimpleName == configuredType)
       val abstractSymbol = symbolOf[A]
-      if (implClasses.isEmpty) throw new ClassNotFoundException(s"Implementation $configuredType of interface ${abstractSymbol.name} not found")
-      if (implClasses.size > 1) throw new IllegalStateException(s"Multiple implementation named $configuredType for interface ${abstractSymbol.name} found: ${implClasses.map(_.getName).mkString(", ")}")
+      if (implClasses.isEmpty) {
+        // check if type does exist in package, but has wrong type
+        val allReflections = new Reflections(WORKFLOW_PACKAGE, new SubTypesScanner(false /* don't exclude Object.class */))
+        val classes = allReflections.getSubTypesOf(classOf[AnyRef]).asScala.filter(_.getSimpleName == configuredType).toSeq
+        classes match {
+          case Seq() => throw new ClassNotFoundException(s"$configuredType not found in package $WORKFLOW_PACKAGE")
+          case Seq(cls) =>
+            val tpe = ReflectionUtil.classToType(cls)
+            throw TypeMismatchException(s"Class $configuredType found in package $WORKFLOW_PACKAGE, but does not implement expected interface ${abstractSymbol.name}: ${cls.getName} implements ${tpe.baseClasses.filter(_.fullName.contains(WORKFLOW_PACKAGE)).map(_.name.toString).mkString(", ")}", cls, typeOf[A].toString)
+        }
+      }
+      if (implClasses.size > 1) throw new IllegalStateException(s"Multiple implementation named $configuredType for interface ${abstractSymbol.name} found in package $WORKFLOW_PACKAGE: ${implClasses.map(_.getName).mkString(", ")}")
       implClasses.head.getName
     } else configuredType
   }

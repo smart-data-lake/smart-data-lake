@@ -20,8 +20,9 @@ package io.smartdatalake.util.misc
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, ScalaReflection, SerializerBuildHelper}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, ScalaReflection, SerializerBuildHelper}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 import java.time.format.DateTimeFormatter
@@ -163,6 +164,15 @@ private[smartdatalake] object ProductUtil {
   }
 
   /**
+   * Create an Schema for a product based on it's type given as parameter (not as type parameter).
+   */
+  def createSchema(tpe: Type): StructType = {
+    val mirror = ScalaReflection.mirror
+    val cls = mirror.runtimeClass(tpe)
+    ScalaReflection.encoderFor(tpe).schema
+  }
+
+  /**
    * Create an Encoder for a product based on it's type given as parameter (not as type parameter).
    */
   def createEncoder(tpe: Type): ExpressionEncoder[_] = {
@@ -211,11 +221,29 @@ private[smartdatalake] object ProductUtil {
     val clsSym = currentMirror.classSymbol(obj.getClass)
     val inst = currentMirror.reflect(obj)
 
-    val attributes: Iterable[universe.MethodSymbol] = ProductUtil.classAccessors(clsSym.toType)
+    val attributes = classAccessors(clsSym.toType)
     attributes.map { m =>
       val key = m.name.toString
       val value = inst.reflectMethod(m).apply()
       (key, value)
     }.toSeq
+  }
+
+  /**
+   * Dynamically apply copy constructor of a case class, replacing the value of one attribute of the instance.
+   * This is useful in class hierarchies to apply the copy constructor from the super class.
+   */
+  def dynamicCopy[T: ClassTag, V](obj: T, fieldName: String, newValue: V): T = {
+    val clsSym = currentMirror.classSymbol(obj.getClass)
+    val inst = currentMirror.reflect(obj)
+    val copyConstructor = inst.symbol.toType.decls.find(_.name.toString == "copy")
+      .getOrElse(throw new IllegalStateException(s"copy constructor method not found in object of type ${obj.getClass.getSimpleName}"))
+    val attributes = classAccessors(clsSym.toType)
+      .map { m =>
+        val key = m.name.toString
+        val value = if (key == fieldName) newValue else inst.reflectMethod(m).apply()
+        (key, value)
+      }.toSeq
+    inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2): _*).asInstanceOf[T]
   }
 }

@@ -149,10 +149,11 @@ private[smartdatalake] trait ExpectationValidation {
     aggExpressions.groupBy(_.getName).map(_._2.head).toSeq // remove potential duplicates
   }
 
-  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String, _] => Map[String, _], scopeJobOnly: Boolean = false)(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
+  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String, _] => Map[String, _], scopeJobOnly: Boolean = false, loggerContext: String)(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     val expectationsToValidate = (expectations ++ additionalExpectations)
       .filter(e => !scopeJobOnly || e.scope == ExpectationScope.Job)
+    if (logger.isDebugEnabled()) logger.debug(s"($id) validating $loggerContext expectations ${expectationsToValidate.map(e => s"${e.name}/${e.scope}").mkString(" ")}. Got scopeJobAndInputMetrics: ${scopeJobAndInputMetrics.mapValues(_.toString).map { case (k, v) => s"$k=$v" }.mkString(" ")}")
     // collect metrics with scope = JobPartition
     val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All
@@ -162,12 +163,14 @@ private[smartdatalake] trait ExpectationValidation {
     // enrich metrics
     val metrics = enrichmentFunc(scopeJobAndInputMetrics ++ scopeJobPartitionMetrics ++ scopeAllMetrics ++ customMetrics)
     // evaluate expectations using dummy ExpressionData
+    if (logger.isDebugEnabled) logger.debug(s"($id) initial metrics before validation: ${metrics.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
     val (expectationValidationCols, updatedMetrics) = expectationsToValidate.foldLeft(Seq[(BaseExpectation, SparkColumn)](), metrics) {
       case ((cols, metrics), expectation) =>
         val (newCols, updatedMetrics) = expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
         (cols ++ newCols.map(c => (expectation, c)), updatedMetrics)
     }
+    if (logger.isDebugEnabled) logger.debug(s"($id) updated metrics before validation: ${metrics.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
     // the evaluation of expectations is made using Spark expressions
     val validationResults = expectationValidationCols.map {
       case (expectation, col) =>

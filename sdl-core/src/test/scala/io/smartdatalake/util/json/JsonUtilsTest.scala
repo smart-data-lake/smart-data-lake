@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,19 +16,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.definitions
 
-/**
- * Column names specific to historization of Hive tables
- */
-object TechnicalTableColumn {
-  /**
-   * Name of column that marks the creation date of a record
-   */
-  val captured = "dl_ts_captured"
+package io.smartdatalake.util.json
 
-  /**
-   * Name of column that marks the end of validity of a record
-   */
-  val delimited = "dl_ts_delimited"
+import org.json4s.jackson.JsonMethods
+import org.scalatest.FunSuite
+
+class JsonUtilsTest extends FunSuite {
+
+  test("extract value") {
+    val str = """{ "link": [ {"href": "abc", "rel": "last"}, {"href": "def", "rel": "next"}]}"""
+    val query = "$.link[?(@.rel == 'next')].href"
+    val json = JsonMethods.parse(str)
+    val result = JsonUtils.evaluateJsonPath(json, query).values
+    assert(result == Seq("def"))
+  }
+
 }
