@@ -152,14 +152,15 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     val snowparkSchema = schema.convert(subFeedType).asInstanceOf[SnowparkSchema]
     val missingCols = SchemaUtil.schemaDiff(this, snowparkSchema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison
+      deep = Environment.schemaValidationDeepComarison,
+      caseSensitive = Environment.caseSensitive
     )
     if (missingCols.nonEmpty) Some(SnowparkSchema(StructType.apply(missingCols.collect{case x:SnowparkField => x.inner}.toSeq)))
     else None
   }
   override def columns: Seq[String] = inner.names
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
-  override def sql: String = throw new NotImplementedError(s"Converting schema back to sql ddl is not supported by Snowpark")
+  override def sql: String = fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
   override def add(colName: String, dataType: GenericDataType): SnowparkSchema = {
     val snowparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SnowparkDataType]
     SnowparkSchema(inner.add(StructField(colName, snowparkDataType.inner)))

@@ -184,7 +184,6 @@ case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends Generi
 }
 
 case class SparkSchema(inner: StructType) extends GenericSchema {
-  val caseSensitive: Boolean = Environment.caseSensitive
 
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
 
@@ -193,7 +192,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
     val missingCols = SchemaUtil.schemaDiff(this, sparkSchema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
       deep = Environment.schemaValidationDeepComarison,
-      caseSensitive = caseSensitive
+      caseSensitive = Environment.caseSensitive
     )
     if (missingCols.nonEmpty) Some(SparkSchema(StructType(missingCols.collect { case x: SparkField => x.inner }.toSeq)))
     else None

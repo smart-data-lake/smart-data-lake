@@ -24,15 +24,22 @@ import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.SchemaViolationException
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, SQLDfTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
+import io.smartdatalake.workflow.dataframe.snowflake.SnowparkSubFeed
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
 import org.apache.spark
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.scalatest.Matchers.intercept
 
 
 /**
  * This is an integration test to read & write to Snowflake with Spark and Snowpark.
  * It needs to be run manually because you need to provide a Snowflake environment.
- * Please configure this in SnowflakeConnectionConfig.
+ * Please configure this through the environment variables read in SnowflakeConnectionConfig.
  */
 object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
 
@@ -42,8 +49,16 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
 
-  val testDO = SnowflakeTableDataObject("test1", Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "abc"), connectionId = "sfCon", virtualPartitions = Seq("dt"), saveMode = SDLSaveMode.Overwrite)
+  val testDO = SnowflakeTableDataObject("test1",
+    Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "abc"),
+    connectionId = "sfCon", virtualPartitions = Seq("dt"),
+    saveMode = SDLSaveMode.Overwrite
+  )
   instanceRegistry.register(testDO)
+  val testDOSchemaMin = testDO.copy(
+    schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")))
+  )
+  val testDOWithReadTransformer = testDO.copy(readTransformer = Some(SQLDfTransformer(code = s"select cast(id as bigint) id, s1, s2, dt from %{inputViewName}")))
 
   // cleanup
   testDO.dropTable
@@ -59,23 +74,23 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
       (4, "d", "D", "20210201"),
       (5, "e", "E", "20210202")
     ).toDF("id", "s1", "s2", "dt")
-    val metrics = testDO.writeSnowparkDataFrame(df, partitionValues = Seq(PartitionValues(Map("dt"->"20210201")),PartitionValues(Map("dt"->"20210202"))))
+    val metrics = testDOSchemaMin.writeSnowparkDataFrame(df, partitionValues = Seq(PartitionValues(Map("dt"->"20210201")),PartitionValues(Map("dt"->"20210202"))))
     logger.info("Finished writing using Snowpark " + metrics)
 
     // partitions
-    val pvs = testDO.listPartitions
+    val pvs = testDOSchemaMin.listPartitions
     assert(pvs.toSet == Set(PartitionValues(Map("dt" -> "20210201")), PartitionValues(Map("dt" -> "20210202"))))
 
     // read data with Snowpark and Spark
     println("SNOWPARK")
-    val dfTestSnowpark = testDO.getSnowparkDataFrame()
+    val dfTestSnowpark = testDOSchemaMin.getSnowparkDataFrame()
     dfTestSnowpark.select("id","s1","S2","dt").show
     assert(dfTestSnowpark.count() == 5)
     // Interestingly, Snowpark converts a Scala Int to a LongType in the Snowpark DataFrame written to Snowflake
     assert(dfTestSnowpark.schema("id").dataType == snowpark.types.LongType)
     assert(dfTestSnowpark.schema.names == Seq("ID","S1","S2","DT"))
 
-    println("SPARK")
+    println("SPARK without readTransformer and schemaMin")
     val dfTestSpark = testDO.getSparkDataFrame()
     dfTestSpark.select("id","s1","S2","dt").show
     assert(dfTestSpark.count() == 5)
@@ -85,23 +100,55 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
     assert(dfTestSpark.schema.names.toSeq == Seq("id","s1","s2","dt"))
   }
 
+  {
+    println("SPARK with readTransformer and schemaMin")
+    val dfTestSpark = testDOWithReadTransformer.getSparkDataFrame()
+    dfTestSpark.select("id","s1","S2","dt").show
+    assert(dfTestSpark.count() == 5)
+  }
+
   // overwrite virtualPartition dt=20210201, add dt=20210203
   {
     val df = Seq(
       (4, "d", "D", "20210201"),
       (6, "f", "F", "20210203")
     ).toDF("id", "s1", "s2", "dt")
-    val metrics = testDO.writeSnowparkDataFrame(df, partitionValues = Seq(PartitionValues(Map("dt"->"20210201")),PartitionValues(Map("dt"->"20210203"))))
+    val metrics = testDOSchemaMin.writeSnowparkDataFrame(df, partitionValues = Seq(PartitionValues(Map("dt"->"20210201")),PartitionValues(Map("dt"->"20210203"))))
     logger.info("Finished writing using Snowpark " + metrics)
     assert(metrics("rows_inserted") == 2)
 
     // read data with Snowpark
     println("SNOWPARK: 20210201 overwritten, 20210203 added")
-    val dfTestSnowpark = testDO.getSnowparkDataFrame()
+    val dfTestSnowpark = testDOSchemaMin.getSnowparkDataFrame()
     assert(dfTestSnowpark.count() == 3)
+  }
+
+  // validate schemaMin while reading
+  {
+    val testDOSchemaX = testDOSchemaMin.copy(schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string, x string"))))
+    intercept[SchemaViolationException](testDOSchemaX.getSnowparkDataFrame(Seq()))
   }
 
   // cleanup
   testDO.dropTable
 
+  // get empty DataFrame (from SparkSchema)
+  {
+    SnowparkSubFeed.getEmptyDataFrame(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")), testDO.id)
+  }
+
+  // validate schemaMin while writing
+  {
+    val df = Seq(
+      (4, "d", "D"),
+      (6, "f", "F")
+    ).toDF("id", "s1", "s2")
+    intercept[SchemaViolationException](testDOSchemaMin.writeSnowparkDataFrame(df, Seq()))
+  }
+}
+
+case class TestReadTransformer() extends CustomDfTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
+    df.withColumn("id", spark.sql.functions.col("id").cast("bigint"))
+  }
 }
