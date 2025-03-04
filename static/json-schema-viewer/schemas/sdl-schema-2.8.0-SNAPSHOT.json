@@ -4636,9 +4636,9 @@
           },
           "readTransformer" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
-            }, {
               "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ColumnsTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
             }, {
@@ -5605,9 +5605,9 @@
             "type" : "array",
             "items" : {
               "oneOf" : [ {
-                "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
               }, {
@@ -6206,9 +6206,9 @@
             "type" : "array",
             "items" : {
               "oneOf" : [ {
-                "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
               }, {
@@ -6441,9 +6441,9 @@
             "type" : "array",
             "items" : {
               "oneOf" : [ {
-                "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
-              }, {
                 "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColumnsTransformer"
               }, {
                 "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
               }, {
@@ -6936,40 +6936,6 @@
       }
     },
     "GenericDfTransformer" : {
-      "AdditionalColumnsTransformer" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "AdditionalColumnsTransformer"
-          },
-          "name" : {
-            "type" : "string",
-            "description" : "name of the transformer"
-          },
-          "description" : {
-            "type" : "string",
-            "description" : "Optional description of the transformer"
-          },
-          "additionalColumns" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]]and added to the DataFrame as literal columns.[[DefaultExpressionData]] contains informations from the context of the SDLB job, like runId or feed name."
-          },
-          "additionalDerivedColumns" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe.\nThe spark sql expressions are evaluated against the input DataFrame and added to the DataFrame as derived columns."
-          }
-        },
-        "title" : "AdditionalColumnsTransformer",
-        "required" : [ "type" ],
-        "additionalProperties" : false,
-        "description" : "Add additional columns to the DataFrame by extracting information from the context or derived from input columns."
-      },
       "BlacklistTransformer" : {
         "type" : "object",
         "properties" : {
@@ -6996,6 +6962,54 @@
         "required" : [ "type", "columnBlacklist" ],
         "additionalProperties" : false,
         "description" : "Apply a column blacklist to a DataFrame."
+      },
+      "ColumnsTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "ColumnsTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "additionalColumns" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe. This allows you to include commonly used context information available at runtime.\nThe spark sql expressions are evaluated against an instance of[[DefaultExpressionData]]and added to the DataFrame as literal columns.[[DefaultExpressionData]] contains informations from the context of the SDLB job, like runId or feed name."
+          },
+          "additionalDerivedColumns" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional tuples of [column name, spark sql expression] to be added as additional columns to the dataframe. This allows you to run custom sql code on the input DataFrame and save the result into a new column for which you define the name."
+          },
+          "renamedColumns" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional tuples of [old column name, new column name]. For each tuple, a column is renamed. A RuntimeError will occur if a column to be renamed does not exist after applying all previous operations."
+          },
+          "droppedColumns" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "optional list of column names to be dropped. A RuntimeError will occur if a column does not exist after applying all previous operations.\nExample Config:\nmultiply {\ntype = CopyAction\ninputId = src1DO\noutputId = tgt1DO\nmetadata.feed = test_feed_name\ntransformers = [\n{type = ColumnsTransformer, additionalDerivedColumns = {rating_doubled = \"rating * 2\"}, renamedColumns = {rating_doubled = rating_doubled_renamed}, droppedColumns = [name]}\n]\n}"
+          }
+        },
+        "title" : "ColumnsTransformer",
+        "required" : [ "type" ],
+        "additionalProperties" : false,
+        "description" : "Add, Rename or Drop columns from the Input DataFrame. The order of execution of the operations is the same as the parameters of the transformer: (1. add context info, 2. add custom sql, 3. rename, 4. drop).\nNote that you can mix and match these operations to your liking and reference the same column from a previous operation if needed."
       },
       "ConvertNullValuesTransformer" : {
         "type" : "object",
@@ -8063,9 +8077,9 @@
           },
           "transformer" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/GenericDfTransformer/AdditionalColumnsTransformer"
-            }, {
               "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericDfTransformer/ColumnsTransformer"
             }, {
               "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
             }, {
