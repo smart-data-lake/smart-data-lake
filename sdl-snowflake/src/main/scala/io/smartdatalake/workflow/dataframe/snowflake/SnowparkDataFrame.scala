@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.custom.SnowparkUtils
+import com.snowflake.snowpark.functions.col
 import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -95,6 +96,9 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
       case snowparkExpression: SnowparkColumn => SnowparkDataFrame(inner.withColumn(colName,snowparkExpression.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
+  }
+  override def withColumnRenamed(colName: String, newName: String): GenericDataFrame = {
+      SnowparkDataFrame(inner.withColumn(newName,col(colName))).drop(colName)
   }
   override def drop(colName: String): GenericDataFrame = SnowparkDataFrame(inner.drop(colName))
 
