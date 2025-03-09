@@ -275,10 +275,21 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
-    if (state.isDefined) {
-      state.get.split(",").foreach { pair =>
-        val Array(key, value) = pair.split(":")
-        incrementalState.put(key, value)
+    state match {
+      case Some(s) => {
+        val stateParts = s.split("--")
+        val schemaStateString = stateParts(0)
+        val incrementalStateString = stateParts(1)
+
+        // handle spark schema
+        debeziumSparkSchemaState = DataType.fromJson(schemaStateString).asInstanceOf[StructType]
+
+        // handle debezium state
+        incrementalStateString.split(",").foreach { pair =>
+          val Array(key, value) = pair.split(":")
+          incrementalState.put(key, value)
+        }
+
       }
     }
   }
@@ -287,9 +298,13 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
    * Return the state of the last increment or empty if no increment was processed.
    */
   override def getState: Option[String] = {
-    val state = incrementalState.map { case (key, value) =>
+    val incrementalStateString = incrementalState.map { case (key, value) =>
       s"$key:$value"
     }.mkString(",")
+
+    val debeziumSparkSchemaStateString = debeziumSparkSchemaState.json
+
+    val state = s"$debeziumSparkSchemaStateString--$incrementalStateString"
 
     Some(state)
   }
