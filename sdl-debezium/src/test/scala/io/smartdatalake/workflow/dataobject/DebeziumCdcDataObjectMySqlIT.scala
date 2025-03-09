@@ -30,7 +30,6 @@ import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.connection.DebeziumConnection
-import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlParallelIT.statePath
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit}
 
@@ -60,7 +59,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
 
   val connection = DebeziumConnection(
     id = "dbzCon",
-    dbEngine = DebeziumDatabaseEngine.MySql,
+    dbEngine = "mysql",
     hostname = sys.env("MYSQL_HOSTNAME"),
     port = sys.env("MYSQL_PORT").toInt,
     authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))
@@ -74,7 +73,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
     db = Some("demo")
   )
 
-  val appName = "sdlb-debezium-parallel-integration-test"
+  val appName = "sdlb-debezium-sequential-integration-test"
   val feedName = "debezium-test-single"
   val tempDir = Files.createTempDirectory(feedName)
   val statePath = "target/stateTestSingle/"
@@ -91,7 +90,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
   val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true")))
   instanceRegistry.register(srcDO1)
 
-  val tgtDO1 = CsvFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
+  val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
   instanceRegistry.register(tgtDO1)
 
   // Setup copy actions

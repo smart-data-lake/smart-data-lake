@@ -29,7 +29,7 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.connection.{DebeziumConnection, DebeziumDatabaseEngine}
+import io.smartdatalake.workflow.connection.{DebeziumConnection}
 import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlIT.{COMMIT_TIMESTAMP_COLUMN_NAME, COMMIT_TYPE_COLUMN_NAME, connection, df, instanceRegistry, jdbcConnection, sparkSession, statePath}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit}
@@ -55,7 +55,7 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
 
   val connection = DebeziumConnection(
     id = "dbzCon",
-    dbEngine = DebeziumDatabaseEngine.MySql,
+    dbEngine = "mysql",
     hostname = sys.env("MYSQL_HOSTNAME"),
     port = sys.env("MYSQL_PORT").toInt,
     authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))
