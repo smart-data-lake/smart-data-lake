@@ -57,8 +57,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   val connection: DebeziumConnection = getConnection[DebeziumConnection](connectionId)
 
-  private val jdbcCatalog: JdbcCatalog = connection.getJdbcTableConnection.catalog
-
   private def getConfigPropertiesMap: Map[String, String] = {
 
     // If duplicate connection properties are set, prefer the ones the user has set in the config file

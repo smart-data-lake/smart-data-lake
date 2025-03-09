@@ -60,19 +60,6 @@ case class DebeziumConnection(override val id: ConnectionId,
 
   }
 
-  private[smartdatalake] def getJdbcTableConnection: JdbcTableConnection = {
-
-    val urlPrefix = dbEngineHelper.jdbcUrlPrefix
-    val driverClassName = dbEngineHelper.jdbcDriverClassName
-
-    JdbcTableConnection(
-      id = ConnectionId(s"${id.id}-jdbc"),
-      url = s"$urlPrefix://${hostname}:${port}",
-      driver = driverClassName,
-      authMode = Some(authMode)
-    )
-  }
-
   /**
    * Returns the factory that can parse this type (that is, type `CO`).
    *
