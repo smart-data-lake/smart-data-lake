@@ -90,9 +90,9 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
   val srcDO2 = DebeziumCdcDataObject("src2", connectionId = "dbzCon", Table(Some("demo"), "test2"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true")))
   instanceRegistry.register(srcDO2)
 
-  val tgtDO1 = CsvFileDataObject( "tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
+  val tgtDO1 = ParquetFileDataObject( "tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
   instanceRegistry.register(tgtDO1)
-  val tgtDO2 = CsvFileDataObject( "tgt2", tempDir.resolve("testTgt2").toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
+  val tgtDO2 = ParquetFileDataObject( "tgt2", tempDir.resolve("testTgt2").toString.replace('\\', '/'))
   instanceRegistry.register(tgtDO2)
 
   // Setup copy actions
