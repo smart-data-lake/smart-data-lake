@@ -85,9 +85,9 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true")))
+  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "12343453456", "database.allowPublicKeyRetrieval" -> "true")))
   instanceRegistry.register(srcDO1)
-  val srcDO2 = DebeziumCdcDataObject("src2", connectionId = "dbzCon", Table(Some("demo"), "test2"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true")))
+  val srcDO2 = DebeziumCdcDataObject("src2", connectionId = "dbzCon", Table(Some("demo"), "test2"), debeziumProperties = Some(Map("database.server.id" -> "12343453459", "database.allowPublicKeyRetrieval" -> "true")))
   instanceRegistry.register(srcDO2)
 
   val tgtDO1 = ParquetFileDataObject( "tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
