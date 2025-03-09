@@ -28,7 +28,6 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
-import io.smartdatalake.workflow.connection.jdbc.{JdbcCatalog, JdbcTableConnection}
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.runtime.WorkerConfig
@@ -122,7 +121,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
         StructField(COMMIT_TIMESTAMP_COLUMN_NAME, TimestampType)
       )
 
-      val schema = StructType(jdbcCatalog.getSchemaFromTable(table.fullName) ++ schemaCdcColumns)
+      val schema = StructType(debeziumSparkSchemaState ++ schemaCdcColumns)
       spark.createDataFrame(new util.ArrayList[Row](), schema)
     }
 
@@ -151,12 +150,12 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       records.headOption match {
         case Some(record) => {
-          val sparkSchema = inferSparkSchema(record.valueSchema())
+          debeziumSparkSchemaState = inferSparkSchema(record.valueSchema())
           val rows = records.map {
             DebeziumRowConverter.convert
           }
 
-          val df = spark.createDataFrame(rows.asJava, sparkSchema)
+          val df = spark.createDataFrame(rows.asJava, debeziumSparkSchemaState)
 
           extractCdcEvents(df)
         }
@@ -263,6 +262,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     reorderedDF
   }
 
+
+  protected[dataobject] var debeziumSparkSchemaState: StructType = StructType(Seq())
   protected[dataobject] var incrementalState: mutable.Map[String, String] = mutable.Map()
 
   /**
