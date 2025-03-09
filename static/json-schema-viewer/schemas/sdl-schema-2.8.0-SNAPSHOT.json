@@ -2743,7 +2743,7 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "optional id of[[io.smartdatalake.workflow.connection.HiveTableConnection]]"
+            "description" : "optional id of[[IcebergTableConnection]]"
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
