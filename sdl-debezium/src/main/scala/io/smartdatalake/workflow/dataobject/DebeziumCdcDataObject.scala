@@ -116,13 +116,41 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     def createEmptyDataFrame(): DataFrame = {
 
-      val schemaCdcColumns = Seq(
-        StructField(COMMIT_TYPE_COLUMN_NAME, StringType),
-        StructField(COMMIT_TIMESTAMP_COLUMN_NAME, TimestampType)
-      )
+      if(debeziumSparkSchemaState.fields.nonEmpty) {
+        spark.createDataFrame(new util.ArrayList[Row](), debeziumSparkSchemaState)
+      } else {
 
-      val schema = StructType(debeziumSparkSchemaState ++ schemaCdcColumns)
-      spark.createDataFrame(new util.ArrayList[Row](), schema)
+        val schemaConsumer = new DebeziumSchemaConsumer
+        val executorService = Executors.newSingleThreadExecutor
+        val completionCallback = new DebeziumCompletionCallback(executorService)
+        val engine = DebeziumEngine.create(classOf[Connect])
+          .using(properties)
+          .notifying(schemaConsumer)
+          .using(completionCallback)
+          .build()
+
+
+        executorService.execute(engine)
+
+        Thread.sleep(10000)
+        engine.close()
+        executorService.shutdown()
+
+        val records = schemaConsumer.records
+
+        val sparkSchema = inferSparkSchema(records.head.valueSchema())
+
+        val rows = records.map {
+          DebeziumRowConverter.convert
+        }
+
+        val df = spark.createDataFrame(rows.asJava, sparkSchema)
+
+        val schema = extractCdcEvents(df).schema
+
+        spark.createDataFrame(new util.ArrayList[Row](), schema)
+      }
+
     }
 
     if (context.isExecPhase) {
@@ -150,14 +178,18 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       records.headOption match {
         case Some(record) => {
-          debeziumSparkSchemaState = inferSparkSchema(record.valueSchema())
+          val sparkSchema = inferSparkSchema(record.valueSchema())
           val rows = records.map {
             DebeziumRowConverter.convert
           }
 
-          val df = spark.createDataFrame(rows.asJava, debeziumSparkSchemaState)
+          val df = spark.createDataFrame(rows.asJava, sparkSchema)
 
-          extractCdcEvents(df)
+          val finalDf = extractCdcEvents(df)
+
+          debeziumSparkSchemaState = finalDf.schema
+
+          finalDf
         }
         case None => createEmptyDataFrame()
       }
@@ -291,6 +323,10 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
         }
 
       }
+      case None => {
+        debeziumSparkSchemaState = StructType(Seq())
+        incrementalState = mutable.Map()
+      }
     }
   }
 
@@ -330,6 +366,20 @@ private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.Chang
 
       recordCommitter.markProcessed(r)
     })
+
+    recordCommitter.markBatchFinished()
+
+  }
+}
+
+private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] {
+
+
+  var records: List[SourceRecord] = List()
+
+  override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
+
+    records  = records :+ batch.get(0).value() // read only the first record
 
     recordCommitter.markBatchFinished()
 
