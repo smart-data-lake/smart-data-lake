@@ -68,7 +68,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
       while (metrics.isEmpty) {
         logger.debug(s"($name) waiting for metrics")
         wait(timeoutSec * 1000L)
-        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"SparkObservation $name did not receive metrics within timeout of $timeoutSec seconds.")
+        if (ts + timeoutSec * 1000L <= System.currentTimeMillis) throw NoMetricsReceivedException(s"SparkObservation $name did not receive metrics within timeout of $timeoutSec seconds. Timeout can be increased through Environment.dataFrameObservationTimeoutSec configuration.")
       }
     }
     extractMetrics()
