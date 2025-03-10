@@ -103,6 +103,7 @@ case class HistorizeAction(
                             historizeWhitelist: Option[Seq[String]] = None,
                             ignoreOldDeletedColumns: Boolean = false,
                             ignoreOldDeletedNestedColumns: Boolean = true,
+                            @Deprecated @deprecated("mergeModeEnable will be always true in future - make sure to use a DataObject with Implementation of CanMergeDataFrame.", "2.0.8")
                             mergeModeEnable: Boolean = false,
                             mergeModeAdditionalJoinPredicate: Option[String] = None,
                             mergeModeCDCColumn: Option[String] = None,
@@ -199,6 +200,7 @@ case class HistorizeAction(
 
   override def validateConfig(): Unit = {
     super.validateConfig()
+    if (!mergeModeEnable) logger.warn(s"($id) mergeModeEnable = false will not be supported in future anymore, please change to a DataObject with Implementation of CanMergeDataFrame otherwise your code will fail at some point.")
     if (mergeModeEnable) assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
     if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate has no effect if mergeModeEnable = false")
   }

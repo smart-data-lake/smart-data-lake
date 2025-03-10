@@ -25,12 +25,15 @@ import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import java.nio.file.Files
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
 
   import session.implicits._
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableDataObjectTest", "org.hsqldb.jdbcDriver")
+  private val tempDir = Files.createTempDirectory("test")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   test("write and read jdbc table") {
     instanceRegistry.register(jdbcConnection)
@@ -155,9 +158,8 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val table = Table(Some("public"), "table1")
     val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("abc"), jdbcOptions = Map("createTableColumnTypes"->"abc varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject.dropTable
-    // Be careful when writing lower case column names over Jdbc with Spark. When creating the table through Spark they will be surrounded with quotes and become case-sensitiv!
-    // In consequence the virtual partition has to be surrounded with quotes as well, see next test case.
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("ABC", "lastname", "firstname", "rating")
+
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     dataObject.prepare
@@ -170,7 +172,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
   test("list jdbc table virtual partitions case quoted identifier") {
     instanceRegistry.register(jdbcConnection)
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("aBc"), createSql = Some("""CREATE TABLE public.table1 ("aBc" varchar(255) , lastname varchar(255) , firstname varchar(255) , rating INTEGER NOT NULL)"""))
+    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("abc"), createSql = Some("""CREATE TABLE public.table1 ("aBc" varchar(255) , lastname varchar(255) , firstname varchar(255) , rating INTEGER NOT NULL)"""))
     dataObject.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.prepare
@@ -302,4 +304,34 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val dfRead = dataObject.getSparkDataFrame(Seq())
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
+
+  test("write partitioned jdbc, copy to hive and delete partition") {
+
+    instanceRegistry.register(jdbcConnection)
+    val srcTable = Table(Some("public"), "table1", None, Some(Seq("lastname","firstname")))
+    val srcDO = JdbcTableDataObject("jdbcDO1", table = srcTable, connectionId = "jdbcCon1", virtualPartitions = Seq("lastname"), jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255), rating INTEGER"))
+    srcDO.dropTable
+    instanceRegistry.register(srcDO)
+
+    val tgtTable = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    val tgtDO = HiveTableDataObject( "tgt", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    tgtDO.dropTable
+    instanceRegistry.register(tgtDO)
+
+    // prepare data
+    val dfSrc = Seq(("dau","bob",10),
+      ("doe","john",5))
+      .toDF("lastname", "firstname", "rating")
+    srcDO.initSparkDataFrame(dfSrc, Seq())
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
+
+    val action = CopyAction("copy", srcDO.id, tgtDO.id)
+    val srcSubFeed = SparkSubFeed(None, "jdbcDO1", Seq())
+    action.exec(Seq(srcSubFeed))(contextExec).head
+
+    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("lastname"->"dau")), PartitionValues(Map("lastname"->"doe"))))
+    tgtDO.deletePartitions(Seq(PartitionValues(Map("lastname"->"doe"))))
+    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("lastname"->"dau"))))
+  }
+
 }

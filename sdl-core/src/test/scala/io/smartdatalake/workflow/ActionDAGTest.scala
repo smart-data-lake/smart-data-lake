@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.conf.Configuration
@@ -45,6 +46,8 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
+
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:ActionDAGTest", "org.hsqldb.jdbcDriver")
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
@@ -69,8 +72,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(jdbcConnection)
+    val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
@@ -128,8 +132,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(jdbcConnection)
+    val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
@@ -225,8 +230,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcBDO.dropTable
     instanceRegistry.register(srcBDO)
 
-    val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
-    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
+    instanceRegistry.register(jdbcConnection)
+    val tgtATable = Table(Some("public"), "tgt_a", None, Some(Seq("lastname","firstname")))
+    val tgtADO = JdbcTableDataObject("tgt_A", table = tgtATable, connectionId = "jdbcCon1", virtualPartitions = Seq("lastname"), jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255), rating INTEGER"))
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
@@ -247,16 +253,19 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
 
     // prepare DAG
     val dataA = Seq(("doe","john",5),("dau","bob",3)).toDF("lastname", "firstname", "rating")
+    val dfTgtA = dataA.where($"lastname"==="doe").withColumn("dl_ts_captured", current_timestamp())
     val dataB = Seq(("doe","john",10),("dau","bob",6)).toDF("lastname", "firstname", "rating")
     srcADO.writeSparkDataFrame(dataA, Seq())
     srcBDO.writeSparkDataFrame(dataB, Seq())
-    tgtADO.writeSparkDataFrame(dataA.where($"lastname"==="doe").withColumn("dl_ts_captured", current_timestamp()), Seq()) // populate tgtA with "doe", so there should be only 1 partition to process (dau)
+    tgtADO.initSparkDataFrame(dfTgtA, Seq())
+    tgtADO.writeSparkDataFrame(dfTgtA, Seq()) // populate tgtA with "doe", so there should be only 1 partition to process (dau)
     tgtDDO.writeSparkDataFrame(dataA, Seq()) // populate tgtD so there should be no partitions left to process
     instanceRegistry.register(DeduplicateAction("a", srcADO.id, tgtADO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
     // srcB should be filtered with partition values received from tgtA. Transformer selects records from srcB, so "doe, bob, 6" should be inserted in tgtB, but "doe, john, 3" should remain.
     instanceRegistry.register(CustomDataFrameAction("b", Seq(tgtADO.id,srcBDO.id), Seq(tgtBDO.id), executionMode = Some(FailIfNoPartitionValuesMode()), metadata = Some(ActionMetadata(feed = Some(feed))),
       transformers = Seq(SQLDfsTransformer(code = Map(tgtBDO.id.id -> "select * from src_B"))), mainInputId = Some(tgtADO.id)
     ))
+
     instanceRegistry.register(CopyAction("c", tgtADO.id, tgtCDO.id, metadata = Some(ActionMetadata(feed = Some(feed)))))
     instanceRegistry.register(CopyAction("d", srcADO.id, tgtDDO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
 
@@ -336,8 +345,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.dropTable
     instanceRegistry.register(srcDO)
 
-    val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
-    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(jdbcConnection)
+    val tgtATable = Table(Some("public"), "tgt_a", None, Some(Seq("lastname","firstname")))
+    val tgtADO = JdbcTableDataObject("tgt_A", table = tgtATable, connectionId = "jdbcCon1")
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
@@ -406,7 +416,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcD1 = MockDataObject("src1", partitions = Seq("lastname")).register
     val srcD2 = MockDataObject("src2", partitions = Seq("lastname")).register
     val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
-    val tgtADO = TickTockHiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgtADO = HiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
@@ -466,13 +476,13 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("dt","type","lastname","firstname")))
+    instanceRegistry.register(jdbcConnection)
+    val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("dt","type","lastname","firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1", virtualPartitions = Seq("dt","type"), jdbcOptions = Map("createTableColumnTypes"->"dt varchar(255), type varchar(255), lastname varchar(255), firstname varchar(255), rating INTEGER"))
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("dt","lastname","firstname")))
-    // second table has partition columns dt only (reduced)
     val tgt2DO = HiveTableDataObject( "tgt2", Some(tempPath+s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
     tgt2DO.dropTable
     instanceRegistry.register(tgt2DO)
@@ -502,7 +512,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     assert(r1.head == 5)
 
     val dfTgt2 = session.table(s"${tgt2Table.fullName}")
-    assert(Seq("dt", "type", "lastname", "firstname", "rating").diff(dfTgt2.columns).isEmpty)
+    assert(Seq("dt", "type", "lastname", "firstname", "rating").diff(dfTgt2.columns.map(_.toLowerCase)).isEmpty)
     val recordsTgt2 = dfTgt2
       .select($"rating")
       .as[Int].collect().toSeq
@@ -618,8 +628,9 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1, expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'"))
+    instanceRegistry.register(jdbcConnection)
+    val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname","firstname")))
+    val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255), rating INTEGER"), virtualPartitions = Seq("lastname"), expectedPartitionsCondition = Some("elements['lastname'] != 'xyz'"))
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
@@ -712,7 +723,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
@@ -1296,7 +1307,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname","firstname")))
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), table = tgt1Table, partitions=Seq("lastname"), numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2DO = UnpartitionedTestDataObject( "tgt2")

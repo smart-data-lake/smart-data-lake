@@ -74,6 +74,44 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     assert(!SchemaEvolution.hasSameColNamesAndTypes(schemaOld, schemaNew, Environment.caseSensitive))
   }
 
+  test("Schema with different columns and difference with upper/lowercase and same types should only result in the actual new columns in case-insensitive mode") {
+    val schemaOld = StructType(List(
+      StructField("a", StringType),
+      StructField("b", IntegerType)
+    ))
+    val schemaNew = StructType(List(
+      StructField("a", StringType),
+      StructField("B", IntegerType),
+      StructField("c", IntegerType)
+    ))
+
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
+
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf))
+    assert(SchemaEvolution.newColumns(oldDf, newDf, caseSensitive = false).toSet == Set("c"))
+    assert(SchemaEvolution.deletedColumns(oldDf, newDf).isEmpty)
+  }
+
+  test("Schema with different columns and difference with upper/lowercase and same types should result in counting uppercase as new column as well in case-sensitive mode") {
+    val schemaOld = StructType(List(
+      StructField("a", StringType),
+      StructField("b", IntegerType)
+    ))
+    val schemaNew = StructType(List(
+      StructField("a", StringType),
+      StructField("B", IntegerType),
+      StructField("c", IntegerType)
+    ))
+
+    val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
+
+    assert(!SchemaEvolution.hasSameColNamesAndTypes(oldDf, newDf, caseSensitiveComparison = true))
+    assert(SchemaEvolution.newColumns(oldDf, newDf, caseSensitive = true).toSet == Set("B", "c"))
+    assert(SchemaEvolution.deletedColumns(oldDf, newDf, caseSensitive = true).toSet == Set("b"))
+  }
+
   test("Old and new schema with different sorting are identical, no matter in which order, but newDf is sorted according to oldDf") {
     val schemaOld = StructType(List(
       StructField("SF_NR_1", IntegerType),
@@ -165,13 +203,15 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
     val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
-    assert(SchemaEvolution.newColumns(oldDf, newDf).toSet == Set("SF_NEW_STR_1", "SF_NEW_DOUBLE_1", "SF_NEW_DOUBLE_2", "SF_NEW_DOUBLE"))
+    //column names are delivered lower case in case-insensitive mode
+    assert(SchemaEvolution.newColumns(oldDf, newDf).toSet == Set("sf_new_str_1", "sf_new_double_1", "sf_new_double_2", "sf_new_double"))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
 
-    assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
-    assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
+    // compare in lowercase as new columns are delivered in lowercase in case-insensitive mode
+    assert(oldEvoDf.columns.map(_.toLowerCase()).toSet == schemaNew.map(_.name.toLowerCase()).toSet)
+    assert(newEvoDf.columns.map(_.toLowerCase()).toSet == schemaNew.map(_.name.toLowerCase()).toSet)
 
     assert(oldEvoDf.count > 0)
     assert(newEvoDf.count > 0)
@@ -277,7 +317,8 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val oldDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaOld))
     val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
-    assert(SchemaEvolution.deletedColumns(oldDf, newDf).toSet == Set("SF_STR_4", "SF_TIME_1", "SF_STR_5", "SF_STR_6"))
+    //column names are delivered lower case in case-insensitive
+    assert(SchemaEvolution.deletedColumns(oldDf, newDf).toSet == Set("sf_str_4", "sf_time_1", "sf_str_5", "sf_str_6"))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
@@ -332,9 +373,10 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
 
+    // compare in lowercase as new columns are delivered in lowercase in case-insensitive mode
     val deletedCols = SchemaEvolution.deletedColumns(oldDf, newDf)
-    assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet ++ deletedCols )
-    assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet ++ deletedCols)
+    assert(oldEvoDf.columns.map(_.toLowerCase()).toSet == schemaNew.map(_.name.toLowerCase()).toSet ++ deletedCols )
+    assert(newEvoDf.columns.map(_.toLowerCase()).toSet == schemaNew.map(_.name.toLowerCase()).toSet ++ deletedCols)
   }
 
   test("New columns and technical cols to ignore") {
@@ -376,8 +418,9 @@ class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogge
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore)
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
 
-    assert(oldEvoDf.columns.toSet == schemaNew.map(_.name).toSet ++ colsToIgnore)
-    assert(newEvoDf.columns.toSet == schemaNew.map(_.name).toSet)
+    // compare in lowercase as new columns are delivered in lowercase in case-insensitive mode
+    assert(oldEvoDf.columns.map(_.toLowerCase()).toSet == schemaNew.map(_.name.toLowerCase()).toSet ++ colsToIgnore)
+    assert(newEvoDf.columns.map(_.toLowerCase()).toSet == schemaNew.map(_.name.toLowerCase()).toSet)
   }
 
   test("Numerical columns can be cast to String") {
