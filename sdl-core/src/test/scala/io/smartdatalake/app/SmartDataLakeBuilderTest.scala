@@ -33,6 +33,7 @@ import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode,
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.CountExpectation
@@ -52,6 +53,8 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
+
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:SmartDataLakeBuilderTest", "org.hsqldb.jdbcDriver")
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
@@ -104,7 +107,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val srcDO = MockDataObject( "src1", partitions = Seq("dt","type")).register
     val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
@@ -202,7 +205,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val srcDO = MockDataObject( "src1", partitions = Seq("dt","type")).register
     val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname","firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname","firstname")))
@@ -539,7 +542,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(srcDO)
     val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
 
@@ -677,7 +680,6 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
   }
 
   test("sdlb simulation run") {
-
     // init sdlb
     val appName = "sdlb-simulation"
     val feedName = "test"
@@ -694,9 +696,9 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
-    val tgt1Path = tempPath + s"/${tgt1Table.fullName}"
-    val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tgt1Path), table = tgt1Table, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(jdbcConnection)
+    val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
+    val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
