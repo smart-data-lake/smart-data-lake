@@ -30,12 +30,6 @@ import org.apache.spark.sql.catalyst.TableIdentifier
  *           Called db for backwards-compatibility because for hive tables, db and schema mean the same thing.
  * @param name        table name
  * @param query       optional select query
- * @param commentsOnColumns Optional sequence of comments to add to the columns of the table as metadata. They must be written as follows:
- *                          commentsOnColumns = {
- *                            colname1 = "Comment or description for column colname1"
- *                            colname2 = "Comment or descrpition for column colname2"
- *                          }
- *                          As of now, this is only possible for Delta Lake and Snowflake tables.
  * @param primaryKey  optional sequence of primary key columns
  * @param createAndReplacePrimaryKey Parameter to define if the primary key should be created and updated
  *                                   according to the SDLB configuration (=TRUE), or if they are configured just
@@ -70,7 +64,6 @@ case class Table(
                   createAndReplacePrimaryKey: Boolean = false,
                   primaryKeyConstraintName: Option[String] = None,
                   foreignKeys: Option[Seq[ForeignKey]] = None,
-                  commentsOnColumns: Option[Map[String, String]] = None,
                   catalog: Option[String] = None
                 ) {
   override def toString: String = s"""$fullName${primaryKey.map(pks => "("+pks.mkString(",")+")").getOrElse("")}"""
@@ -127,8 +120,3 @@ case class ForeignKey(
                        name: Option[String]
                      )
 
-  /**
-   *
-   * @param colName Name of the column
-   * @param comment Comment of the column as metadata.
-   */
