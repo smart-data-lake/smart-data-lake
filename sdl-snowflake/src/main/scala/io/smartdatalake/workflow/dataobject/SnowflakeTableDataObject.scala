@@ -183,10 +183,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       connection.execJdbcStatement(sql)
     }
 
-    //columns comment
-    if (table.commentsOnColumns.isDefined) {
-      table.commentsOnColumns.get.foreach(comment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${comment._1} is '${comment._2}';"))
-    }
+//    //columns comment
+//    if (table.commentsOnColumns.isDefined) {
+//      table.commentsOnColumns.get.foreach(comment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${comment._1} is '${comment._2}';"))
+//    }
 
 
 
