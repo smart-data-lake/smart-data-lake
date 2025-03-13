@@ -260,6 +260,35 @@ object SchemaUtil {
 
   }
 
+
+  /**
+   * Returns a Map of columns and comments based on the metadata of a Spark schema. The columns are represented as a Seq of fields (for nested schemas).
+   * E.g. a kex-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   * @param schema The schema containing the metadata
+   */
+  def columnsComments(schema: StructType, parents: Queue[String] = Queue()): Map[Queue[String], String] = {
+
+    def handleArrays(a: ArrayType, parents: Queue[String]): Map[Queue[String], String] = {
+      a.elementType match {
+        case s: StructType => columnsComments(s, parents)
+        case a: ArrayType => handleArrays(a, parents)
+        case _ => Map()
+      }
+    }
+
+    schema.fields.foldLeft(Map(): Map[Queue[String], String])((map, field) => {
+      val newParents = parents :+ field.name
+      val singlecomment = if (field.getComment().isDefined) Map(newParents -> field.getComment().get) else Map()
+      //only look for identical structures; in the other cases the comments will be updated automatically when writing
+      val nestedComments: Map[Queue[String], String] = field.dataType match {
+        case s: StructType => columnsComments(s, newParents)
+        case a: ArrayType => handleArrays(a, newParents)
+        case _ => Map()
+      }
+      map ++ singlecomment ++ nestedComments
+    })
+  }
+
   def getSchemaFromJavaBean(beanClass: Class[_]): StructType = {
     JavaTypeInference.inferDataType(beanClass)._1.asInstanceOf[StructType]
   }
