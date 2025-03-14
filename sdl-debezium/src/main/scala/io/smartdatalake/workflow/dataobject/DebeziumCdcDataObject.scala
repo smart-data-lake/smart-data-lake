@@ -116,10 +116,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     def createEmptyDataFrame(): DataFrame = {
 
-      if(debeziumSparkSchemaState.fields.nonEmpty) {
-        spark.createDataFrame(new util.ArrayList[Row](), debeziumSparkSchemaState)
-      } else {
-
         val schemaConsumer = new DebeziumSchemaConsumer
         val executorService = Executors.newSingleThreadExecutor
         val completionCallback = new DebeziumCompletionCallback(executorService)
@@ -149,7 +145,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
         val schema = extractCdcEvents(df).schema
 
         spark.createDataFrame(new util.ArrayList[Row](), schema)
-      }
 
     }
 
@@ -185,11 +180,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
           val df = spark.createDataFrame(rows.asJava, sparkSchema)
 
-          val finalDf = extractCdcEvents(df)
+          extractCdcEvents(df)
 
-          debeziumSparkSchemaState = finalDf.schema
-
-          finalDf
         }
         case None => createEmptyDataFrame()
       }
@@ -294,8 +286,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     reorderedDF
   }
 
-
-  protected[dataobject] var debeziumSparkSchemaState: StructType = StructType(Seq())
   protected[dataobject] var incrementalState: mutable.Map[String, String] = mutable.Map()
 
   /**
@@ -308,25 +298,11 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
     state match {
-      case Some(s) => {
-        val stateParts = s.split("--")
-        val schemaStateString = stateParts(0)
-        val incrementalStateString = stateParts(1)
-
-        // handle spark schema
-        debeziumSparkSchemaState = DataType.fromJson(schemaStateString).asInstanceOf[StructType]
-
-        // handle debezium state
-        incrementalStateString.split(",").foreach { pair =>
+      case Some(s) =>
+        s.split(",").foreach { pair =>
           val Array(key, value) = pair.split(":")
           incrementalState.put(key, value)
         }
-
-      }
-      case None => {
-        debeziumSparkSchemaState = StructType(Seq())
-        incrementalState = mutable.Map()
-      }
     }
   }
 
@@ -334,13 +310,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
    * Return the state of the last increment or empty if no increment was processed.
    */
   override def getState: Option[String] = {
-    val incrementalStateString = incrementalState.map { case (key, value) =>
+    val state = incrementalState.map { case (key, value) =>
       s"$key:$value"
     }.mkString(",")
-
-    val debeziumSparkSchemaStateString = debeziumSparkSchemaState.json
-
-    val state = s"$debeziumSparkSchemaStateString--$incrementalStateString"
 
     Some(state)
   }
