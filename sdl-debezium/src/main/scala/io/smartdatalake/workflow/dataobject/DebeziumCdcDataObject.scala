@@ -116,11 +116,18 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     def createEmptyDataFrame(): DataFrame = {
 
+        val schemaProperties = new Properties()
+       getConfigPropertiesMap.foreach { case (key, value) => schemaProperties.setProperty(key, value) }
+
+        Seq("offset.storage", "offset.storage.sdlb.data.object.id").foreach(schemaProperties.remove(_))
+
+        schemaProperties.put("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
+
         val schemaConsumer = new DebeziumSchemaConsumer
         val executorService = Executors.newSingleThreadExecutor
         val completionCallback = new DebeziumCompletionCallback(executorService)
         val engine = DebeziumEngine.create(classOf[Connect])
-          .using(properties)
+          .using(schemaProperties)
           .notifying(schemaConsumer)
           .using(completionCallback)
           .build()
@@ -128,7 +135,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
         executorService.execute(engine)
 
-        Thread.sleep(10000)
+        Thread.sleep(2000)
         engine.close()
         executorService.shutdown()
 
@@ -351,7 +358,9 @@ private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.Chang
 
   override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
 
-    records  = records :+ batch.get(0).value() // read only the first record
+    if(records.isEmpty) {
+     records  = records :+ batch.get(0).value() // read only the first record
+    }
 
     recordCommitter.markBatchFinished()
 
