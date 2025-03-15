@@ -87,7 +87,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       "topic.prefix" -> table.fullName,
       "include.schema.changes" -> "false",
       "name" -> id.toString,
-      "tombstones.on.delete" -> "false"
+      "tombstones.on.delete" -> "false",
+      "decimal.handling.mode" -> "string" // string, because double cannot handle fully completely decimal value and precise is not possible because spark returns an error when processing -> Root cause is 'ClassCastException: class java.math.BigDecimal cannot be cast to class [B (java.math.BigDecimal and [B are in module java.base of loader 'bootstrap')' correct data type can be adjusted f.ex. with a cast in a transformer
     )
 
     // If duplicate default properties are set, prefer the ones the user has set in the config file
