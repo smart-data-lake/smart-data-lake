@@ -83,7 +83,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
   instanceRegistry.register(connection)
 
   jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
-  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value) VALUES ('INIT 1')")
+  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INIT 1', '1994-11-30 01:00:00', 19.94)")
 
   // Setup data objects
 
@@ -115,7 +115,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
   assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
   // 2. Insert test
-  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value) VALUES ('INSERT TEST')")
+  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INSERT TEST', '1994-07-30 07:07:07', 30.0)")
 
   sdlb.run(sdlConfig)
 
