@@ -136,7 +136,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
         executorService.execute(engine)
 
-        Thread.sleep(2000)
+        Thread.sleep(10000)
         engine.close()
         executorService.shutdown()
 
