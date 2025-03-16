@@ -79,9 +79,9 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
   instanceRegistry.register(connection)
 
   jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
-  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value) VALUES ('INIT 1')")
+  jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INIT 1', '1994-11-30 01:00:00', 19.94)")
   jdbcConnection.execJdbcStatement("TRUNCATE demo.test2")
-  jdbcConnection.execJdbcStatement("INSERT INTO demo.test2 (value) VALUES ('INIT 1')")
+  jdbcConnection.execJdbcStatement("INSERT INTO demo.test2 (value, timestampCol, decimalCol) VALUES ('INIT 1', '1994-11-30 01:00:00', 19.94)")
 
   // Setup data objects
 
