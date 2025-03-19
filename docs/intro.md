@@ -12,7 +12,7 @@ SDLB is implemented in Java/Scala and builds on top of open-source big data tech
 including connectors for diverse data sources (HadoopFS, Hive, DeltaLake, JDBC, Splunk, Webservice, SFTP, Kafka, JMS, Excel, Access) and file formats.
 
 ### Benefits of Smart Data Lake Builder
-* Cheaper implementation of data pipelines
+* Cost-effective implementation of data pipelines
 * Increased productivity of data scientists
 * Higher level of self-service
 * Decreased operations and maintenance costs
@@ -20,7 +20,7 @@ including connectors for diverse data sources (HadoopFS, Hive, DeltaLake, JDBC, 
 
 ### When should you consider using Smart Data Lake Builder ?
 Some common use cases include:
-* Building Lakehouse architectur - drastically increasing productivity and usability
+* Building Lakehouse architecture - drastically increasing productivity and usability
 * Implementing Data Products - building simple and complex data apps in a Data Mesh approach
 * DWH automation - reading and writing to relational databases via SQL
 * Data migration - efficiently create one-time data pipelines
