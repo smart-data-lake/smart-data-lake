@@ -75,8 +75,8 @@ Windows or Linux. We will focus on the community version of Intellij. Please [do
 ### Hadoop Setup (Needed for Windows only)
 Windows Users need to follow the steps below to have a working Hadoop Installation :
 1. First download the Windows binaries for Hadoop [here](https://github.com/cdarlint/winutils/archive/refs/heads/master.zip)
-2. Extract the wished version to a folder (e.g. &lt prefix &gt\hadoop-&lt version &gt\bin ). For this tutorial we use the version 3.2.2.
-3. Configure the *HADOOP_HOME* environment variable to point to the folder &lt prefix &gt\hadoop-&lt version &gt\
+2. Extract the wished version to a folder (e.g. \<prefix\>\hadoop-\<version\>\bin ). For this tutorial we use the version 3.2.2.
+3. Configure the *HADOOP_HOME* environment variable to point to the folder \<prefix\>\hadoop-\<version\>
 4. Add the *%HADOOP_HOME%\bin* to the *PATH* environment variable
 
 ### Run SDLB in IntelliJ
