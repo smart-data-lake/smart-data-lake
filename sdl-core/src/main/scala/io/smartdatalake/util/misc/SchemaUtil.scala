@@ -227,9 +227,9 @@ object SchemaUtil {
    * @return A map of the type [Queue[String] -> String], where the key represents the parents / path of a nested column, and the value the comment of that column.
    *         E.g. a result of Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
    */
-  def identifyMissingComments(from: StructType, to: StructType, parents: Queue[String] = Queue()): Map[Queue[String], String] = {
+  def identifyMissingComments(from: StructType, to: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
 
-    def handleArrays(from: ArrayType, to: ArrayType, parents: Queue[String]): Map[Queue[String], String] = {
+    def handleArrays(from: ArrayType, to: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
       (from.elementType, to.elementType) match {
         case (f: StructType, t: StructType) => identifyMissingComments(f, t, parents)
         case (f: ArrayType, t: ArrayType) => handleArrays(f, t, parents)
@@ -238,7 +238,7 @@ object SchemaUtil {
     }
 
     val toFields = to.fieldNames
-    from.fields.foldLeft(Map(): Map[Queue[String], String])((map, field) => {
+    from.fields.foldLeft(Map(): Map[Seq[String], String])((map, field) => {
       val comment = field.getComment()
       val additionalComments = if (toFields.contains(field.name)) { //only columns that already exist
         val toField = to(field.name)
@@ -248,7 +248,7 @@ object SchemaUtil {
         } else Map()
 
         //only look for identical structures; in the other cases the comments will be updated automatically when writing
-        val nestedComments: Map[Queue[String], String] = (field.dataType, toField.dataType) match {
+        val nestedComments: Map[Seq[String], String] = (field.dataType, toField.dataType) match {
           case (f: StructType, t: StructType) => identifyMissingComments(f, t, newParents)
           case (f: ArrayType, t: ArrayType) => handleArrays(f, t, newParents)
           case _ => Map()
@@ -266,9 +266,9 @@ object SchemaUtil {
    * E.g. a key-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
    * @param schema The schema containing the metadata
    */
-  def columnsComments(schema: StructType, parents: Queue[String] = Queue()): Map[Queue[String], String] = {
+  def columnsComments(schema: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
 
-    def handleArrays(a: ArrayType, parents: Queue[String]): Map[Queue[String], String] = {
+    def handleArrays(a: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
       a.elementType match {
         case s: StructType => columnsComments(s, parents)
         case a: ArrayType => handleArrays(a, parents)
@@ -276,11 +276,11 @@ object SchemaUtil {
       }
     }
 
-    schema.fields.foldLeft(Map(): Map[Queue[String], String])((map, field) => {
+    schema.fields.foldLeft(Map(): Map[Seq[String], String])((map, field) => {
       val newParents = parents :+ field.name
       val singlecomment = if (field.getComment().isDefined) Map(newParents -> field.getComment().get) else Map()
       //only look for identical structures; in the other cases the comments will be updated automatically when writing
-      val nestedComments: Map[Queue[String], String] = field.dataType match {
+      val nestedComments: Map[Seq[String], String] = field.dataType match {
         case s: StructType => columnsComments(s, newParents)
         case a: ArrayType => handleArrays(a, newParents)
         case _ => Map()
