@@ -1765,6 +1765,10 @@
             "type" : "boolean",
             "description" : "If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error."
           },
+          "updateColumnComments" : {
+            "type" : "boolean",
+            "description" : "If set to false, the column comments (read from the provided schema) will only be updated for newly created columns.\nIf set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in\na lower performance since a column comparison is needed. Defaults to \"false\"."
+          },
           "retentionPeriod" : {
             "type" : "integer",
             "description" : "Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted."
@@ -4682,6 +4686,10 @@
             } ],
             "description" : "An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte."
           },
+          "syncComments" : {
+            "type" : "boolean",
+            "description" : "Defines if the comments defined in the schema should be synched the Snowflake table. Please note that this can be an expensive operation and it only works if using Spark as an execution engine."
+          },
           "expectedPartitionsCondition" : {
             "type" : "string",
             "description" : "Optional definition of partitions expected to exist.\nDefine a Spark SQL expression that is evaluated against a[[PartitionValues]] instance and returns true or false\nDefault is to expect all partitions to exist."
@@ -6891,6 +6899,14 @@
               "type" : "string"
             },
             "description" : "optional sequence of primary key columns"
+          },
+          "createAndReplacePrimaryKey" : {
+            "type" : "boolean",
+            "description" : "Parameter to define if the primary key should be created and updated\naccording to the SDLB configuration (=TRUE), or if they are configured just\nfor information purposes (=FALSE). It defaults to false. For the creation / replacement to work,\nat least one primary Key column must be defined.\nAs of now, this feature is only available for JdbcTableDataObject. Using it in other DataObjects\nwill have no effect."
+          },
+          "primaryKeyConstraintName" : {
+            "type" : "string",
+            "description" : "This parameter is used in case that createAndReplacePrimaryKey is set to TRUE.\nIn case a constraint name is not given, the default value sdlb_\"tableName\"_pk will be used\nwhen updating the primary key."
           },
           "foreignKeys" : {
             "type" : "array",
