@@ -136,7 +136,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> table.fullName))
     val df = sparkLoad(queryOrTable)
     // convert case-insensitive column names to lowercase
-    val dfLower = if (!Environment.caseSensitive) convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
+    val dfLower = if (!Environment.caseSensitive) SnowflakeUtils.convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
     val dfTransformed = applyReadTransformer(partitionValues, dfLower)
       .asInstanceOf[SparkDataFrame].inner
     validateSchemaMin(SparkSchema(dfTransformed.schema), "read")
