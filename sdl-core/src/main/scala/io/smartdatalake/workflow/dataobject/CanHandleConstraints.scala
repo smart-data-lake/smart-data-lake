@@ -52,7 +52,7 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
     (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
       case (None, _) => logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
       case (Some(pkcols), None) => createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
-      case (Some(definedPkCols), Some(existingPkCols)) if (!definedPkCols.toSet.diff(existingPkCols.pkColumns.toSet).isEmpty) => {
+      case (Some(definedPkCols), Some(existingPkCols)) if (!definedPkCols.toSet.map(_.toLowerCase).diff(existingPkCols.pkColumns.toSet.map(_.toLowerCase)).isEmpty) => {
         if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!")
         dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
         createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
