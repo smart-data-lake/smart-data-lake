@@ -35,6 +35,7 @@ import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import scaladoc.Tag
 
+import scala.collection.immutable.Queue
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 object SchemaUtil {
@@ -179,6 +180,113 @@ object SchemaUtil {
       }
       StructType(newFields)
     } else schema
+  }
+
+
+  /**
+   * Merges the metadata from this schema into another one. This method should only be used if the used schema ("from")
+   * is a subset of the schema it's being merged into ("to"). For this, we should use methods such as the ones defined in the [[io.smartdatalake.workflow.dataobject.SchemaValidation]] trait first.
+   *
+   * @param from the schema from which the metadata is read. It should be a subset of "to".
+   * @param to   The schema in which the metadata is being merged into. Superset of "from".
+   */
+  def mergeSchemaMetadata(from: StructType, to: StructType): StructType = {
+
+    def replaceField(struct: StructType, newField: StructField): StructType = {
+      val structWithoutField = StructType(struct.filterNot(_.name == newField.name)) //Field has to be deleted before since add() does not replace it
+      structWithoutField.add(newField)
+    }
+
+    def handleArrays(from: ArrayType, to: ArrayType): DataType = {
+      from.elementType match {
+        case struct: StructType => mergeSchemaMetadata(struct, to.elementType.asInstanceOf[StructType]) //casting can be done since to is a superset of from
+        case arr: ArrayType => handleArrays(arr, to.elementType.asInstanceOf[ArrayType])
+        case _ => from.elementType
+      }
+    }
+
+    from.fields.foldLeft(to)((struc, field) => field.dataType match {
+      case inner: StructType => {
+        val newField = StructField(field.name, mergeSchemaMetadata(inner, struc(field.name).dataType.asInstanceOf[StructType]), struc(field.name).nullable, field.metadata)
+        replaceField(struc, newField)
+      }
+      case arr: ArrayType => {
+        val mergedType = handleArrays(arr, struc(field.name).dataType.asInstanceOf[ArrayType])
+        val newField = StructField(field.name, ArrayType(mergedType, struc(field.name).nullable), struc(field.name).nullable, field.metadata)
+        replaceField(struc, newField)
+      }
+      case _ => replaceField(struc, struc(field.name).copy(metadata = field.metadata))
+    })
+  }
+
+  /**
+   *  This method compares two Schemas and finds existing columns in schema "to" that have a different comment than the ones in schema "from".
+   *  It returns these columns with their new comments. Note that only columns that are present in both schemas (and with the same types) are considered.
+   * @param from The schema with the updated column comments
+   * @param to The schema which already exists and is compared to
+   * @return A map of the type [Queue[String] -> String], where the key represents the parents / path of a nested column, and the value the comment of that column.
+   *         E.g. a result of Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   */
+  def identifyMissingComments(from: StructType, to: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
+
+    def handleArrays(from: ArrayType, to: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
+      (from.elementType, to.elementType) match {
+        case (f: StructType, t: StructType) => identifyMissingComments(f, t, parents)
+        case (f: ArrayType, t: ArrayType) => handleArrays(f, t, parents)
+        case _ => Map()
+      }
+    }
+
+    val toFields = to.fieldNames
+    from.fields.foldLeft(Map(): Map[Seq[String], String])((map, field) => {
+      val comment = field.getComment()
+      val additionalComments = if (toFields.contains(field.name)) { //only columns that already exist
+        val toField = to(field.name)
+        val newParents = parents :+ field.name
+        val localComment = if (comment.isDefined && !toField.getComment().equals(comment)) { //only if comments are different
+          Map(newParents -> comment.get)
+        } else Map()
+
+        //only look for identical structures; in the other cases the comments will be updated automatically when writing
+        val nestedComments: Map[Seq[String], String] = (field.dataType, toField.dataType) match {
+          case (f: StructType, t: StructType) => identifyMissingComments(f, t, newParents)
+          case (f: ArrayType, t: ArrayType) => handleArrays(f, t, newParents)
+          case _ => Map()
+        }
+        localComment ++ nestedComments
+      } else Map()
+      map ++ additionalComments
+    })
+
+  }
+
+
+  /**
+   * Returns a Map of columns and comments based on the metadata of a Spark schema. The columns are represented as a Seq of fields (for nested schemas).
+   * E.g. a key-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   * @param schema The schema containing the metadata
+   */
+  def columnsComments(schema: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
+
+    def handleArrays(a: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
+      a.elementType match {
+        case s: StructType => columnsComments(s, parents)
+        case a: ArrayType => handleArrays(a, parents)
+        case _ => Map()
+      }
+    }
+
+    schema.fields.foldLeft(Map(): Map[Seq[String], String])((map, field) => {
+      val newParents = parents :+ field.name
+      val singlecomment = if (field.getComment().isDefined) Map(newParents -> field.getComment().get) else Map()
+      //only look for identical structures; in the other cases the comments will be updated automatically when writing
+      val nestedComments: Map[Seq[String], String] = field.dataType match {
+        case s: StructType => columnsComments(s, newParents)
+        case a: ArrayType => handleArrays(a, newParents)
+        case _ => Map()
+      }
+      map ++ singlecomment ++ nestedComments
+    })
   }
 
   def getSchemaFromJavaBean(beanClass: Class[_]): StructType = {

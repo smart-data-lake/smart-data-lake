@@ -29,15 +29,13 @@ import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SQLUtil
+import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import io.smartdatalake.workflow.dataobject.SnowflakeUtils._
-import io.smartdatalake.workflow.dataobject.SnowparkUtils.snowparkCastIntegralTypesToDecimal
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
@@ -75,6 +73,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
  * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
+ * @param syncComments   Defines if the comments defined in the schema should be synched the Snowflake table. Please note that this can be an expensive operation and it only works if using Spark as an execution engine.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
@@ -96,10 +95,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     readTransformer: Option[GenericDfTransformer] = None,
+                                    syncComments: Boolean = false,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation {
+  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
   private val connection = getConnection[SnowflakeConnection](connectionId)
 
@@ -124,6 +124,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
 
+  private var columnComments: Map[String, String] = Map()
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
@@ -134,7 +136,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> table.fullName))
     val df = sparkLoad(queryOrTable)
     // convert case-insensitive column names to lowercase
-    val dfLower = if (!Environment.caseSensitive) convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
+    val dfLower = if (!Environment.caseSensitive) SnowflakeUtils.convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
     val dfTransformed = applyReadTransformer(partitionValues, dfLower)
       .asInstanceOf[SparkDataFrame].inner
     validateSchemaMin(SparkSchema(dfTransformed.schema), "read")
@@ -154,14 +156,21 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   // Write a Spark DataFrame to the Snowflake table
   override def writeSparkDataFrame(df: spark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])
                                   (implicit context: ActionPipelineContext): MetricsMap = {
-    validateSchemaMin(SparkSchema(df.schema), role = "write")
+
+    val dfTarget = if (schemaMin.isDefined) {
+      validateSchemaMin(SparkSchema(df.schema), role = "write") //needed for merging the schemas
+      val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
+      val targetSchemaWithMetadata = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
+      context.sparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
+    } else df
+    columnComments = SchemaUtil.columnsComments(dfTarget.schema).map(kv => (kv._1.mkString("."), kv._2))
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented
     assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
 
     // convert IntegralTypes to Decimal (Snowflake does not support IntegralTypes)
-    val dfPrep = sparkCastIntegralTypesToDecimal(df)
+    val dfPrep = SnowflakeUtils.sparkCastIntegralTypesToDecimal(dfTarget)
 
     // Handle overwrite partitions: delete partitions data and then append data
     if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite) {
@@ -178,11 +187,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         .mode(SparkSaveMode.from(finalSaveMode))
         .save()
     )
-
+    
+    //table comment
     metadata.flatMap(_.description).foreach { comment =>
       val sql = s"comment on table ${table.fullName} is '$comment';"
       connection.execJdbcStatement(sql)
     }
+
 
     // return
     metrics
@@ -275,7 +286,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     assert(finalSaveMode != SDLSaveMode.Merge, "($id) SaveMode.Merge not implemented for writeSparkDataFrame")
 
     // convert IntegralTypes to Decimal (Snowflake does not support IntegralTypes)
-    val dfPrep = snowparkCastIntegralTypesToDecimal(df)
+    val dfPrep = SnowparkUtils.snowparkCastIntegralTypesToDecimal(df)
 
     // Handle overwrite partitions: delete partitions data and then append data
     if (partitionValues.nonEmpty && finalSaveMode == SDLSaveMode.Overwrite && isTableExisting) {
@@ -335,6 +346,23 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     // quote identifier if it contains special characters
     else if (SQLUtil.hasIdentifierSpecialChars(column)) Utils.quotedName(column)
     else column
+  }
+
+  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
+    connection.catalog.getPrimaryKey(catalog, schema, tableName)
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
+    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit =
+    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
+    if (syncComments) {
+      columnComments.foreach(columnComment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${columnComment._1} is '${columnComment._2}';"))
+    }
   }
 }
 

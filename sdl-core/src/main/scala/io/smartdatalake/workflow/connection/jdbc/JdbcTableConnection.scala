@@ -25,6 +25,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
@@ -33,8 +34,7 @@ import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.StructType
-
-import java.sql.{DriverManager, Connection => SqlConnection}
+import java.sql.{DatabaseMetaData, DriverManager, ResultSet, Connection => SqlConnection}
 
 /**
  * Connection information for JDBC tables.
@@ -150,6 +150,16 @@ case class JdbcTableConnection(override val id: ConnectionId,
     if (catalog.isTableExisting(tableName)) {
       execJdbcStatement(s"drop table $tableName", logging = logging)
     }
+  }
+
+  private lazy val connectionMetadata: DatabaseMetaData = this.getConnection.getMetaData
+
+  //The implementation to get the PK is not in the Catalog in order to use the JDBC standard method getPrimaryKeys
+  // and not having to adapt the Query for different DBs.
+  def getJdbcPrimaryKey(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
+    val (catalog, schema) = (catalogOption.getOrElse(""), schemaOption.getOrElse(""))
+    var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
+    this.catalog.handlePrimaryKeyResultSet(resultSet)
   }
 
   override def factory: FromConfigFactory[Connection] = JdbcTableConnection
