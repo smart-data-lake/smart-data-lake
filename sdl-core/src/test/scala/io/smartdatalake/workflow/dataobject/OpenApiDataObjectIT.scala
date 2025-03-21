@@ -42,9 +42,8 @@ class OpenApiDataObjectIT extends FunSuite {
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
-    df.printSchema
     df.withColumn("result", explode($"results")).drop("results")
-      .show(false)
+      .limit(5).show(false)
   }
 
   test("get data.sbb.ch datasets with paging") {
@@ -59,39 +58,36 @@ class OpenApiDataObjectIT extends FunSuite {
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
-    df.printSchema
     df.withColumn("result", explode($"results"))
       .select($"result.*")
-      .show(false)
+      .limit(5).show(false)
   }
 
   test("get catfact.ninja breeds with array return type") {
     val do1 = OpenApiDataObject(
       id = "do1",
       baseUrl = "https://catfact.ninja",
-      apiDocsUrl = "docs/api-docs.json",
+      apiDocsUrl = "docs?api-docs.json",
       operationId = "getBreeds",
       schemaMatchJsonPath = Some("$.data"),
       urlParameters = Map("limit" -> "5")
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
-    df.printSchema
-    df.show(false)
+    df.limit(5).show(false)
   }
 
   test("get catfact.ninja breeds with paging and array return type") {
     val do1 = OpenApiDataObject(
       id = "do1",
       baseUrl = "https://catfact.ninja",
-      apiDocsUrl = "docs/api-docs.json",
+      apiDocsUrl = "docs?api-docs.json",
       operationId = "getBreeds",
       schemaMatchJsonPath = Some("$.data"),
       pagingLinkJsonPath = Some("$.next_page_url")
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
-    df.printSchema
-    df.show(false)
+    df.limit(5).show(false)
   }
 }

@@ -136,9 +136,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val queryOrTable = Map(table.query.map(q => ("query", q)).getOrElse("dbtable" -> table.fullName))
     val df = sparkLoad(queryOrTable)
     // convert case-insensitive column names to lowercase
-    val dfLower = if (!Environment.caseSensitive) SnowflakeUtils.convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
-    applyReadTransformer(partitionValues, dfLower)
+    val dfLower = if (!Environment.caseSensitive) convertColNamesLowercase(SparkDataFrame(df)) else SparkDataFrame(df)
+    val dfTransformed = applyReadTransformer(partitionValues, dfLower)
       .asInstanceOf[SparkDataFrame].inner
+    validateSchemaMin(SparkSchema(dfTransformed.schema), "read")
+    dfTransformed
   }
 
   private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
@@ -266,8 +268,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
     val df = SnowparkDataFrame(snowparkSession.table(table.fullName))
-    applyReadTransformer(partitionValues, df)
+    val dfTransformed = applyReadTransformer(partitionValues, df)
       .asInstanceOf[SnowparkDataFrame].inner
+    validateSchemaMin(SnowparkSchema(dfTransformed.schema), "read")
+    dfTransformed
   }
 
   /**

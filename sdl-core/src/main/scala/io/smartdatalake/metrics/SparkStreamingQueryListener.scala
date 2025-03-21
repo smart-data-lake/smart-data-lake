@@ -27,9 +27,8 @@ import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, Executio
 import org.apache.spark.sql.streaming.{StreamingQueryListener, StreamingQueryProgress}
 
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant, LocalDateTime, ZoneId}
+import java.time.{Instant, LocalDateTime, ZoneId}
 import java.util.UUID
-import java.util.concurrent.Semaphore
 import scala.collection.mutable
 
 /**
@@ -53,7 +52,7 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
       val executionId = SparkStreamingExecutionId(event.progress.batchId)
       val endTstmp = LocalDateTime.ofInstant(Instant.parse(event.progress.timestamp), ZoneId.systemDefault) // String is in UTC. It must be converted to local timezone.
       val startTstmp = endTstmp.minus(event.progress.batchDuration, ChronoUnit.MILLIS) // start time is not stored in event...
-      action.addRuntimeEvent(executionId, ExecutionPhase.Exec, RuntimeEventState.STARTED, tstmp = startTstmp)
+      action.addRuntimeEvent(executionId, ExecutionPhase.Exec, RuntimeEventState.RUNNING, tstmp = startTstmp)
       val streamingMetrics = SparkStreamingMetrics(event.progress)
       logger.info(s"(${event.progress.name}) streaming query ${if (streamingMetrics.noData) "had no data" else "made progress"}: batchId=${event.progress.batchId} ${streamingMetrics.getAsText}")
       if (!streamingMetrics.noData) {

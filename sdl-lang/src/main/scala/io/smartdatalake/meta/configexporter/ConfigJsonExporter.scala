@@ -2,7 +2,7 @@ package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config._
 import configs.ConfigObject
-import io.smartdatalake.app.{AppUtil, FileDescriptor, UploadDefaults}
+import io.smartdatalake.app.{BuildVersionInfo, FileDescriptor, UploadDefaults}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
@@ -117,7 +117,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         val writer = ExportWriter.apply(config.target, config.configPaths)
 
         // write export config
-        val version = if (!config.target.contains("version=")) AppUtil.getManifestVersion.orElse(Some(UploadDefaults.versionDefault)) else None
+        val version = if (!config.target.contains("version=")) BuildVersionInfo.appVersionInfo.map(_.version).orElse(Some(UploadDefaults.versionDefault)) else None
         writer.writeConfig(configAsJson, version)
 
         // write descriptions

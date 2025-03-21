@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataframe
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
@@ -43,7 +44,7 @@ trait DataFrameObservation extends SmartDataLakeLogger {
    * Get the observed metrics, and throws NoDataToProcessWarning if no metrics are observed.
    */
   @throws[NoDataToProcessWarning]
-  def waitForElseNoData(timeoutSec: Int = 1)(implicit context: ActionPipelineContext): Map[String, _] = {
+  def waitForElseNoData(timeoutSec: Int = Environment.dataFrameObservationTimeoutSec)(implicit context: ActionPipelineContext): Map[String, _] = {
     try {
       waitFor(timeoutSec)
     } catch {

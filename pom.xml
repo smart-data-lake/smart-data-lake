@@ -307,7 +307,7 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
-        <spark.version>3.5.4</spark.version>
+        <spark.version>3.5.5</spark.version>
         <spark-extensions.version>3.5.2
         </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.5</spark.minor.version>
@@ -340,7 +340,7 @@
         <kafka.version>3.4.1</kafka.version>
         <!-- After 10.15.1.3, the minimum required version is JDK9 -->
         <derby.version>10.14.2.0</derby.version>
-        <parquet.version>1.13.1</parquet.version>
+        <parquet.version>1.15.0</parquet.version>
         <orc.version>1.9.1</orc.version>
         <orc.classifier>shaded-protobuf</orc.classifier>
         <jetty.version>9.4.52.v20230823</jetty.version>
@@ -456,7 +456,7 @@
         <snowflake-spark.version>3.1.1</snowflake-spark.version>
         <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
         <delta.version>3.3.0</delta.version>
-        <iceberg.version>1.7.1</iceberg.version>
+        <iceberg.version>1.8.1</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 

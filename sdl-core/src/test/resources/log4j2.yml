@@ -37,7 +37,7 @@ Configuration:
 
       # INFO:
       - name: io.smartdatalake
-        level: DEBUG
+        level: INFO
 
       # ERROR:
       - name: org.reflections.Reflections
