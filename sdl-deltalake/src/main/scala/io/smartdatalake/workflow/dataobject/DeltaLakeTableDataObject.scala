@@ -317,7 +317,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       validateSchemaMin(SparkSchema(targetSchema), "write") //needed for merging the schemas
       val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
       val targetSchemaWithMetadata: StructType = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, targetSchema)
-      session.createDataFrame(targetDfIncoming.rdd, targetSchemaWithMetadata); //workaround to replace the schema in the DF
+      targetDfIncoming.to(targetSchemaWithMetadata)
     } else targetDfIncoming
 
     validateSchemaHasPartitionCols(targetDf, "write")

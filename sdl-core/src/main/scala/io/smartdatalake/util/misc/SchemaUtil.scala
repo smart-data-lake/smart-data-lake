@@ -224,7 +224,7 @@ object SchemaUtil {
    *  It returns these columns with their new comments. Note that only columns that are present in both schemas (and with the same types) are considered.
    * @param from The schema with the updated column comments
    * @param to The schema which already exists and is compared to
-   * @return A map of the type [Queue[String] -> String], where the key represents the parents / path of a nested column, and the value the comment of that colulmn.
+   * @return A map of the type [Queue[String] -> String], where the key represents the parents / path of a nested column, and the value the comment of that column.
    *         E.g. a result of Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
    */
   def identifyMissingComments(from: StructType, to: StructType, parents: Queue[String] = Queue()): Map[Queue[String], String] = {
@@ -263,7 +263,7 @@ object SchemaUtil {
 
   /**
    * Returns a Map of columns and comments based on the metadata of a Spark schema. The columns are represented as a Seq of fields (for nested schemas).
-   * E.g. a kex-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   * E.g. a key-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
    * @param schema The schema containing the metadata
    */
   def columnsComments(schema: StructType, parents: Queue[String] = Queue()): Map[Queue[String], String] = {
