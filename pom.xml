@@ -368,8 +368,8 @@
     <scalafmt.validateOnly>true</scalafmt.validateOnly>
     <scalafmt.changedOnly>true</scalafmt.changedOnly>
     <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
-    <fasterxml.jackson.version>2.15.2</fasterxml.jackson.version>
-    <fasterxml.jackson.databind.version>2.15.2</fasterxml.jackson.databind.version>
+    <fasterxml.jackson.version>2.18.3</fasterxml.jackson.version>
+    <fasterxml.jackson.databind.version>2.18.3</fasterxml.jackson.databind.version>
     <snappy.version>1.1.9.1</snappy.version>
     <netlib.ludovic.dev.version>3.0.3</netlib.ludovic.dev.version>
     <commons-codec.version>1.16.0</commons-codec.version>
@@ -452,7 +452,7 @@
     <scaladoc.reader.version>1.0.3</scaladoc.reader.version>
     <scalatest.test.version>3.0.8</scalatest.test.version>
     <sshd.test.version>2.10.0</sshd.test.version>
-    <debezium.version>2.1.4.Final</debezium.version>
+    <debezium.version>3.0.8.Final</debezium.version>
     <!-- Sonar related -->
     <sonar.organization>smart-data-lake</sonar.organization>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
@@ -807,6 +807,9 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.1.0</version>
+          <configuration>
+            <longClasspath>true</longClasspath>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
