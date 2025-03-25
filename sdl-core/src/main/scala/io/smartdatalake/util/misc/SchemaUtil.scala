@@ -23,13 +23,12 @@ import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
 import io.smartdatalake.util.webservice.OpenApiUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
-import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, Encoders}
+import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.JavaTypeInference
 import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
@@ -224,15 +223,8 @@ object SchemaUtil {
   }
 
   def checkPartitionMatch(configuredPartitions: Seq[String], existingPartitions: Seq[String], caseSensitive: Boolean): (Boolean, Set[String], Set[String]) = {
-    val (confPartitions, existPartitions) = if (caseSensitive) {
-      val conf = configuredPartitions.toSet
-      val existing = existingPartitions.toSet
-      (conf, existing)
-    } else {
-      val conf = configuredPartitions.map(_.toLowerCase()).toSet
-      val existing = existingPartitions.map(_.toLowerCase()).toSet
-      (conf, existing)
-    }
+    val (confPartitions, existPartitions) = if (caseSensitive) (configuredPartitions.toSet, existingPartitions.toSet)
+    else (configuredPartitions.map(_.toLowerCase()).toSet, existingPartitions.map(_.toLowerCase()).toSet)
     (confPartitions==existPartitions, confPartitions, existPartitions)
   }
 
