@@ -210,7 +210,7 @@ object PartitionLayout {
 
   def extractPartitionValues(partitionLayout: String, path: String): PartitionValues = {
     val cleanPath = if (Environment.caseSensitive) path
-    else "^(.*?)=".r.replaceAllIn(path, m => m.group(0).toLowerCase)
+    else "(?:^|/)([^/=]*)=".r.replaceAllIn(path, m => m.group(0).toLowerCase)
 
     val tokens = extractTokens(partitionLayout)
     var partitionLayoutPattern = partitionLayout
