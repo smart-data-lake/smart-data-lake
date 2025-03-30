@@ -88,7 +88,7 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "plugin.name" -> "pgoutput")))
+  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "plugin.name" -> "pgoutput", "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat")))
   instanceRegistry.register(srcDO1)
 
   val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))

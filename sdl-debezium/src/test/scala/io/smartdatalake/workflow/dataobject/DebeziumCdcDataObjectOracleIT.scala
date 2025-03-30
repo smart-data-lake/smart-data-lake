@@ -88,7 +88,7 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("C##DEMO"), "TEST"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "topic.prefix" -> "test")))
+  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("C##DEMO"), "TEST"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "topic.prefix" -> "test", "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat")))
   instanceRegistry.register(srcDO1)
 
   val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))

@@ -73,16 +73,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       case (key, value) => if (props.contains(key)) key -> props(key) else key -> defaultOffsetProperties(key)
     }
 
-    val defaultSchemaHistoryProperties: Map[String, String] = Map(
-      "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", // TODO: Implement custom schema history that ignores the changes and just logs
-      "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat" // TODO: change before commit an push
-    )
-
-    // If duplicate schema history properties are set, prefer the ones the user has set in the config file
-    props = props ++ defaultSchemaHistoryProperties.map {
-      case (key, value) => if (props.contains(key)) key -> props(key) else key -> defaultSchemaHistoryProperties(key)
-    }
-
     val defaultProperties: Map[String, String] = Map(
       "topic.prefix" -> table.fullName,
       "include.schema.changes" -> "false",
