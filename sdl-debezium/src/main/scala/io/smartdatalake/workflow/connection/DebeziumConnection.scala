@@ -46,6 +46,9 @@ case class DebeziumConnection(override val id: ConnectionId,
   private val supportedAuthModes = Seq(classOf[BasicAuthMode])
   require(supportedAuthModes.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuthModes.map(_.getSimpleName).mkString(", ")}.")
 
+  // Allow only supported databases engines
+  private val supportedDbEngines = DbEngineHelper.supportedDbEngines()
+  require(supportedDbEngines.contains(dbEngine.toLowerCase), s"Engine '${dbEngine}' not supported by ${this.getClass.getSimpleName}. Supported database engines are (${supportedDbEngines.map(_.toLowerCase).mkString(", ")})")
 
   private val dbEngineHelper = DbEngineHelper.getDbEngineProperties(dbEngine).get
 
@@ -122,5 +125,9 @@ private object DbEngineHelper {
 
   def getDbEngineProperties(dbName: String): Option[DbEngineProperty] = {
     dbEngineProperties.get(dbName.toLowerCase)
+  }
+
+  def supportedDbEngines(): Seq[String] = {
+    dbEngineProperties.keys.toSeq
   }
 }
