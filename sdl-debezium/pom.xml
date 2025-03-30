@@ -105,6 +105,12 @@
 
     <dependency>
       <groupId>io.debezium</groupId>
+      <artifactId>debezium-connector-mariadb</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.debezium</groupId>
       <artifactId>debezium-connector-mysql</artifactId>
       <version>${debezium.version}</version>
     </dependency>

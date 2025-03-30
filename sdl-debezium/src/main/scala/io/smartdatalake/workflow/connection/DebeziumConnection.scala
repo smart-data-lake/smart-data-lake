@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
+import io.debezium.connector.mariadb.MariaDbConnector
 import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
@@ -93,6 +94,9 @@ private object DbEngineHelper {
     ),
     "oracle" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[OracleConnector].getName,
+    ),
+    "mariadb" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[MariaDbConnector].getName,
     )
   )
 
