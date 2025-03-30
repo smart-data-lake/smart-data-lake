@@ -82,23 +82,17 @@ object DebeziumConnection extends FromConfigFactory[Connection] {
 
 private object DbEngineHelper {
 
-  case class DbEngineProperty(debeziumConnectorClassName: String, jdbcUrlPrefix: String, jdbcDriverClassName: String)
+  case class DbEngineProperty(debeziumConnectorClassName: String)
 
   private val dbEngineProperties: Map[String, DbEngineProperty] = Map(
     "mysql" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[MySqlConnector].getName,
-      jdbcUrlPrefix = "jdbc:mysql",
-      jdbcDriverClassName = "com.mysql.cj.jdbc.Driver"
     ),
     "postgresql" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[PostgresConnector].getName,
-      jdbcUrlPrefix = "jdbc:postgresql",
-      jdbcDriverClassName = "org.postgresql.Driver"
+      debeziumConnectorClassName = classOf[PostgresConnector].getName
     ),
     "oracle" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[OracleConnector].getName,
-      jdbcUrlPrefix = "jdbc:oracle",
-      jdbcDriverClassName = "oracle.jdbc.driver.OracleDriver"
     )
   )
 
