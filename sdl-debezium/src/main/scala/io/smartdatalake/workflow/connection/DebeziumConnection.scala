@@ -19,12 +19,11 @@
 
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.postgresql.PostgresConnector
+import io.smartdatalake.config.SdlConfigObject.ConnectionId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 
 case class DebeziumConnection(override val id: ConnectionId,
                               uniqueConnectorName: String = java.util.UUID.randomUUID().toString,
