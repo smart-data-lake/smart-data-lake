@@ -43,7 +43,7 @@ import java.util
 import java.util.{Base64, Properties}
 import java.util.concurrent.{CompletableFuture, ExecutorService, Executors, Future}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter}
+import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, setAsJavaSetConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter}
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
@@ -450,5 +450,10 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
 
   override def configure(config: WorkerConfig): Unit = {
     dataObjectId = config.originalsStrings().get(SDLB_DATA_OBJECT_ID_CONFIG)
+  }
+
+  override def connectorPartitions(s: String): util.Set[util.Map[String, AnyRef]] = {
+    // Not used
+    Set.empty[util.Map[String, AnyRef]].asJava
   }
 }
