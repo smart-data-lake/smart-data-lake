@@ -26,6 +26,7 @@ import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
 import io.debezium.connector.sqlserver.SqlServerConnector
+import io.debezium.connector.vitess.VitessConnector
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
@@ -109,6 +110,9 @@ private object DbEngineHelper {
     ),
     "db2" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[Db2Connector].getName,
+    ),
+    "vitess" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[VitessConnector].getName,
     )
   )
 

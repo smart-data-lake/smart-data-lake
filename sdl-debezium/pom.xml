@@ -129,6 +129,10 @@
 
     <dependency>
       <groupId>io.debezium</groupId>
+      <artifactId>debezium-connector-vitess</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
       <artifactId>debezium-connector-mysql</artifactId>
       <version>${debezium.version}</version>
     </dependency>
