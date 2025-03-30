@@ -25,6 +25,7 @@ import io.debezium.connector.mongodb.MongoDbConnector
 import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
+import io.debezium.connector.spanner.SpannerConnector
 import io.debezium.connector.sqlserver.SqlServerConnector
 import io.debezium.connector.vitess.VitessConnector
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
@@ -113,6 +114,9 @@ private object DbEngineHelper {
     ),
     "vitess" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[VitessConnector].getName,
+    ),
+    "spanner" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[SpannerConnector].getName,
     )
   )
 

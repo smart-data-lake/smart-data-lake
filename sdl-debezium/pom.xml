@@ -133,6 +133,12 @@
       <version>${debezium.version}</version>
     </dependency>
 
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-connector-spanner</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
       <artifactId>debezium-connector-mysql</artifactId>
       <version>${debezium.version}</version>
     </dependency>
