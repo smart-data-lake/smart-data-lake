@@ -24,6 +24,7 @@ import io.debezium.connector.mongodb.MongoDbConnector
 import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
+import io.debezium.connector.sqlserver.SqlServerConnector
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
@@ -101,6 +102,9 @@ private object DbEngineHelper {
     ),
     "mongodb" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[MongoDbConnector].getName,
+    ),
+    "sqlserver" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[SqlServerConnector].getName,
     )
   )
 
