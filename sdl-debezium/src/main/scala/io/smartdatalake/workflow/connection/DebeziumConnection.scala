@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
+import io.debezium.connector.db2.Db2Connector
 import io.debezium.connector.mariadb.MariaDbConnector
 import io.debezium.connector.mongodb.MongoDbConnector
 import io.debezium.connector.mysql.MySqlConnector
@@ -105,6 +106,9 @@ private object DbEngineHelper {
     ),
     "sqlserver" -> DbEngineProperty(
       debeziumConnectorClassName = classOf[SqlServerConnector].getName,
+    ),
+    "db2" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[Db2Connector].getName,
     )
   )
 
