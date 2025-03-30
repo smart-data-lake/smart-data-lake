@@ -29,6 +29,7 @@ case class DebeziumConnection(override val id: ConnectionId,
                               uniqueConnectorName: String = java.util.UUID.randomUUID().toString,
                               dbEngine: String,
                               hostname: String,
+                              db: Option[String] = None,
                               port: Int,
                               authMode: AuthMode,
                               override val metadata: Option[ConnectionMetadata] = None
@@ -45,14 +46,16 @@ case class DebeziumConnection(override val id: ConnectionId,
 
     authMode match {
       case m: BasicAuthMode => {
-
-        Map(
+        val propertiesMap =   Map(
           "connector.class" -> dbEngineHelper.debeziumConnectorClassName,
           "database.hostname" -> hostname,
           "database.port" -> port.toString,
-          "database.user" -> m.userSecret.resolve(), // TODO: Check with Zach regarding security
-          "database.password" -> m.passwordSecret.resolve() // TODO: Check with Zach regarding security
+          "database.user" -> m.userSecret.resolve(),
+          "database.password" -> m.passwordSecret.resolve()
         )
+
+        if(db.isDefined) propertiesMap ++ Map("database.dbname" -> db.get) else propertiesMap
+
       }
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Debezium connection.")
     }
