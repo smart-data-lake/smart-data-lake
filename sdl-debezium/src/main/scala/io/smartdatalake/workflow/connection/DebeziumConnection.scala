@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.debezium.connector.mysql.MySqlConnector
+import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
@@ -93,6 +94,11 @@ private object DbEngineHelper {
       debeziumConnectorClassName = classOf[PostgresConnector].getName,
       jdbcUrlPrefix = "jdbc:postgresql",
       jdbcDriverClassName = "org.postgresql.Driver"
+    ),
+    "oracle" -> DbEngineProperty(
+      debeziumConnectorClassName = classOf[OracleConnector].getName,
+      jdbcUrlPrefix = "jdbc:oracle",
+      jdbcDriverClassName = "oracle.jdbc.driver.OracleDriver"
     )
   )
 
