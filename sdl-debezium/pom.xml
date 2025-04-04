@@ -101,12 +101,24 @@
       <groupId>io.debezium</groupId>
       <artifactId>debezium-connector-oracle</artifactId>
       <version>${debezium.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.debezium</groupId>
+          <artifactId>debezium-ddl-parser</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
       <groupId>io.debezium</groupId>
       <artifactId>debezium-connector-mariadb</artifactId>
       <version>${debezium.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.debezium</groupId>
+          <artifactId>debezium-ddl-parser</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -140,8 +152,8 @@
     </dependency>
 
     <dependency>
-      <groupId>io.debezium</groupId>
-      <artifactId>debezium-connector-mysql</artifactId>
+      <groupId>io.smartdatalake</groupId>
+      <artifactId>sdl-debezium-connector-mysql-shaded</artifactId>
       <version>${debezium.version}</version>
     </dependency>
     <!-- Debezium dependencies end -->
