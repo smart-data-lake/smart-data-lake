@@ -85,6 +85,10 @@
           <groupId>io.debezium</groupId>
           <artifactId>debezium-ddl-parser</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.antlr</groupId>
+          <artifactId>antlr4-runtime</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -95,7 +99,7 @@
       <exclusions>
         <exclusion>
           <groupId>io.debezium</groupId>
-          <artifactId>debezium-ddl-parser</artifactId>
+          <artifactId>debezium-connector-binlog</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

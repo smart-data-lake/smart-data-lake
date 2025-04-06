@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.debezium.connector.db2.Db2Connector
 import io.debezium.connector.mariadb.MariaDbConnector
 import io.debezium.connector.mongodb.MongoDbConnector
-import io.debezium.connector.mysql.MySqlConnector
+import shaded.io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
 import io.debezium.connector.spanner.SpannerConnector
