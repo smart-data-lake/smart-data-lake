@@ -32,6 +32,7 @@
     <module>sdl-azure</module>
     <module>sdl-lang</module>
     <module>sdl-debezium</module>
+    <module>sdl-debezium-connector-mysql-shaded</module>
   </modules>
   <licenses>
     <license>
