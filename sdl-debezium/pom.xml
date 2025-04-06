@@ -44,27 +44,6 @@
       <scope>${sdl-core.scope}</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-sql_${scala.minor.version}</artifactId>
-      <scope>${sdl-core.scope}</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
-      <scope>${sdl-core.scope}</scope>
-    </dependency>
-
-    <!--
-		 	prevent hitting missing dependency exception
-		 	see https://stackoverflow.com/questions/42327777/spark-sql-errors
-		 -->
-    <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-tags_${scala.minor.version}</artifactId>
-      <scope>compile</scope>
-    </dependency>
 
     <dependency>
       <groupId>org.scala-lang</groupId>
