@@ -63,3 +63,28 @@ CREATE TABLE demo.test (
 ```sql
 ALTER USER postgres WITH REPLICATION LOGIN;
 ```
+
+## MariaDB
+Server can easily be setup with an oneliner as docker / podman command:
+```shell
+ podman run -d --name mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=debezium -e MARIADB_REPLICATION_MODE=master -e MARIADB_REPLICATION_USER=debezium -e MARIADB_REPLICATION_PASSWORD=debezium -e MARIADB_EXTRA_FLAGS="--log-bin=mysql-bin --binlog-format=ROW" bitnami/mariadb:11.4.5
+```
+
+Then run following ddl (one after another):
+```sql
+CREATE DATABASE `demo` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
+```
+```sql
+using demo;
+```
+```sql
+CREATE TABLE demo.test (
+	id INT auto_increment NOT NULL PRIMARY KEY,
+	value varchar(100) NULL,
+	timestampCol TIMESTAMP NULL,
+	decimalCol varchar(100) NULL
+)
+ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_general_ci;
+```
