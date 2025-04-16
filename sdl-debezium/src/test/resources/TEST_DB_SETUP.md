@@ -41,3 +41,25 @@ CREATE TABLE `test2` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 ```
+
+## PostgreSQL
+Server can be setup with the following docker / podman command: 
+````shell
+podman run -d --name postgres -p 5432:5432 -e POSTGRESQL_WAL_LEVEL=logical -e POSTGRESQL_DATABASE=test -e POSTGRESQL_POSTGRES_PASSWORD=psql_demo -e POSTGRESQL_PASSWORD=psql_demo -e POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pgaudit,pgoutput bitnami/postgresql:17.4.0
+````
+Then run following ddl (one after another):
+```sql
+CREATE SCHEMA demo AUTHORIZATION postgres;
+```
+```sql
+CREATE TABLE demo.test (
+	id int GENERATED ALWAYS AS IDENTITY NOT NULL,
+	value varchar NULL,
+	timestampcol timestamp NULL,
+	decimalcol decimal NULL,
+	CONSTRAINT test_pk PRIMARY KEY (id)
+);
+```
+```sql
+ALTER USER postgres WITH REPLICATION LOGIN;
+```
