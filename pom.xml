@@ -33,6 +33,7 @@
     <module>sdl-lang</module>
     <module>sdl-debezium</module>
     <module>sdl-debezium-connector-mysql-shaded</module>
+    <module>sdl-debezium-connector-mariadb-shaded</module>
   </modules>
   <licenses>
     <license>

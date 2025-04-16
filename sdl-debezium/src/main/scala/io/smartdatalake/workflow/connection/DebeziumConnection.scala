@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.debezium.connector.db2.Db2Connector
-import io.debezium.connector.mariadb.MariaDbConnector
+import shaded.io.debezium.connector.mariadb.MariaDbConnector
 import io.debezium.connector.mongodb.MongoDbConnector
 import shaded.io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector

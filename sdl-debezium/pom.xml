@@ -94,18 +94,6 @@
 
     <dependency>
       <groupId>io.debezium</groupId>
-      <artifactId>debezium-connector-mariadb</artifactId>
-      <version>${debezium.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>io.debezium</groupId>
-          <artifactId>debezium-connector-binlog</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>io.debezium</groupId>
       <artifactId>debezium-connector-mongodb</artifactId>
       <version>${debezium.version}</version>
     </dependency>
@@ -137,6 +125,12 @@
     <dependency>
       <groupId>io.smartdatalake</groupId>
       <artifactId>sdl-debezium-connector-mysql-shaded</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.smartdatalake</groupId>
+      <artifactId>sdl-debezium-connector-mariadb-shaded</artifactId>
       <version>${debezium.version}</version>
     </dependency>
     <!-- Debezium dependencies end -->
