@@ -133,6 +133,36 @@
       <artifactId>sdl-debezium-connector-mariadb-shaded</artifactId>
       <version>${debezium.version}</version>
     </dependency>
+
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-storage-azure-blob</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-storage-jdbc</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-storage-redis</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-storage-rocketmq</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.debezium</groupId>
+      <artifactId>debezium-storage-s3</artifactId>
+      <version>${debezium.version}</version>
+    </dependency>
     <!-- Debezium dependencies end -->
 
     <dependency>
