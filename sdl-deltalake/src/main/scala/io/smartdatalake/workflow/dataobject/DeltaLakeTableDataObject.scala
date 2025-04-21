@@ -485,7 +485,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       timePassed.compareTo(Duration.parse(minVacuumInterval.get)) > 0 //the time passed is greater than the set minInterval
     }
 
-    lazy val lastVacuum = deltaTable(session).history.filter(col("operation").contains("VACUUM END")).select("timestamp").orderBy(desc("timestamp")).limit(1).collect
+    lazy val lastVacuum = deltaTable(session).history.filter(col("operation").contains("VACUUM END")).select(max("timestamp")).collect
 
     //execute vacuum if either no interval is set, there has never been a vacuum operation, or the set interval has passed
     if (minVacuumInterval.isEmpty || lastVacuum.isEmpty || intervalHasPassed(lastVacuum(0).getTimestamp(0))) {
