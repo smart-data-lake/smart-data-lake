@@ -202,7 +202,7 @@ object SchemaEvolution extends SmartDataLakeLogger {
 
       // log information
       val infoList = tgtColumns.flatMap(_.infoMsg).map("-> " + _).mkString("\n")
-      val infoTxt = s"$infoList\nold schema:\n${oldDf.schema.treeString().stripTrailing()}\nnew schema:\n${newDf.schema.treeString().stripTrailing()}".indent(2)
+      val infoTxt = s"$infoList\nold schema:\n${oldDf.schema.treeString().stripTrailing()}\nnew schema:\n${newDf.schema.treeString().stripTrailing()}"//.indent(2)
       logger.info(s"schema evolution needed. mapping is:\n$infoTxt"
       )
 
