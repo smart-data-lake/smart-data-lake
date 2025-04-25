@@ -45,7 +45,8 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
-import java.sql.SQLException
+import java.sql.{SQLException, Timestamp}
+import java.time.{Duration, LocalDateTime}
 
 import scala.util.Try
 
@@ -94,6 +95,9 @@ import scala.util.Try
  *                             If set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in
  *                             a lower performance since a column comparison is needed. Defaults to "false".
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
+ * @param minVacuumInterval Optional String to determine the minimum time interval between two vacuum operations. If the parameter is set,
+ *                          SDLB will look at the last vacuum-execution time in the table and compare it to the current time. If the parameter is not set or if a vacuum has never happened, it will vacuum the table.
+ *                          The interval must be provided as a String in ISO 8601 Duration format (e.g. "P4DT12H" for "four days and twelve hours")
  * @param acl override connection permissions for files created tables hadoop directory with this connection
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -119,6 +123,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val allowSchemaEvolution: Boolean = false,
                                     updateColumnComments: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
+                                    minVacuumInterval: Option[String] = None,
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
@@ -472,12 +477,26 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   def vacuum(implicit context: ActionPipelineContext): Unit = {
-    retentionPeriod.foreach { period =>
-      val (_, d) = PerformanceUtils.measureDuration {
-        DeltaTable.forPath(context.sparkSession, hadoopPath.toString).vacuum(period)
-      }
-      logger.info(s"($id) vacuum took $d")
+
+    val session = context.sparkSession
+
+    def intervalHasPassed(lastExecution: Timestamp): Boolean = {
+      val timePassed = Duration.between(lastExecution.toLocalDateTime, LocalDateTime.now)
+      timePassed.compareTo(Duration.parse(minVacuumInterval.get)) > 0 //the time passed is greater than the set minInterval
     }
+
+    lazy val lastVacuum = deltaTable(session).history.filter(col("operation").contains("VACUUM END")).select(max("timestamp")).collect
+
+    //execute vacuum if either no interval is set, there has never been a vacuum operation, or the set interval has passed
+    if (minVacuumInterval.isEmpty || lastVacuum.isEmpty || intervalHasPassed(lastVacuum(0).getTimestamp(0))) {
+      retentionPeriod.foreach { period =>
+        val (_, d) = PerformanceUtils.measureDuration {
+          DeltaTable.forPath(session, hadoopPath.toString).vacuum(period)
+        }
+        logger.info(s"($id) vacuum took $d")
+      }
+    }
+
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
