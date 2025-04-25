@@ -1773,6 +1773,10 @@
             "type" : "integer",
             "description" : "Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted."
           },
+          "minVacuumInterval" : {
+            "type" : "string",
+            "description" : "Optional String to determine the minimum time interval between two vacuum operations. If the parameter is set,\nSDLB will look at the last vacuum-execution time in the table and compare it to the current time. If the parameter is not set or if a vacuum has never happened, it will vacuum the table.\nThe interval must be provided as a String in ISO 8601 Duration format (e.g. \"P4DT12H\" for \"four days and twelve hours\")"
+          },
           "acl" : {
             "type" : "object",
             "properties" : {
