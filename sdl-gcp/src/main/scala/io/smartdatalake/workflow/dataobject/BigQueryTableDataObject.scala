@@ -91,7 +91,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
       "persistentGcsBucket" -> persistentGcsBucket,
       "persistentGcsPath" -> persistentGcsPath,
       "project" -> project
-  ).filter(_._2.isDefined).map(kv => (kv._1, kv._2.get))
+  ).collect({case (key, Some(value)) => key -> value})
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = bigQueryDataset != null && bigQueryDataset.exists
 
