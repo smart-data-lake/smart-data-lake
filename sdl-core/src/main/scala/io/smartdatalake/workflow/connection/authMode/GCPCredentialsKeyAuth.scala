@@ -45,12 +45,6 @@ case class GCPCredentialsKeyAuth(private val serviceAccountKey: Option[StringOrS
     if (serviceAccountKey.isDefined) ("credentials", serviceAccountKey.get.resolve()) else ("credentialsFile", serviceAccountKeyFile.get.resolve())
   }
 
-  //private def getBigQueryObject: = ???
-
-  //evaluate lazily to let prepare() catch configuration errors
-  lazy val bigQueryObject = ???
-
-
   override def factory: FromConfigFactory[AuthMode] = GCPCredentialsKeyAuth
 }
 

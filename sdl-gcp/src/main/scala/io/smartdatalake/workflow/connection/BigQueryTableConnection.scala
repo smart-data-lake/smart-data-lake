@@ -18,11 +18,18 @@
  */
 package io.smartdatalake.workflow.connection
 
+import com.google.cloud.spark.bigquery.repackaged.com.google.auth.oauth2.ServiceAccountCredentials
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, GCPCredentialsKeyAuth}
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery._
+
+import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
+import java.util.Base64
+import scala.io.Source
 
 /**
  * Connection information for GCP BigQuery Tables
@@ -37,24 +44,34 @@ import io.smartdatalake.workflow.connection.authMode.{AuthMode, GCPCredentialsKe
  * @param metadata
  */
 case class BigQueryTableConnection(override val id: ConnectionId,
-                                   authMode: AuthMode,
-                                   parentProject: Option[String],
+                                   val authMode: AuthMode,
+                                   val parentProject: String,
                                    override val metadata: Option[ConnectionMetadata] = None
                                   ) extends Connection with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[GCPCredentialsKeyAuth])
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
-  def getCredentialsOptions(): (String, String) = {
+  val credentialsOptions: (String, String) = {
     authMode match {
       case g: GCPCredentialsKeyAuth => g.getAuthCredentials()
-      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
+      case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Google BigQuery connection.")
     }
   }
 
-  def getConnectionOptions(): Map[String, String] = {
-    val projectOptions =  if (parentProject.isDefined) Map("parentProject" -> parentProject.get) else Map()
-    Map(getCredentialsOptions) ++ projectOptions
+  def getConnectionOptions(): Map[String, String] = Map(credentialsOptions) + ("parentProject" -> parentProject)
+
+  private def getBigQueryObject: BigQuery = {
+    val credentialsByteArray: Array[Byte] = credentialsOptions._1 match {
+      case "credentials" => Base64.getDecoder.decode(credentialsOptions._2)
+      case "credentialsFile" => Source.fromFile(credentialsOptions._2).mkString.getBytes(StandardCharsets.UTF_8)
+      case _ => throw new IllegalStateException(f"BigQuery Authentication is not working properly as it is sending a credential String of ${credentialsOptions._1}")
+    }
+    val credentials: ServiceAccountCredentials = ServiceAccountCredentials.fromStream(new ByteArrayInputStream(credentialsByteArray))
+    BigQueryOptions.newBuilder().setCredentials(credentials).build().getService()
   }
+
+  //evaluate lazily (only once per connection) to let prepare() catch configuration errors
+  lazy val bigQueryObject = getBigQueryObject
 
 
   override def factory: FromConfigFactory[Connection] = BigQueryTableConnection
