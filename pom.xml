@@ -35,6 +35,7 @@
         <module>sdl-snowflake</module>
         <module>sdl-azure</module>
         <module>sdl-lang</module>
+        <module>sdl-gcp</module>
     </modules>
 
     <licenses>
@@ -457,6 +458,7 @@
         <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
         <delta.version>3.3.0</delta.version>
         <iceberg.version>1.8.1</iceberg.version>
+        <bigquery.version>0.42.1</bigquery.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 
