@@ -86,17 +86,17 @@ object SchemaUtil {
   }
 
   /**
-   * Computes the set difference of `right` minus `left`, i.e: `Set(right)` \ `Set(left)`.
+   * Computes the set difference of `left` minus `right`, i.e: `Set(left)` \ `Set(right)`.
    *
    * StructField equality is defined by exact matching of the field name and partial (subset) matching of field
    * data type as computed by `deepIsTypeSubset`.
    *
    * @param ignoreNullable whether to ignore differences in nullability.
-   * @return The set of fields in `right` that are not contained in `left`.
+   * @return The set of fields in `left` that are not contained in `right`.
    *
    *         TODO #935: probably doesnt work for structs nested in arrays...
    */
-  private def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
+  private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
     left.toSet.map { leftField: GenericField =>
       val leftName = if (caseSensitive) leftField.name else leftField.name.toLowerCase
