@@ -114,7 +114,6 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
       if (writeMethod == "indirect") require(!Seq(persistentGcsPath, persistentGcsBucket, temporaryGscBucket).flatten.isEmpty, "When using indirect mode, a temporary/persistent bucket or path must be defined")
 
       require(isDbExisting, f"The provided dataset ${table.db.get} doesn't exist")
-      require(isTableExisting, f"The provided table ${table.name} doesn't exist")
       require(viewsEnabled || !hasQuery, "If the table has a 'query' argument, the parameter 'viewsEnabled' cannot be false")
       require(Seq(SDLSaveMode.Append, SDLSaveMode.Overwrite).contains(saveMode), "As of now, the BigQuery Data Object only supports Save modes Append and Overwrite")
     }
@@ -136,6 +135,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
   override def dropTable(implicit context: ActionPipelineContext): Unit = bigQueryTable.delete()
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
+    require(isTableExisting, f"The provided table ${table.name} doesn't exist")
     val df = context.sparkSession
             .read
             .format("bigquery")

@@ -87,6 +87,15 @@
             <version>${bigquery.version}</version>
         </dependency>
 
+        <!--
+        Needed for writing to BigQuery, see https://github.com/GoogleCloudDataproc/spark-bigquery-connector/issues/599
+        -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-mllib_${scala.minor.version}</artifactId>
+            <version>${spark.version}</version>
+        </dependency>
+
 
         <dependency>
             <groupId>org.scala-lang</groupId>

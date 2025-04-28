@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, GCPCredentialsKeyAuth}
-import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery._
+import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.{BigQuery, BigQueryOptions}
 
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
