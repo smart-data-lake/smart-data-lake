@@ -87,14 +87,14 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   private val bigquery = connection.bigQueryObject
 
-  private val bigQueryTable = bigquery.getTable(table.db.get, table.name)
+  lazy val bigQueryTable = bigquery.getTable(table.db.get, table.name)
 
-  private val bigQueryDataset = bigquery.getDataset(table.db.get)
+  lazy val bigQueryDataset = bigquery.getDataset(table.db.get)
 
   private val hasQuery: Boolean = table.query.isDefined
 
   //Using options that are only valid for write operations doesn't have any effect on the readDataFrame method and viceversa --> We can use one map for the entire data object.
-  private val sparkOptions: Map[String, String] =
+  private def sparkOptions: Map[String, String] =
       connection.getConnectionOptions() ++ options ++ Map(
       "viewsEnabled" -> viewsEnabled.toString,
       "materializationDataset" -> (if (materializationDataset.isEmpty) table.db.get else materializationDataset.get),
