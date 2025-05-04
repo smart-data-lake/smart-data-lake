@@ -23,7 +23,7 @@ import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumSchemaConsumer}
+import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -315,19 +315,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DebeziumCdcDataObject = {
     extract[DebeziumCdcDataObject](config)
-  }
-}
-
-private[smartdatalake] class DebeziumCompletionCallback(executorService: ExecutorService) extends DebeziumEngine.CompletionCallback with SmartDataLakeLogger {
-
-  var error: Option[Throwable] = None;
-
-  override def handle(success: Boolean, message: String, error: Throwable): Unit = {
-    if (success) logger.info(s"Debezium ended successfully with {$message}")
-    else logger.warn(s"Debezium failed with {$message}")
-
-    this.error = Some(error)
-    this.executorService.shutdown()
   }
 }
 
