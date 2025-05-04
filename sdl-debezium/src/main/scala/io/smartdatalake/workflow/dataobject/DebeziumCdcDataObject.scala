@@ -23,6 +23,7 @@ import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.debezium.DebeziumChangeConsumer
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -43,7 +44,7 @@ import java.util
 import java.util.{Base64, Properties}
 import java.util.concurrent.{CompletableFuture, ExecutorService, Executors, Future}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, setAsJavaSetConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter}
+import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter, setAsJavaSetConverter}
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
@@ -323,24 +324,6 @@ object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
 }
 
 
-private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] {
-
-
-  var records: List[SourceRecord] = List()
-
-  override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
-
-    batch.forEach(r => {
-
-      records = records :+ r.value()
-
-      recordCommitter.markProcessed(r)
-    })
-
-    recordCommitter.markBatchFinished()
-
-  }
-}
 
 private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] {
 
