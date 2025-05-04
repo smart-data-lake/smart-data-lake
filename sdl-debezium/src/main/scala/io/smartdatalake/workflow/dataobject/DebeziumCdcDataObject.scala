@@ -34,9 +34,10 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
+import scala.concurrent.Future
 import java.util
 import java.util.Properties
-import java.util.concurrent.Executors
+import java.util.concurrent.{ExecutorService, Executors}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
@@ -93,8 +94,28 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
-
     val spark = context.sparkSession
+
+    def runDebeziumEngine[T](
+                              engineBuilder: DebeziumEngine.Builder[T],
+                              executorService: ExecutorService = Executors.newSingleThreadExecutor,
+                              timeoutMilliSeconds: Int = 10000
+                            ): Unit = {
+
+      val completionCallback = new DebeziumCompletionCallback(executorService)
+
+      val engine = engineBuilder.using(completionCallback).build()
+
+      executorService.execute(engine)
+
+      Thread.sleep(timeoutMilliSeconds)
+
+      engine.close()
+      executorService.shutdown()
+
+      completionCallback.error.foreach(err => throw new Exception(err))
+
+    }
 
     def createEmptyDataFrame(): DataFrame = {
 
@@ -105,20 +126,12 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
         schemaProperties.put("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
 
         val schemaConsumer = new DebeziumSchemaConsumer
-        val executorService = Executors.newSingleThreadExecutor
-        val completionCallback = new DebeziumCompletionCallback(executorService)
-        val engine = DebeziumEngine.create(classOf[Connect])
+
+        val engineBuilder = DebeziumEngine.create(classOf[Connect])
           .using(schemaProperties)
           .notifying(schemaConsumer)
-          .using(completionCallback)
-          .build()
 
-
-        executorService.execute(engine)
-
-        Thread.sleep(10000)
-        engine.close()
-        executorService.shutdown()
+        runDebeziumEngine(engineBuilder)
 
         val records = schemaConsumer.records
 
@@ -133,23 +146,12 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     if (context.isExecPhase) {
 
       val changeConsumer = new DebeziumChangeConsumer
-      val executorService = Executors.newSingleThreadExecutor
-      val completionCallback = new DebeziumCompletionCallback(executorService)
 
-      val engine = DebeziumEngine.create(classOf[Connect])
+      val engineBuilder = DebeziumEngine.create(classOf[Connect])
         .using(debeziumPropertiesForEngine)
         .notifying(changeConsumer)
-        .using(completionCallback)
-        .build()
 
-
-      executorService.execute(engine)
-
-      Thread.sleep(10000)
-      engine.close()
-      executorService.shutdown()
-
-      completionCallback.error.foreach(err => throw new Exception(err))
+      runDebeziumEngine(engineBuilder)
 
       val records = changeConsumer.records
 
