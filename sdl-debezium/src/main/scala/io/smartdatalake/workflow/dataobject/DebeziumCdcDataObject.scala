@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.connection.DebeziumConnection
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.source.SourceRecord
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
@@ -122,15 +122,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
         val records = schemaConsumer.records
 
-        val sparkSchema = inferSparkSchema(records.head.valueSchema())
+        val df = DebeziumEventConverter.convert(records)(spark)
 
-        val rows = records.map {
-          DebeziumRowConverter.convert
-        }
-
-        val df = spark.createDataFrame(rows.asJava, sparkSchema)
-
-        val schema = extractCdcEvents(df).schema
+        val schema = df.schema
 
         spark.createDataFrame(new util.ArrayList[Row](), schema)
 
@@ -161,15 +155,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       records.headOption match {
         case Some(record) => {
-          val sparkSchema = inferSparkSchema(record.valueSchema())
-          val rows = records.map {
-            DebeziumRowConverter.convert
-          }
-
-          val df = spark.createDataFrame(rows.asJava, sparkSchema)
-
-          extractCdcEvents(df)
-
+          DebeziumEventConverter.convert(records)(spark)
         }
         case None => createEmptyDataFrame()
       }
@@ -178,100 +164,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       createEmptyDataFrame()
     }
 
-  }
-
-  private def inferSparkSchema(schema: Schema): StructType = {
-    val fields = schema.fields().asScala.map { field =>
-      val fieldName = field.name()
-      val fieldType: DataType = field.schema().`type`() match {
-        case Type.INT8 => ByteType
-        case Type.INT16 => ShortType
-        case Type.INT32 => IntegerType
-        case Type.INT64 => LongType
-        case Type.FLOAT32 => FloatType
-        case Type.FLOAT64 => DoubleType
-        case Type.BOOLEAN => BooleanType
-        case Type.STRING => StringType
-        case Type.BYTES => BinaryType
-        case Type.MAP => {
-          // Infer key and value types for MapType
-          val keyType = inferSparkSchema(field.schema().keySchema())
-          val valueType = inferSparkSchema(field.schema().valueSchema())
-          MapType(keyType, valueType)
-        }
-        case Type.ARRAY => {
-          // Infer the element type for ArrayType
-          val elementType = inferSparkSchema(field.schema().valueSchema())
-          ArrayType(elementType)
-        }
-        case Type.STRUCT => inferSparkSchema(field.schema())
-        case _ => StringType
-      }
-      StructField(fieldName, fieldType, nullable = true)
-    }
-
-    StructType(fields.toArray)
-  }
-
-  private val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  private val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
-  private def extractCdcEvents(df: DataFrame): DataFrame = {
-
-    val updateBeforeDf = df.filter(col("op") === "u")
-      .withColumn("event_data", col("before"))
-      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_preimage"))
-
-    val updateAfterDf = df.filter(col("op") === "u")
-      .withColumn("event_data", col("after"))
-      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_postimage"))
-
-    val otherOperationsDf = df.filter(col("op") =!= "u")
-      .withColumn("event_data", coalesce(col("after"), col("before")))
-      .withColumn(COMMIT_TYPE_COLUMN_NAME,
-        when(col("op") === "c", lit("create"))
-          .when(col("op") === "d", lit("delete"))
-          .otherwise(lit("read")))
-
-    val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
-      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000).cast(TimestampType))
-      .drop("before", "after", "source", "op", "ts_ms", "ts_us", "ts_ns", "transaction")
-      .orderBy(col(COMMIT_TIMESTAMP_COLUMN_NAME).desc)
-
-    reorderCdcColumns(flattenDf(unionDf))
-
-  }
-
-  private def flattenDf(df: DataFrame): DataFrame = {
-    var newDF = df
-    for (colName <- df.columns) {
-      val colType = df.schema(colName).dataType
-      colType match {
-        case structType: StructType =>
-          for (fieldName <- structType.fieldNames) {
-            newDF = newDF.withColumn(fieldName, col(s"$colName.$fieldName"))
-          }
-          newDF = newDF.drop(colName)
-        case _ =>
-      }
-    }
-    newDF
-  }
-
-  private def reorderCdcColumns(df: DataFrame): DataFrame = {
-
-    val colsToMove = Seq(COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME)
-
-    val allColumns = df.columns
-
-    val remainingColumns = allColumns.filterNot(colsToMove.contains)
-
-    // Create the new order: remaining columns + colsToMove at the end
-    val newColumnOrder = remainingColumns ++ colsToMove
-
-    // Reorder DataFrame by selecting columns in the new order
-    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail: _*)
-
-    reorderedDF
   }
 
   private[smartdatalake] var incrementalState: mutable.Map[String, String] = mutable.Map()
@@ -312,8 +204,56 @@ object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
   }
 }
 
-private[smartdatalake] object DebeziumRowConverter {
-  def convert(record: SourceRecord): Row = {
+/**
+ * Helper object to convert from debezium events in SourceRecord format to sdlb compatible spark dataframe
+ */
+private object DebeziumEventConverter {
+
+  def convert(records: Seq[SourceRecord])(implicit spark: SparkSession): DataFrame = {
+
+    val sparkSchema = inferSparkSchema(records.head.valueSchema())
+    val rows = records.map {
+     recordToRow
+     }
+
+    val df = spark.createDataFrame(rows.asJava, sparkSchema)
+    extractCdcEvents(df)
+  }
+
+  private def inferSparkSchema(schema: Schema): StructType = {
+    val fields = schema.fields().asScala.map { field =>
+      val fieldName = field.name()
+      val fieldType: DataType = field.schema().`type`() match {
+        case Type.INT8 => ByteType
+        case Type.INT16 => ShortType
+        case Type.INT32 => IntegerType
+        case Type.INT64 => LongType
+        case Type.FLOAT32 => FloatType
+        case Type.FLOAT64 => DoubleType
+        case Type.BOOLEAN => BooleanType
+        case Type.STRING => StringType
+        case Type.BYTES => BinaryType
+        case Type.MAP => {
+          // Infer key and value types for MapType
+          val keyType = inferSparkSchema(field.schema().keySchema())
+          val valueType = inferSparkSchema(field.schema().valueSchema())
+          MapType(keyType, valueType)
+        }
+        case Type.ARRAY => {
+          // Infer the element type for ArrayType
+          val elementType = inferSparkSchema(field.schema().valueSchema())
+          ArrayType(elementType)
+        }
+        case Type.STRUCT => inferSparkSchema(field.schema())
+        case _ => StringType
+      }
+      StructField(fieldName, fieldType, nullable = true)
+    }
+
+    StructType(fields.toArray)
+  }
+
+  private def recordToRow(record: SourceRecord): Row = {
 
     val valueStruct = record.value().asInstanceOf[org.apache.kafka.connect.data.Struct]
     structToRow(valueStruct)
@@ -330,6 +270,67 @@ private[smartdatalake] object DebeziumRowConverter {
     }.toSeq
 
     Row(values: _*)
+
+  }
+
+  private def flattenDf(df: DataFrame): DataFrame = {
+    var newDF = df
+    for (colName <- df.columns) {
+      val colType = df.schema(colName).dataType
+      colType match {
+        case structType: StructType =>
+          for (fieldName <- structType.fieldNames) {
+            newDF = newDF.withColumn(fieldName, col(s"$colName.$fieldName"))
+          }
+          newDF = newDF.drop(colName)
+        case _ =>
+      }
+    }
+    newDF
+  }
+
+  private def reorderCdcColumns(df: DataFrame): DataFrame = {
+
+    val colsToMove = Seq(COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME)
+
+    val allColumns = df.columns
+
+    val remainingColumns = allColumns.filterNot(colsToMove.contains)
+
+    // Create the new order: remaining columns + colsToMove at the end
+    val newColumnOrder = remainingColumns ++ colsToMove
+
+    // Reorder DataFrame by selecting columns in the new order
+    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail: _*)
+
+    reorderedDF
+  }
+
+  private val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
+  private val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  private def extractCdcEvents(df: DataFrame): DataFrame = {
+
+    val updateBeforeDf = df.filter(col("op") === "u")
+      .withColumn("event_data", col("before"))
+      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_preimage"))
+
+    val updateAfterDf = df.filter(col("op") === "u")
+      .withColumn("event_data", col("after"))
+      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_postimage"))
+
+    val otherOperationsDf = df.filter(col("op") =!= "u")
+      .withColumn("event_data", coalesce(col("after"), col("before")))
+      .withColumn(COMMIT_TYPE_COLUMN_NAME,
+        when(col("op") === "c", lit("create"))
+          .when(col("op") === "d", lit("delete"))
+          .otherwise(lit("read")))
+
+    val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
+      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000).cast(TimestampType))
+      .drop("before", "after", "source", "op", "ts_ms", "ts_us", "ts_ns", "transaction")
+      .orderBy(col(COMMIT_TIMESTAMP_COLUMN_NAME).desc)
+
+    reorderCdcColumns(flattenDf(unionDf))
 
   }
 
