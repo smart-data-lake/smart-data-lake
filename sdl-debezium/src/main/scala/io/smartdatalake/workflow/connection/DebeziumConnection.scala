@@ -49,14 +49,12 @@ case class DebeziumConnection(override val id: ConnectionId,
   private val supportedDbEngines = DbEngineHelper.supportedDbEngines()
   require(supportedDbEngines.contains(dbEngine.toLowerCase), s"Engine '${dbEngine}' not supported by ${this.getClass.getSimpleName}. Supported database engines are (${supportedDbEngines.map(_.toLowerCase).mkString(", ")})")
 
-  private val dbEngineHelper = DbEngineHelper.getDbEngineProperties(dbEngine).get
-
   private[smartdatalake] def connectionPropertiesMap: Map[String, String] = {
 
     authMode match {
       case m: BasicAuthMode => {
         val propertiesMap =   Map(
-          "connector.class" -> dbEngineHelper.debeziumConnectorClassName,
+          "connector.class" -> DbEngineHelper.getDbEngineConnectorClassName(dbEngine).get,
           "database.hostname" -> hostname,
           "database.port" -> port.toString,
           "database.user" -> m.userSecret.resolve(),
@@ -90,43 +88,23 @@ object DebeziumConnection extends FromConfigFactory[Connection] {
 
 private object DbEngineHelper {
 
-  case class DbEngineProperty(debeziumConnectorClassName: String)
-
-  private val dbEngineProperties: Map[String, DbEngineProperty] = Map(
-    "mysql" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[MySqlConnector].getName,
-    ),
-    "postgresql" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[PostgresConnector].getName
-    ),
-    "oracle" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[OracleConnector].getName,
-    ),
-    "mariadb" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[MariaDbConnector].getName,
-    ),
-    "mongodb" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[MongoDbConnector].getName,
-    ),
-    "sqlserver" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[SqlServerConnector].getName,
-    ),
-    "db2" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[Db2Connector].getName,
-    ),
-    "vitess" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[VitessConnector].getName,
-    ),
-    "spanner" -> DbEngineProperty(
-      debeziumConnectorClassName = classOf[SpannerConnector].getName,
-    )
+  private val dbEngineConnectorClassNames: Map[String, String] = Map(
+    "mysql" -> classOf[MySqlConnector].getName,
+    "postgresql" -> classOf[PostgresConnector].getName,
+    "oracle" -> classOf[OracleConnector].getName,
+    "mariadb" -> classOf[MariaDbConnector].getName,
+    "mongodb" -> classOf[MongoDbConnector].getName,
+    "sqlserver" -> classOf[SqlServerConnector].getName,
+    "db2" -> classOf[Db2Connector].getName,
+    "vitess" -> classOf[VitessConnector].getName,
+    "spanner" -> classOf[SpannerConnector].getName
   )
 
-  def getDbEngineProperties(dbName: String): Option[DbEngineProperty] = {
-    dbEngineProperties.get(dbName.toLowerCase)
+  def getDbEngineConnectorClassName(dbName: String): Option[String] = {
+    dbEngineConnectorClassNames.get(dbName.toLowerCase)
   }
 
   def supportedDbEngines(): Seq[String] = {
-    dbEngineProperties.keys.toSeq
+    dbEngineConnectorClassNames.keys.toSeq
   }
 }
