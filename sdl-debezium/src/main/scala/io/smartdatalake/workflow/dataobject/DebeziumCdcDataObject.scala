@@ -20,12 +20,11 @@
 package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.debezium.embedded.Connect
-import io.debezium.engine.{ChangeEvent, DebeziumEngine}
+import io.debezium.engine.DebeziumEngine
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import org.apache.kafka.connect.data.Schema.Type
@@ -37,7 +36,7 @@ import org.apache.spark.sql.functions._
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.{ExecutorService, Executors}
+import java.util.concurrent.Executors
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
@@ -52,7 +51,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   val connection: DebeziumConnection = getConnection[DebeziumConnection](connectionId)
 
-  private def getConfigPropertiesMap: Map[String, String] = {
+  private def debeziumPropertiesForEngine: Properties = {
 
     // If duplicate connection properties are set, prefer the ones the user has set in the config file
     var props: Map[String, String] = debeziumProperties.getOrElse(Map()) ++ connection.connectionPropertiesMap.map {
@@ -85,13 +84,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     // Always overwrite table.include.list property to include only the changes of the table specified in the data object
     props = props ++ Map("table.include.list" -> table.fullName)
 
-    props
-  }
-
-  private val properties: Properties = {
-    val props = new Properties()
-    getConfigPropertiesMap.foreach { case (key, value) => props.setProperty(key, value) }
-    props
+    val propsForEngine = new Properties();
+    props.foreach { case (key, value) => propsForEngine.setProperty(key, value) }
+    propsForEngine
   }
 
   override def factory: FromConfigFactory[DataObject] = DebeziumCdcDataObject
@@ -103,8 +98,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     def createEmptyDataFrame(): DataFrame = {
 
-        val schemaProperties = new Properties()
-       getConfigPropertiesMap.foreach { case (key, value) => schemaProperties.setProperty(key, value) }
+        val schemaProperties = debeziumPropertiesForEngine
 
         Seq("offset.storage", "offset.storage.sdlb.data.object.id").foreach(schemaProperties.remove(_))
 
@@ -149,7 +143,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       val completionCallback = new DebeziumCompletionCallback(executorService)
 
       val engine = DebeziumEngine.create(classOf[Connect])
-        .using(properties)
+        .using(debeziumPropertiesForEngine)
         .notifying(changeConsumer)
         .using(completionCallback)
         .build()
