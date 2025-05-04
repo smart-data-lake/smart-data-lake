@@ -19,29 +19,6 @@
 
 package io.smartdatalake.debezium
 
-import io.debezium.engine.{ChangeEvent, DebeziumEngine}
-import org.apache.kafka.connect.source.SourceRecord
-
-import java.util
-
-/**
- * Custom change consumer that stores the resulting change events as a list of [SourceRecord].
- */
-private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with HasRecords[SourceRecord] {
-
-  var records: List[SourceRecord] = List()
-
-  override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
-
-    batch.forEach(r => {
-
-      records = records :+ r.value()
-
-      recordCommitter.markProcessed(r)
-    })
-
-    recordCommitter.markBatchFinished()
-
-  }
+trait HasRecords[T] {
+  def records: Seq[T]
 }
-

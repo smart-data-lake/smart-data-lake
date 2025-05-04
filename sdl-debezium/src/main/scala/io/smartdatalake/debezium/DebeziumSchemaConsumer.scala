@@ -27,7 +27,7 @@ import java.util
 /**
  * Custom change consumer that returns only the first change event record for schema extraction.
  */
-private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] {
+private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with HasRecords[SourceRecord] {
 
 
   var records: List[SourceRecord] = List()
