@@ -23,7 +23,7 @@ import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.debezium.DebeziumChangeConsumer
+import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumSchemaConsumer}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -323,23 +323,6 @@ object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
   }
 }
 
-
-
-private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] {
-
-
-  var records: List[SourceRecord] = List()
-
-  override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
-
-    if(records.isEmpty) {
-     records  = records :+ batch.get(0).value() // read only the first record
-    }
-
-    recordCommitter.markBatchFinished()
-
-  }
-}
 
 private[smartdatalake] class DebeziumCompletionCallback(executorService: ExecutorService) extends DebeziumEngine.CompletionCallback with SmartDataLakeLogger {
 
