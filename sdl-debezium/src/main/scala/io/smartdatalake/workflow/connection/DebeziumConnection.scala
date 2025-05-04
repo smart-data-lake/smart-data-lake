@@ -33,7 +33,6 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 
 case class DebeziumConnection(override val id: ConnectionId,
-                              uniqueConnectorName: String = java.util.UUID.randomUUID().toString,
                               dbEngine: String,
                               hostname: String,
                               db: Option[String] = None,
