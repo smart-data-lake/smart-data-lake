@@ -31,9 +31,12 @@ private[smartdatalake] class DebeziumCompletionCallback(executorService: Executo
 
   override def handle(success: Boolean, message: String, error: Throwable): Unit = {
     if (success) logger.info(s"Debezium ended successfully with {$message}")
-    else logger.warn(s"Debezium failed with {$message}")
+    else {
+      logger.warn(s"Debezium failed with {$message}")
+      this.error = Some(error)
+    }
 
-    this.error = Some(error)
+
     this.executorService.shutdown()
   }
 }
