@@ -22,7 +22,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.PerformanceUtils.measureTime
-import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{EnvironmentUtil, SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataobject.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{array, col}
@@ -181,7 +181,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     }
 
     // return seq of columns
-    partitionColsAndDatatypes.map( _.map(_(0).toLowerCase))
+    partitionColsAndDatatypes.map(_.map(_(0)))
   }
 
   private def movePartitionColsLast( cols:Seq[String], partitions:Seq[String] ): Seq[String] = {
@@ -202,7 +202,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
    * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.
    *
-   * Note that you need to use writeDfToHiveWithTickTock to write a hive table in tick-tock mode.
    *
    * @param session SparkSession
    * @param dfNew DataFrame to write
@@ -216,7 +215,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     logger.info(s"(${table.fullName}) writeDfToHive: starting outputPath=$outputPath partitions=$partitions saveMode=${saveMode.name}")
 
     // check if all partition cols are present in DataFrame
-    val missingPartitionCols = partitions.diff(dfNew.columns)
+    val missingPartitionCols = SchemaUtil.checkMissingCols(partitions, dfNew.columns.toSeq, Environment.caseSensitive)
     require( missingPartitionCols.isEmpty, s"(${table.fullName}) Partition column(s) ${missingPartitionCols.mkString(",")} are missing in DataFrame columns (${dfNew.columns.mkString(",")})." )
 
     // check if table exists and location is correct
@@ -225,9 +224,10 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
     // check if partitionsOpt match with existing table definition
     if (tableExists) {
-      val configuredCols = partitions.toSet
-      val existingCols = getTablePartitionCols(table).getOrElse(Seq()).toSet
-      require( configuredCols==existingCols, s"(${table.fullName}) writeDfToHive: configured vs existing partition columns are different: configured=$configuredCols, existing=$existingCols" )
+      val existingPartitions = getTablePartitionCols(table).getOrElse(Seq())
+      val (partitionsMatch, configuredCols, existingCols) = SchemaUtil.checkPartitionMatch(partitions, existingPartitions, Environment.caseSensitive)
+
+      require( partitionsMatch, s"(${table.fullName}) writeDfToHive: configured vs existing partition columns are different: configured=$configuredCols, existing=$existingCols" )
     }
 
     // check if this run is with SchemaEvolution and sort columns (partition columns last)
@@ -237,8 +237,8 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(SparkDataFrame(df_existing), SparkDataFrame(dfNew))
       if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${dfNew.schema.treeString}")
 
-      // Schema evolution with Partitions can only be done with Tick-Tock
-      require( !(withSchemaEvolution && partitions.nonEmpty), s"(${table.fullName}) Schema evolution with partitions only works with TickTock! Use writeDfToHiveWithTickTock instead." )
+      // Schema evolution with Partitions can only be done with other TransactionalTableDataObjects
+      require( !(withSchemaEvolution && partitions.nonEmpty), s"(${table.fullName}) Schema evolution with partitions is not working on Hive tables anymore as TickTock tables are deprecated! Use Delta, Iceberg,... instead." )
 
       // move partition cols last, retain current column ordering if not schema evolution
       // TODO: Do partitions-columns not only need to be at the end, but also in the right order if you have more than one?
@@ -323,123 +323,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       }
     }
     session.conf.set("spark.sql.files.maxRecordsPerFile", originalMaxRecordsPerFile.toLong)
-  }
-
-
-  /**
-   * Writes DataFrame to Hive table by using DataFrameWriter.
-   * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
-   * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.
-   * This method always uses the TickTock method to write the data.
-   *
-   * @param session SparkSession
-   * @param df_new DataFrame to write
-   * @param outputPath Directory to store files for Table
-   * @param table Table
-   * @param partitions Partitions column name
-   * @param forceTickTock set to true if you want to always to tick-tock, and avoid the optimization to cancel tick-tock for partitioned tables
-   */
-  def writeDfToHiveWithTickTock(df_new: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode, forceTickTock: Boolean = false)
-                               (implicit session: SparkSession): Unit = {
-    logger.info(s"(${table.fullName}) writeDfToHiveWithTickTock: start writing outputPath=$outputPath partitions=$partitions saveMode=${saveMode.name} forceTickTock=$forceTickTock")
-
-    // check if all partition cols are present in DataFrame
-    val missingPartitionCols = partitions.diff(df_new.columns)
-    require( missingPartitionCols.isEmpty, s"""(${table.fullName}) partition columns ${missingPartitionCols.mkString(",")} not present in DataFrame""" )
-
-    // check if table exists and location is correct
-    val tableExists = isHiveTableExisting(table)
-    if (!tableExists) logger.info(s"(${table.fullName}) writeDfToHive: table doesn't exist yet")
-
-    // check if partitionsOpt match with existing table definition
-    if (tableExists) {
-      val configuredCols = partitions.toSet
-      val existingCols = getTablePartitionCols(table).getOrElse(Seq()).toSet
-      require( configuredCols==existingCols, s"(${table.fullName}) writeDfToHive: configured vs existing partition columns are different: configured=$configuredCols, existing=$existingCols" )
-    }
-
-    // check if this run is with SchemaEvolution and sort columns (partition columns last)
-    val (df_newColsSorted, withSchemaEvolution) = if (tableExists) {
-      // check if schema evolution
-      val df_existing = session.table(table.fullName)
-      val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(SparkDataFrame(df_existing), SparkDataFrame(df_new))
-      if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${df_new.schema.treeString}")
-
-      // if schema evolution with partitioning, make sure old partitions data is included within new dataframe
-      if (withSchemaEvolution && partitions.nonEmpty) {
-        val existingPartitions = df_existing.select(array(partitions.map(col): _*)).distinct().collect().map( _.getSeq[String](0))
-        val newPartitions = df_new.select(array(partitions.map(col): _*)).distinct().collect().map( _.getSeq[String](0))
-        assert(existingPartitions.diff(newPartitions).nonEmpty, s"(${table.fullName}) writeDfToHive: schema evolution with partitions needs all existing data in new dataframe, but partition data of existing dataframe is missing in new data frame!")
-      }
-
-      // move partition cols last, retain current column ordering if not schema evolution
-      // TODO: Do partitions-columns not only need to be at the end, but also in the right order if you have more than one?
-      val colsSorted = movePartitionColsLast( if (withSchemaEvolution) df_new.columns else df_existing.columns, partitions )
-      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
-      val df_newColsSorted = df_new.select(colsSorted.map(col):_*)
-      (df_newColsSorted, withSchemaEvolution)
-
-    } else { // table does not exists
-      // move partition cols last
-      val colsSorted = movePartitionColsLast( df_new.columns, partitions )
-      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
-      val df_newColsSorted = df_new.select(colsSorted.map(col):_*)
-      (df_newColsSorted, false)
-    }
-
-    // cancel tick-tock if
-    // - partitions without schema evolution to avoid partition migration
-    // - table doesnt exists yet
-    val doTickTock = forceTickTock || ((partitions.isEmpty || withSchemaEvolution) && tableExists)
-
-    // define table: use tmp-table if we need to *do* a tick-tock
-    val tableName = if (doTickTock) {
-      logger.info(s"(${table.fullName}) writeDfToHive: tick-tock needed")
-      s"${table.fullName}_tmp"
-    } else table.fullName
-
-    // write to table
-    if (tableExists && !doTickTock && !withSchemaEvolution) {
-      // insert into existing table
-      logger.info(s"(${table.fullName}) writeDfToHive: insert into $tableName")
-      df_newColsSorted.write.mode(saveMode).insertInto(tableName)
-
-    } else {
-      // define location: use tick-tock path
-      val location: Path = alternatingTickTockLocation2(table, outputPath)
-
-      // create and write to table
-      if (partitions.nonEmpty) { // with partitions
-        logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table $tableName at location $location")
-        implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(location)
-        HdfsUtil.deletePath(location, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
-        df_newColsSorted.write
-          .partitionBy(partitions:_*)
-          .format(OutputType.Parquet.toString)
-          .option("path", location.toString)
-          .mode("overwrite")
-          .saveAsTable(tableName)
-
-      } else { // without partitions
-        logger.info(s"(${table.fullName}) writeDfToHive: creating table $tableName at location $location")
-        df_newColsSorted.write
-          .format(OutputType.Parquet.toString)
-          .option("path", location.toString)
-          .mode("overwrite")
-          .saveAsTable(tableName)
-      }
-    }
-
-    // point hiveTable to new data for Tick-Tock table
-    if (doTickTock) {
-      val existingTable = table.fullName
-      // drop existing table (schema is outdated), rename tmp table (new schema)
-      // Attention: this table is potentially missing for some milliseconds...
-      // Note: we could also change location of existing table, but this get's complicated for partitioned tables as all partition locations need to be changed as well, maybe even with multiple partition cols.
-      logger.info(s"(${table.fullName}) writeDfToHive: droping table $existingTable, renaming table $tableName to $existingTable" )
-      session.sql(s"DROP TABLE IF EXISTS $existingTable")
-      session.sql(s"ALTER TABLE $tableName RENAME TO $existingTable")
-    }
   }
 
   /**
@@ -576,45 +459,9 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     session.sharedState.externalCatalog.getTable(table.db.get,table.name).location
   }
 
-  def existingTickTockLocation(table: Table)(implicit session: SparkSession): String = {
-    hiveTableLocation(table)
-  }
-
-  def getCurrentTickTockLocationSuffix(table: Table)(implicit session: SparkSession): HiveTableLocationSuffix.Value = {
-    val currentLocation = hiveTableLocation(table)
-    logger.debug(s"currentLocation: $currentLocation")
-    HiveTableLocationSuffix.withName(new Path(currentLocation).getName)
-  }
-
-  def removeTickTockFromLocation(location: Path): Path = {
-    if (location.getName == HiveTableLocationSuffix.Tock.toString || location.getName == HiveTableLocationSuffix.Tick.toString) location.getParent
-    else location
-  }
-
-  def alternateTickTockLocation(location: Path): Path = {
-    val currentTickTock = location.getName
-    val baseLocation = location.getParent
-    currentTickTock match {
-      // Tick -> Tock
-      case tt if tt==HiveTableLocationSuffix.Tick.toString => new Path(baseLocation, HiveTableLocationSuffix.Tock.toString)
-      // Tock -> Tick
-      case tt if tt==HiveTableLocationSuffix.Tock.toString => new Path(baseLocation, HiveTableLocationSuffix.Tick.toString)
-      case _ => throw new IllegalArgumentException(s"Table location $location doesn't use Tick-Tock")
-    }
-  }
-
-  def alternatingTickTockLocation2(table: Table, basePath: Path)(implicit session: SparkSession): Path = {
-    if (isHiveTableExisting(table)) {
-      alternateTickTockLocation(new Path(hiveTableLocation(table)))
-    } else {
-      // If the table doesn't exist yet, start with tick
-      new Path(basePath, HiveTableLocationSuffix.Tick.toString)
-    }
-  }
-
   /**
    * Normalizes a HDFS path so they can be better compared.
-   * i.e. by replacing \ with / and always pointing to tick
+   * i.e. by replacing \ with /
    *
    * @param path
    * @return
@@ -625,7 +472,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       .replaceAll("\\\\", Path.SEPARATOR)
       .replaceAll("file:/", "")
       .replaceAll("/+$", "")
-      .replaceAll("tock$", "tick")
   }
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {

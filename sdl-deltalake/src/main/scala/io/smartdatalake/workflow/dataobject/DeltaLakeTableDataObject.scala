@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil}
+import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
 import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -45,6 +45,8 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import java.sql.{SQLException, Timestamp}
+import java.time.{Duration, LocalDateTime}
 
 import scala.util.Try
 
@@ -89,7 +91,13 @@ import scala.util.Try
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
+ * @param updateColumnComments If set to false, the column comments (read from the provided schema) will only be updated for newly created columns.
+ *                             If set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in
+ *                             a lower performance since a column comparison is needed. Defaults to "false".
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
+ * @param minVacuumInterval Optional String to determine the minimum time interval between two vacuum operations. If the parameter is set,
+ *                          SDLB will look at the last vacuum-execution time in the table and compare it to the current time. If the parameter is not set or if a vacuum has never happened, it will vacuum the table.
+ *                          The interval must be provided as a String in ISO 8601 Duration format (e.g. "P4DT12H" for "four days and twelve hours")
  * @param acl override connection permissions for files created tables hadoop directory with this connection
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -113,14 +121,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
+                                    updateColumnComments: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
+                                    minVacuumInterval: Option[String] = None,
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -288,6 +298,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
   }
 
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
+    metadata.flatMap(_.description).foreach {addTableComment}
+
+  }
+
+
   /**
    * Writes DataFrame to HDFS/Parquet and creates DeltaLake table.
    */
@@ -297,10 +315,16 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     implicit val helper: SparkSubFeed.type = SparkSubFeed
 
     val genericDf = SparkDataFrame(df)
-    val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
-    val targetSchema = targetDf.schema
+    val targetDfIncoming = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
+    val targetSchema = targetDfIncoming.schema
 
-    validateSchemaMin(SparkSchema(targetSchema), "write")
+    val targetDf = if (schemaMin.isDefined) {
+      validateSchemaMin(SparkSchema(targetSchema), "write") //needed for merging the schemas
+      val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
+      val targetSchemaWithMetadata: StructType = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, targetSchema)
+      targetDfIncoming.to(targetSchemaWithMetadata)
+    } else targetDfIncoming
+
     validateSchemaHasPartitionCols(targetDf, "write")
     validateSchemaHasPrimaryKeyCols(targetDf, "write")
 
@@ -351,6 +375,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         .optionalPartitionBy(partitions)
         .saveAsTable(table.fullName)
     )
+
+    //if the flag is set, update comments of existing columns (one by one)
+    if (updateColumnComments) {
+      val columnsToUpdate = SchemaUtil.identifyMissingComments(targetDf.schema, session.table(table.fullName).schema).map(kv => (kv._1.mkString("."), kv._2))
+      updateExistingColumnComments(columnsToUpdate)
+    }
 
     // get delta table operational metrics
     val dfHistory = deltaTable.history(1)
@@ -447,12 +477,26 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   def vacuum(implicit context: ActionPipelineContext): Unit = {
-    retentionPeriod.foreach { period =>
-      val (_, d) = PerformanceUtils.measureDuration {
-        DeltaTable.forPath(context.sparkSession, hadoopPath.toString).vacuum(period)
-      }
-      logger.info(s"($id) vacuum took $d")
+
+    val session = context.sparkSession
+
+    def intervalHasPassed(lastExecution: Timestamp): Boolean = {
+      val timePassed = Duration.between(lastExecution.toLocalDateTime, LocalDateTime.now)
+      timePassed.compareTo(Duration.parse(minVacuumInterval.get)) > 0 //the time passed is greater than the set minInterval
     }
+
+    lazy val lastVacuum = deltaTable(session).history.filter(col("operation").contains("VACUUM END")).select(max("timestamp")).collect
+
+    //execute vacuum if either no interval is set, there has never been a vacuum operation, or the set interval has passed
+    if (minVacuumInterval.isEmpty || lastVacuum.isEmpty || intervalHasPassed(lastVacuum(0).getTimestamp(0))) {
+      retentionPeriod.foreach { period =>
+        val (_, d) = PerformanceUtils.measureDuration {
+          DeltaTable.forPath(session, hadoopPath.toString).vacuum(period)
+        }
+        logger.info(s"($id) vacuum took $d")
+      }
+    }
+
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
@@ -635,6 +679,44 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
+
+  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
+    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '${catalog.get}'"
+    val schemaConstraint = if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '${schema.get}'"
+    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
+    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
+    val df = context.sparkSession.sql(query)
+    val (primaryKeyCols, primaryKeyName) = df.collect.foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
+    (primaryKeyCols.toList, primaryKeyName.toList) match {
+      case (List(), _) => None
+      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
+      case (_, pk) if pk.size > 1 => throw new SQLException(f"The $tableName returns more than one Primary Key: ${pk.mkString}")
+      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
+    }
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
+    val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
+    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+  }
+
+  def updateExistingColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
+    comments.foreach( comment => {
+      val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
+      SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+    }
+    )
   }
 }
 

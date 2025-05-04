@@ -1,0 +1,34 @@
+{
+  "paths": {
+    "/paging": {
+      "get": {
+        "operationId": "getPaging",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The user ID."
+                    },
+                    "username": {
+                      "type": "string",
+                      "description": "The user name."
+                    },
+                    "nextLink": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -580,6 +580,23 @@ object Environment extends SmartDataLakeLogger {
 
   var _throwExceptionOnSparkListenerError: Option[Boolean] = None
 
+  /**
+   * Timeout in seconds to wait for DataFrame observation result.
+   * Note that this is only relevant for asynchronous observations, e.g. SparkObservation.
+   * Default is 1 second.
+   */
+  def dataFrameObservationTimeoutSec: Int = {
+    if (_dataFrameObservationTimeoutSec.isEmpty) {
+      _dataFrameObservationTimeoutSec = Some(
+        EnvironmentUtil.getSdlParameter("dataFrameObservationTimeoutSec")
+          .map(_.toInt).getOrElse(1)
+      )
+    }
+    _dataFrameObservationTimeoutSec.get
+  }
+
+  var _dataFrameObservationTimeoutSec: Option[Int] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

@@ -24,8 +24,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
-import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Column, DataFrame}
 
 import java.time.{Instant, LocalDateTime, ZoneId}
 import java.util.TimeZone
@@ -118,7 +118,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def partitionModDates(timezoneId: ZoneId = TimeZone.getDefault.toZoneId): Seq[(PartitionValues,LocalDateTime)] = dataObject match {
     case o: HadoopFileDataObject with CanHandlePartitions =>
       o.getPartitionPathsStatus(context)
-        .map( s => (o.extractPartitionValuesFromDirPath(s.getPath.toString)(context), LocalDateTime.ofInstant(Instant.ofEpochMilli(s.getModificationTime), timezoneId)))
+        .map(s => (o.extractPartitionValuesFromDirPath(s.getPath.toString)(context), LocalDateTime.ofInstant(Instant.ofEpochMilli(s.getModificationTime), timezoneId)))
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned or has no hadoop directory layout")
   }
   def schema: StructType = dataObject.getSparkDataFrame()(context).schema

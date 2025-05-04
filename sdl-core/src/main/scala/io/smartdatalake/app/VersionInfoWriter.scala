@@ -177,9 +177,9 @@ object BuildVersionInfo extends SmartDataLakeLogger {
   def getRevision: String = {
     import sys.process._
     try {
-      s"git rev-parse --verify --short=$gitRevisionLength HEAD" !!
+      (s"git rev-parse --verify --short=$gitRevisionLength HEAD" !!).trim
     } catch {
-      case e: Exception =>
+      case e: Throwable =>
         logger.warn(s"Could not get Git revision number: ${e.getClass.getSimpleName} ${e.getMessage}")
         "unknown"
     }

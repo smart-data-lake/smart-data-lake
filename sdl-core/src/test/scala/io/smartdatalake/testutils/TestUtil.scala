@@ -168,6 +168,7 @@ object TestUtil extends SmartDataLakeLogger {
           .bindAddress(host)
           .keystorePath(wiremockKeyStoreFile)
           .keystorePassword("mytruststorepassword")
+          .asynchronousResponseEnabled(false)
       )
     wireMockServer
       .start()

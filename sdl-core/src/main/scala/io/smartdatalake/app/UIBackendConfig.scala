@@ -20,11 +20,16 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, StateUploader}
-import io.smartdatalake.util.webservice.SttpUtil.validateResponse
+import io.smartdatalake.util.webservice.SttpUtil.getContent
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import sttp.client3.{HttpClientSyncBackend, Identity, SttpBackend, basicRequest}
+import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
+import sttp.client3.{BasicRequestBody, HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, basicRequest}
 import sttp.model.Uri.PathSegment
-import sttp.model.{Header, MediaType, Method, Uri}
+import sttp.model._
+
+import java.sql.Timestamp
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 
 /**
  * Configuration of the UI backend to upload state updates of the Job runs.
@@ -64,6 +69,7 @@ import sttp.model.{Header, MediaType, Method, Uri}
  *                       Upload of these files is retried on initialization of next SDLB run.
  * @param processUpdates optional; if false, only initial & final state is uploaded, otherwise all state updates are uploaded as partial updates.
  *                       Default is processUpdates=true.
+ * @param timeouts       configuration of HTTP timeouts. Default is connectionTimeout=500ms, readTimeout=5s.
  */
 case class UIBackendConfig(
                             baseUrl: String,
@@ -72,10 +78,15 @@ case class UIBackendConfig(
                             env: String = "std",
                             authMode: Option[HttpAuthMode] = None,
                             stagePath: Option[String] = None,
-                            processUpdates: Boolean = true
+                            processUpdates: Boolean = true,
+                            timeouts: HttpTimeoutConfig = HttpTimeoutConfig(500, 5000),
+                            proxy: Option[HttpProxyConfig] = None
                           ) extends SmartDataLakeLogger {
 
-  @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend()
+  private val sttpBackendOptions = Seq(proxy, Some(timeouts)).flatten.foldLeft(SttpBackendOptions.Default) {
+    case (options, config) => config.sttpConfig(options)
+  }
+  @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(sttpBackendOptions)
   private val params = Map("tenant" -> tenant, "repo" -> repo, "env" -> env)
 
   def getStateListener: StateListener = {
@@ -86,28 +97,33 @@ case class UIBackendConfig(
 
   def getUploadService: UploadService = {
     new UploadService() {
-      override def sendBytes(operation: String, body: Array[Byte], method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Unit = {
-        logger.debug(s"operation=$operation method=$method params=$params additionalParams=$additionalParams mediaType=$mediaType bodyLength=${body.length}")
-        val request = basicRequest
+      override def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
+        assert(body.isEmpty || multipartBody.isEmpty, "Only body or multipartBody can be set.")
+        logger.debug(s"operation=$operation method=$method params=$params additionalParams=$additionalParams mediaType=$mediaType bodyLength=${body.map(_.length).getOrElse(0)}")
+        var request = basicRequest
           .method(method, Uri.unsafeParse(baseUrl).addPathSegment(PathSegment(operation)).addParams(params ++ additionalParams))
-          .header(Header.contentType(MediaType.ApplicationJson))
+          .header(Header.contentType(mediaType))
           .headers(authMode.map(_.getHeaders).getOrElse(Map()))
+          .readTimeout(FiniteDuration(timeouts.readTimeoutMs, TimeUnit.MILLISECONDS))
           .followRedirects(true)
-          .body(body)
+        body.foreach(b => request = request.body(b))
+        multipartBody.foreach(mp => request = request.multipartBody(mp.head, mp.tail: _*))
         val response = request.send(httpBackend)
-        validateResponse(response, s"$method $operation")
+        Option(getContent(response, s"$method $operation")).filter(_.nonEmpty)
       }
     }
   }
 }
 
 trait UploadService extends SmartDataLakeLogger {
-  def sendBytes(operation: String, body: Array[Byte], method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Unit
+  def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String]
 
-  def send(operation: String, body: String, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Unit = {
-    sendBytes(operation, body.getBytes("UTF-8"), method, additionalParams, mediaType)
+  def send(operation: String, body: Option[String] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
+    sendBytes(operation, body = body.map(_.getBytes("UTF-8")), method = method, additionalParams = additionalParams, mediaType = mediaType)
   }
 }
+
+case class FileDescriptor(name: String, mediaType: String, size: Long, lastModified: Timestamp)
 
 private[smartdatalake] object UploadDefaults {
   val versionDefault = "latest"

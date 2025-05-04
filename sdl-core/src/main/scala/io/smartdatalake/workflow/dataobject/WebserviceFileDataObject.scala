@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
@@ -27,13 +26,16 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.webservice.SttpUtil.guessMimeType
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import org.apache.tika.Tika
+import sttp.client3.SttpBackendOptions
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -48,9 +50,22 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  * @param host proxy host
  * @param port proxy port
  */
-case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None)
+case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None) extends SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
+    if (user.nonEmpty && password.nonEmpty) options.httpProxy(host, port, user.get.resolve(), password.get.resolve())
+    else options.httpProxy(host, port)
+  }
+}
 
-case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
+case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) extends SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
+    options.connectionTimeout(FiniteDuration(connectionTimeoutMs, TimeUnit.MILLISECONDS))
+  }
+}
+
+trait SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions
+}
 
 /**
  * [[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.
@@ -68,7 +83,7 @@ case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int)
  * @param timeouts optional configuration of HTTP timeouts
  * @param authMode Optional configuration of webservice authentication. Supported `AuthMode`s are BasicAuthMode and CustomHttpAuthMode.
  *                 CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
- * @param mimeType Optionally specify mime-type of Webservice response. If not specified `tika`-library is used to guess the type.
+ * @param mimeType Optionally specify mime-type of Webservice response. If not specified SDLB tries to guess the type.
  * @param writeMethod HTTP method used when uploading data to a webservice.
  *                    Default method is POST.
  * @param proxy optional Proxy configuration used to make HTTP-connection.
@@ -95,9 +110,6 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends FileRefDataObject with CanCreateInputStream with CanCreateOutputStream with SmartDataLakeLogger {
-
-  // Used to determine mimetype of post data
-  val tika = new Tika
 
   // Always set to Append as we use Webservice to push files
   override val saveMode: SDLSaveMode = SDLSaveMode.Append
@@ -132,10 +144,11 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     }
   }
 
+
   /**
    * Calls webservice POST method with binary data as body
    *
-   * @param body  post body as Byte Array, type will be determined by Tika
+   * @param body post body as Byte Array
    * @param query optional URL with replaced placeholders to call
    * @return Response as Array[Byte]
    */
@@ -145,17 +158,8 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
     // Try to extract Mime Type
     // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as
     // application/json
-    val mimetype: String = mimeType.getOrElse {
-      tika.detect(body) match {
-        case "text/plain" => try {
-          new ObjectMapper().readTree(body)
-          "application/json"
-        } catch {
-          case _: Throwable => "text/plain"
-        }
-        case s => s
-      }
-    }
+    val mimetype: String = mimeType.orElse(guessMimeType(body))
+      .getOrElse(throw new IllegalStateException(s"($id) Could not guess mime-type for body in postResponse. Please set mimeType attribute manually."))
     val response = writeMethod match {
       case WebserviceMethod.Post => webserviceClient.post(body, mimetype)
       case WebserviceMethod.Put => webserviceClient.put(body, mimetype)
@@ -174,25 +178,21 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    */
   override def createInputStreams(query: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     val targetUrl = url + query
-    val responses: Iterator[Array[Byte]] = new Iterator[Array[Byte]]() {
-      var nextLink: Option[String] = Some(targetUrl)
-      override def hasNext: Boolean = nextLink.isDefined
-      override def next(): Array[Byte] = {
-        assert(nextLink.nonEmpty)
-        val response = getResponse(nextLink.get)
-        nextLink = pagingLinkRegex.flatMap{ patternStr =>
-          val pattern = patternStr.r.unanchored
-          new String(response) match {
-            case pattern(link) =>
-              logger.debug(s"next pagingLink found: $link")
-              Some(link)
-            case _ => None
-          }
-        }
-        response
-      }
-    }
+    val responses = if (pagingLinkRegex.isDefined) {
+      val pagingLinkExtractorFun = createPagingLinkRegexExtractor(pagingLinkRegex.get)
+      SttpUtil.getPagedResponseIterator(targetUrl, pagingLinkExtractorFun, (url, idx) => getResponse(url))
+    } else Iterator(getResponse(targetUrl))
     responses.map(e => new ByteArrayInputStream(e))
+  }
+
+  private def createPagingLinkRegexExtractor(regex: String): Array[Byte] => Option[String] = response => {
+    val pagingLinkPattern = regex.r.unanchored
+    new String(response) match {
+      case pagingLinkPattern(link) =>
+        logger.debug(s"next pagingLink found: $link")
+        Some(link)
+      case _ => None
+    }
   }
 
   override def startWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()

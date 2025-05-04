@@ -14,7 +14,7 @@ It is implemented in Scala and builds on top of open-source big data technologie
 * a declarative, configuration-driven approach to creating data pipelines. Metadata about data pipelines allows for efficient operations, maintenance and more business self-service.
 
 ### Benefits of Smart Data Lake Builder
-* Cheaper implementation of data lakes
+* Cost-effective implementation of data lakes
 * Increased productivity of data scientists
 * Higher level of self-service
 * Decreased operations and maintenance costs

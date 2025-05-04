@@ -1,10 +1,10 @@
-<?xml version="1.0" encoding="UTF-8"?><!--
+<!--
   ~ Smart Data Lake - Build your data lake the smart way.
   ~
   ~ Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
-  ~ it under the terms of the GNU General Pufblic License as published by
+  ~ it under the terms of the GNU General Public License as published by
   ~ the Free Software Foundation, either version 3 of the License, or
   ~ (at your option) any later version.
   ~
@@ -300,9 +300,8 @@
     <jetty.deps.scope>compile</jetty.deps.scope>
     <scala.minor.version>2.12</scala.minor.version>
     <scala.version>${scala.minor.version}.15</scala.version>
-    <spark.version>3.5.2</spark.version>
-    <spark-extensions.version>3.5.2
-        </spark-extensions.version>
+    <spark.version>3.5.5</spark.version>
+    <spark-extensions.version>3.5.5</spark-extensions.version>
     <!-- this sdl-specific extensions should match the minor version of property spark.version -->
     <spark.minor.version>3.5</spark.minor.version>
     <spark.version331>3.3.1</spark.version331>
@@ -334,7 +333,7 @@
     <kafka.version>3.4.1</kafka.version>
     <!-- After 10.15.1.3, the minimum required version is JDK9 -->
     <derby.version>10.14.2.0</derby.version>
-    <parquet.version>1.13.1</parquet.version>
+    <parquet.version>1.15.0</parquet.version>
     <orc.version>1.9.1</orc.version>
     <orc.classifier>shaded-protobuf</orc.classifier>
     <jetty.version>9.4.52.v20230823</jetty.version>
@@ -407,11 +406,11 @@
         If you are changing Arrow version specification, please check
         ./python/pyspark/sql/pandas/utils.py, and ./python/setup.py too.
         -->
-    <arrow.version>12.0.1</arrow.version>
-    <!-- org.fusesource.leveldbjni will be used except on arm64 platform. -->
-    <leveldbjni.group>org.fusesource.leveldbjni</leveldbjni.group>
-    <kubernetes-client.version>6.7.2</kubernetes-client.version>
-    <!--
+        <arrow.version>12.0.1</arrow.version>
+        <!-- org.fusesource.leveldbjni will be used except on arm64 platform. -->
+        <leveldbjni.group>org.fusesource.leveldbjni</leveldbjni.group>
+        <kubernetes-client.version>6.7.2</kubernetes-client.version>
+        <!--
           These default to Hadoop 3.x shaded client/minicluster jars, but since the shaded jars are
           only available in 3.x, we have to switch to non-shaded Hadoop client jars when the active
           profile is hadoop-2.7.
@@ -429,376 +428,392 @@
 
           Please check SPARK-36835 for more details.
         -->
-    <hadoop-client-api.artifact>hadoop-client-api</hadoop-client-api.artifact>
-    <hadoop-client-runtime.artifact>hadoop-client-runtime</hadoop-client-runtime.artifact>
-    <hadoop-client-minicluster.artifact>hadoop-client-minicluster</hadoop-client-minicluster.artifact>
-    <spark.yarn.isHadoopProvided>false</spark.yarn.isHadoopProvided>
-    <!-- SPARK-PARENT finished -->
-    <!-- other dependency versions -->
-    <scopt.version>4.0.1</scopt.version>
-    <databricks.spark-xml.version>0.18.0</databricks.spark-xml.version>
-    <spark.excel.version>${spark.version331}_0.18.6-beta1</spark.excel.version>
-    <hsqldb.version>2.7.2</hsqldb.version>
-    <jackcess.version>4.0.5</jackcess.version>
-    <!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
-    <typesafe.config.version>1.4.1</typesafe.config.version>
-    <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
-    <monix.version>3.4.0</monix.version>
-    <splunk.version>1.6.5.0</splunk.version>
-    <sshj.version>0.35.0</sshj.version>
-    <snowflake-spark.version>3.1.1</snowflake-spark.version>
-    <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
-    <delta.version>3.2.0</delta.version>
-    <iceberg.version>1.6.1</iceberg.version>
-    <json4s.version>3.7.0-M11</json4s.version>
-    <scaladoc.reader.version>1.0.3</scaladoc.reader.version>
-    <scalatest.test.version>3.0.8</scalatest.test.version>
-    <sshd.test.version>2.10.0</sshd.test.version>
-    <debezium.version>3.1.0.Final</debezium.version>
-    <!-- Sonar related -->
-    <sonar.organization>smart-data-lake</sonar.organization>
-    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-    <scoverage.plugin.version>2.0.2</scoverage.plugin.version>
-    <scoverage.scalacPluginVersion>2.0.11</scoverage.scalacPluginVersion>
-  </properties>
-  <scm>
-    <connection>scm:git:git://github.com/smart-data-lake/smart-data-lake.git</connection>
-    <developerConnection>scm:git:ssh://github.com/smart-data-lake/smart-data-lake.git</developerConnection>
-    <url>http://github.com/smart-data-lake/smart-data-lake/tree/master</url>
-  </scm>
-  <repositories>
-    <repository>
-      <id>maven central</id>
-      <name>Maven Central Repository</name>
-      <url>https://repo1.maven.org/maven2/</url>
-    </repository>
-    <repository>
-      <id>confluent</id>
-      <name>Confluent Schema Repository</name>
-      <url>https://packages.confluent.io/maven/</url>
-    </repository>
-    <!-- smartdatalake snapshots -->
-    <repository>
-      <id>ossrh</id>
-      <name>ossrh snapshots</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
-  <build>
-    <pluginManagement>
-      <plugins>
-        <!-- add scala sources, if we have also java sources using sourceDirectory / testSourceDirectory tag -->
-        <plugin>
-          <groupId>org.codehaus.mojo</groupId>
-          <artifactId>build-helper-maven-plugin</artifactId>
-          <version>3.4.0</version>
-          <executions>
-            <execution>
-              <id>add-source</id>
-              <phase>generate-sources</phase>
-              <goals>
-                <goal>add-source</goal>
-              </goals>
-              <configuration>
-                <sources>
-                  <source>src/main/scala</source>
-                </sources>
-              </configuration>
-            </execution>
-            <execution>
-              <id>add-test-source</id>
-              <phase>generate-test-sources</phase>
-              <goals>
-                <goal>add-test-source</goal>
-              </goals>
-              <configuration>
-                <sources>
-                  <source>src/test/scala</source>
-                </sources>
-              </configuration>
-            </execution>
-          </executions>
-        </plugin>
-        <!-- Compiles Scala sources. -->
-        <plugin>
-          <groupId>net.alchim31.maven</groupId>
-          <artifactId>scala-maven-plugin</artifactId>
-          <version>4.5.6</version>
-          <!-- attention: maven build fails when upgrading version -->
-          <executions>
-            <execution>
-              <goals>
-                <goal>compile</goal>
-                <goal>testCompile</goal>
-              </goals>
-            </execution>
-          </executions>
-          <configuration>
-            <scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
-            <checkMultipleScalaVersions>true</checkMultipleScalaVersions>
-            <failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
-            <recompileMode>incremental</recompileMode>
-            <args>
-              <arg>-unchecked</arg>
-              <arg>-deprecation</arg>
-              <arg>-feature</arg>
-              <arg>-explaintypes</arg>
-              <arg>-target:jvm-1.${maven.compiler.release}</arg>
-            </args>
-            <jvmArgs>
-              <jvmArg>-Xms64m</jvmArg>
-              <jvmArg>-Xmx1024m</jvmArg>
-            </jvmArgs>
-            <compilerPlugins>
-              <!-- embedded scaladoc as annotations -->
-              <!-- an alternative library would be com.github.andyglow:scaladoc-compiler-plugin, but there are plugin initialization problems with path on windows. -->
-              <compilerPlugin>
-                <groupId>com.github.takezoe</groupId>
-                <artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
-                <version>${scaladoc.reader.version}</version>
-              </compilerPlugin>
-            </compilerPlugins>
-          </configuration>
-        </plugin>
-        <!-- rewrite pom for compiling with different scala version profiles -->
-        <plugin>
-          <groupId>org.spurint.maven.plugins</groupId>
-          <artifactId>scala-cross-maven-plugin</artifactId>
-          <version>0.3.0</version>
-          <executions>
-            <execution>
-              <id>rewrite-pom</id>
-              <goals>
-                <goal>rewrite-pom</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-        <!-- Copies files in resources folders to target folder. -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-resources-plugin</artifactId>
-          <version>3.3.1</version>
-        </plugin>
-        <!-- Checks whether source files have the specified license header. -->
-        <plugin>
-          <groupId>com.mycila</groupId>
-          <artifactId>license-maven-plugin</artifactId>
-          <version>4.2</version>
-          <configuration>
-            <header>${basedir}/${license.header.file}</header>
-            <properties>
-              <copyright.name>${project.organization.name}</copyright.name>
-              <copyright.contact>${project.organization.url}</copyright.contact>
-            </properties>
-            <includes>
-              <include>src/**</include>
-            </includes>
-            <excludes>
-              <exclude>**/*.accdb</exclude>
-              <exclude>**/*.mdb</exclude>
-              <exclude>**/*.csv</exclude>
-              <exclude>**/*.keytab</exclude>
-              <exclude>**/*.pkcs12</exclude>
-            </excludes>
-            <mapping>
-              <scala>SLASHSTAR_STYLE</scala>
-              <conf>SCRIPT_STYLE</conf>
-            </mapping>
-            <failIfMissing>false</failIfMissing>
-          </configuration>
-          <dependencies>
-            <dependency>
-              <groupId>com.mycila</groupId>
-              <artifactId>license-maven-plugin-git</artifactId>
-              <version>4.2</version>
-            </dependency>
-          </dependencies>
-          <executions>
-            <execution>
-              <goals>
-                <goal>check</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-        <!-- Creates the jar without dependencies -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-jar-plugin</artifactId>
-          <version>3.3.0</version>
-          <configuration>
-            <archive>
-              <manifest>
-                <addClasspath>true</addClasspath>
-                <mainClass>io.smartdatalake.app.SparkSmartDataLakeBuilder</mainClass>
-                <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-              </manifest>
-            </archive>
-            <excludes>
-              <exclude>log4j2.*</exclude>
-              <!-- Logging configuration should be left to user. -->
-              <exclude>${project.artifactId}*.jar
-                            </exclude>
-              <!-- avoid "Error assembling JAR" because of already existing artifact jar -->
-            </excludes>
-          </configuration>
-        </plugin>
-        <!-- Creates a JAR file with the source files of the project. -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-source-plugin</artifactId>
-          <version>3.3.0</version>
-          <executions>
-            <execution>
-              <id>attach-sources</id>
-              <goals>
-                <goal>jar-no-fork</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-        <!-- Builds executable fat-jar that includes all dependencies -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-shade-plugin</artifactId>
-          <version>3.5.0</version>
-          <executions>
-            <execution>
-              <phase>package</phase>
-              <goals>
-                <goal>shade</goal>
-              </goals>
-              <configuration>
-                <filters>
-                  <filter>
-                    <artifact>*:*</artifact>
-                    <excludes>
-                      <exclude>META-INF/*.SF</exclude>
-                      <exclude>META-INF/*.DSA</exclude>
-                      <exclude>META-INF/*.RSA</exclude>
-                      <!-- handle some duplicate warnings: these files are not needed -->
-                      <exclude>META-INF/DEPENDENCIES</exclude>
-                      <exclude>META-INF/LICENSE</exclude>
-                      <exclude>META-INF/LICENSE.txt</exclude>
-                      <exclude>META-INF/NOTICE</exclude>
-                      <exclude>META-INF/NOTICE.txt</exclude>
-                      <exclude>META-INF/ASL2.0</exclude>
-                      <exclude>META-INF/NOTICE</exclude>
-                      <exclude>META-INF/MANIFEST.MF</exclude>
-                      <exclude>META-INF/maven/**/*</exclude>
-                      <exclude>META-INF/README.txt</exclude>
-                      <exclude>LICENSE</exclude>
-                      <exclude>LICENSE.txt</exclude>
-                      <exclude>NOTICE.txt</exclude>
-                      <!-- shading doesnt respect Java Modularisation (>JDK9) -->
-                      <exclude>module-info.class</exclude>
-                    </excludes>
-                  </filter>
-                </filters>
-                <shadedArtifactAttached>true</shadedArtifactAttached>
-                <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
-                <artifactSet>
-                  <includes>
-                    <include>*:*</include>
-                  </includes>
-                </artifactSet>
-                <transformers>
-                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                    <manifestEntries>
-                      <Main-Class>io.smartdatalake.app.SparkSmartDataLakeBuilder</Main-Class>
-                      <Implementation-Version>${project.version}</Implementation-Version>
-                      <Multi-Release>true</Multi-Release>
-                    </manifestEntries>
-                  </transformer>
-                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                  <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
-                </transformers>
-              </configuration>
-            </execution>
-          </executions>
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
-              <version>0.1.0</version>
-            </dependency>
-          </dependencies>
-        </plugin>
-        <!-- Executes units tests with scalatest  -->
-        <plugin>
-          <groupId>org.scalatest</groupId>
-          <artifactId>scalatest-maven-plugin</artifactId>
-          <version>2.2.0</version>
-          <configuration>
-            <reportsDirectory>
+        <hadoop-client-api.artifact>hadoop-client-api</hadoop-client-api.artifact>
+        <hadoop-client-runtime.artifact>hadoop-client-runtime</hadoop-client-runtime.artifact>
+        <hadoop-client-minicluster.artifact>hadoop-client-minicluster</hadoop-client-minicluster.artifact>
+        <spark.yarn.isHadoopProvided>false</spark.yarn.isHadoopProvided>
+        <!-- SPARK-PARENT finished -->
+
+        <!-- other dependency versions -->
+        <scopt.version>4.1.0</scopt.version>
+        <databricks.spark-xml.version>0.18.0</databricks.spark-xml.version>
+        <spark.excel.version>${spark.version331}_0.18.6-beta1</spark.excel.version>
+        <hsqldb.version>2.7.2</hsqldb.version>
+        <jackcess.version>4.0.5</jackcess.version>
+        <!-- when changing config version, remember to update it in DatabricksSmartDataLakeBuilder main method -->
+        <typesafe.config.version>1.4.3</typesafe.config.version>
+        <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
+        <monix.version>3.4.1</monix.version>
+        <splunk.version>1.6.5.0</splunk.version>
+        <sshj.version>0.35.0</sshj.version>
+        <snowflake-spark.version>3.1.1</snowflake-spark.version>
+        <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
+        <delta.version>3.3.0</delta.version>
+        <iceberg.version>1.8.1</iceberg.version>
+
+        <json4s.version>3.7.0-M11</json4s.version>
+
+        <scaladoc.reader.version>1.0.3</scaladoc.reader.version>
+
+        <scalatest.test.version>3.0.8</scalatest.test.version>
+        <sshd.test.version>2.10.0</sshd.test.version>
+        <debezium.version>3.1.0.Final</debezium.version>
+
+        <!-- Sonar related -->
+        <sonar.organization>smart-data-lake</sonar.organization>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <scoverage.plugin.version>2.0.2</scoverage.plugin.version>
+        <scoverage.scalacPluginVersion>2.0.11</scoverage.scalacPluginVersion>
+
+    </properties>
+
+    <scm>
+        <connection>scm:git:git://github.com/smart-data-lake/smart-data-lake.git</connection>
+        <developerConnection>scm:git:ssh://github.com/smart-data-lake/smart-data-lake.git</developerConnection>
+        <url>http://github.com/smart-data-lake/smart-data-lake/tree/master</url>
+    </scm>
+
+    <repositories>
+        <repository>
+            <id>maven central</id>
+            <name>Maven Central Repository</name>
+            <url>https://repo1.maven.org/maven2/</url>
+        </repository>
+        <repository>
+            <id>confluent</id>
+            <name>Confluent Schema Repository</name>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+        <!-- smartdatalake snapshots -->
+        <repository>
+            <id>ossrh</id>
+            <name>ossrh snapshots</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <build>
+
+        <pluginManagement>
+            <plugins>
+
+                <!-- add scala sources, if we have also java sources using sourceDirectory / testSourceDirectory tag -->
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>3.4.0</version>
+                    <executions>
+                        <execution>
+                            <id>add-source</id>
+                            <phase>generate-sources</phase>
+                            <goals>
+                                <goal>add-source</goal>
+                            </goals>
+                            <configuration>
+                                <sources>
+                                    <source>src/main/scala</source>
+                                </sources>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>add-test-source</id>
+                            <phase>generate-test-sources</phase>
+                            <goals>
+                                <goal>add-test-source</goal>
+                            </goals>
+                            <configuration>
+                                <sources>
+                                    <source>src/test/scala</source>
+                                </sources>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Compiles Scala sources. -->
+                <plugin>
+                    <groupId>net.alchim31.maven</groupId>
+                    <artifactId>scala-maven-plugin</artifactId>
+                    <version>4.5.6</version> <!-- attention: maven build fails when upgrading version -->
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>compile</goal>
+                                <goal>testCompile</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
+                        <checkMultipleScalaVersions>true</checkMultipleScalaVersions>
+                        <failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
+                        <recompileMode>incremental</recompileMode>
+                        <args>
+                            <arg>-unchecked</arg>
+                            <arg>-deprecation</arg>
+                            <arg>-feature</arg>
+                            <arg>-explaintypes</arg>
+                            <arg>-target:jvm-1.${maven.compiler.release}</arg>
+                        </args>
+                        <jvmArgs>
+                            <jvmArg>-Xms64m</jvmArg>
+                            <jvmArg>-Xmx1024m</jvmArg>
+                        </jvmArgs>
+                        <compilerPlugins>
+                            <!-- embedded scaladoc as annotations -->
+                            <!-- an alternative library would be com.github.andyglow:scaladoc-compiler-plugin, but there are plugin initialization problems with path on windows. -->
+                            <compilerPlugin>
+                                <groupId>com.github.takezoe</groupId>
+                                <artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
+                                <version>${scaladoc.reader.version}</version>
+                            </compilerPlugin>
+                        </compilerPlugins>
+                    </configuration>
+                </plugin>
+
+                <!-- rewrite pom for compiling with different scala version profiles -->
+                <plugin>
+                    <groupId>org.spurint.maven.plugins</groupId>
+                    <artifactId>scala-cross-maven-plugin</artifactId>
+                    <version>0.3.0</version>
+                    <executions>
+                        <execution>
+                            <id>rewrite-pom</id>
+                            <goals>
+                                <goal>rewrite-pom</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Copies files in resources folders to target folder. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>3.3.1</version>
+                </plugin>
+
+                <!-- Checks whether source files have the specified license header. -->
+                <plugin>
+                    <groupId>com.mycila</groupId>
+                    <artifactId>license-maven-plugin</artifactId>
+                    <version>4.2</version>
+                    <configuration>
+                        <header>${basedir}/${license.header.file}</header>
+                        <properties>
+                            <copyright.name>${project.organization.name}</copyright.name>
+                            <copyright.contact>${project.organization.url}</copyright.contact>
+                        </properties>
+                        <includes>
+                            <include>src/**</include>
+                        </includes>
+                        <excludes>
+                            <exclude>**/*.accdb</exclude>
+                            <exclude>**/*.mdb</exclude>
+                            <exclude>**/*.csv</exclude>
+                            <exclude>**/*.keytab</exclude>
+                            <exclude>**/*.pkcs12</exclude>
+                        </excludes>
+                        <mapping>
+                            <scala>SLASHSTAR_STYLE</scala>
+                            <conf>SCRIPT_STYLE</conf>
+                        </mapping>
+                        <failIfMissing>false</failIfMissing>
+                    </configuration>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.mycila</groupId>
+                            <artifactId>license-maven-plugin-git</artifactId>
+                            <version>4.2</version>
+                        </dependency>
+                    </dependencies>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Creates the jar without dependencies -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.3.0</version>
+                    <configuration>
+                        <archive>
+                            <manifest>
+                                <addClasspath>true</addClasspath>
+                                <mainClass>io.smartdatalake.app.SparkSmartDataLakeBuilder</mainClass>
+                                <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            </manifest>
+                        </archive>
+                        <excludes>
+                            <exclude>log4j2.*</exclude> <!-- Logging configuration should be left to user. -->
+                            <exclude>${project.artifactId}*.jar
+                            </exclude> <!-- avoid "Error assembling JAR" because of already existing artifact jar -->
+                        </excludes>
+                    </configuration>
+                </plugin>
+
+                <!-- Creates a JAR file with the source files of the project. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.3.0</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Builds executable fat-jar that includes all dependencies -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>3.5.0</version>
+                    <executions>
+                        <execution>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <filters>
+                                    <filter>
+                                        <artifact>*:*</artifact>
+                                        <excludes>
+                                            <exclude>META-INF/*.SF</exclude>
+                                            <exclude>META-INF/*.DSA</exclude>
+                                            <exclude>META-INF/*.RSA</exclude>
+                                            <!-- handle some duplicate warnings: these files are not needed -->
+                                            <exclude>META-INF/DEPENDENCIES</exclude>
+                                            <exclude>META-INF/LICENSE</exclude>
+                                            <exclude>META-INF/LICENSE.txt</exclude>
+                                            <exclude>META-INF/NOTICE</exclude>
+                                            <exclude>META-INF/NOTICE.txt</exclude>
+                                            <exclude>META-INF/ASL2.0</exclude>
+                                            <exclude>META-INF/NOTICE</exclude>
+                                            <exclude>META-INF/MANIFEST.MF</exclude>
+                                            <exclude>META-INF/maven/**/*</exclude>
+                                            <exclude>META-INF/README.txt</exclude>
+                                            <exclude>LICENSE</exclude>
+                                            <exclude>LICENSE.txt</exclude>
+                                            <exclude>NOTICE.txt</exclude>
+                                            <!-- shading doesnt respect Java Modularisation (>JDK9) -->
+                                            <exclude>module-info.class</exclude>
+                                        </excludes>
+                                    </filter>
+                                </filters>
+                                <shadedArtifactAttached>true</shadedArtifactAttached>
+                                <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                                <artifactSet>
+                                    <includes>
+                                        <include>*:*</include>
+                                    </includes>
+                                </artifactSet>
+                                <transformers>
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                        <manifestEntries>
+                                            <Main-Class>io.smartdatalake.app.SparkSmartDataLakeBuilder</Main-Class>
+                                            <Implementation-Version>${project.version}</Implementation-Version>
+                                            <Multi-Release>true</Multi-Release>
+                                        </manifestEntries>
+                                    </transformer>
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                    <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer" />
+                                </transformers>
+                            </configuration>
+                        </execution>
+                    </executions>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                            <version>0.1.0</version>
+                        </dependency>
+                    </dependencies>
+                </plugin>
+
+                <!-- Executes units tests with scalatest  -->
+                <plugin>
+                    <groupId>org.scalatest</groupId>
+                    <artifactId>scalatest-maven-plugin</artifactId>
+                    <version>2.2.0</version>
+                    <configuration>
+                        <reportsDirectory>
                             ${project.build.directory}/scalatest-reports
                         </reportsDirectory>
-            <junitxml>.</junitxml>
-            <filereports>
+                        <junitxml>.</junitxml>
+                        <filereports>
                             ${project.artifactId}.txt
                         </filereports>
-            <stdout>WFT
-                        </stdout>
-            <!-- without color, show full stack traces, show reminder of failed and canceled tests with short stack traces see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
-            <environmentVariables>
-              <SPARK_LOCAL_IP>127.0.0.1
-                            </SPARK_LOCAL_IP>
-              <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
-            </environmentVariables>
-            <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED</argLine>
-          </configuration>
-          <executions>
-            <execution>
-              <goals>
-                <goal>test</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-        <!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.6.0</version>
-          <configuration>
-            <failOnWarning>false</failOnWarning>
-            <ignoreNonCompile>true</ignoreNonCompile>
-            <ignoredUsedUndeclaredDependencies>
-              <dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
-            </ignoredUsedUndeclaredDependencies>
-          </configuration>
-          <executions>
-            <execution>
-              <goals>
-                <goal>analyze-only</goal>
-              </goals>
-            </execution>
-          </executions>
-        </plugin>
-        <!-- check for dependency version conflicts -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-enforcer-plugin</artifactId>
-          <version>3.3.0</version>
-          <configuration>
-            <rules>
-              <requireMavenVersion>
-                <version>2.0.6</version>
-              </requireMavenVersion>
-              <requireJavaVersion>
-                <version>1.8</version>
-              </requireJavaVersion>
-              <dependencyConvergence/>
-              <requireProperty>
-                <property>scala.minor.version</property>
-                <message>You must setscala.minor.version property by activating profile scala-2.11 or
+                        <stdout>WFT
+                        </stdout>  <!-- without color, show full stack traces, show reminder of failed and canceled tests with short stack traces see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
+                        <environmentVariables>
+                            <SPARK_LOCAL_IP>127.0.0.1
+                            </SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
+                        </environmentVariables>
+                        <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED</argLine>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.6.0</version>
+                    <configuration>
+                        <failOnWarning>false</failOnWarning>
+                        <ignoreNonCompile>true</ignoreNonCompile>
+                        <ignoredUsedUndeclaredDependencies>
+                            <dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
+                        </ignoredUsedUndeclaredDependencies>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>analyze-only</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- check for dependency version conflicts -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>3.3.0</version>
+                    <configuration>
+                        <rules>
+                            <requireMavenVersion>
+                                <version>2.0.6</version>
+                            </requireMavenVersion>
+                            <requireJavaVersion>
+                                <version>1.8</version>
+                            </requireJavaVersion>
+                            <dependencyConvergence/>
+                            <requireProperty>
+                                <property>scala.minor.version</property>
+                                <message>You must setscala.minor.version property by activating profile scala-2.11 or
                                     scala-2.12!
                                 </message>
               </requireProperty>
@@ -2893,127 +2908,124 @@
                       We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
                       hadoop-client library is not shaded and included below.
                     -->
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client-runtime</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client-api</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.typesafe</groupId>
-        <artifactId>config</artifactId>
-        <version>${typesafe.config.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.kxbmap</groupId>
-        <artifactId>configs_${scala.minor.version}</artifactId>
-        <version>${kxbmap.configs.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.scala-lang.modules</groupId>
-        <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
-        <version>2.11.0</version>
-      </dependency>
-      <dependency>
-        <groupId>io.swagger</groupId>
-        <artifactId>swagger-annotations</artifactId>
-        <version>1.5.22</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>ST4</artifactId>
-        <version>4.0.4</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr-runtime</artifactId>
-        <version>3.4</version>
-      </dependency>
-      <dependency>
-        <groupId>io.smartdatalake</groupId>
-        <artifactId>spark-extensions_${scala.minor.version}</artifactId>
-        <version>${spark-extensions.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.json4s</groupId>
-        <artifactId>json4s-ext_${scala.minor.version}</artifactId>
-        <version>${json4s.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.delta</groupId>
-        <artifactId>delta-spark_${scala.minor.version}</artifactId>
-        <version>${delta.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tika</groupId>
-        <artifactId>tika-core</artifactId>
-        <version>2.5.0</version>
-      </dependency>
-      <!-- TEST dependencies -->
-      <dependency>
-        <groupId>org.scalatest</groupId>
-        <artifactId>scalatest_${scala.minor.version}</artifactId>
-        <version>${scalatest.test.version}</version>
-        <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-xml_${scala.minor.version}</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.scalactic</groupId>
-        <artifactId>scalactic_${scala.minor.version}</artifactId>
-        <version>${scalatest.test.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.scalacheck</groupId>
-        <artifactId>scalacheck_${scala.minor.version}</artifactId>
-        <version>1.14.3</version>
-        <scope>test</scope>
-      </dependency>
-      <!-- Vulnerable Dependencies Upgrades -->
-      <dependency>
-        <groupId>com.fasterxml.woodstox</groupId>
-        <artifactId>woodstox-core</artifactId>
-        <version>6.5.1</version>
-      </dependency>
-      <dependency>
-        <groupId>org.yaml</groupId>
-        <artifactId>snakeyaml</artifactId>
-        <version>2.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>20231013</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jettison</groupId>
-        <artifactId>jettison</artifactId>
-        <version>1.5.4</version>
-      </dependency>
-      <dependency>
-        <groupId>com.h2database</groupId>
-        <artifactId>h2</artifactId>
-        <version>2.2.220</version>
-      </dependency>
-      <dependency>
-        <groupId>org.ow2.asm</groupId>
-        <artifactId>asm</artifactId>
-        <version>${asm.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.ow2.asm</groupId>
-        <artifactId>asm-commons</artifactId>
-        <version>${asm.version}</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>com.typesafe</groupId>
+                <artifactId>config</artifactId>
+                <version>${typesafe.config.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.kxbmap</groupId>
+                <artifactId>configs_${scala.minor.version}</artifactId>
+                <version>${kxbmap.configs.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang.modules</groupId>
+                <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
+                <version>2.11.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.swagger</groupId>
+                <artifactId>swagger-annotations</artifactId>
+                <version>1.5.22</version>
+            </dependency>
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>ST4</artifactId>
+                <version>4.0.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr-runtime</artifactId>
+                <version>3.4</version>
+            </dependency>
+            <dependency>
+                <groupId>io.smartdatalake</groupId>
+                <artifactId>spark-extensions_${scala.minor.version}</artifactId>
+                <version>${spark-extensions.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.json4s</groupId>
+                <artifactId>json4s-ext_${scala.minor.version}</artifactId>
+                <version>${json4s.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.delta</groupId>
+                <artifactId>delta-spark_${scala.minor.version}</artifactId>
+                <version>${delta.version}</version>
+            </dependency>
+
+            <!-- TEST dependencies -->
+            <dependency>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest_${scala.minor.version}</artifactId>
+                <version>${scalatest.test.version}</version>
+                <scope>test</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.scala-lang.modules</groupId>
+                        <artifactId>scala-xml_${scala.minor.version}</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.scalactic</groupId>
+                <artifactId>scalactic_${scala.minor.version}</artifactId>
+                <version>${scalatest.test.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.scalacheck</groupId>
+                <artifactId>scalacheck_${scala.minor.version}</artifactId>
+                <version>1.14.3</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- Vulnerable Dependencies Upgrades -->
+            <dependency>
+                <groupId>com.fasterxml.woodstox</groupId>
+                <artifactId>woodstox-core</artifactId>
+                <version>6.5.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>2.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.json</groupId>
+                <artifactId>json</artifactId>
+                <version>20231013</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.jettison</groupId>
+                <artifactId>jettison</artifactId>
+                <version>1.5.4</version>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <version>2.2.220</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm</artifactId>
+                <version>${asm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-commons</artifactId>
+                <version>${asm.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>

@@ -31,6 +31,7 @@ import org.apache.spark.sql.SparkSession
 import org.scalatest.FunSuite
 
 import java.nio.file.Files
+import java.time.temporal.ChronoUnit
 import java.time.{Duration, LocalDateTime}
 
 class ActionDAGRunTest extends FunSuite {
@@ -43,13 +44,13 @@ class ActionDAGRunTest extends FunSuite {
 
   test("convert ActionDAGRunState to json and back") {
     val df = Seq(("a",1)).toDF("txt", "value")
-    val startTime = LocalDateTime.now
+    val startTime = LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS)
     val duration = Duration.ofMinutes(5)
     val endTime = startTime.plus(duration)
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
       results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))), metrics = Some(Map("test"->1, "test2"->"abc")))),
       dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now, Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo = sdlbVersionInfo, appVersionInfo = appVersionInfo )
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS), LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS), Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo = sdlbVersionInfo.map(_.filterKeys(_ != "date").toMap), appVersionInfo = appVersionInfo)
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState

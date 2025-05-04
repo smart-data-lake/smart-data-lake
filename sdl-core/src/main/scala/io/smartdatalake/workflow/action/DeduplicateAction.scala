@@ -74,6 +74,7 @@ case class DeduplicateAction(override val id: ActionId,
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
                              updateCapturedColumnOnlyWhenChanged: Boolean = false,
+                             @Deprecated @deprecated("mergeModeEnable will be always true in future - make sure to use a DataObject with Implementation of CanMergeDataFrame.", "2.0.8")
                              mergeModeEnable: Boolean = false,
                              mergeModeAdditionalJoinPredicate: Option[String] = None,
                              override val breakDataFrameLineage: Boolean = false,
@@ -89,7 +90,8 @@ case class DeduplicateAction(override val id: ActionId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
 
-  if (!mergeModeEnable && mergeModeAdditionalJoinPredicate.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate as no effect if mergeModeEnable = false")
+  if (!mergeModeEnable) logger.warn(s"($id) mergeModeEnable = false will not be supported in future anymore, please change to a DataObject with Implementation of CanMergeDataFrame otherwise your code will fail at some point.")
+  if (!mergeModeEnable && mergeModeAdditionalJoinPredicate.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate has no effect if mergeModeEnable = false")
 
   override def saveModeOptions: Option[SaveModeOptions] = if (mergeModeEnable) {
     // force SDLSaveMode.Merge if mergeModeEnable = true
@@ -122,7 +124,7 @@ case class DeduplicateAction(override val id: ActionId,
 
   // check preconditions
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
-  require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not yet implemented for mergeModeEnable = false")
+  require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not implemented for mergeModeEnable = false")
 
   private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toList ++ transformers
 

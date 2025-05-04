@@ -159,12 +159,9 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     throw new NotImplementedError("explode array is not implemented in Snowpark")
   }
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkDataFrame = {
-    schema match {
-      case snowparkSchema: SnowparkSchema =>
-        val dataObject = context.instanceRegistry.get[SnowflakeTableDataObject](dataObjectId)
-        SnowparkDataFrame(dataObject.snowparkSession.createDataFrame(Seq(), snowparkSchema.inner))
-      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
-    }
+    val snowparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SnowparkSchema]
+    val dataObject = context.instanceRegistry.get[SnowflakeTableDataObject](dataObjectId)
+    SnowparkDataFrame(dataObject.snowparkSession.createDataFrame(Seq(), snowparkSchema.inner))
   }
   override def getSubFeed(df: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     df match {

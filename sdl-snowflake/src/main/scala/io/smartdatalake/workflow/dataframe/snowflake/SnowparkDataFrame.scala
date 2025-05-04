@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.custom.SnowparkUtils
+import com.snowflake.snowpark.functions.col
 import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -96,6 +97,9 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
+  override def withColumnRenamed(colName: String, newName: String): GenericDataFrame = {
+      SnowparkDataFrame(inner.withColumn(newName,col(colName))).drop(colName)
+  }
   override def drop(colName: String): GenericDataFrame = SnowparkDataFrame(inner.drop(colName))
 
   override def drop(col: GenericColumn): GenericDataFrame = {
@@ -152,14 +156,15 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     val snowparkSchema = schema.convert(subFeedType).asInstanceOf[SnowparkSchema]
     val missingCols = SchemaUtil.schemaDiff(this, snowparkSchema,
       ignoreNullable = Environment.schemaValidationIgnoresNullability,
-      deep = Environment.schemaValidationDeepComarison
+      deep = Environment.schemaValidationDeepComarison,
+      caseSensitive = Environment.caseSensitive
     )
     if (missingCols.nonEmpty) Some(SnowparkSchema(StructType.apply(missingCols.collect{case x:SnowparkField => x.inner}.toSeq)))
     else None
   }
   override def columns: Seq[String] = inner.names
   override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
-  override def sql: String = throw new NotImplementedError(s"Converting schema back to sql ddl is not supported by Snowpark")
+  override def sql: String = fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
   override def add(colName: String, dataType: GenericDataType): SnowparkSchema = {
     val snowparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SnowparkDataType]
     SnowparkSchema(inner.add(StructField(colName, snowparkDataType.inner)))

@@ -29,12 +29,12 @@ import io.smartdatalake.workflow.dataframe._
   */
 object SchemaEvolution extends SmartDataLakeLogger {
 
-  def newColumns(left: GenericDataFrame, right: GenericDataFrame): Seq[String] = {
-    right.columns.diff(left.columns)
+  def newColumns(left: GenericDataFrame, right: GenericDataFrame, caseSensitive: Boolean = Environment.caseSensitive): Seq[String] = {
+    SchemaUtil.checkMissingCols(right.columns, left.columns, caseSensitive)
   }
 
-  def deletedColumns(left: GenericDataFrame, right: GenericDataFrame): Seq[String] = {
-    left.columns.diff(right.columns)
+  def deletedColumns(left: GenericDataFrame, right: GenericDataFrame, caseSensitive: Boolean = Environment.caseSensitive): Seq[String] = {
+    SchemaUtil.checkMissingCols(left.columns, right.columns, caseSensitive)
   }
 
   /**

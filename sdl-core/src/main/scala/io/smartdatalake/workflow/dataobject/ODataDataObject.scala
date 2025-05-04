@@ -211,7 +211,9 @@ case class ODataBearerToken(token: String, expiresAt:java.time.Instant) {
 /**
  * [[DataObject]] of type OData.
  *
- * @param schema : Schema of the expected output in the form of <<array< struct< columnA:string, columnB: integer ... >>
+ * @param schema : Schema of the expected output. It can be provided as a string in the form of <<array< struct< columnA:string, columnB: integer ... >>,
+ *               as ddl-File, caseClass, java Bean, XSD-File, JSON-Schema-File or Avro-Schema File. For more information, please see the SDLB-docuemntation
+ *               on specifying schemas (https://smartdatalake.ch/docs/reference/schema#specifying-schema).
  * @param baseUrl : Base URL of the OData Service like https://xxx.crm4.dynamics.com/api/data/v9.2/
  * @param tableName : Name of the table which needs to be accessed
  * @param sourceFilters : Optional. OData filter string which will be applied to the access operation like "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
@@ -344,22 +346,6 @@ case class ODataDataObject(override val id: DataObjectId,
     )
   }
 
-  /**
-   * Extracts the column names from the provided schema
-   * @param schema : Expected schema
-   * @return Sequence of column names
-   */
-  private def extractColumnNames(schema: StructType): Seq[String] = {
-    schema.fields.flatMap {
-      field =>
-        field.dataType match {
-          case structType: StructType =>
-            extractColumnNames(structType).map(field.name + "." + _)
-          case _ =>
-            field.name :: Nil
-        }
-    }
-  }
 
   /**
    * Scans the received response text for the next link using Regex

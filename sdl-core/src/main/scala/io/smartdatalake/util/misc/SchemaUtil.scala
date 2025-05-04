@@ -21,6 +21,8 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
+import io.smartdatalake.util.webservice.OpenApiUtil
+import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
@@ -33,9 +35,7 @@ import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import scaladoc.Tag
 
-import java.io.{BufferedReader, InputStreamReader}
-import java.nio.charset.StandardCharsets
-import java.util.stream.Collectors
+import scala.collection.immutable.Queue
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 object SchemaUtil {
@@ -86,17 +86,17 @@ object SchemaUtil {
   }
 
   /**
-   * Computes the set difference of `right` minus `left`, i.e: `Set(right)` \ `Set(left)`.
+   * Computes the set difference of `left` minus `right`, i.e: `Set(left)` \ `Set(right)`.
    *
    * StructField equality is defined by exact matching of the field name and partial (subset) matching of field
    * data type as computed by `deepIsTypeSubset`.
    *
    * @param ignoreNullable whether to ignore differences in nullability.
-   * @return The set of fields in `right` that are not contained in `left`.
+   * @return The set of fields in `left` that are not contained in `right`.
    *
    *         TODO #935: probably doesnt work for structs nested in arrays...
    */
-  private def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
+  private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
     left.toSet.map { leftField: GenericField =>
       val leftName = if (caseSensitive) leftField.name else leftField.name.toLowerCase
@@ -182,6 +182,113 @@ object SchemaUtil {
     } else schema
   }
 
+
+  /**
+   * Merges the metadata from this schema into another one. This method should only be used if the used schema ("from")
+   * is a subset of the schema it's being merged into ("to"). For this, we should use methods such as the ones defined in the [[io.smartdatalake.workflow.dataobject.SchemaValidation]] trait first.
+   *
+   * @param from the schema from which the metadata is read. It should be a subset of "to".
+   * @param to   The schema in which the metadata is being merged into. Superset of "from".
+   */
+  def mergeSchemaMetadata(from: StructType, to: StructType): StructType = {
+
+    def replaceField(struct: StructType, newField: StructField): StructType = {
+      val structWithoutField = StructType(struct.filterNot(_.name == newField.name)) //Field has to be deleted before since add() does not replace it
+      structWithoutField.add(newField)
+    }
+
+    def handleArrays(from: ArrayType, to: ArrayType): DataType = {
+      from.elementType match {
+        case struct: StructType => mergeSchemaMetadata(struct, to.elementType.asInstanceOf[StructType]) //casting can be done since to is a superset of from
+        case arr: ArrayType => handleArrays(arr, to.elementType.asInstanceOf[ArrayType])
+        case _ => from.elementType
+      }
+    }
+
+    from.fields.foldLeft(to)((struc, field) => field.dataType match {
+      case inner: StructType => {
+        val newField = StructField(field.name, mergeSchemaMetadata(inner, struc(field.name).dataType.asInstanceOf[StructType]), struc(field.name).nullable, field.metadata)
+        replaceField(struc, newField)
+      }
+      case arr: ArrayType => {
+        val mergedType = handleArrays(arr, struc(field.name).dataType.asInstanceOf[ArrayType])
+        val newField = StructField(field.name, ArrayType(mergedType, struc(field.name).nullable), struc(field.name).nullable, field.metadata)
+        replaceField(struc, newField)
+      }
+      case _ => replaceField(struc, struc(field.name).copy(metadata = field.metadata))
+    })
+  }
+
+  /**
+   *  This method compares two Schemas and finds existing columns in schema "to" that have a different comment than the ones in schema "from".
+   *  It returns these columns with their new comments. Note that only columns that are present in both schemas (and with the same types) are considered.
+   * @param from The schema with the updated column comments
+   * @param to The schema which already exists and is compared to
+   * @return A map of the type [Queue[String] -> String], where the key represents the parents / path of a nested column, and the value the comment of that column.
+   *         E.g. a result of Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   */
+  def identifyMissingComments(from: StructType, to: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
+
+    def handleArrays(from: ArrayType, to: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
+      (from.elementType, to.elementType) match {
+        case (f: StructType, t: StructType) => identifyMissingComments(f, t, parents)
+        case (f: ArrayType, t: ArrayType) => handleArrays(f, t, parents)
+        case _ => Map()
+      }
+    }
+
+    val toFields = to.fieldNames
+    from.fields.foldLeft(Map(): Map[Seq[String], String])((map, field) => {
+      val comment = field.getComment()
+      val additionalComments = if (toFields.contains(field.name)) { //only columns that already exist
+        val toField = to(field.name)
+        val newParents = parents :+ field.name
+        val localComment = if (comment.isDefined && !toField.getComment().equals(comment)) { //only if comments are different
+          Map(newParents -> comment.get)
+        } else Map()
+
+        //only look for identical structures; in the other cases the comments will be updated automatically when writing
+        val nestedComments: Map[Seq[String], String] = (field.dataType, toField.dataType) match {
+          case (f: StructType, t: StructType) => identifyMissingComments(f, t, newParents)
+          case (f: ArrayType, t: ArrayType) => handleArrays(f, t, newParents)
+          case _ => Map()
+        }
+        localComment ++ nestedComments
+      } else Map()
+      map ++ additionalComments
+    })
+
+  }
+
+
+  /**
+   * Returns a Map of columns and comments based on the metadata of a Spark schema. The columns are represented as a Seq of fields (for nested schemas).
+   * E.g. a key-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   * @param schema The schema containing the metadata
+   */
+  def columnsComments(schema: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
+
+    def handleArrays(a: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
+      a.elementType match {
+        case s: StructType => columnsComments(s, parents)
+        case a: ArrayType => handleArrays(a, parents)
+        case _ => Map()
+      }
+    }
+
+    schema.fields.foldLeft(Map(): Map[Seq[String], String])((map, field) => {
+      val newParents = parents :+ field.name
+      val singlecomment = if (field.getComment().isDefined) Map(newParents -> field.getComment().get) else Map()
+      //only look for identical structures; in the other cases the comments will be updated automatically when writing
+      val nestedComments: Map[Seq[String], String] = field.dataType match {
+        case s: StructType => columnsComments(s, newParents)
+        case a: ArrayType => handleArrays(a, newParents)
+        case _ => Map()
+      }
+      map ++ singlecomment ++ nestedComments
+    })
+  }
+
   def getSchemaFromJavaBean(beanClass: Class[_]): StructType = {
     JavaTypeInference.inferDataType(beanClass)._1.asInstanceOf[StructType]
   }
@@ -202,17 +309,31 @@ object SchemaUtil {
     StructType.fromDDL(ddl)
   }
 
+  def getSchemaFromOpenApi(specUrl: String, operationId: String, responseContentType: String = "application/json")(implicit hadoopConfiguration: Configuration): StructType = {
+    OpenApiUtil.queryOperationSchema(specUrl, operationId, responseContentType) match {
+      case (contentType, x: StructType) => x
+      case (contentType, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema for $operationId, but needs StructType ($specUrl)")
+    }
+  }
+
   def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
     val path = addHadoopDefaultSchemaAuthority(inputPath)
-    if (ResourceUtil.canHandleScheme(path)) {
-      val inputStream = ResourceUtil.readResource(path)
-      new BufferedReader(
-        new InputStreamReader(inputStream, StandardCharsets.UTF_8)
-      ).lines().collect(Collectors.joining())
-    } else {
+    if (ResourceUtil.canHandleScheme(path)) ResourceUtil.readResourceAsString(path)
+    else {
       val filesystem = getHadoopFsWithConf(path)
       readHadoopFile(path)(filesystem)
     }
+  }
+
+  def checkMissingCols(colsLeft: Seq[String], colsRight: Seq[String], caseSensitive: Boolean): Seq[String] = {
+    if (caseSensitive) colsLeft.diff(colsRight)
+    else colsLeft.map(_.toLowerCase).diff(colsRight.map(_.toLowerCase))
+  }
+
+  def checkPartitionMatch(configuredPartitions: Seq[String], existingPartitions: Seq[String], caseSensitive: Boolean): (Boolean, Set[String], Set[String]) = {
+    val (confPartitions, existPartitions) = if (caseSensitive) (configuredPartitions.toSet, existingPartitions.toSet)
+    else (configuredPartitions.map(_.toLowerCase()).toSet, existingPartitions.map(_.toLowerCase()).toSet)
+    (confPartitions==existPartitions, confPartitions, existPartitions)
   }
 
   /**
@@ -273,6 +394,19 @@ object SchemaUtil {
           val content = readFromPath(new Path(path))
           val schema = getSchemaFromAvroSchema(content)
           SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+        } else LazyGenericSchema(schemaConfig)
+      case OpenApi =>
+        val valueElements = value.split(";")
+        assert(2 <= valueElements.size && valueElements.size <= 3, s"OpenApi schema provider configuration error. Configuration format is '<apiDocsUrl>;<operationId>;<responseContentType>', but received $value.")
+        val apiDocsUrl = valueElements(1)
+        val operationId = valueElements(2)
+        val responseContentType = if (valueElements.size >= 3) valueElements(3) else defaultResponseContentType
+        if (!lazyFileReading) {
+          val (contentType, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
+          dataType match {
+            case schema: StructType => SparkSchema(schema)
+            case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed, but got dataType $dataType for operation $operationId")
+          }
         } else LazyGenericSchema(schemaConfig)
     }
   }
@@ -413,5 +547,15 @@ object SchemaProviderType extends Enumeration {
    *   To extract a nested row tag, split the elements by slash (/).
    */
   val AvroSchemaFile: SchemaProviderType.Value = Value("avroschemafile")
+
+  /**
+   * Get schema from OpenApi specification operation
+   * Parameters (semicolon separated):
+   * - baseUrl
+   * - operationId
+   * - optional apiDocsPath, default is v3/api-docs
+   * - optional responseContentType, default is application/json
+   */
+  val OpenApi: SchemaProviderType.Value = Value("openapi")
 
 }
