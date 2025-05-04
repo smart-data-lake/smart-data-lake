@@ -24,27 +24,22 @@ import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumSchemaConsumer}
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
-import org.apache.kafka.connect.runtime.WorkerConfig
 import org.apache.kafka.connect.source.SourceRecord
-import org.apache.kafka.connect.storage.OffsetBackingStore
-import org.apache.kafka.connect.util.Callback
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
-import java.nio.ByteBuffer
 import java.util
-import java.util.{Base64, Properties}
-import java.util.concurrent.{CompletableFuture, ExecutorService, Executors, Future}
+import java.util.Properties
+import java.util.concurrent.{ExecutorService, Executors}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter, setAsJavaSetConverter}
+import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
@@ -65,7 +60,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     }
 
     val defaultOffsetProperties: Map[String, String] = Map(
-      "offset.storage" -> "io.smartdatalake.workflow.dataobject.SDLBDebeziumOffsetStorage",
+      "offset.storage" -> "io.smartdatalake.debezium.SDLBDebeziumOffsetStorage",
       "offset.storage.sdlb.data.object.id" -> this.id.id,
       "offset.flush.interval.ms" -> "10000")
 
@@ -285,7 +280,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     reorderedDF
   }
 
-  protected[dataobject] var incrementalState: mutable.Map[String, String] = mutable.Map()
+  private[smartdatalake] var incrementalState: mutable.Map[String, String] = mutable.Map()
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
@@ -323,7 +318,6 @@ object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
   }
 }
 
-
 private[smartdatalake] class DebeziumCompletionCallback(executorService: ExecutorService) extends DebeziumEngine.CompletionCallback with SmartDataLakeLogger {
 
   var error: Option[Throwable] = None;
@@ -358,68 +352,4 @@ private[smartdatalake] object DebeziumRowConverter {
 
   }
 
-}
-
-class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeLogger {
-
-  private val SDLB_DATA_OBJECT_ID_CONFIG = "offset.storage.sdlb.data.object.id"
-  private var dataObjectId: String = ""
-
-  private val instanceRegistry = Environment.instanceRegistry
-
-  private var data: mutable.Map[ByteBuffer, ByteBuffer] = mutable.Map()
-
-  override def start(): Unit = {
-    logger.info(s"Start SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
-    instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.foreach(state => {
-      val key = stringToByteBuffer(state._1)
-      val value = stringToByteBuffer(state._2)
-
-      data.put(key, value)
-
-    })
-
-  }
-
-  // Helper function to convert Base64 string back to ByteBuffer
-  private def stringToByteBuffer(str: String): ByteBuffer = {
-    val bytes = Base64.getDecoder.decode(str)
-    ByteBuffer.wrap(bytes)
-  }
-
-  override def stop(): Unit = {
-    logger.info(s"Stop SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
-    data.clear()
-  }
-
-  override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] = {
-    CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).asJava)
-  }
-
-  override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
-
-    values.asScala.foreach(state => {
-      val key = byteBufferToString(state._1)
-      val value = byteBufferToString(state._2)
-      instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.put(key, value)
-    })
-
-    CompletableFuture.completedFuture(null)
-  }
-
-  // Helper function to convert ByteBuffer to Base64 string
-  private def byteBufferToString(buffer: ByteBuffer): String = {
-    val bytes = new Array[Byte](buffer.remaining())
-    buffer.get(bytes)
-    Base64.getEncoder.encodeToString(bytes)
-  }
-
-  override def configure(config: WorkerConfig): Unit = {
-    dataObjectId = config.originalsStrings().get(SDLB_DATA_OBJECT_ID_CONFIG)
-  }
-
-  override def connectorPartitions(s: String): util.Set[util.Map[String, AnyRef]] = {
-    // Not used
-    Set.empty[util.Map[String, AnyRef]].asJava
-  }
 }
