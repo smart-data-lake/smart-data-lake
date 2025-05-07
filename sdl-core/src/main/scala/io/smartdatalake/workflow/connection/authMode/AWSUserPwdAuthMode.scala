@@ -23,8 +23,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.webservice.{OAuth2Response, OAuth2Service}
-import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
+import io.smartdatalake.util.webservice.{OAuth2Response, OAuth2Service, HttpTimeoutConfig, HttpProxyConfig}
+
 import org.json4s._
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.jackson.Serialization

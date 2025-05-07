@@ -21,7 +21,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
@@ -88,7 +88,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
 
     //Verify Rest API context endpoint is reachable and returns correct results
     val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
-    val webserviceClientContext = ScalaJWebserviceClient(webserviceDOContext)
+    val webserviceClientContext = SttpWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
       case Failure(exception) =>
         throw exception
@@ -102,7 +102,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     //The problem arises after the second call to the webservice (no matter what the call is)
     // If you encounter it, either: Comment out one of the Calls to the webservice, or use a different JDK version to run the test.
     val webserviceDOContext2 = WebserviceFileDataObject("dummy2", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
-    val webserviceClientContext2 = ScalaJWebserviceClient(webserviceDOContext2)
+    val webserviceClientContext2 = SttpWebserviceClient(webserviceDOContext2)
     webserviceClientContext2.get() match {
       case Failure(exception) =>
         throw exception

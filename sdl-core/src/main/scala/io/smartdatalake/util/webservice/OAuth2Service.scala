@@ -21,7 +21,6 @@ package io.smartdatalake.util.webservice
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.SttpUtil.getContent
-import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, NoTypeHints}

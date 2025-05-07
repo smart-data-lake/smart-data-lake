@@ -19,10 +19,11 @@
 
 package io.smartdatalake.app
 
+import io.netty.handler.codec.http.HttpUtil
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, StateUploader}
-import io.smartdatalake.util.webservice.SttpUtil.getContent
+import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig}
+import io.smartdatalake.util.webservice.SttpUtil.{getContent, createDefaultBackendOptions}
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
 import sttp.client3.{BasicRequestBody, HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, basicRequest}
 import sttp.model.Uri.PathSegment
 import sttp.model._
@@ -83,9 +84,8 @@ case class UIBackendConfig(
                             proxy: Option[HttpProxyConfig] = None
                           ) extends SmartDataLakeLogger {
 
-  private val sttpBackendOptions = Seq(proxy, Some(timeouts)).flatten.foldLeft(SttpBackendOptions.Default) {
-    case (options, config) => config.sttpConfig(options)
-  }
+  private val sttpBackendOptions = createDefaultBackendOptions(proxy, Some(timeouts))
+
   @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(sttpBackendOptions)
   private val params = Map("tenant" -> tenant, "repo" -> repo, "env" -> env)
 

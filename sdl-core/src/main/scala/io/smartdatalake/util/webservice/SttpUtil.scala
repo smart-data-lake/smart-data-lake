@@ -20,11 +20,14 @@
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import sttp.client3.{Identity, Request, Response, SttpBackend}
+import io.smartdatalake.util.secrets.StringOrSecret
+import sttp.client3.{Empty, Identity, Request, RequestT, Response, SttpBackend, SttpBackendOptions}
 
 import java.io.ByteArrayInputStream
 import java.net.URLConnection
+import java.util.concurrent.TimeUnit
 import javax.ws.rs.core.MediaType
+import scala.concurrent.duration.FiniteDuration
 
 object SttpUtil extends SmartDataLakeLogger {
 
@@ -44,7 +47,7 @@ object SttpUtil extends SmartDataLakeLogger {
     response.body.right.get
   }
 
-  def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
+  private def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
     if (response.body.isLeft) {
       throw HttpRequestError(context, response.code.code, response.body.left.get)
     }
@@ -82,6 +85,36 @@ object SttpUtil extends SmartDataLakeLogger {
         response
       }
     }
+  }
+
+  def createDefaultBackendOptions(proxy: Option[HttpProxyConfig], timeouts: Option[HttpTimeoutConfig]): SttpBackendOptions =
+    Seq(proxy, timeouts).flatten.foldLeft(SttpBackendOptions.Default) {
+      case (options, config) => config.sttpConfig(options)
+    }
+
+  type SttpRequest = RequestT[Empty, Either[String, Array[Byte]], Any]
+}
+
+trait SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions
+}
+
+/**
+ * Proxy configuration used to make HTTP-connection.
+ *
+ * @param host proxy host
+ * @param port proxy port
+ */
+case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None) extends SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
+    if (user.nonEmpty && password.nonEmpty) options.httpProxy(host, port, user.get.resolve(), password.get.resolve())
+    else options.httpProxy(host, port)
+  }
+}
+
+case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) extends SttpConfigModifier {
+  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
+    options.connectionTimeout(FiniteDuration(connectionTimeoutMs, TimeUnit.MILLISECONDS))
   }
 }
 

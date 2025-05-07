@@ -6,7 +6,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
-import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceMethod}
+import io.smartdatalake.util.webservice.{SttpWebserviceClient, WebserviceMethod, HttpTimeoutConfig, HttpProxyConfig}
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, OAuthMode}
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -144,17 +144,17 @@ class ODataIOC {
   }
 
   /**
-   * Create a new instance of the io.smartdatalake.util.webservice.ScalaJWebserviceClient class
+   * Create a new instance of the io.smartdatalake.util.webservice.SttpWebserviceClient class
    * @param url
    * @param headers
    * @param timeouts
    * @param authMode
    * @param proxy
    * @param followRedirects
-   * @return io.smartdatalake.util.webservice.ScalaJWebserviceClient
+   * @return io.smartdatalake.util.webservice.SttpWebserviceClient
    */
-  def newScalaJWebServiceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : ScalaJWebserviceClient = {
-    ScalaJWebserviceClient(url, headers, timeouts, authMode, proxy, followRedirects)
+  def newSttpWebserviceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : SttpWebserviceClient = {
+    SttpWebserviceClient(url = url, additionalHeaders = headers, timeouts = timeouts, authMode = authMode, proxy = proxy, followRedirects =  followRedirects, sttpBackendOption = None)
   }
 
   /**
@@ -271,7 +271,7 @@ case class ODataDataObject(override val id: DataObjectId,
                       , mimeType: String = "application/json"
                       , retry: Int = nRetry
                      ) : Array[Byte] = {
-    val webserviceClient = ioc.newScalaJWebServiceClient(url, headers, timeouts, authMode = None, proxy = None, followRedirects = true)
+    val webserviceClient = ioc.newSttpWebserviceClient(url, headers, timeouts, authMode = None, proxy = None, followRedirects = true)
     val webserviceResult = method match {
       case WebserviceMethod.Get =>
         webserviceClient.get()

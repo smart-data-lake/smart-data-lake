@@ -28,7 +28,7 @@ import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
-import io.smartdatalake.util.webservice.{OpenApiOperation, OpenApiSpec, OpenApiUtil, SttpUtil}
+import io.smartdatalake.util.webservice.{OpenApiOperation, OpenApiSpec, OpenApiUtil, SttpUtil, HttpProxyConfig, HttpTimeoutConfig}
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.conf.Configuration

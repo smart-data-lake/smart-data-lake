@@ -25,7 +25,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.DefaultExpressionData
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
@@ -80,12 +80,15 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
    * Download Notebook content from url
    */
   def downloadNotebook(url: String, authMode: Option[AuthMode]): String = {
-    import ScalaJWebserviceClient._
-    val client = new ScalaJWebserviceClient(Http(url)
-      .applyAuthMode(authMode)
-      .option(HttpOptions.followRedirects(true))
-      .header("Accept", "application/x-ipynb+json; application/json")
-    )
+    val client = SttpWebserviceClient(
+      url = url,
+      authMode = authMode,
+      followRedirects = true,
+      additionalHeaders = Map("Accept"-> "application/x-ipynb+json; application/json"),
+      proxy = None,
+      timeouts = None,
+      sttpBackendOption = None
+      )
     client.get() match {
       case Success(content) => new String(content)
       case Failure(ex) => throw new ConfigurationException(s"Could not read notebook code from url $url: ${ex.getClass.getSimpleName}: ${ex.getMessage}")

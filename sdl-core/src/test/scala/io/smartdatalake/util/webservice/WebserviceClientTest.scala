@@ -54,14 +54,14 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
 
   test("Call webservice with wrong Url") {
     val webserviceDO = WebserviceFileDataObject("do1", url = "http://...")
-    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isFailure)
   }
 
   test("Call webservice without Authentication") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/no_auth/")
-    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isSuccess)
   }
@@ -69,14 +69,14 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
   // TODO: Get https calls working. Error: Failure(javax.net.ssl.SSLHandshakeException: Remote host closed connection during handshake)
   ignore("Call a URL with Basic authentication") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(BasicAuthMode(Some(StringOrSecret("testuser")), Some(StringOrSecret("abc")))))
-    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isSuccess)
   }
 
   test("Call webservice with invalid AuthHeader") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(AuthHeaderMode("auth-header", Some(StringOrSecret("Basic xxxxxxxxxxxxx")))))
-    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isFailure)
   }
@@ -97,7 +97,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
 
   test("Check posting JSON") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth")
-    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
     val testJson = s"""{name: "Samantha", age: 31, city: "San Francisco"};""".getBytes
     val response = webserviceClient.post(testJson, "application/json")
     assert(response.isSuccess)

@@ -45,27 +45,6 @@ import scala.util.{Failure, Success, Try}
  */
 case class WebservicePartitionDefinition(name: String, values: Seq[String])
 
-/**
- * Proxy configuration used to make HTTP-connection.
- * @param host proxy host
- * @param port proxy port
- */
-case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None) extends SttpConfigModifier {
-  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
-    if (user.nonEmpty && password.nonEmpty) options.httpProxy(host, port, user.get.resolve(), password.get.resolve())
-    else options.httpProxy(host, port)
-  }
-}
-
-case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) extends SttpConfigModifier {
-  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
-    options.connectionTimeout(FiniteDuration(connectionTimeoutMs, TimeUnit.MILLISECONDS))
-  }
-}
-
-trait SttpConfigModifier {
-  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions
-}
 
 /**
  * [[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.
@@ -135,7 +114,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @return Response as Array[Byte]
    */
   def getResponse(url: String): Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, Some(url))
+    val webserviceClient = SttpWebserviceClient(this, Some(url))
 
     webserviceClient.get() match {
       case Success(c) => c
@@ -153,7 +132,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @return Response as Array[Byte]
    */
   def postResponse(body: Array[Byte], query: Option[String] = None): Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, query.map(url + _))
+    val webserviceClient = SttpWebserviceClient(this, query.map(url + _))
 
     // Try to extract Mime Type
     // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as

@@ -22,11 +22,12 @@ package io.smartdatalake.util.webservice
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpHeaderAuth}
-import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig, WebserviceFileDataObject}
+import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import scalaj.http.{Http, HttpOptions, HttpRequest, HttpResponse}
 
 import scala.util.{Failure, Success, Try}
 
+@deprecated
 private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) extends WebserviceClient {
   private val contentTypeHeader = "content-type"
   override def get(params: Map[String,String] = Map()): Try[Array[Byte]] = {
@@ -49,6 +50,7 @@ private[smartdatalake] case class ScalaJWebserviceClient(request: HttpRequest) e
   }
 }
 
+@deprecated
 private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger {
 
   /**
@@ -61,7 +63,8 @@ private[smartdatalake] object ScalaJWebserviceClient extends SmartDataLakeLogger
   /**
    * Creates a [[WebserviceClient]]
    */
-  def apply(url: String, additionalHeaders: Map[String,String],
+  def apply(url: String,
+            additionalHeaders: Map[String,String],
             timeouts: Option[HttpTimeoutConfig],
             authMode: Option[AuthMode],
             proxy: Option[HttpProxyConfig],
