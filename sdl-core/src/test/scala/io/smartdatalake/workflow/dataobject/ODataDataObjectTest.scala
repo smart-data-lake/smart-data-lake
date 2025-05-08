@@ -24,7 +24,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.webservice.WebserviceException
+import io.smartdatalake.util.webservice.{HttpRequestError, WebserviceException}
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ProcessAllMode}
 import io.smartdatalake.workflow.connection.authMode.OAuthMode
@@ -1071,10 +1071,10 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       server.stop()
     }
 
-    assert(exceptionCaught.isInstanceOf[WebserviceException])
+    assert(exceptionCaught.isInstanceOf[HttpRequestError])
 
-    val webServiceExceptionCaught = exceptionCaught.asInstanceOf[WebserviceException]
-    assert(webServiceExceptionCaught.responseBody.get == "FoobarErrorMessage")
-    assert(webServiceExceptionCaught.getMessage == "Webservice Request failed with error <400> - FoobarErrorMessage")
+    val error = exceptionCaught.asInstanceOf[HttpRequestError]
+    assert(error.err == "FoobarErrorMessage")
+    assert(error.code == 400)
   }
 }
