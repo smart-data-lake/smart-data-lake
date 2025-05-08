@@ -33,7 +33,6 @@ import io.smartdatalake.workflow.connection.authMode.AuthMode
 import org.apache.spark.sql.DataFrame
 import org.json4s._
 import org.json4s.jackson.{JsonMethods, Serialization}
-import scalaj.http.{Http, HttpOptions}
 
 import scala.util.{Failure, Success}
 

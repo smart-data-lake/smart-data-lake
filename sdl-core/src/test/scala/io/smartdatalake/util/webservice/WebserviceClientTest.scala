@@ -26,7 +26,10 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthMode, CustomHttpAuthModeLogic}
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
-import scalaj.http.{Http, HttpResponse}
+import sttp.client3.Response
+import sttp.model.StatusCode
+
+import scala.util.Try
 
 class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll  {
 
@@ -54,8 +57,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
 
   test("Call webservice with wrong Url") {
     val webserviceDO = WebserviceFileDataObject("do1", url = "http://...")
-    val webserviceClient = SttpWebserviceClient(webserviceDO)
-    val response = webserviceClient.get()
+    val response = Try(SttpWebserviceClient(webserviceDO).get())
     assert(response.isFailure)
   }
 
@@ -81,18 +83,16 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
     assert(response.isFailure)
   }
 
-  test("Check response: http status code == 200") {
-    val request = Http("http://...")
-    val response = HttpResponse(body = "hello there".getBytes, code = 200, headers = Map())
-    val check = ScalaJWebserviceClient.checkResponse(request, response)
-    assert(check.isSuccess)
+  test("STTP: Check response: http status code == 200") {
+    val response: Response[Either[String, String]] = Response(body = Right("Hello There"), code = StatusCode(200))
+    val validation = Try(SttpUtil.validateResponse(response, "Test res"))
+    assert(validation.isSuccess)
   }
 
-  test("Check response with http error status code") {
-    val request = Http("http://...")
-    val response = HttpResponse(body = "error".getBytes, code = 403, headers = Map())
-    val check = ScalaJWebserviceClient.checkResponse(request, response)
-    assert(check.isFailure)
+  test("STTP: Check response with http error status code") {
+    val response: Response[Either[String, String]] = Response(body = Left("Error Message"), code = StatusCode(403))
+    val validation = Try(SttpUtil.validateResponse(response, "Test res"))
+    assert(validation.isFailure)
   }
 
   test("Check posting JSON") {
@@ -103,6 +103,7 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
     assert(response.isSuccess)
   }
 
+  //CustomAuthMode is deprecated and will not be tested for STTP
   test("CustomAuthMode") {
     val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth", authMode = Some(CustomHttpAuthMode(className = classOf[MyCustomHttpAuthMode].getName, options = Map("test"-> StringOrSecret("ok")))))
     webserviceDO.prepare

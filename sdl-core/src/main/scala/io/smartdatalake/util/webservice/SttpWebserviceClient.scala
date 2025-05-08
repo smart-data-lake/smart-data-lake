@@ -73,7 +73,14 @@ private[smartdatalake] object SttpWebserviceClient extends SmartDataLakeLogger {
 
     def defaultBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(createDefaultBackendOptions(proxy, timeouts))
 
-    val uri: Uri = uri"$url"
+    val uri: Uri = try {
+      uri"$url"
+    } catch {
+      case e => {
+        logger.error(s"could not parse the following url: $url")
+        throw e
+      }
+    }
     val request = basicRequest
       .response(asByteArray)
       .headers(additionalHeaders)

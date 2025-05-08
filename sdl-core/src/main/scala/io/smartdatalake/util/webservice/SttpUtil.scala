@@ -47,7 +47,7 @@ object SttpUtil extends SmartDataLakeLogger {
     response.body.right.get
   }
 
-  private def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
+  private[smartdatalake] def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
     if (response.body.isLeft) {
       throw HttpRequestError(context, response.code.code, response.body.left.get)
     }
