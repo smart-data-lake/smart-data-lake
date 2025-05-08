@@ -52,13 +52,24 @@ trait DataFrameFunctions {
   def countDistinct(columns: GenericColumn*): GenericColumn
   def approxCountDistinct(columns: GenericColumn, rsd: Option[Double] = None): GenericColumn
   def coalesce(columns: GenericColumn*): GenericColumn
-  def when(condition: GenericColumn, value: GenericColumn): GenericColumn
+
+  def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen
   def stringType: GenericDataType
-  def arrayType(dataType: GenericDataType): GenericDataType
-  def structType(colTypes: Map[String,GenericDataType]): GenericDataType
+
+  def arrayType(dataType: GenericDataType): GenericDataType with GenericArrayDataType
+
+  def structType(colTypes: Map[String, GenericDataType]): GenericDataType with GenericStructDataType
+
+  def structType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType
+
+  def mapType(keyType: GenericDataType, valueType: GenericDataType): GenericDataType with GenericMapDataType
+
+  def field(name: String, dataType: GenericDataType, nullable: Boolean): GenericField
   def concat(exprs: GenericColumn*): GenericColumn
   def regexp_extract(e: GenericColumn, regexp: String, groupIdx: Int): GenericColumn
   def raise_error(column: GenericColumn): GenericColumn
+
+  def hash(column: GenericColumn): GenericColumn
   /**
    * Get a DataFrame with the result of the given sql statement.
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
@@ -72,4 +83,15 @@ trait DataFrameFunctions {
   def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn
   def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
   def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn
+
+  def rowFromSeq(values: Seq[Any]): GenericRow
+
+  def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf
+
+}
+
+trait GenericWhen {
+  def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen
+
+  def otherwise(value: GenericColumn): GenericColumn
 }

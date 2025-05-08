@@ -26,6 +26,8 @@ import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
 import java.net.URI
+import java.sql.Timestamp
+import java.time.LocalDateTime
 
 /**
  * Environment dependent configurations.
@@ -479,7 +481,7 @@ object Environment extends SmartDataLakeLogger {
   var _failSimulationOnMissingInputSubFeeds: Option[Boolean] = None
 
   /**
-   * Whether SDL should run in case sensitive mode. If true Spark will also be configured to be case sensitive.
+   * Whether SDLB should run in case sensitive mode. If true Spark will also be configured to be case sensitive.
    * Default is false.
    */
   def caseSensitive: Boolean = {
@@ -519,6 +521,82 @@ object Environment extends SmartDataLakeLogger {
   }
   var _analyzeTableColumnMaxBytesThreshold: Option[Int] = None
 
+  /**
+   * Upper horizon timestamp for historization.
+   * This is the end validity for current records, e.g. records that are currently valid.
+   * Default is 9999-12-31 00:00:00.0
+   */
+  def historizationUpperHorizonTimestamp: Timestamp = {
+    if (_historizationUpperHorizonTimestamp.isEmpty) {
+      _historizationUpperHorizonTimestamp = Some(
+        EnvironmentUtil.getSdlParameter("historizationUpperHorizonTimestamp")
+          .map(Timestamp.valueOf).getOrElse(Timestamp.valueOf(LocalDateTime.of(9999, 12, 31, 0, 0, 0, 0)))
+      )
+    }
+    _historizationUpperHorizonTimestamp.get
+  }
+
+  var _historizationUpperHorizonTimestamp: Option[Timestamp] = None
+
+  /**
+   * Name of column that marks the creation date of a record.
+   * Used in HistorizeAction and DeduplicateAction.
+   * Default is `dl_ts_captured`.
+   */
+  def capturedColumnName: String = {
+    if (_capturedColumnName.isEmpty) {
+      _capturedColumnName = Some(EnvironmentUtil.getSdlParameter("capturedColumnName").getOrElse("dl_ts_captured"))
+    }
+    _capturedColumnName.get
+  }
+
+  var _capturedColumnName: Option[String] = None
+
+  /**
+   * Name of column that marks the end of validity of a record
+   * Used in HistorizeAction.
+   * Default is `dl_ts_delimited`.
+   */
+  def delimitedColumnName: String = {
+    if (_delimitedColumnName.isEmpty) {
+      _delimitedColumnName = Some(EnvironmentUtil.getSdlParameter("delimitedColumnName").getOrElse("dl_ts_delimited"))
+    }
+    _delimitedColumnName.get
+  }
+
+  var _delimitedColumnName: Option[String] = None
+
+  /**
+   * Whether SDLB should throw an exception if a SparkListener doesn't get expected notifications.
+   * If true SDLB will throw an exception and stop execution, otherwise a Warning is logged.
+   * Default is false, e.g. a warning is logged.
+   */
+  def throwExceptionOnSparkListenerError: Boolean = {
+    if (_throwExceptionOnSparkListenerError.isEmpty) {
+      _throwExceptionOnSparkListenerError = Some(EnvironmentUtil.getSdlParameter("throwExceptionOnSparkListenerError").exists(_.toBoolean))
+    }
+    _throwExceptionOnSparkListenerError.get
+  }
+
+  var _throwExceptionOnSparkListenerError: Option[Boolean] = None
+
+  /**
+   * Timeout in seconds to wait for DataFrame observation result.
+   * Note that this is only relevant for asynchronous observations, e.g. SparkObservation.
+   * Default is 1 second.
+   */
+  def dataFrameObservationTimeoutSec: Int = {
+    if (_dataFrameObservationTimeoutSec.isEmpty) {
+      _dataFrameObservationTimeoutSec = Some(
+        EnvironmentUtil.getSdlParameter("dataFrameObservationTimeoutSec")
+          .map(_.toInt).getOrElse(1)
+      )
+    }
+    _dataFrameObservationTimeoutSec.get
+  }
+
+  var _dataFrameObservationTimeoutSec: Option[Int] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"
@@ -538,7 +616,7 @@ object Environment extends SmartDataLakeLogger {
   private[smartdatalake] var _sdlPlugin: Option[Option[SDLPlugin]] = None
 
   // dynamically shared environment for custom code (see also #106)
-  // attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDL code, but might be used in custom code on your own risk.
+  // attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDLB code, but might be used in custom code on your own risk.
   def sparkSession: SparkSession = _sparkSession
   private [smartdatalake] var _sparkSession: SparkSession = _
   def instanceRegistry: InstanceRegistry = _instanceRegistry

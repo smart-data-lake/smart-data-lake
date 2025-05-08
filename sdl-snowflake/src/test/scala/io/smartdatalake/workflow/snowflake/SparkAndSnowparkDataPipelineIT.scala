@@ -24,11 +24,11 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
-import io.smartdatalake.workflow.action.generic.transformer.{AdditionalColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer, ScalaClassGenericDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
+import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
 
@@ -47,7 +47,7 @@ import java.nio.file.Files
  */
 object SparkAndSnowparkDataPipelineIT extends App {
 
-  val sdlb = new DefaultSmartDataLakeBuilder()
+  val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry = sdlb.instanceRegistry
   implicit val sparkSession = TestUtil.session
   implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
@@ -87,7 +87,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
       ScalaClassSnowparkDfTransformer(className = classOf[TestOptionsSnowparkDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
       // generic predefined transformers
       FilterTransformer(filterClause = "lastname='jonson'"),
-      AdditionalColumnsTransformer(additionalColumns = Map("run_id" -> "runId")),
+      ColumnsTransformer(additionalColumns = Map("run_id" -> "runId")),
       // a custom generic transformer
       ScalaClassGenericDfTransformer(className = classOf[TestAdd1GenericDfTransformer].getName, options = Map("column" -> "rating")),
       SQLDfTransformer(code = "select %{inputViewName}.*, run_id + 1 as run_id2 from %{inputViewName}"),
@@ -114,7 +114,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
   srcDO.writeSparkDataFrame(l1, Seq())
 
   // run
-  val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "ids:.*", applicationName = Some(feed))
+  val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:.*", applicationName = Some(feed))
   sdlb.run(sdlConfig)
 
 }

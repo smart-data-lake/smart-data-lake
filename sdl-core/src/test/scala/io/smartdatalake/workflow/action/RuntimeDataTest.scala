@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.{ExecutionPhase, GenericMetrics, SubFeed}
+import io.smartdatalake.workflow.{ExecutionPhase, GenericMetrics}
 import org.scalatest.FunSuite
 
 import java.time.LocalDateTime
@@ -30,13 +30,13 @@ class RuntimeDataTest extends FunSuite {
 
   test("store and get synchronous events") {
     val runtimeData = SynchronousRuntimeData(10)
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now().plusSeconds(1), ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, None, Seq()))
     assert(runtimeData.getEvents().size==2)
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).size==2)
     assert(runtimeData.getLatestEventState.contains(RuntimeEventState.SUCCEEDED))
     runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.PREPARED, None, Seq()))
-    runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now().plusSeconds(1), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now().plusSeconds(1), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now().plusSeconds(2), ExecutionPhase.Exec, RuntimeEventState.FAILED, None, Seq()))
     assert(runtimeData.getEvents().size==3)
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).size==2)
@@ -47,14 +47,14 @@ class RuntimeDataTest extends FunSuite {
   test("store and get asynchronous events") {
     val runtimeData = AsynchronousRuntimeData(10)
     // synchronous execution first
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now().plusSeconds(1), ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, None, Seq()))
     assert(runtimeData.getEvents().isEmpty) // only asynchronous events can be current
     assert(runtimeData.getLatestEventState.isEmpty)
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).size==2)
     // asynchronous execution
     runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.PREPARED, None, Seq()))
-    runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now().plusSeconds(1), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now().plusSeconds(1), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now().plusSeconds(2), ExecutionPhase.Exec, RuntimeEventState.FAILED, None, Seq()))
     assert(runtimeData.getEvents().size==3)
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).size==2)
@@ -66,10 +66,10 @@ class RuntimeDataTest extends FunSuite {
     val runtimeData = AsynchronousRuntimeData(10)
     val dataObjectId = DataObjectId("test")
     // synchronous execution first
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addMetric(None, dataObjectId, GenericMetrics("spark-metric1", 1, Map()))
     // asynchronous execution 1
-    runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map("metric1" -> 1)))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map("metric2" -> 2)))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
@@ -78,10 +78,10 @@ class RuntimeDataTest extends FunSuite {
     // metric for wrong asynchronous execution
     intercept[AssertionError](runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map())))
     // another synchronous execution (should not happen in real-life, but nevertheless a test what happens)
-    runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addMetric(None, dataObjectId, GenericMetrics("spark-metric2", 1, Map()))
     // second asynchronous execution
-    runtimeData.addEvent(SparkStreamingExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SparkStreamingExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric1", 1, Map("metric1" -> 1)))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(2)), dataObjectId, GenericMetrics("test2-metric2", 2, Map("metric2" -> 2)))
     assert(runtimeData.getMetrics(dataObjectId, Some(SparkStreamingExecutionId(2))).exists(_.getMainInfos.isDefinedAt("metric2")))
@@ -93,7 +93,7 @@ class RuntimeDataTest extends FunSuite {
     val inputDataObjectId = DataObjectId("input")
     val outputDataObjectId = DataObjectId("test")
     val now = LocalDateTime.now()
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now, ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq(SparkSubFeed(None, outputDataObjectId, Seq()))))
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now, ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq(SparkSubFeed(None, outputDataObjectId, Seq()))))
     runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(now.plusSeconds(10), ExecutionPhase.Exec, RuntimeEventState.SUCCEEDED, None, Seq(SparkSubFeed(None, outputDataObjectId, Seq()))))
     val info = runtimeData.getRuntimeInfo(Seq(inputDataObjectId), Seq(outputDataObjectId), Seq())
     assert(info.exists(_.duration.get.getSeconds == 10))
@@ -101,13 +101,13 @@ class RuntimeDataTest extends FunSuite {
 
   test("housekeeping") {
     val runtimeData = SynchronousRuntimeData(5)
-    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addEvent(SDLExecutionId(3), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addEvent(SDLExecutionId(4), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
-    runtimeData.addEvent(SDLExecutionId(5), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(2), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(3), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(4), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(5), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).size == 1)
-    runtimeData.addEvent(SDLExecutionId(6), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.STARTED, None, Seq()))
+    runtimeData.addEvent(SDLExecutionId(6), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).isEmpty)
   }
 

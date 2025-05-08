@@ -62,7 +62,6 @@ import java.time.LocalDateTime
      val context = TestUtil.getDefaultActionPipelineContext
 
      // setup DataObjects
-     val feed = "historize"
      val srcTable = Table(Some("default"), "historize_input")
      val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
      srcDO.dropTable(context)
@@ -86,7 +85,7 @@ import java.time.LocalDateTime
      action1.exec(Seq(srcSubFeed))(context1)
 
      {
-       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)))
+       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp))
          .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
          .drop(Historization.historizeHashColName)
@@ -110,7 +109,7 @@ import java.time.LocalDateTime
      {
        val expected = Seq(
          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context2)
          .drop(Historization.historizeHashColName)
@@ -137,7 +136,7 @@ import java.time.LocalDateTime
        val expected = Seq(
          ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
          ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context3)
          .drop(Historization.historizeHashColName)
@@ -152,7 +151,6 @@ import java.time.LocalDateTime
      val context = TestUtil.getDefaultActionPipelineContext
 
      // setup DataObjects
-     val feed = "historize"
      val srcTable = Table(Some("default"), "historize_input")
      val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
      srcDO.dropTable(context)
@@ -177,8 +175,8 @@ import java.time.LocalDateTime
 
      {
        val expected = Seq(
-          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
-          ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+         ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp),
+         ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
          .drop(Historization.historizeDummyColName)
@@ -202,7 +200,7 @@ import java.time.LocalDateTime
      {
        val expected = Seq(
          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
+         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp),
          ("pan","peter", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context1)
@@ -230,7 +228,7 @@ import java.time.LocalDateTime
        val expected = Seq(
          ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
          ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)),
+         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp),
          ("pan","peter", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
        ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
        val actual = tgtDO.getSparkDataFrame()(context3)

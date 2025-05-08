@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.executionMode.{CustomPartitionMode, CustomPartitionModeLogic, DataFrameIncrementalMode, ExecutionModeFailedException, FileIncrementalMoveMode, PartitionDiffMode}
+import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
@@ -58,15 +58,15 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
   instanceRegistry.register(srcDO)
 
   val tgt1Table = Table(Some("default"), "tgt1", None, Some(Seq("lastname", "firstname")))
-  val tgt1DO = TickTockHiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), table = tgt1Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+  val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), table = tgt1Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
   instanceRegistry.register(tgt1DO)
 
   val tgt2Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname", "firstname")))
-  val tgt2DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+  val tgt2DO = HiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
   instanceRegistry.register(tgt2DO)
 
-  val tgt3Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname", "firstname")))
-  val tgt3DO = TickTockHiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+  val tgt3Table = Table(Some("default"), "tgt3", None, Some(Seq("lastname", "firstname")))
+  val tgt3DO = HiveTableDataObject("tgt3", Some(tempPath + s"/${tgt3Table.fullName}"), table = tgt3Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
   instanceRegistry.register(tgt3DO)
 
   val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath + s"/fileTestSrc", partitions = Seq("lastname"))

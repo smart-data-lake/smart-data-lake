@@ -26,9 +26,10 @@ import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem, Path}
 
 import java.io.{FileNotFoundException, InputStreamReader, Reader}
+import java.util.Properties
 import scala.util.{Failure, Success, Try}
 
 object ConfigLoader extends SmartDataLakeLogger {
@@ -85,7 +86,7 @@ object ConfigLoader extends SmartDataLakeLogger {
    *                            In that case the default configuration is used.
    * @return                    a resolved [[Config]] merged from all found configuration files.
    */
-  def loadConfigFromFilesystem(configLocations: Seq[String], hadoopConf: Configuration): Config = try {
+  def loadConfigFromFilesystem(configLocations: Seq[String], hadoopConf: Configuration, configurationValueOverwrite: Map[String, String] = Map()): Config = try {
     val hadoopPaths = configLocations.map( l => HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(l)))
     logger.info(s"Loading configuration from filesystem locations: ${hadoopPaths.map(_.toUri).mkString(", ")}.")
 
@@ -131,9 +132,10 @@ object ConfigLoader extends SmartDataLakeLogger {
       }
     }
 
-    //system properties take precedence
+    //overwrite and system properties take precedence
     val systemPropConfig = ConfigFactory.systemProperties()
-    mergeConfigs(systemPropConfig +: sortedConfigs.map(_._2)).resolve()
+    val overwriteConfig = ConfigFactory.parseProperties(mapToProperties(configurationValueOverwrite))
+    mergeConfigs(overwriteConfig +: systemPropConfig +: sortedConfigs.map(_._2)).resolve()
   } catch {
     // catch if hadoop libraries are missing and output debug informations
     case ex:UnsatisfiedLinkError =>
@@ -210,6 +212,12 @@ object ConfigLoader extends SmartDataLakeLogger {
       logger.debug(s"Ignoring file '$path'.")
       Seq()
     }
+  }
+
+  def mapToProperties(m: Map[String, String]): Properties = {
+    val properties = new Properties()
+    m.foreach { case (k, v) => properties.put(k, v) }
+    properties
   }
 
   // Helper classes to handle different location types

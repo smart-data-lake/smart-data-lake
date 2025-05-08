@@ -21,14 +21,15 @@ package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
 import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types.{ArrayType, StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame, functions}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Column, DataFrame, Row, functions}
 
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -171,10 +172,8 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    schema match {
-      case sparkSchema: SparkSchema => SparkDataFrame(DataFrameUtil.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
-      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
-    }
+    val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkSchema]
+    SparkDataFrame(DataFrameUtil.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
   }
   override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = {
     schema match {
@@ -189,16 +188,37 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   override def stringType: GenericDataType = SparkDataType(StringType)
-  override def arrayType(dataType: GenericDataType): GenericDataType = {
+
+  override def arrayType(dataType: GenericDataType): SparkArrayDataType = {
     dataType match {
-      case sparkDataType: SparkDataType => SparkDataType(ArrayType(sparkDataType.inner))
+      case sparkDataType: SparkDataType => SparkArrayDataType(ArrayType(sparkDataType.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
     }
   }
-  override def structType(fields: Map[String,GenericDataType]): GenericDataType = {
+
+  override def structType(fields: Map[String, GenericDataType]): SparkStructDataType = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields.values.toSeq)
     val sparkFields = fields.map{ case (name,dataType) => StructField(name, dataType.asInstanceOf[SparkDataType].inner)}.toSeq
-    SparkDataType(StructType(sparkFields))
+    SparkStructDataType(StructType(sparkFields))
+  }
+
+  override def structType(fields: Seq[GenericField]): SparkStructDataType = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
+    SparkStructDataType(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
+  }
+
+  override def mapType(keyType: GenericDataType, valueType: GenericDataType): SparkMapDataType = {
+    (keyType, valueType) match {
+      case (sparkKeyType: SparkDataType, sparkValueType: SparkDataType) => SparkMapDataType(MapType(sparkKeyType.inner, sparkValueType.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(keyType)
+    }
+  }
+
+  override def field(name: String, dataType: GenericDataType, nullable: Boolean): GenericField = {
+    dataType match {
+      case sparkDataType: SparkDataType => SparkField(StructField(name, sparkDataType.inner, nullable))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+    }
   }
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
@@ -213,9 +233,10 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     SparkColumn(functions.struct(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def expr(sqlExpr: String): GenericColumn = SparkColumn(functions.expr(sqlExpr))
-  override def when(condition: GenericColumn, value: GenericColumn): GenericColumn = {
+
+  override def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = {
     (condition, value) match {
-      case (sparkCondition: SparkColumn, sparkValue: SparkColumn) => SparkColumn(functions.when(sparkCondition.inner, sparkValue.inner))
+      case (sparkCondition: SparkColumn, sparkValue: SparkColumn) => new SparkColumn(functions.when(sparkCondition.inner, sparkValue.inner)) with SparkWhen
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${condition.subFeedType.typeSymbol.name}, ${value.subFeedType.typeSymbol.name} in method when")
     }
   }
@@ -237,10 +258,18 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
   override def raise_error(column: GenericColumn): GenericColumn = {
     column match {
-      case snowparkColumn: SparkColumn => SparkColumn(functions.raise_error(snowparkColumn.inner))
+      case sparkColumn: SparkColumn => SparkColumn(functions.raise_error(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+
+  override def hash(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.hash(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
     SparkDataFrame(context.sparkSession.sql(query))
   }
@@ -274,7 +303,6 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       )
       case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
     }
-
   }
 
   override def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn = {
@@ -284,18 +312,65 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  def transform_keys(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn = {
+
+  override def transform_keys(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): GenericColumn = {
     val sparkFunc = (keyColumn: Column, valueColumn: Column) => func(SparkColumn(keyColumn), SparkColumn(valueColumn)).asInstanceOf[SparkColumn].inner
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.transform_keys(sparkColumn.inner, sparkFunc))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  def transform_values(column: GenericColumn, func: (GenericColumn,GenericColumn) => GenericColumn): GenericColumn = {
+
+  override def transform_values(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): GenericColumn = {
     val sparkFunc = (keyColumn: Column, valueColumn: Column) => func(SparkColumn(keyColumn), SparkColumn(valueColumn)).asInstanceOf[SparkColumn].inner
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.transform_values(sparkColumn.inner, sparkFunc))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  override def rowFromSeq(values: Seq[Any]): GenericRow = {
+    SparkRow(Row.fromSeq(values))
+  }
+
+  override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = (srcType, tgtType) match {
+    case (srcType, tgtType) if srcType.isSameType(tgtType) => SparkUnaryUdf(x => x)
+    case (srcType: SparkSimpleDataType, tgtType: SparkSimpleDataType) => SparkUnaryUdf(x => x.cast(tgtType.inner))
+    case (srcType: SparkStructDataType, tgtType: SparkStructDataType) => SparkUnaryUdf(TypeEvolutionUtil.schemaEvolutionUdf(srcType.inner, tgtType.inner))
+    case (srcType: SparkArrayDataType, tgtType: SparkArrayDataType) => new GenericUnaryUdf {
+      override def subFeedType: universe.Type = SparkSubFeed.subFeedType
+
+      override def convert(col: GenericColumn): GenericColumn = {
+        transform(col, schemaEvolutionUdf(srcType.elementDataType, tgtType.elementDataType).convert _)
+      }
+    }
+    case (srcType: SparkMapDataType, tgtType: SparkMapDataType) => new GenericUnaryUdf {
+      override def subFeedType: universe.Type = SparkSubFeed.subFeedType
+
+      override def convert(col: GenericColumn): GenericColumn = {
+        transform_values(
+          transform_keys(col, (k, _) => schemaEvolutionUdf(srcType.keyDataType, tgtType.keyDataType).convert(k)),
+          (_, v) => schemaEvolutionUdf(srcType.valueDataType, tgtType.valueDataType).convert(v)
+        )
+      }
+    }
+  }
+
+}
+
+trait SparkWhen extends GenericWhen {
+  col: SparkColumn =>
+  override def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = {
+    (condition, value) match {
+      case (condition: SparkColumn, value: SparkColumn) => new SparkColumn(col.inner.when(condition.inner, value.inner)) with SparkWhen
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(condition)
+    }
+  }
+
+  override def otherwise(value: GenericColumn): GenericColumn = {
+    value match {
+      case value: SparkColumn => new SparkColumn(col.inner.otherwise(value.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(value)
     }
   }
 }

@@ -209,6 +209,9 @@ object PartitionLayout {
   }
 
   def extractPartitionValues(partitionLayout: String, path: String): PartitionValues = {
+    val cleanPath = if (Environment.caseSensitive) path
+    else "(?:^|/)([^/=]*)=".r.replaceAllIn(path, m => m.group(0).toLowerCase)
+
     val tokens = extractTokens(partitionLayout)
     var partitionLayoutPattern = partitionLayout
     // quote regexp characters in partition layout
@@ -221,12 +224,12 @@ object PartitionLayout {
     })
     // create regex and match with path.
     val partitionLayoutRegex = s"^$partitionLayoutPattern$$".r
-    partitionLayoutRegex.findFirstMatchIn(path) match {
+    partitionLayoutRegex.findFirstMatchIn(cleanPath) match {
       case Some(regexMatch) =>
         val tokenValues = (1 to regexMatch.groupCount).map( i => regexMatch.group(i))
         val tokenMap = tokens.zip(tokenValues).toMap
         PartitionValues(tokenMap)
-      case None => throw new RuntimeException(s"""prepared regexp partition layout "$partitionLayoutRegex" didn't match path "$path"""")
+      case None => throw new RuntimeException(s"""prepared regexp partition layout "$partitionLayoutRegex" didn't match path "$cleanPath"""")
     }
   }
 }

@@ -20,15 +20,19 @@
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.Historization
+import io.smartdatalake.util.historization.HistorizationTestUtils.defaultTimeAxisUnit
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ExecutionPhase
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, TickTockHiveTableDataObject}
+ import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table, JdbcTableDataObject}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
+ import org.scalatest.Assertions.withClue
 
 import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
@@ -38,6 +42,8 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
+
+  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeActionTest", "org.hsqldb.jdbcDriver")
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
@@ -55,17 +61,16 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
   }
 
   test("historize load") {
-
     val context = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val feed = "historize"
     val srcTable = Table(Some("default"), "historize_input")
     val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable(context)
     instanceRegistry.register(srcDO)
-    val tgtTable = Table(Some("default"), "historize_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = TickTockHiveTableDataObject("tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(jdbcConnection)
+    val tgtTable = Table(Some("public"), "historize_output", None, Some(Seq("lastname","firstname")))
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", allowSchemaEvolution = true)
     tgtDO.dropTable(context)
     instanceRegistry.register(tgtDO)
 
@@ -84,7 +89,7 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     assert(tgtSubFeed.asInstanceOf[SparkSubFeed].isDummy) // should return a dummy DataFrame as breakDataFrameOutputLineage is set to true
 
     {
-      val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp)))
+      val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Environment.historizationUpperHorizonTimestamp))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
@@ -107,8 +112,8 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
 
     {
       val expected = Seq(
-        ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-        ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+        ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
@@ -131,9 +136,9 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
 
     {
       val expected = Seq(
-        ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-        ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-        ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), Timestamp.valueOf(definitions.HiveConventions.getHistorizationSurrogateTimestamp))
+        ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
       val resultat = expected.isEqual(actual)
@@ -148,12 +153,15 @@ class HistorizeActionTest extends FunSuite with BeforeAndAfter {
     val srcPath = tempPath+s"/${srcTable.fullName}"
     val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
-    val tgtTable = Table(Some("default"), "historize_output")
-    val tgtPath = tempPath+s"/${tgtTable.fullName}"
-    val tgtDO = TickTockHiveTableDataObject( "tgt1", Some(tgtPath), table = tgtTable, numInitialHdfsPartitions = 1)
+    instanceRegistry.register(jdbcConnection)
+    val tgtTable = Table(Some("public"), "historize_output")
+    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1")
     instanceRegistry.register(tgtDO)
 
-    // prepare & start 1st load
-    intercept[IllegalArgumentException]{HistorizeAction("hist1", srcDO.id, tgtDO.id)}
+    // check primary key missing
+    val exception = intercept[IllegalArgumentException]{HistorizeAction("hist1", srcDO.id, tgtDO.id)}
+    withClue(exception.getMessage) {
+      assert(exception.getMessage.contains("Primary key must be defined for output DataObject"))
+    }
   }
 }

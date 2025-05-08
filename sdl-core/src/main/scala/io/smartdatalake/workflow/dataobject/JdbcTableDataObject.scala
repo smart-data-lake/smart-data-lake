@@ -110,7 +110,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
-    with CanCreateIncrementalOutput with ExpectationValidation {
+    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleConstraints {
 
   /**
    * Connection defines driver, url and db in central location
@@ -162,11 +162,16 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       }
     }
 
+    //If enabled, create or replace the primary Key of the table
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint;
+
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
       val missingPartitionColumns = partitions.toSet.diff(getExistingSchema.get.fieldNames.toSet)
       assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
+
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -235,7 +240,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val genericDf = SparkDataFrame(df)
     validateSchemaMin(genericDf.schema, "write")
     validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(df, "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     if (isTableExisting) {
       if (allowSchemaEvolution) evolveTableSchema(saveModeTargetDf.schema)
@@ -253,7 +258,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     val existingSchema = SparkSchema(getExistingSchema.get)
-    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema]
+    val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SparkSchema(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     // prepare changes
     val newColumns = newSchema.columns.diff(existingSchema.columns) // add new column
     val missingNotNullColumns = existingSchema.columns.diff(newSchema.columns) // make missing columns nullable
@@ -302,7 +307,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val targetSchema = targetDf.schema
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
     if (!allowSchemaEvolution) validateSchemaOnWrite(targetDf)
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
@@ -448,7 +453,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
       // convert to lowercase when Spark is in non-casesensitive mode
-      if (!Environment.caseSensitive) cachedExistingSchema = Some(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get), ignoreNullable = false, caseSensitive = false).asInstanceOf[SparkSchema].inner)
+      if (!Environment.caseSensitive) cachedExistingSchema = Some(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     }
     cachedExistingSchema
   }
@@ -546,6 +551,19 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         else column
       }
     }
+  }
+
+  def getExistingPKConstraint(catalog: Option[String],
+                                       schema: Option[String],
+                                       tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
+    connection.getJdbcPrimaryKey(catalog, schema, tableName)
+  }
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
+    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
+    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
   }
 }
 

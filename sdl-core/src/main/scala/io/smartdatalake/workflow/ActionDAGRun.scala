@@ -240,15 +240,23 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))
     }
-    stateListeners.foreach(_.notifyState(runState, context, changedActionId))
+    if (!context.appConfig.isDryRun) {
+      stateListeners.foreach(_.notifyState(runState, context, changedActionId))
+    }
     // return
     runState
   }
 
   private class ActionEventListener(phase: ExecutionPhase)(implicit context: ActionPipelineContext) extends DAGEventListener[Action] with SmartDataLakeLogger {
     override def onNodeStart(node: Action): Unit = {
-      node.addRuntimeEvent(executionId, phase, RuntimeEventState.STARTED)
+      val state = phase match {
+        case ExecutionPhase.Prepare => RuntimeEventState.PREPARING
+        case ExecutionPhase.Init => RuntimeEventState.INITIALIZING
+        case ExecutionPhase.Exec => RuntimeEventState.RUNNING
+      }
+      node.addRuntimeEvent(executionId, phase, state)
       logger.info(s"${node.toStringShort}: $phase started")
+      saveState(phase, Some(node.id))
     }
 
     override def onNodeSuccess(results: Seq[DAGResult])(node: Action): Unit = {

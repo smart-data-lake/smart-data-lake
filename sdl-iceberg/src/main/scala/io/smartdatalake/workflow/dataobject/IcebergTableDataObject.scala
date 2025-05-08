@@ -87,7 +87,7 @@ import scala.util.Try
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param historyRetentionPeriod Optional Iceberg retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
  * @param acl override connection permissions for files created tables hadoop directory with this connection
- * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
+ * @param connectionId optional id of [[IcebergTableConnection]]
  * @param metadata meta data
  * @param preReadSql SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
  *                   explicitly defined, the ones present in the configured "table" object are used.
@@ -239,6 +239,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) Dropped existing Iceberg table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -331,7 +332,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
     if (isTableExisting) {
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), existingSchema, "write")
@@ -360,7 +361,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, table.primaryKey.getOrElse(Seq()), "write")
+    validateSchemaHasPrimaryKeyCols(targetDf, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 

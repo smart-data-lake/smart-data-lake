@@ -19,10 +19,10 @@
 
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.{BuildVersionInfo, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{DateUtil, ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.apache.spark.util.Json4sCompat
@@ -89,9 +89,11 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     },
     {case obj: Duration => JString(obj.toString)}
   ))
-  private val localDateTimeSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](formats => (
-    {case json: JString => LocalDateTime.parse(json.s)},
-    {case obj: LocalDateTime => JString(obj.toString)}
+  private val localDateTimeToUtcSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](formats => ( {
+    case json: JString => DateUtil.parseDateTimeToLocalDateTime(json.s)
+  }, {
+    case obj: LocalDateTime => JString(DateUtil.convertLocalDateTimeToUtcISOString(obj))
+  }
   ))
   private val actionIdKeySerializer = Json4sCompat.getCustomKeySerializer[ActionId](formats => (
     {case s: String => ActionId(s)},
@@ -118,7 +120,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
-    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeSerializer + runtimeEventStateKeySerializer + partitionValuesSerializer
+    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeToUtcSerializer + runtimeEventStateKeySerializer + partitionValuesSerializer
 
   // write state to Json
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
