@@ -22,7 +22,7 @@ package io.smartdatalake.app
 import com.typesafe.config.Config
 import configs.ConfigReader
 import configs.syntax._
-import io.smartdatalake.config.ConfigImplicits
+import io.smartdatalake.config.{ConfigImplicits, ConfigurationException}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
@@ -70,6 +70,8 @@ import org.apache.spark.util.PrivateAccessor
  * @param pluginOptions  Options for SDLPlugin initialization.
  *                       Note that SDLPlugin.startup is executed before SDLB parses the config, and pluginOptions are only available later when calling SDLPlugin.configure method.
  *                       An SDLPlugin is set through Environment.plugin, normally this is configured through the java system property "sdl.pluginClassName".
+ * @param pluginsOptions  List of options for SDLPlugin initialization in case there are more than one plugin defined. Note that for each options block (Map of configuration KV-pairs)
+ *                        a key 'className' must be provided in order to assign the configuration to the relevant plugin.
  * @param uiBackend      Configuration of the UI backend to upload state updates of the Job runs.
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
@@ -87,6 +89,7 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , synchronousStreamingTriggerIntervalSec: Int = 60
                         , environment: Map[String, String] = Map()
                         , pluginOptions: Map[String, StringOrSecret] = Map()
+                        , pluginsOptions: Seq[Map[String, StringOrSecret]] = Seq()
                         , uiBackend: Option[UIBackendConfig] = None
                        )
 extends SmartDataLakeLogger {
@@ -105,6 +108,21 @@ extends SmartDataLakeLogger {
     SecretsUtil.registerProvider(id, providerConfig.provider)
   }
 
+  /**
+   * If more than one plugin is defined
+   * 1. check that all options have a className key.
+   * 2. Check that all definfed plugins have been configured
+   * 3. configure
+   */
+  if (Environment.sdlPlugins.isDefined) {
+    val pluginList = Environment.sdlPlugins.get
+    val pluginsOptionsClassKey = "className"
+    if (!pluginsOptions.forall(_.get(pluginsOptionsClassKey).isDefined)) throw ConfigurationException(s"Wrong configuration of pluginsOptions: Each plugin-option block must have a '$pluginsOptionsClassKey' key to match the corresponding plugin")
+    val missingOptions = (pluginList.map(_.className).toSet) diff (pluginsOptions.map(_(pluginsOptionsClassKey).resolve()).toSet)
+    missingOptions.foreach(missingClass => throw ConfigurationException(f"Missing configuration block for plugin class $missingClass"))
+    val classToOptionsMap = pluginsOptions.map(m => (m(pluginsOptionsClassKey).resolve() -> m.-(pluginsOptionsClassKey))).toMap
+    pluginList.foreach(p => p.plugin.configure(classToOptionsMap(p.className)))
+  }
   // configure SDLPlugin
   Environment.sdlPlugin.foreach(_.configure(pluginOptions))
 
