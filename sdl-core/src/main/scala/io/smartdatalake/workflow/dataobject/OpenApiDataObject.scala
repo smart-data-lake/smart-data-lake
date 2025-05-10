@@ -28,7 +28,8 @@ import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
-import io.smartdatalake.util.webservice.{OpenApiOperation, OpenApiSpec, OpenApiUtil, SttpUtil, HttpProxyConfig, HttpTimeoutConfig}
+import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend}
+import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.conf.Configuration
@@ -36,11 +37,8 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
 import org.json4s.{JArray, JObject, JValue}
-import sttp.client3.{HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, asByteArray, basicRequest}
+import sttp.client3.{Identity, SttpBackend, asByteArray, basicRequest}
 import sttp.model.{MediaType, Uri}
-
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
 
 /**
  * Reads data from an OpenApi compliant WebService operation.
@@ -74,7 +72,7 @@ import scala.concurrent.duration.FiniteDuration
  * @param urlParameters             Additional Url parameters to pass with the http request to get data
  * @param additionalHeaders         Additional headers to pass with the http request to get spec and data
  * @param timeouts                  optional configuration of HTTP timeouts
- * @param authMode                  Optional configuration of webservice authentication. Supported `AuthMode`s are BasicAuthMode and CustomHttpAuthMode.
+ * @param authMode                  Optional configuration of webservice authentication. Supported `AuthMode`s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.
  *                                  CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
  * @param followRedirects           if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
  * @param pagingLinkJsonPath        If selected operation implements paging and returns content-type application/json, configure a JsonPath expression to extract the link of the next page to query.
@@ -124,10 +122,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
   private var responseSchema: Option[DataType] = None
   private var schema: Option[StructType] = None
 
-  private val sttpBackendOptions = Seq(proxy, timeouts).flatten.foldLeft(SttpBackendOptions.Default) {
-    case (options, config) => config.sttpConfig(options)
-  }
-  @transient private lazy implicit val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(sttpBackendOptions)
+  @transient private lazy implicit val httpBackend: SttpBackend[Identity, Any] = createDefaultBackend(proxy, timeouts)
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val hadoopConf: Configuration = context.hadoopConf
@@ -154,13 +149,14 @@ case class OpenApiDataObject(override val id: DataObjectId,
   }
 
   def getContent(url: String, contentType: String, withUrlParameters: Boolean = true): Array[Byte] = {
-    var request = basicRequest
+    val request = basicRequest
+      .applyAuthMode(authMode)
+      .optionalReadTimeout(timeouts)
       .get(Uri.unsafeParse(url).addParams(if (withUrlParameters) urlParameters else Map[String, String]()))
-      .headers(additionalHeaders ++ authMode.map(_.getHeaders).getOrElse(Map()))
+      .headers(additionalHeaders)
       .header("Allow", contentType)
       .followRedirects(followRedirects)
       .response(asByteArray)
-    if (timeouts.isDefined) request = request.readTimeout(FiniteDuration(timeouts.get.readTimeoutMs, TimeUnit.MILLISECONDS))
     SttpUtil.sendRequest(request, s"($id) get")
   }
 
@@ -234,6 +230,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
   }
 
   override def factory: FromConfigFactory[DataObject] = OpenApiDataObject
+
 }
 
 object OpenApiDataObject extends FromConfigFactory[DataObject] {

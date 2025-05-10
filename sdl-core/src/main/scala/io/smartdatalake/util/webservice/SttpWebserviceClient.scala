@@ -19,21 +19,17 @@
 
 package io.smartdatalake.util.webservice
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.SttpUtil.{createDefaultBackendOptions, SttpRequest}
-import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpHeaderAuth}
+import io.smartdatalake.util.webservice.SttpUtil.{SttpRequest, SttpRequestExtension, createDefaultBackend, parseUrl}
+import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
-
+import sttp.client3.{Identity, SttpBackend, asByteArray, basicRequest}
+import sttp.model.{Method, Uri}
 
 import scala.util.Try
-import scala.concurrent.duration.{Duration, MILLISECONDS}
-import sttp.client3.{HttpClientSyncBackend, Identity, RequestT, SttpBackend, asByteArray, basicRequest}
-import sttp.model.{Method, Uri}
-import sttp.client3._
 
 private[smartdatalake] case class SttpWebserviceClient(uri: Uri,
-                                                          request: SttpRequest,
+                                                       request: SttpRequest[Array[Byte]],
                                                           context: Option[String])
                                                          (implicit httpBackend: SttpBackend[Identity, Any]) extends WebserviceClient {
   val contentTypeHeader = "content-type"
@@ -71,46 +67,16 @@ private[smartdatalake] object SttpWebserviceClient extends SmartDataLakeLogger {
             followRedirects: Boolean,
             sttpBackendOption: Option[SttpBackend[Identity, Any]]): SttpWebserviceClient = {
 
-    def defaultBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(createDefaultBackendOptions(proxy, timeouts))
-
-    val uri: Uri = try {
-      uri"$url"
-    } catch {
-      case e => {
-        logger.error(s"could not parse the following url: $url")
-        throw e
-      }
-    }
+    val uri = parseUrl(url)
     val request = basicRequest
       .response(asByteArray)
       .headers(additionalHeaders)
-      .optionally(timeouts, (v:HttpTimeoutConfig, req:SttpRequest) => req.readTimeout(Duration(v.readTimeoutMs, MILLISECONDS)))
+      .optionalReadTimeout(timeouts)
       .applyAuthMode(authMode)
       .followRedirects(followRedirects)
-    @transient val sttpBackend = sttpBackendOption.getOrElse(defaultBackend)
+    val sttpBackend = sttpBackendOption.getOrElse(createDefaultBackend(proxy, timeouts))
 
     new SttpWebserviceClient(uri = uri, request = request, context = None)(sttpBackend)
-  }
-
-
-
-  /**
-   * Extend functionality of the the RequestT class
-   */
-  implicit class SttpRequestExtension[T, R](request: RequestT[Empty, T, R]) {
-    def optionally[A](config: Option[A], func: (A, RequestT[Empty, T, R]) => RequestT[Empty, T, R]): RequestT[Empty, T, R] = {
-      if (config.isDefined) func(config.get, request) else request
-    }
-
-    //TODO: also allow OAuth2, which is supported by sttp and already used by ODataDataObject
-    def applyAuthMode(authMode: Option[AuthMode]): RequestT[Empty, T, R] = {
-      request.optionally(authMode, (v: AuthMode, request: RequestT[Empty, T, R]) => {
-        v match {
-          case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
-          case x => throw ConfigurationException(s"authentication mode $x is not supported by SttpWebserviceClient")
-        }
-      })
-    }
   }
 
 }

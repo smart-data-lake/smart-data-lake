@@ -19,9 +19,13 @@
 
 package io.smartdatalake.util.webservice
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
-import sttp.client3.{Empty, Identity, Request, RequestT, Response, SttpBackend, SttpBackendOptions}
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpHeaderAuth}
+import sttp.client3.{Empty, HttpClientSyncBackend, Identity, Request, RequestT, Response, SttpBackend, SttpBackendOptions}
+import sttp.model.Uri
+import sttp.model.Uri.unsafeParse
 
 import java.io.ByteArrayInputStream
 import java.net.URLConnection
@@ -66,6 +70,16 @@ object SttpUtil extends SmartDataLakeLogger {
       }
   }
 
+  def parseUrl(url: String): Uri = {
+    try {
+      unsafeParse(url)
+    } catch {
+      case e: Exception =>
+        logger.error(s"could not parse the following url: $url")
+        throw e
+    }
+  }
+
   /**
    * Create an Iterator that query paged Webservices.
    * The Iterator queries the initial URL and extract next URL from response until all pages have been queried.
@@ -92,7 +106,33 @@ object SttpUtil extends SmartDataLakeLogger {
       case (options, config) => config.sttpConfig(options)
     }
 
-  type SttpRequest = RequestT[Empty, Either[String, Array[Byte]], Any]
+  def createDefaultBackend(proxy: Option[HttpProxyConfig] = None, timeouts: Option[HttpTimeoutConfig] = None): SttpBackend[Identity, Any] = {
+    HttpClientSyncBackend(createDefaultBackendOptions(proxy, timeouts))
+  }
+
+  type SttpRequest[R] = RequestT[Empty, Either[String, R], Any]
+
+  /**
+   * Extend functionality of the the RequestT class
+   */
+  implicit class SttpRequestExtension[R](request: SttpRequest[R]) {
+    def optionally[A](config: Option[A], func: (A, SttpRequest[R]) => SttpRequest[R]): SttpRequest[R] = {
+      if (config.isDefined) func(config.get, request) else request
+    }
+
+    def optionalReadTimeout(timeouts: Option[HttpTimeoutConfig]): SttpRequest[R] = {
+      request.optionally(timeouts, (c: HttpTimeoutConfig, request: SttpRequest[R]) => request.readTimeout(c.readTimeout))
+    }
+
+    def applyAuthMode(authMode: Option[AuthMode]): SttpRequest[R] = {
+      request.optionally(authMode, (v: AuthMode, request: SttpRequest[R]) => {
+        v match {
+          case headerAuth: HttpHeaderAuth => request.headers(headerAuth.getHeaders)
+          case x => throw ConfigurationException(s"authentication mode $x is not supported by SttpWebserviceClient")
+        }
+      })
+    }
+  }
 }
 
 trait SttpConfigModifier {
@@ -114,8 +154,12 @@ case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret]
 
 case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) extends SttpConfigModifier {
   def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
-    options.connectionTimeout(FiniteDuration(connectionTimeoutMs, TimeUnit.MILLISECONDS))
+    options.connectionTimeout(connectionTimeout)
   }
+
+  def connectionTimeout: FiniteDuration = FiniteDuration(readTimeoutMs, TimeUnit.MILLISECONDS)
+
+  def readTimeout: FiniteDuration = FiniteDuration(readTimeoutMs, TimeUnit.MILLISECONDS)
 }
 
 
