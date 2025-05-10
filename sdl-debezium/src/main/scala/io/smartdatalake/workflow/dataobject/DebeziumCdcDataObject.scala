@@ -21,8 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer, HasRecords}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -30,16 +30,15 @@ import io.smartdatalake.workflow.connection.DebeziumConnection
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.source.SourceRecord
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
-import scala.concurrent.Future
 import java.util
 import java.util.Properties
 import java.util.concurrent.{ExecutorService, Executors}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
+import scala.jdk.CollectionConverters._
 
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,

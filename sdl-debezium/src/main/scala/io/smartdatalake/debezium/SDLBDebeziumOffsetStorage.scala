@@ -32,7 +32,7 @@ import java.util
 import java.util.Base64
 import java.util.concurrent.{CompletableFuture, Future}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter, mapAsScalaMapConverter, mutableMapAsJavaMap, seqAsJavaListConverter, setAsJavaSetConverter}
+import scala.jdk.CollectionConverters._
 
 /**
  * Custom offset storage that leverage the sdlb state mechanism to save the offset
@@ -70,7 +70,7 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
   }
 
   override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] = {
-    CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).asJava)
+    CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).toMap.asJava)
   }
 
   override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
