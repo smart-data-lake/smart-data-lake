@@ -66,225 +66,226 @@
 
     <profiles>
         <profile>
-          <id>fat-jar</id>
-          <properties>
-            <scala.deps.scope>provided</scala.deps.scope>
-            <spark.deps.scope>provided</spark.deps.scope>
-            <hadoop.deps.scope>provided</hadoop.deps.scope>
-            <hive.deps.scope>provided</hive.deps.scope>
-            <hive.storage.scope>provided</hive.storage.scope>
-            <hive.common.scope>provided</hive.common.scope>
-            <hive.llap.scope>provided</hive.llap.scope>
-            <hive.serde.scope>provided</hive.serde.scope>
-            <hive.shims.scope>provided</hive.shims.scope>
-            <orc.deps.scope>provided</orc.deps.scope>
-            <parquet.deps.scope>provided</parquet.deps.scope>
-            <jetty.deps.scope>provided</jetty.deps.scope>
-          </properties>
-          <build>
-            <plugins>
-              <!-- Builds executable fat-jar that includes all dependencies -->
-              <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-              </plugin>
-            </plugins>
-          </build>
+            <id>fat-jar</id>
+            <properties>
+                <scala.deps.scope>provided</scala.deps.scope>
+                <spark.deps.scope>provided</spark.deps.scope>
+                <hadoop.deps.scope>provided</hadoop.deps.scope>
+                <hive.deps.scope>provided</hive.deps.scope>
+                <hive.storage.scope>provided</hive.storage.scope>
+                <hive.common.scope>provided</hive.common.scope>
+                <hive.llap.scope>provided</hive.llap.scope>
+                <hive.serde.scope>provided</hive.serde.scope>
+                <hive.shims.scope>provided</hive.shims.scope>
+                <orc.deps.scope>provided</orc.deps.scope>
+                <parquet.deps.scope>provided</parquet.deps.scope>
+                <jetty.deps.scope>provided</jetty.deps.scope>
+            </properties>
+            <build>
+                <plugins>
+                    <!-- Builds executable fat-jar that includes all dependencies -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
-          <id>fat-jar-with-spark</id>
-          <build>
-            <plugins>
-              <!-- Builds executable fat-jar that includes all dependencies -->
-              <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-              </plugin>
-            </plugins>
-          </build>
+            <id>fat-jar-with-spark</id>
+            <build>
+                <plugins>
+                    <!-- Builds executable fat-jar that includes all dependencies -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
-          <id>copy-libs</id>
-          <properties>
-            <scala.deps.scope>provided</scala.deps.scope>
-            <spark.deps.scope>provided</spark.deps.scope>
-            <hadoop.deps.scope>provided</hadoop.deps.scope>
-            <hive.deps.scope>provided</hive.deps.scope>
-            <hive.storage.scope>provided</hive.storage.scope>
-            <hive.common.scope>provided</hive.common.scope>
-            <hive.llap.scope>provided</hive.llap.scope>
-            <hive.serde.scope>provided</hive.serde.scope>
-            <hive.shims.scope>provided</hive.shims.scope>
-            <orc.deps.scope>provided</orc.deps.scope>
-            <parquet.deps.scope>provided</parquet.deps.scope>
-            <jetty.deps.scope>provided</jetty.deps.scope>
-          </properties>
-          <build>
-            <plugins>
-              <!-- Copy all dependencies to target/lib folder -->
-              <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.1</version>
-                <executions>
-                  <execution>
-                    <id>copy-libs-exec</id>
-                    <phase>package</phase>
-                    <goals>
-                      <goal>copy-dependencies</goal>
-                    </goals>
-                    <configuration>
-                      <includeScope>runtime</includeScope>
-                      <excludeScope>provided</excludeScope>
-                      <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                      <overWriteIfNewer>true</overWriteIfNewer>
-                    </configuration>
-                  </execution>
-                </executions>
-              </plugin>
-            </plugins>
-          </build>
+            <id>copy-libs</id>
+            <properties>
+                <scala.deps.scope>provided</scala.deps.scope>
+                <spark.deps.scope>provided</spark.deps.scope>
+                <hadoop.deps.scope>provided</hadoop.deps.scope>
+                <hive.deps.scope>provided</hive.deps.scope>
+                <hive.storage.scope>provided</hive.storage.scope>
+                <hive.common.scope>provided</hive.common.scope>
+                <hive.llap.scope>provided</hive.llap.scope>
+                <hive.serde.scope>provided</hive.serde.scope>
+                <hive.shims.scope>provided</hive.shims.scope>
+                <orc.deps.scope>provided</orc.deps.scope>
+                <parquet.deps.scope>provided</parquet.deps.scope>
+                <jetty.deps.scope>provided</jetty.deps.scope>
+            </properties>
+            <build>
+                <plugins>
+                    <!-- Copy all dependencies to target/lib folder -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.1.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-libs-exec</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <excludeScope>provided</excludeScope>
+                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
-          <id>copy-libs-with-spark</id>
-          <build>
-            <plugins>
-              <!-- Copy all dependencies to target/lib folder -->
-              <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.1</version>
-                <executions>
-                  <execution>
-                    <id>copy-libs-with-exec</id>
-                    <phase>package</phase>
-                    <goals>
-                      <goal>copy-dependencies</goal>
-                    </goals>
-                    <configuration>
-                      <includeScope>runtime</includeScope>
-                      <excludeScope>provided</excludeScope>
-                      <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                      <overWriteIfNewer>true</overWriteIfNewer>
-                    </configuration>
-                  </execution>
-                </executions>
-              </plugin>
-            </plugins>
-          </build>
+            <id>copy-libs-with-spark</id>
+            <build>
+                <plugins>
+                    <!-- Copy all dependencies to target/lib folder -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <version>3.1.1</version>
+                        <executions>
+                            <execution>
+                                <id>copy-libs-with-exec</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <includeScope>runtime</includeScope>
+                                    <excludeScope>provided</excludeScope>
+                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                                    <overWriteIfNewer>true</overWriteIfNewer>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
-          <id>scala-2.12</id>
-          <activation>
-            <!-- scala 2.12 is default in spark 3.3/3.4 -->
-            <activeByDefault>true</activeByDefault>
-          </activation>
-          <properties>
-            <scala.minor.version>2.12</scala.minor.version>
-            <scala.version>${scala.minor.version}.18</scala.version>
-            <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
-          </properties>
+            <id>scala-2.12</id>
+            <activation>
+                <!-- scala 2.12 is default in spark 3.3/3.4 -->
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <scala.minor.version>2.12</scala.minor.version>
+                <scala.version>${scala.minor.version}.18</scala.version>
+                <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+            </properties>
         </profile>
         <profile>
-          <id>scala-2.13</id>
-          <properties>
-            <scala.minor.version>2.13</scala.minor.version>
-            <scala.version>${scala.minor.version}.12</scala.version>
-            <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
-          </properties>
+            <id>scala-2.13</id>
+            <properties>
+                <scala.minor.version>2.13</scala.minor.version>
+                <scala.version>${scala.minor.version}.12</scala.version>
+                <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+            </properties>
         </profile>
         <profile>
-          <id>test-sonar</id>
-          <build>
-            <plugins>
-              <plugin>
-                <groupId>org.scoverage</groupId>
-                <artifactId>scoverage-maven-plugin</artifactId>
-                <version>${scoverage.plugin.version}</version>
-                <configuration>
-                  <scalaVersion>${scala.version}</scalaVersion>
-                  <aggregate>true</aggregate>
-                  <highlighting>true</highlighting>
-                </configuration>
-              </plugin>
-            </plugins>
-          </build>
+            <id>test-sonar</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.scoverage</groupId>
+                        <artifactId>scoverage-maven-plugin</artifactId>
+                        <version>${scoverage.plugin.version}</version>
+                        <configuration>
+                            <scalaVersion>${scala.version}</scalaVersion>
+                            <aggregate>true</aggregate>
+                            <highlighting>true</highlighting>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
         <profile>
-          <id>release-sonatype</id>
-          <distributionManagement>
-            <snapshotRepository>
-              <id>ossrh</id>
-              <name>Central Repository OSSRH</name>
-              <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-            </snapshotRepository>
-            <repository>
-              <id>ossrh</id>
-              <name>Central Repository OSSRH</name>
-              <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-            </repository>
-          </distributionManagement>
-          <build>
-            <plugins>
-              <!-- create scala-doc -->
-              <plugin>
-                <groupId>net.alchim31.maven</groupId>
-                <artifactId>scala-maven-plugin</artifactId>
-                <version>4.5.6</version>
-                <executions>
-                  <execution>
-                    <id>scala-doc</id>
-                    <goals>
-                      <goal>doc-jar</goal>
-                    </goals>
-                    <configuration>
-                      <args>
-                        <arg>-no-link-warnings</arg>
-                      </args>
-                    </configuration>
-                  </execution>
-                </executions>
-              </plugin>
-              <!-- sign artifacts with gpg -->
-              <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                  <execution>
-                    <id>sign-artifacts</id>
-                    <phase>verify</phase>
-                    <goals>
-                      <goal>sign</goal>
-                    </goals>
-                    <configuration>
-                      <!-- Prevent `gpg` from using pinentry programs -->
-                      <gpgArguments>
-                        <arg>--pinentry-mode</arg>
-                        <arg>loopback</arg>
-                      </gpgArguments>
-                    </configuration>
-                  </execution>
-                </executions>
-              </plugin>
-              <!-- deploy to sonatype / maven central -->
-              <plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.13</version>
-                <extensions>true</extensions>
-                <configuration>
-                  <serverId>ossrh</serverId>
-                  <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                  <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                  <stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
-                </configuration>
-              </plugin>
-            </plugins>
-          </build>
+            <id>release-sonatype</id>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>ossrh</id>
+                    <name>Central Repository OSSRH</name>
+                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                </snapshotRepository>
+                <repository>
+                    <id>ossrh</id>
+                    <name>Central Repository OSSRH</name>
+                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+                </repository>
+            </distributionManagement>
+            <build>
+                <plugins>
+                    <!-- create scala-doc -->
+                    <plugin>
+                        <groupId>net.alchim31.maven</groupId>
+                        <artifactId>scala-maven-plugin</artifactId>
+                        <version>4.5.6</version>
+                        <executions>
+                            <execution>
+                                <id>scala-doc</id>
+                                <goals>
+                                    <goal>doc-jar</goal>
+                                </goals>
+                                <configuration>
+                                    <args>
+                                        <arg>-no-link-warnings</arg>
+                                    </args>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- sign artifacts with gpg -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Prevent `gpg` from using pinentry programs -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- deploy to sonatype / maven central -->
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.13</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                            <stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
-        </profiles>
-        <properties>
+    </profiles>
+
+    <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <license.header.file>src/license/gplv3-header.txt</license.header.file>
         <maven.compiler.source>1.8</maven.compiler.source>
