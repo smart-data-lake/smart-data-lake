@@ -23,7 +23,6 @@ import java.io.{BufferedWriter, File, FileWriter}
 import java.net.URLEncoder
 import java.nio.file.{Files, Paths}
 import java.time.Instant
-import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe.typeOf
 import scala.util.{Failure, Success}
@@ -223,18 +222,17 @@ case class ODataDataObject(override val id: DataObjectId,
    * @param headers: Additional headers to be sent allong with the request
    * @param body: The body of the message
    * @param mimeType: MIME type of the message
-   * @param retry: Number of retries
+   * @param retries : Number of retries if http request fails. Default is 0 retries.
    * @return the response to the request
    */
-  @tailrec
   private def request(url: String
                       , method: WebserviceMethod = WebserviceMethod.Get
                       , headers: Map[String, String] = Map()
                       , body: String = ""
                       , mimeType: String = "application/json"
-                      , retry: Int = nRetry
+                      , retries: Int = 0
                      ) : Array[Byte] = {
-    val webserviceClient = SttpWebserviceClient(url = url, additionalHeaders = headers, timeouts = timeouts, authMode = authorization, proxy = proxy, followRedirects = followRedirects, sttpBackendOption = None)
+    val webserviceClient = SttpWebserviceClient(url = url, additionalHeaders = headers, timeouts = timeouts, authMode = authorization, proxy = proxy, followRedirects = followRedirects, retries = retries, sttpBackendOption = None)
     val webserviceResult = method match {
       case WebserviceMethod.Get =>
         webserviceClient.get()
@@ -244,16 +242,8 @@ case class ODataDataObject(override val id: DataObjectId,
     }
 
     webserviceResult match {
-      case Success(c) =>
-        logger.info(s"Success for request $url")
-        c
-      case Failure(e) =>
-        if(retry == 0) {
-          logger.error(e.getMessage, e)
-          throw e
-        }
-        logger.info(s"Request will be repeated, because the server responded with: ${e.getMessage}. \nRequest retries left: ${retry-1}")
-        request(url, method, headers, body, mimeType, retry-1)
+      case Success(c) => c
+      case Failure(e) => throw e
     }
   }
 
@@ -263,7 +253,7 @@ case class ODataDataObject(override val id: DataObjectId,
    * @return Map instance with the headers
    */
   private def getRequestHeader: Map[String, String] = {
-    Map("Accept" -> "application/json")
+    Map("Content-Type" -> "application/json; charset=UTF-8", "Accept" -> "application/json")
   }
 
 
@@ -372,7 +362,6 @@ case class ODataDataObject(override val id: DataObjectId,
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     import org.apache.spark.sql.functions._
-    implicit val formats: Formats = DefaultFormats
     val session = context.sparkSession
     import session.implicits._
 
@@ -402,7 +391,7 @@ case class ODataDataObject(override val id: DataObjectId,
       while (requestUrl != "") {
 
         //Execute the current request
-        val responseBytes = request(requestUrl, headers = getRequestHeader)
+        val responseBytes = request(requestUrl, headers = getRequestHeader, retries = nRetry)
 
         //Convert the current response into a string
         val responseString = new String(responseBytes, "UTF8")

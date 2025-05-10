@@ -25,17 +25,13 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.SttpUtil.guessMimeType
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import sttp.client3.SttpBackendOptions
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -67,6 +63,7 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  *                    Default method is POST.
  * @param proxy optional Proxy configuration used to make HTTP-connection.
  * @param followRedirects if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param retries         number of retries if http request fails. Default is 0 retries.
  * @param partitionDefs Optional list of partitions and possible partition values.
  *                      Partitions and their values are mapped as query parameter in webservice requests.
  *                      Multiple values are translated into multiple requests. Each request handles one combination of partition values.
@@ -83,6 +80,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     writeMethod: WebserviceMethod = WebserviceMethod.Post,
                                     proxy: Option[HttpProxyConfig] = None,
                                     followRedirects: Boolean = false,
+                                    retries: Int = 0,
                                     partitionDefs: Seq[WebservicePartitionDefinition] = Seq(),
                                     override val partitionLayout: Option[String] = None,
                                     pagingLinkRegex: Option[String] = None,

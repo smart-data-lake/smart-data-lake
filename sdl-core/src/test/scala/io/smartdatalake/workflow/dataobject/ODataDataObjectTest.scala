@@ -19,317 +19,24 @@
 
 package io.smartdatalake.workflow.dataobject
 
+import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.webservice.{HttpRequestError, WebserviceException}
+import io.smartdatalake.util.webservice.{HttpRequestError, HttpTimeoutConfig}
+import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ProcessAllMode}
 import io.smartdatalake.workflow.connection.authMode.OAuthMode
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrameReader, SparkSession}
-import org.mockito.ArgumentMatchers.{any, isNull, eq => eqTo}
 import org.mockito.{Mockito => m}
 
 import java.io.File
 import java.nio.file.Files
 import java.time.Instant
-import scala.collection.mutable.ArrayBuffer
-
-class ODataResponseMemoryBufferTest extends DataObjectTestSuite {
-
-  def init_ioc(): ODataIOC = {
-    org.mockito.Mockito.mock(classOf[ODataIOC])
-  }
-
-  def init_sut(ioc: ODataIOC = new ODataIOC(), threshold: Int = 9999, tableName: String = null): ODataResponseMemoryBuffer = {
-    val context = this.contextExec
-    val setup = ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(threshold))
-
-    if (tableName != null) {
-      setup.setActionName(tableName)
-    }
-
-    new ODataResponseMemoryBuffer(setup, context, ioc)
-  }
-
-  test("ODataResponseMemoryBuffer - addResponse") {
-    val sut = init_sut()
-
-    sut.addResponse("TEST1")
-    assert(sut.getResponseBuffer == ArrayBuffer("TEST1"))
-    assert(sut.getStoredCharacterCount == 5)
-
-    sut.addResponse("TEST2")
-    assert(sut.getResponseBuffer == ArrayBuffer("TEST1", "TEST2"))
-    assert(sut.getStoredCharacterCount == 10)
-  }
-
-  test("ODataResponseMemoryBuffer - addResponses") {
-    val sut = init_sut()
-
-    sut.addResponses(Array("TEST1", "TEST2"))
-    assert(sut.getResponseBuffer == ArrayBuffer("TEST1", "TEST2"))
-    assert(sut.getStoredCharacterCount == 10)
-  }
-
-  test("ODataResponseMemoryBuffer - getDataFrame") {
-    val sut = init_sut()
-
-    sut.addResponse("TEST1")
-    sut.addResponse("TEST2")
-    sut.addResponse("TEST3")
-
-    val df = sut.getDataFrame
-    val df_data = df.collect()
-
-    assert(df.schema.fieldNames sameElements Array("responseString"))
-
-    val rec1 = df_data(0)
-    assert(rec1.getString(0) == "TEST1")
-
-    val rec2 = df_data(1)
-    assert(rec2.getString(0) == "TEST2")
-
-    val rec3 = df_data(2)
-    assert(rec3.getString(0) == "TEST3")
-  }
-
-
-  test("ODataResponseMemoryBuffer - cleanUp") {
-    val sut = init_sut()
-    sut.addResponse("TEST1")
-
-    sut.cleanUp()
-
-    assert(sut.getResponseBuffer == ArrayBuffer[String]())
-    assert(sut.getStoredCharacterCount == 0)
-  }
-
-  test("ODataResponseMemoryBuffer - switchIfNecessary - still under threshold") {
-    //val bufferMock = org.mockito.Mockito.mock(classOf[ODataResponseBuffer])
-    //m.doReturn(bufferMock).when(ioc.newODataResponseFileBufferByType(org.mockito.ArgumentMatchers.any[String])
-    //(ioc.newODataResponseFileBufferByType _).when().returns(bufferMock)
-    //val newBuffer = mockito.Mockito.mock(classOf[ODataResponseDBFSFileBuffer])
-    //ODataResponseBufferFactory.injectTestInstance(newBuffer)
-
-    val ioc = init_ioc()
-    val sut = init_sut(ioc)
-    sut.addResponse("TEST")
-
-    val result = sut.switchIfNecessary()
-
-    assert(result == sut)
-    m.verify(ioc, m.never()).newODataResponseFileBuffer(any[String], any[ODataResponseBufferSetup], any[ActionPipelineContext])
-  }
-
-  test("ODataResponseMemoryBuffer - switchIfNecessary - new buffer") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(3))
-    setup.setActionName("TABLE")
-
-    val ioc = init_ioc()
-    val newBuffer = m.mock(classOf[ODataResponseFileBuffer])
-    m.when(ioc.newODataResponseFileBuffer("TABLE", setup, context)).thenReturn(newBuffer)
-    val sut = new ODataResponseMemoryBuffer(setup, context, ioc)
-
-    sut.addResponse("TEST")
-    val result = sut.switchIfNecessary()
-
-    assert(result == newBuffer)
-    m.verify(ioc, m.times(1)).newODataResponseFileBuffer("TABLE", setup, context)
-  }
-
-
-  test("ODataResponseMemoryBuffer - switchIfNecessary - above threshold but no path") {
-    val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(None, Some(3))
-    setup.setActionName("TABLE")
-
-    val ioc = init_ioc()
-    val sut = new ODataResponseMemoryBuffer(setup, context, ioc)
-
-    sut.addResponse("TEST")
-    val result = sut.switchIfNecessary()
-
-    assert(result == sut)
-    m.verify(ioc, m.never()).newODataResponseFileBuffer(any[String], any[ODataResponseBufferSetup], any[ActionPipelineContext])
-  }
-
-  test("ODataResponseLocalFileBuffer - getDirectoryPath") {
-  }
-}
-
-class ODataResponseFileBufferTest extends DataObjectTestSuite {
-
-  def init_ioc_mock(): ODataIOC = {
-
-    val instant = Instant.ofEpochSecond(1726124260)
-
-    val mock_ioc = org.mockito.Mockito.mock(classOf[ODataIOC])
-    m.doReturn(instant, Seq.empty: _*).when(mock_ioc).getInstantNow
-
-    mock_ioc
-
-  }
-
-  def init_context(): ActionPipelineContext = {
-    m.mock(classOf[ActionPipelineContext])
-  }
-
-  def init_sut_spy(ioc:ODataIOC,  bufferType: String = "BUFFERTYPE", path: String = "PATH", limit: Int = 3, context: Option[ActionPipelineContext] = None, fileSystem: Option[org.apache.hadoop.fs.FileSystem] = None): ODataResponseFileBuffer = {
-    val setup = ODataResponseBufferSetup(Some("PATH"), Some(3))
-
-    val filesystem_mock = fileSystem.getOrElse(m.mock(classOf[org.apache.hadoop.fs.FileSystem]))
-
-    m.doReturn(filesystem_mock, Seq.empty: _*).when(ioc).newHadoopFsWithConf(any[org.apache.hadoop.fs.Path], any[ActionPipelineContext])
-
-    val sut = new ODataResponseFileBuffer("TMPDIR", setup, context.getOrElse(init_context()), ioc)
-    m.spy(sut)
-  }
-
-  test("ODataResponseFileBufferTest - initTemporaryDirectory") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-
-    m.doNothing().when(sut).clearTemporaryDirectory()
-    m.doNothing().when(sut).makeTempDirIfNotExists()
-
-    sut.initTemporaryDirectory()
-    m.verify(sut, m.times(1)).clearTemporaryDirectory()
-    m.verify(sut, m.times(1)).makeTempDirIfNotExists()
-
-    sut.initTemporaryDirectory()
-    m.verify(sut, m.times(1)).clearTemporaryDirectory()
-    m.verify(sut, m.times(1)).makeTempDirIfNotExists()
-  }
-
-  test("ODataResponseFileBufferTest - makeTempDirIfNotExists") {
-    val ioc = init_ioc_mock()
-    val filesystem = m.mock(classOf[org.apache.hadoop.fs.FileSystem])
-    val mock_path = m.mock(classOf[org.apache.hadoop.fs.Path])
-    m.doReturn(mock_path, Seq.empty: _*).when(ioc).newHadoopPath(any[String])
-    val sut = init_sut_spy(ioc, fileSystem = Some(filesystem))
-
-    assert(sut.getFileSystem == filesystem)
-
-    sut.makeTempDirIfNotExists()
-
-    m.verify(filesystem, m.times(1)).mkdirs(isNull[org.apache.hadoop.fs.Path])
-  }
-
-  test("ODataResponseFileBufferTest - cleanUp") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-
-    m.doNothing().when(sut).clearTemporaryDirectory()
-
-    sut.cleanUp()
-
-    m.verify(sut, m.times(1)).clearTemporaryDirectory()
-  }
-
-  test("ODataResponseFileBufferTest - clearTemporaryDirectory - when exists") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-    val filesystem = sut.getFileSystem
-
-    m.doReturn(true, Seq.empty: _*).when(filesystem).exists(any[org.apache.hadoop.fs.Path])
-
-    sut.clearTemporaryDirectory()
-
-    m.verify(filesystem, m.times(1)).exists(any[org.apache.hadoop.fs.Path])
-    m.verify(filesystem, m.times(1)).delete(any[org.apache.hadoop.fs.Path], eqTo(true))
-  }
-
-  test("ODataResponseFileBufferTest - clearTemporaryDirectory - when not exists") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-    val filesystem = sut.getFileSystem
-
-    m.doReturn(false, Seq.empty: _*).when(filesystem).exists(any[org.apache.hadoop.fs.Path])
-
-    sut.clearTemporaryDirectory()
-
-    m.verify(filesystem, m.times(1)).exists(any[org.apache.hadoop.fs.Path])
-    m.verify(filesystem, m.times(0)).delete(any[org.apache.hadoop.fs.Path], any[Boolean])
-  }
-
-  test("ODataResponseFileBufferTest - writeToFile") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-    val filesystem = sut.getFileSystem
-    val path_mock = m.mock(classOf[org.apache.hadoop.fs.Path])
-
-    m.doNothing().when(sut).initTemporaryDirectory()
-    m.doReturn(path_mock, Seq.empty: _*).when(ioc).newHadoopPath(any[org.apache.hadoop.fs.Path], eqTo("FILENAME"))
-
-
-    sut.writeToFile("FILENAME", "CONTENT")
-
-    m.verify(sut, m.times(1)).initTemporaryDirectory()
-    m.verify(ioc, m.times(1)).writeHadoopFile(eqTo(path_mock), eqTo("CONTENT"), eqTo(filesystem))
-  }
-
-  test("ODataResponseFileBufferTest - generateFileName") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-
-    m.doReturn(42, Seq.empty: _*).when(sut).getResponseCount
-
-    val result = sut.generateFileName()
-
-    assert(result == "42.json")
-  }
-
-  test("ODataResponseFileBufferTest - addResponse") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-
-    m.doReturn("FILENAME", Seq.empty: _*).when(sut).generateFileName()
-    m.doNothing().when(sut).writeToFile(any[String], any[String])
-
-    sut.addResponse("RESPONSE")
-
-    m.verify(sut, m.times(1)).writeToFile("FILENAME", "RESPONSE")
-  }
-
-  test("ODataResponseFileBufferTest - getDataFrame") {
-    val ioc = init_ioc_mock()
-    val context = init_context()
-    val session = m.mock(classOf[SparkSession])
-    val reader = m.mock(classOf[DataFrameReader])
-    val dataframe = m.mock(classOf[org.apache.spark.sql.DataFrame])
-    val path = m.mock(classOf[org.apache.hadoop.fs.Path])
-
-    m.doReturn(session, Seq.empty: _*).when(context).sparkSession
-    m.doReturn(reader, Seq.empty: _*).when(session).read
-    m.doReturn(reader, Seq.empty: _*).when(reader).option(any[String], any[Boolean])
-
-    m.doReturn("PATH", Seq.empty: _*).when(path).toString
-    m.doReturn(path, Seq.empty: _*).when(ioc).newHadoopPath(any[String], any[String])
-    m.doReturn(dataframe, Seq.empty: _*).when(reader).text(any[String])
-    m.doReturn(dataframe, Seq.empty: _*).when(dataframe).withColumnRenamed("value", "responseString")
-
-    val sut = init_sut_spy(ioc, context = Some(context))
-    val result = sut.getDataFrame
-
-    assert(result == dataframe)
-  }
-
-  test("ODataResponseFileBufferTest - switchIfNecessary") {
-    val ioc = init_ioc_mock()
-    val sut = init_sut_spy(ioc)
-
-    val result = sut.switchIfNecessary()
-
-    assert(result == sut)
-  }
-}
 
 class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
@@ -578,13 +285,22 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
 class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
+  val port = 8080
+  val httpsPort = 8443
+  val host = "127.0.0.1"
+  var server: WireMockServer = _
+
+  override def additionalBefore(): Unit = {
+    server = TestUtil.startWebservice(host, port, httpsPort)
+  }
+
+  after {
+    server.stop()
+  }
 
   test("Simple Test without special options and only two records") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
-    val auth_response = """{"access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
+
+    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
@@ -629,16 +345,10 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val record2 = resultData(1)
     assert(record2.getString(0) == "FOOBAR_2A")
     assert(record2.getInt(1) == 2)
-
-    server.stop()
   }
 
   test("With state") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
-    val auth_response = """{"access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
+    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
@@ -694,16 +404,10 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val newState = sut.getState
     assert(newState.get == "2024-06-10T10:03:44.000Z")
-
-    server.stop()
   }
 
   test("With three pages with memory buffer") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
-    val auth_response = """{"access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
+    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
@@ -787,16 +491,10 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val newState = sut.getState
     assert(newState.get == "2024-06-10T10:03:48.000Z")
-
-    server.stop()
   }
 
   test("With three pages with temp file buffer") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
-    val auth_response = """{"access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
+    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
@@ -894,15 +592,10 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     assert(numOfTempFiles2 == 0)
 
     temp_dir_base.delete()
-    server.stop()
   }
 
   test("With connection problems and retry success") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
-    val auth_response = """{"access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
+    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .inScenario("FailTheFirstTime")
@@ -926,7 +619,8 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(response1))
     )
 
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"),
+      timeouts = Some(HttpTimeoutConfig(connectionTimeoutMs = 500, readTimeoutMs = 500)))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -956,21 +650,16 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val record2 = resultData(1)
     assert(record2.getString(0) == "FOOBAR_2A")
     assert(record2.getInt(1) == 2)
-
-    server.stop()
   }
 
   test("With connection problems and no retry success") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .willReturn(w.aResponse().withFault(com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER))
     )
 
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
+    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"),
+      timeouts = Some(HttpTimeoutConfig(connectionTimeoutMs = 500, readTimeoutMs = 500)))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -987,22 +676,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
     val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
-    //val context_mock = m.mock(classOf[ActionPipelineContext])
-    //m.doReturn(this.session,Seq.empty: _*).when(context_mock).sparkSession
-    var exceptionCaught = false
-
-    try {
-      sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
-    }
-    catch
-    {
-      case x: Exception => exceptionCaught = true
-    }
-    finally {
-      server.stop()
-    }
-
-    assert(exceptionCaught)
+    intercept[Exception](sut.getSparkDataFrame(Seq.empty)(actionPipelineContext))
   }
 
   test("Regression test - Missing incremental column in schema") {
@@ -1032,10 +706,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   }
 
   test("Test with error message on remote errors") {
-    val port = 8080
-    val httpsPort = 8443
-    val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
       .willReturn(w.aResponse().withStatus(400).withBody("FoobarErrorMessage"))
@@ -1058,22 +728,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
     val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
-    var exceptionCaught : Exception = null
-
-    try {
-      sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
-    }
-    catch
-    {
-      case x: Exception => exceptionCaught = x
-    }
-    finally {
-      server.stop()
-    }
-
-    assert(exceptionCaught.isInstanceOf[HttpRequestError])
-
-    val error = exceptionCaught.asInstanceOf[HttpRequestError]
+    val error = intercept[HttpRequestError](sut.getSparkDataFrame(Seq.empty)(actionPipelineContext))
     assert(error.err == "FoobarErrorMessage")
     assert(error.code == 400)
   }

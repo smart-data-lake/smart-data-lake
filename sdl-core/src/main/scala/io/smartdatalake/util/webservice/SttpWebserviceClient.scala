@@ -24,15 +24,16 @@ import io.smartdatalake.util.webservice.SttpUtil.{SttpRequest, SttpRequestExtens
 import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import sttp.client3.{Identity, SttpBackend, asByteArray, basicRequest}
-import sttp.model.{Method, Uri}
+import sttp.model.{HeaderNames, Method, Uri}
 
 import scala.util.Try
 
 private[smartdatalake] case class SttpWebserviceClient(uri: Uri,
                                                        request: SttpRequest[Array[Byte]],
-                                                          context: Option[String])
-                                                         (implicit httpBackend: SttpBackend[Identity, Any]) extends WebserviceClient {
-  val contentTypeHeader = "content-type"
+                                                       retries: Int,
+                                                       context: Option[String])
+                                                      (implicit httpBackend: SttpBackend[Identity, Any])
+  extends WebserviceClient {
   override def get(params: Map[String, String]): Try[Array[Byte]] = send(method = Method.GET, params = params)
 
   override def post(body: Array[Byte], mimeType: String, params: Map[String, String]): Try[Array[Byte]] = send(Method.POST, body, mimeType, params)
@@ -46,18 +47,18 @@ private[smartdatalake] case class SttpWebserviceClient(uri: Uri,
     val uriWithParams = uri.addParams(params)
     val req = method match {
       case Method.GET => request.get(uriWithParams)
-      case Method.PUT => request.put(uriWithParams).header(contentTypeHeader, mimeType).body(body)
-      case Method.POST => request.post(uriWithParams).header(contentTypeHeader, mimeType).body(body)
-      case Method.PATCH => request.patch(uriWithParams).header(contentTypeHeader, mimeType).body(body)
+      case Method.PUT => request.put(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
+      case Method.POST => request.post(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
+      case Method.PATCH => request.patch(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
     }
-    Try(SttpUtil.sendRequest(req, contextForErrorMsg))
+    Try(SttpUtil.sendRequest(req, contextForErrorMsg, retries))
   }
 }
 
 private[smartdatalake] object SttpWebserviceClient extends SmartDataLakeLogger {
 
   def apply(config: WebserviceFileDataObject, url: Option[String] = None): SttpWebserviceClient = {
-    apply(url.getOrElse(config.url), config.additionalHeaders, config.timeouts, config.authMode, config.proxy, config.followRedirects, None)
+    apply(url.getOrElse(config.url), config.additionalHeaders, config.timeouts, config.authMode, config.proxy, config.followRedirects, config.retries, None)
   }
   def apply(url: String,
             additionalHeaders: Map[String, String],
@@ -65,6 +66,7 @@ private[smartdatalake] object SttpWebserviceClient extends SmartDataLakeLogger {
             authMode: Option[AuthMode],
             proxy: Option[HttpProxyConfig],
             followRedirects: Boolean,
+            retries: Int,
             sttpBackendOption: Option[SttpBackend[Identity, Any]]): SttpWebserviceClient = {
 
     val uri = parseUrl(url)
@@ -76,7 +78,7 @@ private[smartdatalake] object SttpWebserviceClient extends SmartDataLakeLogger {
       .followRedirects(followRedirects)
     val sttpBackend = sttpBackendOption.getOrElse(createDefaultBackend(proxy, timeouts))
 
-    new SttpWebserviceClient(uri = uri, request = request, context = None)(sttpBackend)
+    new SttpWebserviceClient(uri = uri, request = request, retries = retries, context = None)(sttpBackend)
   }
 
 }

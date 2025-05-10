@@ -75,6 +75,7 @@ import sttp.model.{MediaType, Uri}
  * @param authMode                  Optional configuration of webservice authentication. Supported `AuthMode`s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.
  *                                  CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
  * @param followRedirects           if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param retries                   number of retries if http request fails. Default is 0 retries.
  * @param pagingLinkJsonPath        If selected operation implements paging and returns content-type application/json, configure a JsonPath expression to extract the link of the next page to query.
  *                                  The JsonPath expression should return a String or a list of Strings as result.
  *                                  If a link for the next page is not found, it is assumed that it is the last page and no further queries will be made.
@@ -96,6 +97,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
                              authMode: Option[HttpAuthMode] = None,
                              proxy: Option[HttpProxyConfig] = None,
                              followRedirects: Boolean = false,
+                             retries: Int = 0,
                              urlParameters: Map[String, String] = Map(),
                              additionalHeaders: Map[String, String] = Map(),
                              timeouts: Option[HttpTimeoutConfig] = None,
@@ -157,7 +159,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
       .header("Allow", contentType)
       .followRedirects(followRedirects)
       .response(asByteArray)
-    SttpUtil.sendRequest(request, s"($id) get")
+    SttpUtil.sendRequest(request, s"($id) get", retries)
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {

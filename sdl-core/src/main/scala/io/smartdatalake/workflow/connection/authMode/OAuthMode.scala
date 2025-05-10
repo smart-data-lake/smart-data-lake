@@ -39,6 +39,10 @@ import sttp.model.{Header, MediaType}
  * @param clientSecret Password of the user (supports secret providers)
  * @param oauthScope OAuth authorization scope (like https://xxx.crm4.dynamics.com/.default) (supports secret providers)
  * @param useIdToken If true, id_token is used for Http Authorization header, otherwise access_token. Default is false.
+ * @param proxy      optional Proxy configuration used to make HTTP-connection.
+ * @param timeouts   optional configuration of HTTP timeouts
+ * @param followRedirects if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param retries number of retries if http request fails. Default is 1 retry.
  */
 case class OAuthMode (
                        oauthUrl: StringOrSecret,
@@ -47,11 +51,13 @@ case class OAuthMode (
                        oauthScope: StringOrSecret,
                        useIdToken: Boolean = false,
                        proxy: Option[HttpProxyConfig] = None,
-                       timeouts: Option[HttpTimeoutConfig] = None
+                       timeouts: Option[HttpTimeoutConfig] = None,
+                       followRedirects: Boolean = false,
+                       retries: Int = 1
                      ) extends HttpAuthMode with SmartDataLakeLogger {
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
-  private lazy val oAuth2Service = OAuth2Service(oauthUrl.resolve(), Some(clientId.resolve()), clientCredentialsInit, proxy, timeouts)
+  private lazy val oAuth2Service = OAuth2Service(oauthUrl.resolve(), Some(clientId.resolve()), clientCredentialsInit, proxy, timeouts, followRedirects, retries)
   private val oauthUri = parseUrl(oauthUrl.resolve())
 
   override def prepare(): Unit = {
@@ -74,10 +80,10 @@ case class OAuthMode (
       .post(oauthUri)
       .header("Content-Type", "application/x-www-form-urlencoded")
       .header(Header.accept(MediaType.ApplicationJson))
-      .followRedirects(true)
+      .followRedirects(followRedirects)
       .body(payload) // Map is automatically serialized as "application/x-www-form-urlencoded" by sttp
 
-    parse(oAuth2Service.sendRequest(request, "AWS initiate auth")).extract[OAuth2Response]
+    parse(oAuth2Service.sendRequest(request, "OAuth initiate")).extract[OAuth2Response]
   }
 
   override def getHeaders: Map[String, String] = {

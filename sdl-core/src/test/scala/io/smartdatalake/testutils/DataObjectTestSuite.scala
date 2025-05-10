@@ -18,14 +18,14 @@
  */
 package io.smartdatalake.testutils
 
-import java.nio.file.Files
-import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql._
 import org.scalatest.{BeforeAndAfter, FunSuite, Matchers}
+
+import java.nio.file.Files
 
 
 trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
@@ -49,5 +49,8 @@ trait DataObjectTestSuite extends FunSuite with Matchers with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    additionalBefore()
   }
+
+  def additionalBefore(): Unit = ()
 }

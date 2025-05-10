@@ -24,13 +24,12 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpHeaderAuth}
 import sttp.client3.{Empty, HttpClientSyncBackend, Identity, Request, RequestT, Response, SttpBackend, SttpBackendOptions}
-import sttp.model.Uri
 import sttp.model.Uri.unsafeParse
+import sttp.model.{MediaType, Uri}
 
 import java.io.ByteArrayInputStream
 import java.net.URLConnection
 import java.util.concurrent.TimeUnit
-import javax.ws.rs.core.MediaType
 import scala.concurrent.duration.FiniteDuration
 
 object SttpUtil extends SmartDataLakeLogger {
@@ -40,9 +39,19 @@ object SttpUtil extends SmartDataLakeLogger {
    */
   def canHandleScheme(uri: String): Boolean = uri.matches("https?:.*")
 
-  def sendRequest[T](request: Request[Either[String, T], Any], context: String)(implicit httpBackend: SttpBackend[Identity, Any]): T = {
+  def sendRequest[T](request: Request[Either[String, T], Any], context: String, retries: Int = 0)(implicit sttpBackend: SttpBackend[Identity, Any]): T = {
     logger.info(s"${request.method} ${request.uri}")
-    val response = request.send(httpBackend)
+    val response = try {
+      retry(retries) {
+        val r = request.send(sttpBackend)
+        logger.debug("response received: ${request.method} ${request.uri}")
+        r
+      }
+    } catch {
+      case ex: Exception =>
+        logger.debug("request failed: ${request.method} ${request.uri}")
+        throw SttpBackendError(ex)
+    }
     getContent(response, context)
   }
 
@@ -64,8 +73,8 @@ object SttpUtil extends SmartDataLakeLogger {
         // manually detect type as guessContentTypeFromStream doesnt work for Json and Text...
         val str = new String(content)
         if (str.take(100).matches("(?:\\P{Cntrl}|\\p{Space})+")) { // is text
-          if (str.matches("\\s*[{\\[]")) Some(MediaType.APPLICATION_JSON)
-          else Some(MediaType.TEXT_PLAIN)
+          if (str.matches("\\s*[{\\[]")) Some(MediaType.ApplicationJson.toString())
+          else Some(MediaType.TextPlain.toString())
         } else None
       }
   }
@@ -75,7 +84,7 @@ object SttpUtil extends SmartDataLakeLogger {
       unsafeParse(url)
     } catch {
       case e: Exception =>
-        logger.error(s"could not parse the following url: $url")
+        logger.error(s"could not parse url $url")
         throw e
     }
   }
@@ -108,6 +117,16 @@ object SttpUtil extends SmartDataLakeLogger {
 
   def createDefaultBackend(proxy: Option[HttpProxyConfig] = None, timeouts: Option[HttpTimeoutConfig] = None): SttpBackend[Identity, Any] = {
     HttpClientSyncBackend(createDefaultBackendOptions(proxy, timeouts))
+  }
+
+  def retry[T](n: Int)(fn: => T): T = {
+    try {
+      fn
+    } catch {
+      case e: Exception if n >= 1 =>
+        logger.warn(s"Retry for ${e.getClass.getSimpleName}: ${e.getMessage}")
+        retry(n - 1)(fn)
+    }
   }
 
   type SttpRequest[R] = RequestT[Empty, Either[String, R], Any]
@@ -163,4 +182,8 @@ case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) exten
 }
 
 
-case class HttpRequestError(context: String, code: Int, err: String) extends Exception(s"'$context' failed: StatusCode=$code Error=$err")
+case class HttpRequestError(context: String, code: Int, err: String)
+  extends Exception(s"'$context' failed: StatusCode=$code Error=$err")
+
+case class SttpBackendError(ex: Exception)
+  extends Exception(s"SttpBackend failed with exception ${ex.getClass.getSimpleName}: ${ex.getMessage}")

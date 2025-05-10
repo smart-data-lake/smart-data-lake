@@ -86,6 +86,7 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
       additionalHeaders = Map("Accept"-> "application/x-ipynb+json; application/json"),
       proxy = None,
       timeouts = None,
+      retries = 0,
       sttpBackendOption = None
       )
     client.get() match {

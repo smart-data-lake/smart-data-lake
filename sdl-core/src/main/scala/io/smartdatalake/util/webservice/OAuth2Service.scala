@@ -20,7 +20,7 @@
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend, getContent, parseUrl}
+import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend, parseUrl}
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, NoTypeHints}
@@ -35,10 +35,10 @@ import sttp.model.{Header, MediaType}
  * @param clientId     optional application client id to add to refresh request
  * @param tokenInitFun function to create initial OAuth2 token
  */
-case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFun: () => OAuth2Response, proxy: Option[HttpProxyConfig], timeouts: Option[HttpTimeoutConfig] = None) extends SmartDataLakeLogger {
+case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFun: () => OAuth2Response, proxy: Option[HttpProxyConfig], timeouts: Option[HttpTimeoutConfig] = None, followRedirects: Boolean = false, retries: Int = 1) extends SmartDataLakeLogger {
 
   private var currentToken: Option[OAuth2Response] = None
-  private lazy val sttpBackend: SttpBackend[Identity, Any] = createDefaultBackend(proxy, timeouts)
+  private implicit lazy val sttpBackend: SttpBackend[Identity, Any] = createDefaultBackend(proxy, timeouts)
   private val tokenUri = parseUrl(tokenUrl)
 
   def getToken: OAuth2Response = {
@@ -60,7 +60,7 @@ case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFu
       .post(tokenUri)
       .header(Header.contentType(MediaType.ApplicationXWwwFormUrlencoded))
       .header(Header.accept(MediaType.ApplicationJson))
-      .followRedirects(true)
+      .followRedirects(followRedirects)
       .body(Map(
         "grant_type" -> "refresh_token",
         "refresh_token" -> response.refresh_token.getOrElse(throw new IllegalStateException("refresh_token not defined!"))
@@ -69,8 +69,7 @@ case class OAuth2Service(tokenUrl: String, clientId: Option[String], tokenInitFu
   }
 
   def sendRequest(request: Request[Either[String, String], Any], context: String): String = {
-    val response = request.send(sttpBackend)
-    getContent(response, context)
+    SttpUtil.sendRequest(request, context, retries)
   }
 }
 
