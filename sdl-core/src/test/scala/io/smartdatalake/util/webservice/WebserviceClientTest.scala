@@ -23,7 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthMode, CustomHttpAuthModeLogic}
+import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthModeLogic}
 import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 import sttp.client3.Response
@@ -103,13 +103,6 @@ class WebserviceClientTest extends FunSuite with BeforeAndAfter with BeforeAndAf
     assert(response.isSuccess)
   }
 
-  //CustomAuthMode is deprecated and will not be tested for STTP
-  test("CustomAuthMode") {
-    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth", authMode = Some(CustomHttpAuthMode(className = classOf[MyCustomHttpAuthMode].getName, options = Map("test"-> StringOrSecret("ok")))))
-    webserviceDO.prepare
-    val webserviceClient = ScalaJWebserviceClient(webserviceDO)
-    assert(webserviceClient.request.headers.toMap.apply("test") == "ok")
-  }
 }
 
 private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
