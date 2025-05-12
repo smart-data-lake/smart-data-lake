@@ -32,6 +32,17 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 
+/**
+ * Connection information for debezium connection
+ *
+ * @param id unique id of this connection
+ * @param dbEngine what database engine to use, currently supported engines: mysql, postgresql, oracle, mariadb, mongodb, sqlserver, db2, vitess, spanner
+ * @param hostname database server
+ * @param db database to read data from
+ * @param port
+ * @param authMode authentication information: for now BasicAuthMode is supported.
+ * @param metadata optional connection metadata
+ */
 case class DebeziumConnection(override val id: ConnectionId,
                               dbEngine: String,
                               hostname: String,
