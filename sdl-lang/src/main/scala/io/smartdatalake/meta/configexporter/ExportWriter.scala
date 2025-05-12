@@ -200,7 +200,7 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
 
   private def upload(content: Array[Byte], subPath: String, additionalParams: Map[String,String] = Map()): Unit = {
     logger.info(s"Uploading $subPath "+additionalParams.map{case (k,v) => s"$k=$v"}.mkString(" "))
-    val wsClient = SttpWebserviceClient(url = URIUtil.appendPath(baseUrl, subPath), additionalHeaders = Map(), timeouts = None, authMode = None, proxy = None, followRedirects = true, sttpBackendOption = None)
+    val wsClient = SttpWebserviceClient(url = URIUtil.appendPath(baseUrl, subPath), additionalHeaders = Map(), timeouts = None, authMode = None, proxy = None, followRedirects = true, retries = 1, sttpBackendOption = None)
     wsClient.put(content, "application/json", additionalParams).get
   }
 }
