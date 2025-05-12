@@ -65,6 +65,16 @@ This executes a simple data pipeline that downloads two files from two different
 When the execution is complete, you should see the two new directories in the *data* folder.
 Wonder what happened ? You will create the data pipeline that does just this in the first steps of this guide.
 
+:::caution
+In case you get an error stating that the validity of a certificate can not be checked, take the following steps:
+- Navigate to the file `config/airports.conf.part-1-solution`
+- Uncomment the url https://davidmegginson.github.io/ourairports-data/airports.csv
+- Add a comment to the url  https://ourairports.com/data/airports.csv
+- Run the above command again
+
+Please consult the [Troubleshooting Guide](troubleshooting/common-problems.md#certificate-of-ourairportscom-expired) for more details.
+:::
+
 If you wish, you can start with [part 1](get-input-data) right away.
 For [part 2](part-2/industrializing.md) and [part 3](part-3/custom-webservice.md), it is recommended to set up a Development Environment.
 
@@ -83,8 +93,13 @@ Windows Users need to follow the steps below to have a working Hadoop Installati
 We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
 This needs an Intellij and Java SDK installation. Please make sure you have:
 - Java Java 17 SDK or Java 11 JDK
-- Scala Version 2.12. You need to install the Scala-Plugin with this exact version and DO NOT UPGRADE to Scala 3. For the complete list of versions at play in SDLB, [you can consult the Reference](../reference/build).
+- Scala Version 2.12.
+    - Install the Scala-Plugin (`File` -> `Settings` -> `Plugins`)
+    - Install Scala version 2.12 and DO NOT UPGRADE to Scala 3. For the complete list of versions at play in SDLB, [you can consult the Reference](../reference/build).
+        - Existing Project: `File` -> `Project Structure` -> `Global Libraries` -> `Add` (Select correct version)
+        - New Project: Select `Scala` under New Project and choose the correct version
 
+Then do the following to load the project successfully:
 1. Load the project as a maven project: Right-click on pom.xml file -> add as Maven Project
 2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Reload Project
 3. Configure and run the following run configuration in IntelliJ IDEA:
