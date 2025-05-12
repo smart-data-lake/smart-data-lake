@@ -20,9 +20,9 @@
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.debezium.connector.db2.Db2Connector
-import shaded.io.debezium.connector.mariadb.MariaDbConnector
+import io.debezium.connector.mariadb.MariaDbConnector
 import io.debezium.connector.mongodb.MongoDbConnector
-import shaded.io.debezium.connector.mysql.MySqlConnector
+import io.debezium.connector.mysql.MySqlConnector
 import io.debezium.connector.oracle.OracleConnector
 import io.debezium.connector.postgresql.PostgresConnector
 import io.debezium.connector.spanner.SpannerConnector
@@ -30,6 +30,7 @@ import io.debezium.connector.sqlserver.SqlServerConnector
 import io.debezium.connector.vitess.VitessConnector
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 
 /**
@@ -58,7 +59,7 @@ case class DebeziumConnection(override val id: ConnectionId,
 
   // Allow only supported databases engines
   private val supportedDbEngines = DbEngineHelper.supportedDbEngines()
-  require(supportedDbEngines.contains(dbEngine.toLowerCase), s"Engine '${dbEngine}' not supported by ${this.getClass.getSimpleName}. Supported database engines are (${supportedDbEngines.map(_.toLowerCase).mkString(", ")})")
+  require(supportedDbEngines.contains(dbEngine.toLowerCase) || dbEngine.contains("."), s"Engine '${dbEngine}' not supported by ${this.getClass.getSimpleName}. Supported database engines are (${supportedDbEngines.map(_.toLowerCase).mkString(", ")})")
 
   private[smartdatalake] def connectionPropertiesMap: Map[String, String] = {
 
@@ -112,7 +113,12 @@ private object DbEngineHelper {
   )
 
   def getDbEngineConnectorClassName(dbName: String): Option[String] = {
-    dbEngineConnectorClassNames.get(dbName.toLowerCase)
+    // check if this is a class name or just the database name
+    if (dbName.contains(".")) {
+      // check if class exists
+      Environment.classLoader().loadClass(dbName)
+      Some(dbName)
+    } else dbEngineConnectorClassNames.get(dbName.toLowerCase)
   }
 
   def supportedDbEngines(): Seq[String] = {

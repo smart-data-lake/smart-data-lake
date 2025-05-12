@@ -44,6 +44,8 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   /**
    * Init tests
+   *
+   * podman run --rm --name some-mariadb -p 3306:3306 --env MARIADB_ROOT_PASSWORD=my-secret-pw --env MARIADB_DATABASE=demo docker.io/mariadb:latest
    */
 
   val sdlb = DefaultSmartDataLakeBuilder
@@ -60,19 +62,20 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   val connection = DebeziumConnection(
     id = "dbzCon",
     dbEngine = "mariadb",
-    hostname = sys.env("MARIADB_HOSTNAME"),
-    db = Some(sys.env("MARIADB_DB")),
-    port = sys.env("MARIADB_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))
+    hostname = "172.23.240.151",
+    //db = Some("test"),
+    port = 3306,
+    authMode = BasicAuthMode(Some(StringOrSecret("root")),
+      Some(StringOrSecret("my-secret-pw")))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "psqlCon",
     url = s"jdbc:mariadb" +
-      s"://${sys.env("MARIADB_HOSTNAME")}:${sys.env("MARIADB_PORT").toInt}/${sys.env("MARIADB_DB")}",
+      s"://172.23.240.151:3306/demo",
     driver = "org.mariadb.jdbc.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))),
-    db = Some("demo")
+    authMode = Some(BasicAuthMode(Some(StringOrSecret("root")),
+      Some(StringOrSecret("my-secret-pw"))))
   )
 
   val appName = "sdlb-debezium-sequential-integration-test"
@@ -84,12 +87,13 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   instanceRegistry.register(connection)
 
-  jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
+  //jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
+  jdbcConnection.execJdbcStatement("CREATE TABLE IF NOT EXISTS demo.test (value varchar(100), timestampCol timestamp, decimalCol decimal(38,10))")
   jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INIT 1', '1994-11-30 01:00:00', 19.94)")
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "plugin.name" -> "pgoutput", "schema.history.internal" -> "shaded.io.debezium.storage.file.history.FileSchemaHistory", "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat")))
+  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "plugin.name" -> "pgoutput", "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat")))
   instanceRegistry.register(srcDO1)
 
   val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
