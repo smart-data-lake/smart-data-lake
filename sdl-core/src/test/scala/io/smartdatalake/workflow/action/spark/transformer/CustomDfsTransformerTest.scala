@@ -130,7 +130,7 @@ class CustomDfsTransformerTest extends FunSuite {
 
   test("CustomDfsTransformer can dynamically map parameters") {
     val transformer = new DynamicReturnUnitTestTransformer(true, Some(true), false, 1L, Some(1L), Seq())
-    val options = Map("isExec" -> "true", "optionalBoolean" -> "true", "defaultBoolean" -> "false", "long" -> "1", "optionalLong" -> "1", "seqString" -> "")
+    val options = Map("isExec" -> "true", "optionalBoolean" -> "true", "defaultBoolean" -> "false", "long" -> "1", "optionalLong" -> "1")
     val df1 = Seq(("x", 1)).toDF("a", "b")
     val dfs = Map("test" -> df1)
     val resultDfs = transformer.transform(session, options, dfs)
@@ -161,7 +161,7 @@ class CustomDfsTransformerTest extends FunSuite {
  * It cannot be used in Actions as it has this needs a constructor without arguments.
  */
 class DynamicReturnUnitTestTransformer(isExecExpected: Boolean, optionalBooleanExpected: Option[Boolean], defaultBooleanExpected: Boolean = true, longExpected: Long, optionalLongExpected: Option[Long], seqStringExpected: Seq[String]) extends CustomDfsTransformer {
-  def transform(session: SparkSession, dfTest: DataFrame, dsTest: Dataset[Test], isExec: Boolean, optionalBoolean: Option[Boolean], defaultBoolean: Boolean = true, long: Long, optionalLong: Option[Long], seqString: Seq[String]) = {
+  def transform(session: SparkSession, dfTest: DataFrame, dsTest: Dataset[Test], isExec: Boolean, optionalBoolean: Option[Boolean], defaultBoolean: Boolean = true, long: Long, optionalLong: Option[Long], seqString: Seq[String] = Seq()) = {
     assert(session != null)
     assert(dfTest.columns.toSeq == Seq("a", "b"))
     assert(dsTest.toDF.columns.toSeq == Seq("a", "b"))

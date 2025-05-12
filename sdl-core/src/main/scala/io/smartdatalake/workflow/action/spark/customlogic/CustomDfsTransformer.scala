@@ -244,7 +244,11 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
         }
         (optionalParam, optionVal)
       case seqParam if seqParam.tpe <:< typeOf[Seq[_]] =>
-        val seqVal = extractSeqVal(options, seqParam, getConverterFor(seqParam.tpe.typeArgs.head))
+        val seqVal = try {
+          extractSeqVal(options, seqParam, getConverterFor(seqParam.tpe.typeArgs.head))
+        } catch {
+          case ex: NotFoundError => seqParam.defaultValue.map(_.asInstanceOf[Seq[Any]]).getOrElse(throw ex)
+        }
         (seqParam, seqVal)
       case defaultParam if defaultParam.defaultValue.isDefined =>
         val defaultVal = try {
