@@ -22,7 +22,9 @@ package io.smartdatalake.workflow.connection.authMode
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
-import scalaj.http.HttpConstants
+
+import java.util.Base64
+
 
 /**
  * Authenticate using basic user/pwd authentication.
@@ -41,7 +43,11 @@ case class BasicAuthMode(private val user: Option[StringOrSecret],
 
   def passwordSecret: StringOrSecret = _password
 
-  override def getHeaders: Map[String, String] = Map("Authorization" -> HttpConstants.basicAuthValue(userSecret.resolve(), passwordSecret.resolve()))
+  def basicAuthValue(user: String, password: String): String = {
+    val c = new String(Base64.getEncoder.encode(s"$user:$password".getBytes("utf-8")), "utf-8")
+    s"Basic $c"
+  }
+  override def getHeaders: Map[String, String] = Map("Authorization" -> basicAuthValue(userSecret.resolve(), passwordSecret.resolve()))
 
   override def factory: FromConfigFactory[HttpAuthMode] = BasicAuthMode
 

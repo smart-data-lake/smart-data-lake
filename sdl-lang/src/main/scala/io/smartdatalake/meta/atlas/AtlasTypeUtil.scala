@@ -22,8 +22,8 @@ package io.smartdatalake.meta.atlas
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.meta.GenericTypeUtil
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
-import io.smartdatalake.workflow.dataobject.{HttpTimeoutConfig, WebserviceFileDataObject}
+import io.smartdatalake.util.webservice.{HttpTimeoutConfig, SttpWebserviceClient}
+import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
 import org.json4s.Extraction.decompose
 import org.json4s.jackson.JsonMethods.{parse, pretty, render}
 import org.json4s.{DefaultFormats, Formats, JObject}
@@ -109,7 +109,7 @@ case class AtlasTypeUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogger {
   def atlasDefinedTypeNames(implicit instanceRegistry: InstanceRegistry): Map[String, Set[String]] = {
     val target = "/api/atlas/v2/types/typedefs?"
     val webserviceDO = WebserviceFileDataObject("atlasWebservice", url = atlasConfig.getAtlasUrl + target, authMode = atlasConfig.getAtlasAuth)
-    val webservice = ScalaJWebserviceClient(webserviceDO)
+    val webservice = SttpWebserviceClient(webserviceDO)
     val result = webservice.get().get
     val response = parse(result.map(_.toChar).mkString("", "", "")).asInstanceOf[JObject]
     Map(
@@ -124,7 +124,7 @@ case class AtlasTypeUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogger {
   def atlasDefinedEntities(implicit instanceRegistry: InstanceRegistry): Set[AtlasTypeDef] = {
     val target = "/api/atlas/v2/types/typedefs?"
     val webserviceDO = WebserviceFileDataObject("atlasWebservice", url = atlasConfig.getAtlasUrl + target, authMode = atlasConfig.getAtlasAuth)
-    val webservice = ScalaJWebserviceClient(webserviceDO)
+    val webservice = SttpWebserviceClient(webserviceDO)
     webservice.get() match {
       case Success(response) =>
         implicit val formats: Formats = DefaultFormats
@@ -145,7 +145,7 @@ case class AtlasTypeUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogger {
   def exportTypesToAtlas(typeDefs: Map[String, Set[_]], update: Boolean = false)(implicit instanceRegistry: InstanceRegistry): Array[Byte] = {
     val target = "/api/atlas/v2/types/typedefs?"
     val webserviceDO = WebserviceFileDataObject("atlasWebservice", url = atlasConfig.getAtlasUrl + target, authMode = atlasConfig.getAtlasAuth, timeouts = Some(HttpTimeoutConfig(30000, 60000)))
-    val webservice = ScalaJWebserviceClient(webserviceDO)
+    val webservice = SttpWebserviceClient(webserviceDO)
     implicit val formats: DefaultFormats.type = DefaultFormats
     val body = pretty(render(decompose(typeDefs)))
     val result = if (update) webservice.put(body.getBytes(), "application/json")

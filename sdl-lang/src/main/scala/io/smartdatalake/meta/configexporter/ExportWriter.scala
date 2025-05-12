@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigLoader, ConfigurationException}
 import io.smartdatalake.util.misc.FileUtil.readFile
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, URIUtil}
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.SttpWebserviceClient
 import org.apache.commons.lang.NotImplementedException
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.util.Json4sCompat
@@ -200,7 +200,7 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
 
   private def upload(content: Array[Byte], subPath: String, additionalParams: Map[String,String] = Map()): Unit = {
     logger.info(s"Uploading $subPath "+additionalParams.map{case (k,v) => s"$k=$v"}.mkString(" "))
-    val wsClient = ScalaJWebserviceClient(URIUtil.appendPath(baseUrl, subPath), Map(), None, None, None, followRedirects = true)
+    val wsClient = SttpWebserviceClient(url = URIUtil.appendPath(baseUrl, subPath), additionalHeaders = Map(), timeouts = None, authMode = None, proxy = None, followRedirects = true, retries = 1, sttpBackendOption = None)
     wsClient.put(content, "application/json", additionalParams).get
   }
 }

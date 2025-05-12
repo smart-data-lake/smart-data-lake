@@ -6,9 +6,9 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
-import io.smartdatalake.util.webservice.{ScalaJWebserviceClient, WebserviceMethod}
+import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig, SttpWebserviceClient, WebserviceMethod}
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
-import io.smartdatalake.workflow.connection.authMode.{AuthMode, OAuthMode}
+import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -17,14 +17,12 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.{col, date_format, expr, max}
 import org.apache.spark.sql.types._
-import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
 import java.io.{BufferedWriter, File, FileWriter}
 import java.net.URLEncoder
 import java.nio.file.{Files, Paths}
 import java.time.Instant
-import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe.typeOf
 import scala.util.{Failure, Success}
@@ -95,16 +93,6 @@ class ODataIOC {
   }
 
   /**
-   * Create a new instance of the ODataBearerToken class
-   * @param token bearer token
-   * @param expiresAt expire datetime
-   * @return ODataBearerToken
-   */
-  def newODataBearerToken(token: String, expiresAt:java.time.Instant) : ODataBearerToken = {
-    ODataBearerToken(token, expiresAt)
-  }
-
-  /**
    * Creates a new instance of the org.apache.hadoop.fs.FileSystem class
    * @param path base path for the file system
    * @param context pipeline context
@@ -141,20 +129,6 @@ class ODataIOC {
    */
   def newHadoopPath(parent: HadoopPath, child: String) : HadoopPath = {
     new HadoopPath(parent, child)
-  }
-
-  /**
-   * Create a new instance of the io.smartdatalake.util.webservice.ScalaJWebserviceClient class
-   * @param url
-   * @param headers
-   * @param timeouts
-   * @param authMode
-   * @param proxy
-   * @param followRedirects
-   * @return io.smartdatalake.util.webservice.ScalaJWebserviceClient
-   */
-  def newScalaJWebServiceClient(url: String, headers : Map[String, String], timeouts : Option[HttpTimeoutConfig], authMode : Option[AuthMode], proxy :  Option[HttpProxyConfig], followRedirects: Boolean) : ScalaJWebserviceClient = {
-    ScalaJWebserviceClient(url, headers, timeouts, authMode, proxy, followRedirects)
   }
 
   /**
@@ -196,19 +170,6 @@ class ODataIOC {
 
 
 /**
- * [[ODataBearerToken]] contains the current bearer token and a method to check whether the token is still valid.
- * @param token : The token string
- * @param expiresAt : Instant at which the token expires
- */
-case class ODataBearerToken(token: String, expiresAt:java.time.Instant) {
-
-  def isExpired : Boolean = {
-    expiresAt.isBefore(Instant.now())
-  }
-}
-
-
-/**
  * [[DataObject]] of type OData.
  *
  * @param schema : Schema of the expected output. It can be provided as a string in the form of <<array< struct< columnA:string, columnB: integer ... >>,
@@ -218,13 +179,12 @@ case class ODataBearerToken(token: String, expiresAt:java.time.Instant) {
  * @param tableName : Name of the table which needs to be accessed
  * @param sourceFilters : Optional. OData filter string which will be applied to the access operation like "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
  * @param timeouts : Optional. Timeout settings of type [[HttpTimeoutConfig]]
- * @param authorization: Optional. Authorization credentials of type [[ODataAuthorization]]
+ * @param authorization : Optional configuration of webservice authentication. Supported `AuthMode`s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.
+ * CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
  * @param incrementalOutputExpr: Optional. Name of the column which will be used to read incrementally (like "modifiedon"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems.
  * @param nRetry: Optional. Number of retries after a failed attempt, default = 1
  * @param responseBufferSetup: Optional. Setup for response buffers of type [[ODataResponseBufferSetup]]
  * @param maxRecordCount: Optional. Maximum number of records to be extracted.
- * @param metadata
- * @param instanceRegistry
  */
 case class ODataDataObject(override val id: DataObjectId,
                            override val schema: Option[GenericSchema],
@@ -232,7 +192,9 @@ case class ODataDataObject(override val id: DataObjectId,
                            tableName: String,
                            sourceFilters: Option[String] = None,
                            timeouts: Option[HttpTimeoutConfig] = None,
-                           authorization: Option[OAuthMode] = None,
+                           proxy: Option[HttpProxyConfig] = None,
+                           authorization: Option[HttpAuthMode] = None,
+                           followRedirects: Boolean = false,
                            incrementalOutputExpr: Option[String] = None,
                            nRetry: Int = 1,
                            responseBufferSetup : Option [ODataResponseBufferSetup] = None,
@@ -260,18 +222,17 @@ case class ODataDataObject(override val id: DataObjectId,
    * @param headers: Additional headers to be sent allong with the request
    * @param body: The body of the message
    * @param mimeType: MIME type of the message
-   * @param retry: Number of retries
+   * @param retries : Number of retries if http request fails. Default is 0 retries.
    * @return the response to the request
    */
-  @tailrec
   private def request(url: String
                       , method: WebserviceMethod = WebserviceMethod.Get
                       , headers: Map[String, String] = Map()
                       , body: String = ""
                       , mimeType: String = "application/json"
-                      , retry: Int = nRetry
+                      , retries: Int = 0
                      ) : Array[Byte] = {
-    val webserviceClient = ioc.newScalaJWebServiceClient(url, headers, timeouts, authMode = None, proxy = None, followRedirects = true)
+    val webserviceClient = SttpWebserviceClient(url = url, additionalHeaders = headers, timeouts = timeouts, authMode = authorization, proxy = proxy, followRedirects = followRedirects, retries = retries, sttpBackendOption = None)
     val webserviceResult = method match {
       case WebserviceMethod.Get =>
         webserviceClient.get()
@@ -281,69 +242,18 @@ case class ODataDataObject(override val id: DataObjectId,
     }
 
     webserviceResult match {
-      case Success(c) =>
-        logger.info(s"Success for request $url")
-        c
-      case Failure(e) =>
-        if(retry == 0) {
-          logger.error(e.getMessage, e)
-          throw e
-        }
-        logger.info(s"Request will be repeated, because the server responded with: ${e.getMessage}. \nRequest retries left: ${retry-1}")
-        request(url, method, headers, body, mimeType, retry-1)
+      case Success(c) => c
+      case Failure(e) => throw e
     }
   }
 
   /**
-   * Packs the provided map into a url string and encodes this string according to http standards
-   * @param content: Content to be packed
-   * @return URL string
-   */
-  private def getFormUrlEncodedBody(content: Map[String, String]) : String = {
-    val contentEncoded = content.map{
-      case (key, value) => key + "=" + URLEncoder.encode(value, "UTF-8")
-    }
-    contentEncoded.mkString("&")
-  }
-
-  /**
-   * Requests a new bearer token from the remote authorization instance
-   * @param authorization : authorization parameters
-   * @return new [[ODataBearerToken]] instance
-   */
-  def getBearerToken(authorization: OAuthMode) : ODataBearerToken = {
-    implicit val formats: Formats = DefaultFormats
-
-    val payload : Map[String, String] = Map(
-      "grant_type" -> "client_credentials",
-      "client_id" -> authorization.clientId.resolve(),
-      "client_secret" -> authorization.clientSecret.resolve(),
-      "scope" ->  authorization.oauthScope.resolve()
-    )
-
-    val payloadString = getFormUrlEncodedBody(payload)
-
-    val response = request(authorization.oauthUrl.resolve(), method=WebserviceMethod.Post, body=payloadString, mimeType="application/x-www-form-urlencoded")
-    val responseString : String = new String(response)
-    val responseMap : Map[String, Any] = Serialization.read[Map[String, Any]](responseString)
-
-    val token = responseMap.apply("access_token").asInstanceOf[String]
-    val expiresInSecs = responseMap.apply("expires_in").asInstanceOf[BigInt].longValue
-
-    val expiresDateTime = Instant.now.plusSeconds(expiresInSecs)
-    ioc.newODataBearerToken(token, expiresDateTime)
-  }
-
-  /**
-   * Creates the required headers for the main requests (containing the bearer token)
-   * @param bearerToken : Current instance of the [[ODataBearerToken]]
+   * Creates the required headers for the main requests
+   *
    * @return Map instance with the headers
    */
-  private def getRequestHeader(bearerToken: ODataBearerToken) : Map[String, String] = {
-    Map("Authorization" -> s"Bearer ${bearerToken.token}"
-      , "Accept" -> "application/json"
-      , "Content-Type" -> "application/json; charset=utf-8"
-    )
+  private def getRequestHeader: Map[String, String] = {
+    Map("Content-Type" -> "application/json; charset=UTF-8", "Accept" -> "application/json")
   }
 
 
@@ -452,7 +362,6 @@ case class ODataDataObject(override val id: DataObjectId,
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     import org.apache.spark.sql.functions._
-    implicit val formats: Formats = DefaultFormats
     val session = context.sparkSession
     import session.implicits._
 
@@ -472,9 +381,6 @@ case class ODataDataObject(override val id: DataObjectId,
       //Generate the URL for the first API call
       var requestUrl = getODataURL(columnNames, context)
 
-      //Request the bearer token
-      var bearerToken = getBearerToken(authorization.get)
-
       responseBufferSetup.get.setActionName(this.id.id)
 
       //Initialize the MemoryBuffer
@@ -483,16 +389,9 @@ case class ODataDataObject(override val id: DataObjectId,
 
       //Commence the looping for each request
       while (requestUrl != "") {
-        //Check if the bearer token is still valid and request a new one if not
-        if (bearerToken.isExpired) {
-          bearerToken = getBearerToken(authorization.get)
-        }
-
-        //Generate the request header
-        val requestHeader = getRequestHeader(bearerToken)
 
         //Execute the current request
-        val responseBytes = request(requestUrl, headers = requestHeader)
+        val responseBytes = request(requestUrl, headers = getRequestHeader, retries = nRetry)
 
         //Convert the current response into a string
         val responseString = new String(responseBytes, "UTF8")
