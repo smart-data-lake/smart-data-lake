@@ -40,6 +40,16 @@ import java.util.concurrent.{ExecutorService, Executors}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
+/**
+ * [[DataObject]] of type DebeziumCdcDataObject.
+ * Provides details to access Change data over Debezium Engine.
+ *
+ * @param id unique name of this data object
+ * @param connectionId optional id of [[io.smartdatalake.workflow.connection.DebeziumConnection]]
+ * @param table Source table to get change data from
+ * @param debeziumProperties Properties for the specific Debezium connector
+ * @param metadata optional data object metadata
+ */
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
                                  table: Table,
