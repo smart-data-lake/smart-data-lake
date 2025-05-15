@@ -273,7 +273,7 @@ private object DebeziumEventConverter {
 
   }
 
-  private def flattenDf(df: DataFrame): DataFrame = {
+  private def flattenDebeziumDf(df: DataFrame): DataFrame = {
     var newDF = df
     for (colName <- df.columns) {
       val colType = df.schema(colName).dataType
@@ -330,7 +330,7 @@ private object DebeziumEventConverter {
       .drop("before", "after", "source", "op", "ts_ms", "ts_us", "ts_ns", "transaction")
       .orderBy(col(COMMIT_TIMESTAMP_COLUMN_NAME).desc)
 
-    reorderCdcColumns(flattenDf(unionDf))
+    reorderCdcColumns(flattenDebeziumDf(unionDf))
 
   }
 
