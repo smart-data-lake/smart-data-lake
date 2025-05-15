@@ -214,9 +214,7 @@ private object DebeziumEventConverter {
   def convert(records: Seq[SourceRecord])(implicit spark: SparkSession): DataFrame = {
 
     val sparkSchema = inferSparkSchema(records.head.valueSchema())
-    val rows = records.map {
-     recordToRow
-     }
+    val rows = records.map(recordToRow)
 
     val df = spark.createDataFrame(rows.asJava, sparkSchema)
     extractCdcEvents(df)
