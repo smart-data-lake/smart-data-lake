@@ -328,7 +328,6 @@ private object DebeziumEventConverter {
     val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
       .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000).cast(TimestampType))
       .drop("before", "after", "source", "op", "ts_ms", "ts_us", "ts_ns", "transaction")
-      .orderBy(col(COMMIT_TIMESTAMP_COLUMN_NAME).desc)
 
     reorderCdcColumns(flattenDebeziumDf(unionDf))
 
