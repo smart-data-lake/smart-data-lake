@@ -28,19 +28,18 @@ CREATE DATABASE `demo` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_09
 using demo;
 ```
 ```sql
-CREATE TABLE `test` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `value` varchar(100) DEFAULT NULL,
-  `timestampCol` timestamp NULL DEFAULT NULL,
-  `decimalCol` decimal(6,3) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE test (
+  id int NOT NULL AUTO_INCREMENT,
+  value varchar(100) DEFAULT NULL,
+  timestampCol timestamp NULL DEFAULT NULL,
+  decimalCol decimal(6,3) DEFAULT NULL,
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-```
-```sql
-CREATE TABLE `test2` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `value` varchar(100) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+
+CREATE TABLE test2 (
+  id int NOT NULL AUTO_INCREMENT,
+  value varchar(100) DEFAULT NULL,
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 ```
