@@ -10,6 +10,9 @@ Because of incompatibilities of the versions of the library `org.antlr` between 
 Additionally, one database (PostgreSQL), which does not rely on this dependency, was also tested. 
 The test suite executed against PostgreSQL is intended to serve as a baseline and its successful execution suggests that the underlying data object and configurations are likely compatible with other databases as well. 
 
+> [!IMPORTANT]
+> Make sure to test the db connections with e.g. DBeaver before doing the tests. So you are sure the connection is working properly.
+
 
 ## MySQL
 Server can easily be setup with an oneliner as docker / podman command:
