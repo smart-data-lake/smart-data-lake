@@ -5,8 +5,8 @@ While following the official [debezium (3.1.0) documentation](https://debezium.i
 You have to build it first.
 
 
-**Important Note:** Not all databases were explicitly tested as part of this integration test setup. 
-The tests primarily focused on databases that include `org.antlr` as a transitive dependency. 
+**Important Note:** Not all databases were explicitly tested as part of this integration test setup.
+Because of incompatibilities of the versions of the library `org.antlr` between spark and debezium we had to resort to shading for the debezium connectors of mariadb and mysql. Therefore, the tests primarily focused on databases that include `org.antlr` as a transitive dependency to test that everything still works after doing the shading.
 Additionally, one database (PostgreSQL), which does not rely on this dependency, was also tested. 
 The test suite executed against PostgreSQL is intended to serve as a baseline and its successful execution suggests that the underlying data object and configurations are likely compatible with other databases as well. 
 
