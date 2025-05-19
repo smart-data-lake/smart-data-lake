@@ -173,7 +173,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
    * The state is just a string. It's semantics is internal to the DataObject.
-   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase).
+   * When starting SDLB with the --streaming option, it will be called after every execution of an Action involving this DataObject (postExec).
    *
    * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
    */
