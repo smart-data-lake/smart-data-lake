@@ -72,7 +72,7 @@ Server can easily be setup with an oneliner as docker / podman command:
 
 Then run following ddl (one after another):
 ```sql
-CREATE DATABASE `demo` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
+CREATE DATABASE demo /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
 ```
 ```sql
 using demo;
