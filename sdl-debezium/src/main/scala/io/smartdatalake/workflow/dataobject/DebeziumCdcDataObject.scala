@@ -54,7 +54,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
                                  table: Table,
                                  debeziumProperties: Option[Map[String, String]] = None,
-                                 maxWaitTimeInSeconds: Int = 10,
+                                 maxWaitTimeMilliSeconds: Int = 2000,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
@@ -146,7 +146,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
         schemaProperties.put("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
 
-        val records = getRecordsFromDebeziumEngine(schemaProperties, changeConsumer = new DebeziumSchemaConsumer)
+        val records = getRecordsFromDebeziumEngine(schemaProperties, changeConsumer = new DebeziumSchemaConsumer, timeoutMilliSeconds = maxWaitTimeMilliSeconds)
 
         val df = DebeziumEventConverter.convert(records)(spark)
 
@@ -158,7 +158,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     if (context.isExecPhase) {
 
-      val records = getRecordsFromDebeziumEngine(debeziumPropertiesForEngine, changeConsumer = new DebeziumChangeConsumer)
+      val records = getRecordsFromDebeziumEngine(debeziumPropertiesForEngine, changeConsumer = new DebeziumChangeConsumer, timeoutMilliSeconds = maxWaitTimeMilliSeconds)
 
       records.headOption match {
         case Some(_) => {
