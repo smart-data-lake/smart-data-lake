@@ -36,7 +36,7 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import java.util
 import java.util.Properties
-import java.util.concurrent.{ExecutorService, Executors}
+import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
@@ -122,10 +122,15 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       executorService.execute(engine)
 
-      Thread.sleep(timeoutMilliSeconds)
-
-      engine.close()
-      executorService.shutdown()
+      do {
+        if(executorService.isShutdown) {
+          engine.close()
+        } else {
+          executorService.shutdown()
+          logger.info(s"Waiting $timeoutMilliSeconds milliseconds for Debezium engine to shut down")
+        }
+      }
+      while(!executorService.awaitTermination(timeoutMilliSeconds, TimeUnit.MILLISECONDS))
 
       completionCallback.error.foreach(err => throw new Exception(err))
 
