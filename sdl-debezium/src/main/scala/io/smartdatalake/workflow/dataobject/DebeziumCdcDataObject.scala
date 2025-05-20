@@ -49,6 +49,22 @@ import scala.jdk.CollectionConverters._
  * @param table Source table to get change data from
  * @param debeziumProperties Properties for the specific Debezium connector
  * @param metadata optional data object metadata
+ * @param maxWaitTimeMilliSeconds Waiting time interval for debezium to finish
+ *
+ * Example config:
+ *
+ * Source {
+ *	type = DebeziumCdcDataObject
+ *	connectionId = "connection1"
+ *	table = "Test"
+ *	debeziumProperties = {
+ *		"database.server.id" = "1234345345"
+ *		"plugin.name" = "pgoutput"
+ *		"schema.history.internal" = "io.debezium.storage.file.history.FileSchemaHistory"
+ *		"schema.history.internal.file.filename" = "C://TEMP/schemahistory.dat"
+ *	}
+ *	maxWaitTimeMilliSeconds = 20
+ * }
  */
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
