@@ -43,6 +43,21 @@ import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
  * @param port
  * @param authMode authentication information: for now BasicAuthMode is supported.
  * @param metadata optional connection metadata
+ *
+ *  Example config:
+ *
+ *  dbzCon {
+ *  type = DebeziumConnection
+ *  dbEngine = "postgresql"
+ *  hostname = "localhost"
+ *  db = "test"
+ *  port = 5432
+ *  authMode {
+ *    type = BasicAuthMode
+ *    userVariable = "ENV#POSTGRES_USER"
+ *    passwordVariable  = "ENV#POSTGRES_PW"
+ *   }
+ *  }
  */
 case class DebeziumConnection(override val id: ConnectionId,
                               dbEngine: String,
