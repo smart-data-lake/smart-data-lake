@@ -7,7 +7,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 :::info Trouble Shooting
-In case you encounter an issue during this tutorial, feel free to consult the [trouble shooting section](troubleshooting) of the Getting Started guide or the [one](../reference/troubleshooting.md) of the Smart Data Lake Reference. Another good source is the issue tracker on Github, either of the [Getting Started guide](https://github.com/smart-data-lake/getting-started/issues) or on the [main repository](https://github.com/smart-data-lake/getting-started/issues).
+In case you encounter an issue during this tutorial, feel free to consult the [trouble shooting section](troubleshooting/common-problems.md) of the Getting Started guide or the [one](../reference/troubleshooting.md) of the Smart Data Lake Reference. Another good source is the issue tracker on Github, either of the [Getting Started guide](https://github.com/smart-data-lake/getting-started/issues) or on the [main repository](https://github.com/smart-data-lake/getting-started/issues).
 :::
 
 ## Requirements
