@@ -620,7 +620,7 @@ object Environment extends SmartDataLakeLogger {
   private[smartdatalake] def sdlPlugins: Option[Seq[SDLPluginWithClassName]] = {
     if (_sdlPlugins.isEmpty) {
       _sdlPlugins = Some(EnvironmentUtil.getSdlParameter("pluginClassNames")
-        .map(listString => listString.split(",").map(className => SDLPluginWithClassName(CustomCodeUtil.getClassInstanceByName[SDLPlugin](className.trim), className.trim))))
+        .map(listString => listString.split(",").map(_.trim).map(className => SDLPluginWithClassName(CustomCodeUtil.getClassInstanceByName[SDLPlugin](className), className))))
     }
     _sdlPlugins.get
   }
