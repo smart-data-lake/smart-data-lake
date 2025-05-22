@@ -45,7 +45,7 @@ To solve the problem, either remove the `.conf` file extension or move one of th
 ## How to kill SDLB if it hangs
 
 In case you run into issues when executing your pipeline and you want to terminate the process
-you can use this docker command to list the running containers:
+you can use this podman command to list the running containers:
 ```
 podman ps
 ```
