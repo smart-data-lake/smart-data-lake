@@ -13,6 +13,10 @@ Except for the object and action names, the config to add here is almost identic
 You are welcome to try to implement it yourself before continuing. 
 Just as in the previous step, you can use "download" as feed name.
 
+:::info
+Since November 3rd 2021 the download files are stored on Github in the repository [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data). So instead of using https://ourairports.com/data/airports.csv as the source for the download, you need to use https://davidmegginson.github.io/ourairports-data/airports.csv as the former no longer has a problem with its certificate chain as an intermediary certificate needs to be downloaded (see: [SSL Labs Report](https://www.ssllabs.com/ssltest/analyze.html?d=ourairports.com)).
+:::
+
 ## Solution
 You should now have an airports.conf file similar to [this](https://github.com/smart-data-lake/getting-started/tree/master/config/airports.conf.part-1a-solution) one.
 The only notable difference is that you had to use the type **CsvFileDataObject** for the airports.csv file,

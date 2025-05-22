@@ -6,6 +6,10 @@ title: Technical Setup
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+:::info Trouble Shooting
+In case you encounter an issue during this tutorial, feel free to consult the [trouble shooting section](troubleshooting) of the Getting Started guide or the [one](../reference/troubleshooting.md) of the Smart Data Lake Reference. Another good source is the issue tracker on Github, either of the [Getting Started guide](https://github.com/smart-data-lake/getting-started/issues) or on the [main repository](https://github.com/smart-data-lake/getting-started/issues).
+:::
+
 ## Requirements
 
 To run this tutorial you just need two things:
@@ -65,22 +69,12 @@ This executes a simple data pipeline that downloads two files from two different
 When the execution is complete, you should see the two new directories in the *data* folder.
 Wonder what happened ? You will create the data pipeline that does just this in the first steps of this guide.
 
-:::caution
-In case you get an error stating that the validity of a certificate can not be checked, take the following steps:
-- Navigate to the file `config/airports.conf.part-1-solution`
-- Uncomment the url https://davidmegginson.github.io/ourairports-data/airports.csv
-- Add a comment to the url  https://ourairports.com/data/airports.csv
-- Run the above command again
-
-Please consult the [Troubleshooting Guide](troubleshooting/common-problems.md#certificate-of-ourairportscom-expired) for more details.
-:::
-
 If you wish, you can start with [part 1](get-input-data) right away.
 For [part 2](part-2/industrializing.md) and [part 3](part-3/custom-webservice.md), it is recommended to set up a Development Environment.
 
 ## Development Environment
 For some parts of this tutorial it is beneficial to have a working development environment ready. In the following we will mainly explain how one can configure a working environment for 
-Windows or Linux. We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
+Windows or Linux. We will focus on the community version of IntelliJ. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
 
 ### Hadoop Setup (Needed for Windows only)
 Windows Users need to follow the steps below to have a working Hadoop Installation :
@@ -90,7 +84,7 @@ Windows Users need to follow the steps below to have a working Hadoop Installati
 4. Add the *%HADOOP_HOME%\bin* to the *PATH* environment variable
 
 ### Run SDLB in IntelliJ
-We will focus on the community version of Intellij. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
+We will focus on the community version of IntelliJ. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
 This needs an Intellij and Java SDK installation. Please make sure you have:
 - Java Java 17 SDK or Java 11 JDK
 - Scala Version 2.12.

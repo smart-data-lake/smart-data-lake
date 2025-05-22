@@ -47,20 +47,11 @@ To solve the problem, either remove the `.conf` file extension or move one of th
 In case you run into issues when executing your pipeline and you want to terminate the process
 you can use this docker command to list the running containers:
 ```
-docker ps
+podman ps
 ```
 While your feed-execution is running, the output of this command will contain
 an execution with the image name *sdl-spark:latest*.
 Use the container id to stop the container by typing:
 ```
-docker containter stop <container id>
+podman containter stop <container id>
 ```
-## Certificate of  ourairports.com expired
-If you get this error
-```
-Caused by: sun.security.validator.ValidatorException: PKIX path validation failed: java.security.cert.CertPathValidatorException: validity check failed
-Caused by: java.security.cert.CertificateExpiredException: NotAfter: Wed Oct 09 20:03:30 UTC 2024
-```
-this means that the certificate of the website behind the URL https://ourairports.com/data/airports.csv has expired.
-We need this site for the dataobject ext-airports.
-If that is the case you can switch to the other url that is commented out, https://davidmegginson.github.io/ourairports-data/airports.csv"
