@@ -73,7 +73,7 @@ class Log4j2InitPlugin extends SDLPlugin with SmartDataLakeLogger {
 
     // finalize
     context.updateLoggers()
-    logger.info("SDLPlugin startup finished")
+    logger.info("Log4j2InitPlugin startup finished")
   }
 
   override def configure(options: Map[String, StringOrSecret]): Unit = {
@@ -101,7 +101,7 @@ class Log4j2InitPlugin extends SDLPlugin with SmartDataLakeLogger {
     val loggerNamesToIgnore = options.get("loggerNamesToIgnore").map(_.resolve().split(','))
     loggerNamesToIgnore.foreach(names => appender.addFilter(LoggerNameFilter(names.toSet)))
 
-    logger.info("SDLPlugin configure finished")
+    logger.info("Log4j2InitPlugin configure finished")
   }
 
   private def configureLogger(config: Configuration, name: String, level: Level, appender: LogAnalyticsAppender): LoggerConfig = {
