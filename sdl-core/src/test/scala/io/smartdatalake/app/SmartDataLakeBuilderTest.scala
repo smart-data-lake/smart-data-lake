@@ -96,7 +96,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     // configure SDLPlugin for testing
-    Environment._sdlPlugins = Some(Seq(new TestSDLPlugin))
+    Environment._sdlPlugins = Seq(new TestSDLPlugin)
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
@@ -187,7 +187,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(TestSDLPlugin.startupCalled)
     assert(TestSDLPlugin.configureCalled)
     assert(TestSDLPlugin.shutdownCalled)
-    Environment._sdlPlugins = None
+    Environment._sdlPlugins = Seq()
   }
 
   test("sdlb run with skipped action and recovery after action 2 failed the first time") {
