@@ -92,12 +92,12 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   def listDataFiles(pv: PartitionValues = PartitionValues(Map()))(implicit context: ActionPipelineContext): Iterator[Path] = {
-    val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)), fileName).toString)
-    else new GlobPattern(new Path(hadoopPath, fileName).toString)
+    val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(pv.getPartitionString(partitionLayout().get), fileName).toString)
+    else new GlobPattern(fileName)
     RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, partitions.nonEmpty))
       .filter(_.isFile)
       .map(_.getPath)
-      .filter(p => pathPattern.matches(p.toString))
+      .filter(p => pathPattern.matches(relativizePath(p.toString)))
   }
 
   def listPartitionPathsStatus(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[FileStatus] = {
