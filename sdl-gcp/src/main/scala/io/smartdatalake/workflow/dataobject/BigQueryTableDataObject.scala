@@ -37,7 +37,7 @@ import org.apache.spark.sql.DataFrame
 
 /**
  * [[DataObject]] of type BigQueryTableDataObject.
- * Provides details to access Tables in delta format to an Action.
+ * Provides details to access BigQuery Tables to an Action.
  * The object uses the official Spark-connector by Google see: [[https://github.com/GoogleCloudDataproc/spark-bigquery-connector]].
  * As of now, the only authentication mode supported is a Service Account Key.
  * @param id unique name of this data object
@@ -46,9 +46,9 @@ import org.apache.spark.sql.DataFrame
  * @param materializationDataset Required if the table is being read with a query, as BigQuery will create a temporary table in the background.
  *                               This argument defines on which dataset the view will be created. Defaults to the same dataset as the table.
  * @param writeMethod Can be 'direct' or 'indirect'. The indirect mode stores the data in a Bucket or a path first and load it to BigQuery in a second step.
- *                    If 'indirect' mode is used, one of the options 'temporaryGscBucket', 'persistentGscBucket' or 'persistentGscPath' must be set.
+ *                    If 'indirect' mode is used, one of the options 'temporaryGcsBucket', 'persistentGscBucket' or 'persistentGscPath' must be set.
  *                    Defaults to 'direct'
- * @param temporaryGscBucket Temporary Bucket to store data if saving with "indirect" mode.
+ * @param temporaryGcsBucket Temporary Bucket to store data if saving with "indirect" mode.
  * @param persistentGcsBucket Persistent Bucket to store data if saving with "indirect" mode.
  * @param persistentGcsPath Temporary GSC Path to store data if saving with "indirect" mode.
  * @param project Defaults to the project of the project Id of the service account being used
@@ -67,7 +67,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
                                    viewsEnabled: Boolean = true,
                                    materializationDataset: Option[String] = None,
                                    writeMethod: String = "direct",
-                                   temporaryGscBucket: Option[String] = None,
+                                   temporaryGcsBucket: Option[String] = None,
                                    persistentGcsBucket: Option[String] = None,
                                    persistentGcsPath: Option[String] = None,
                                    project: Option[String] = None,
@@ -100,7 +100,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
       "materializationDataset" -> (if (materializationDataset.isEmpty) table.db.get else materializationDataset.get),
       "writeMethod" -> writeMethod
     ) ++ Map(
-        "temporaryGscBucket" -> temporaryGscBucket,
+        "temporaryGcsBucket" -> temporaryGcsBucket,
         "persistentGcsBucket" -> persistentGcsBucket,
         "persistentGcsPath" -> persistentGcsPath,
         "project" -> project
@@ -111,7 +111,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
     try {
       require(table.db.isDefined, "The Dataset of the BigQueryTable must be defined explicitly in the field table.db") //table dataset is not defined in connection
       require(Seq("direct", "indirect").contains(writeMethod), f"The write method should be 'direct' or 'indirect', and not the provided value of $writeMethod")
-      if (writeMethod == "indirect") require(!Seq(persistentGcsPath, persistentGcsBucket, temporaryGscBucket).flatten.isEmpty, "When using indirect mode, a temporary/persistent bucket or path must be defined")
+      if (writeMethod == "indirect") require(!Seq(persistentGcsPath, persistentGcsBucket, temporaryGcsBucket).flatten.isEmpty, "When using indirect mode, a temporary/persistent bucket or path must be defined")
 
       require(isDbExisting, f"The provided dataset ${table.db.get} doesn't exist")
       require(viewsEnabled || !hasQuery, "If the table has a 'query' argument, the parameter 'viewsEnabled' cannot be false")
