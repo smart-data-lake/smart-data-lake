@@ -108,9 +108,7 @@ extends SmartDataLakeLogger {
   /**
   pluginOptions are global for all plugins
    */
-  if (Environment.sdlPlugins.isDefined) {
-    Environment.sdlPlugins.get.foreach(_.configure(pluginOptions))
-  }
+    Environment.sdlPlugins.foreach(_.configure(pluginOptions))
 
   /**
    * Get Hadoop configuration as Spark would see it.

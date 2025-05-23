@@ -607,21 +607,21 @@ object Environment extends SmartDataLakeLogger {
 
   // instantiate sdl plugins if configured. The class names must be separated by a comma.
   // initializes with envVars pluginClassName (deprecated) and pluginClassNames
-  private[smartdatalake] def sdlPlugins: Option[Seq[SDLPlugin]] = {
+  private[smartdatalake] def sdlPlugins: Seq[SDLPlugin] = {
+    def pluginList(pluginsString: String): Seq[SDLPlugin] =
+      pluginsString.split(",").map(_.trim).filterNot(_.isEmpty).map(CustomCodeUtil.getClassInstanceByName[SDLPlugin]).toSeq
     if (_sdlPlugins.isEmpty) {
-      val pluginsString = (EnvironmentUtil.getSdlParameter("pluginClassNames"), EnvironmentUtil.getSdlParameter("pluginClassName")) match {
-        case (Some(ps), Some(p)) =>  s"$ps, $p"
-        case (Some(ps), None) => ps
-        case (None, Some(p)) => p
-        case _ => ""
+      _sdlPlugins = (EnvironmentUtil.getSdlParameter("pluginClassNames"), EnvironmentUtil.getSdlParameter("pluginClassName")) match {
+        case (Some(ps), Some(p)) =>  pluginList(s"$ps, $p")
+        case (Some(ps), None) => pluginList(ps)
+        case (None, Some(p)) => pluginList(p)
+        case _ => Seq()
       }
-
-      _sdlPlugins = Some(pluginsString.split(",").map(_.trim).filterNot(_.isEmpty).map(CustomCodeUtil.getClassInstanceByName[SDLPlugin]).toSeq)
     }
     _sdlPlugins
   }
 
-  private[smartdatalake] var _sdlPlugins: Option[Seq[SDLPlugin]] = None
+  private[smartdatalake] var _sdlPlugins: Seq[SDLPlugin] = Seq()
 
   // dynamically shared environment for custom code (see also #106)
   // attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDLB code, but might be used in custom code on your own risk.

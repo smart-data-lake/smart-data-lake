@@ -284,7 +284,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     AppUtil.setSdlbRunLoggerContext(appConfig)
     val stats = try {
       // invoke SDLPlugins if configured
-      Environment.sdlPlugins.foreach(_.foreach(_.startup()))
+      Environment.sdlPlugins.foreach(_.startup())
       // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
       implicit val defaultHadoopConf: Configuration = new Configuration()
       // handle state if defined
@@ -330,7 +330,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     MemoryUtils.stopMemoryLogger()
 
     // invoke SDLPlugin if configured
-    Environment.sdlPlugins.foreach(_.foreach(_.shutdown()))
+    Environment.sdlPlugins.foreach(_.shutdown())
 
     //Environment._globalConfig can be null here if global contains superfluous entries
     val stopStatusInfoServer = Option(Environment._globalConfig).flatMap(_.statusInfo.map(_.stopOnEnd)).getOrElse(false)
