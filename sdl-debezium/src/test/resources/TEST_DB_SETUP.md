@@ -61,6 +61,18 @@ CREATE TABLE demo.test (
 	decimalcol decimal NULL,
 	CONSTRAINT test_pk PRIMARY KEY (id)
 );
+
+CREATE TABLE demo.empty_table (
+	id int GENERATED ALWAYS AS IDENTITY NOT NULL,
+	value varchar NULL,
+	CONSTRAINT et_pk PRIMARY KEY (id)
+);
+
+CREATE TABLE demo.big_table (
+	id int GENERATED ALWAYS AS IDENTITY NOT NULL,
+	value varchar NULL,
+	CONSTRAINT bt_pk PRIMARY KEY (id)
+);
 ```
 ```sql
 ALTER USER postgres WITH REPLICATION LOGIN;
