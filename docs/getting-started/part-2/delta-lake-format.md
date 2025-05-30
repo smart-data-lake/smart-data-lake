@@ -134,7 +134,7 @@ We will use a Spark session for this, i.e. by starting a spark-shell.
 Alternatively one could use notebooks like Jupyter, Polynote or Databricks for this.
 See our [Polynote-lab](https://github.com/smart-data-lake/polynote-lab) for a local solution.
 
-Execute the following command to start a spark-shell. Note that his starts a spark-shell having SDLB and your Apps code in the class-path, using the same data/metastore_db as metastore like ./startJob.sh.
+Execute the following command to start a spark-shell. Note that this starts a spark-shell having SDLB and your Apps code in the class-path, using the same data/metastore_db as metastore like ./startJob.sh.
 
 ```
 ./sparkShell.sh

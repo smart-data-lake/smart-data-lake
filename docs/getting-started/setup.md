@@ -25,8 +25,8 @@ To do this, run `git config --global core.autocrlf false` in your terminal befor
 ## Build Spark docker image
 
 - Download the source code of the example either via git or by [downloading the zip](https://github.com/smart-data-lake/getting-started/archive/refs/heads/master.zip) and extracting it.
-- Open up a terminal and change to the folder with the source, you should see a file called Dockerfile. 
-- Then run (note: this might take some time, but it's only needed once):
+- Open up a terminal and change to the folder with the source, you should see a file called Dockerfile in the Spark subfolder. 
+- Run the following command from the root directory (note: this might take some time, but it's only needed once):
 
 ```
 ./buildSpark.sh
@@ -95,8 +95,8 @@ This needs an Intellij and Java SDK installation. Please make sure you have:
 
 Then do the following to load the project successfully:
 1. Load the project as a maven project: Right-click on pom.xml file -> add as Maven Project
-2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Reload Project
-3. Configure and run the following run configuration in IntelliJ IDEA:
+2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Sync Project
+3. Configure and run the following run configuration in IntelliJ IDEA (optional, as the .idea folder already contains this setup):
     - Main class: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
     - Program arguments: `--feed-sel <regex-feedname-selector> --config $ProjectFileDir$/config`
     - Working directory: `/path/to/sdl-examples/target` or just `target`
