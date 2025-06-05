@@ -49,7 +49,6 @@ Then lets replace all `table.database` and `path` configuration entries with a H
       name = int_departures
       primaryKey = [icao24, estdepartureairport, dt]
     }
-    allowSchemaEvolution = true
   }
 ```
 

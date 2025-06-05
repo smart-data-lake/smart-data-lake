@@ -199,7 +199,7 @@ For now lets make it more stable by adding a fixed schema to `stg-airports` Data
 ```
   stg-airports {
     type = CsvFileDataObject
-    path = ${env.basePath}"~{id}"
+    path = "~{id}"
     schema = "id string, ident string, type string, name string, latitude_deg string, longitude_deg string, elevation_ft string, continent string, iso_country string, iso_region string, municipality string, scheduled_service string, gps_code string, iata_code string, local_code string, home_link string, wikipedia_link string, keywords string"
   }
 ```

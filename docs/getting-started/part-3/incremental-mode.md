@@ -127,9 +127,6 @@ The scenario will be that the first run fetches the data defined in the configur
 If this time difference is larger than a week, the program only queries the next four days since the last execution.
 If there is no data available in a time window, because only a few seconds have passed since the last execution, the execution will fail with Error **404**.
 
-At the end the departure.conf file should look something like [this](https://github.com/smart-data-lake/getting-started/tree/master/config/departures.conf.part-3-solution)
-and the CustomWebserviceDataObject code like [this](https://github.com/smart-data-lake/getting-started/tree/master/src/main/scala/com/sample/CustomWebserviceDataObject.scala.part-3-solution).
-
 :::info
 Unfortunately, the webservice on opensky-network.org responds with a **404** error code when no data is available, rather than a **200** and an empty response. 
 Therefore, SDLB gets a 404 and will fail the execution. The exception could be caught inside CustomWebserviceDataObject, but what if we have a real 404 error?!
@@ -138,6 +135,6 @@ Therefore, SDLB gets a 404 and will fail the execution. The exception could be c
 ## Summary
 
 Congratulation, you just completed implementing a nice incremental loading mechanism!
-At the end, your departures.conf file should look something like [this](https://github.com/smart-data-lake/getting-started/tree/master/config/departures.conf.part-3b-solution)
+At the end, your departures.conf file should look something like [this](https://github.com/smart-data-lake/getting-started/tree/master/config/departures.conf.part-3b-solution) and your CustomWebserviceDataObject file like [this](https://github.com/smart-data-lake/getting-started/tree/master/src/main/scala/com/sample/CustomWebserviceDataObject.scala.part-3-solution).
 
 In the next step we are going to have a look at descriptive metadata...

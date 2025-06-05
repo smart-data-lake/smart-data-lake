@@ -20,9 +20,7 @@ We don't need to define a new input DataObject as we will wire our new action to
 
 Let's use CsvFileDataObject again because that makes it easy for us to check the result.
 In more advanced (speak: real-life) scenarios, we would use one of numerous other possibilities, 
-such as HiveTableDataObject, SplunkDataObject...
-See [this list](https://github.com/smart-data-lake/smart-data-lake/blob/develop-spark3/docs/Reference.md#data-objects) for an overview.
-You can also consult the [Configuration Schema Browser](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2) to get a list of all Data Objects and related properties.
+such as HiveTableDataObject, SplunkDataObject... You can consult the [Configuration Schema Viewer](https://smartdatalake.ch/json-schema-viewer/) to get a list of all Data Objects and related properties.
 
 In a first step, we want to make the airport data more understandable by removing any columns we don't need. 
 Since we don't introduce any business logic into the transformation, 
