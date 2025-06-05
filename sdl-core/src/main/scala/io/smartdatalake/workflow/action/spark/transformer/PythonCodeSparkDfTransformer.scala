@@ -87,22 +87,8 @@ object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   def dedent(code: String): String = {
     val lines = code.stripMargin.linesIterator.toList
     val nonEmptyLines = lines.filter(line => line.trim.nonEmpty)
-    val indents = nonEmptyLines.map(_.takeWhile(c => c == ' ' || c == '\t'))
-    val commonIndent: String = if (indents.isEmpty) {
-      ""
-    } else {
-      val firstIndent = indents.head
-      indents.tail.foldLeft(firstIndent) { (common, next) =>
-        common.zip(next)
-          .takeWhile { case (c1, c2) => c1 == c2 }
-          .map(_._1)
-          .mkString
-      }
-    }
-    val dedentedLines = lines.map { line =>
-      if (line.startsWith(commonIndent)) line.drop(commonIndent.length)
-      else line
-    }
+    val commonIndent = if (nonEmptyLines.isEmpty) "" else nonEmptyLines.map(_.takeWhile(c => c == ' ' || c == '\t')).min
+    val dedentedLines = lines.map(_.drop(commonIndent.length))
     dedentedLines.mkString(System.lineSeparator())
   }
 }
