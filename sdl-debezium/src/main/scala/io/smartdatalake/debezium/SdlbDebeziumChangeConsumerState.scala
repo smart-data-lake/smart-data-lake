@@ -19,6 +19,12 @@
 
 package io.smartdatalake.debezium
 
-trait HasRecords[T] {
-  def records: Seq[T]
+import org.apache.kafka.connect.source.SourceRecord
+
+import java.time.ZonedDateTime
+
+trait SdlbDebeziumChangeConsumerState {
+  def records: Seq[SourceRecord]
+  def isSnapshotting: Boolean
+  def lastRecordTimestamp: ZonedDateTime
 }

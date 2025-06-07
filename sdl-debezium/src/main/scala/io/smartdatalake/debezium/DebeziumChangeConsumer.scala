@@ -22,26 +22,45 @@ package io.smartdatalake.debezium
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import org.apache.kafka.connect.source.SourceRecord
 
+import java.time.ZonedDateTime
 import java.util
 
 /**
  * Custom change consumer that stores the resulting change events as a list of [SourceRecord].
  */
-private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with HasRecords[SourceRecord] {
+private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState {
 
-  var records: List[SourceRecord] = List()
+  private var _records: List[SourceRecord] = List()
+  private var _isSnapshotting: Boolean = false
+  private var _lastRecordTimestamp: ZonedDateTime = ZonedDateTime.now()
 
   override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
 
-    batch.forEach(r => {
+    _lastRecordTimestamp = ZonedDateTime.now()
 
-      records = records :+ r.value()
+    batch.forEach(record => {
 
-      recordCommitter.markProcessed(r)
+      val r = record.value()
+
+      if(r.sourceOffset().containsKey("snapshot") && r.sourceOffset().get("snapshot_completed").equals(true.toString)) {
+        _isSnapshotting = true
+      } else {
+        _isSnapshotting = false
+      }
+
+      _records = _records :+ r
+
+      recordCommitter.markProcessed(record)
     })
 
     recordCommitter.markBatchFinished()
 
   }
+
+  override def records: Seq[SourceRecord] = _records
+
+  override def isSnapshotting: Boolean = _isSnapshotting
+
+  override def lastRecordTimestamp: ZonedDateTime = _lastRecordTimestamp
 }
 

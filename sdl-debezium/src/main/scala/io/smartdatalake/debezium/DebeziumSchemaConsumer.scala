@@ -22,23 +22,46 @@ package io.smartdatalake.debezium
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import org.apache.kafka.connect.source.SourceRecord
 
+import java.time.ZonedDateTime
 import java.util
 
 /**
  * Custom change consumer that returns only the first change event record for schema extraction.
  */
-private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with HasRecords[SourceRecord] {
+private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState {
 
-
-  var records: List[SourceRecord] = List()
+  private var _records: List[SourceRecord] = List()
+  private var _isSnapshotting: Boolean = false
+  private var _lastRecordTimestamp: ZonedDateTime = ZonedDateTime.now()
 
   override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
 
-    if(records.isEmpty) {
-      records  = records :+ batch.get(0).value() // read only the first record
-    }
+    batch.forEach(record => {
+
+      val r = record.value()
+
+      if(r.sourceOffset().containsKey("snapshot") && r.sourceOffset().get("snapshot_completed").equals(true.toString)) {
+        _isSnapshotting = true
+      } else {
+        _isSnapshotting = false
+      }
+
+      if(records.isEmpty) {
+        _lastRecordTimestamp = ZonedDateTime.now() // only set on first record
+        _records  = _records :+ r // read only the first record
+      }
+
+      recordCommitter.markProcessed(record)
+
+    })
 
     recordCommitter.markBatchFinished()
 
   }
+
+  override def records: Seq[SourceRecord] = _records
+
+  override def isSnapshotting: Boolean = _isSnapshotting
+
+  override def lastRecordTimestamp: ZonedDateTime = _lastRecordTimestamp
 }
