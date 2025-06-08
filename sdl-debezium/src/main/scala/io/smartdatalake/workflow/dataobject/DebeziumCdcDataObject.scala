@@ -155,6 +155,22 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     }
 
+    def checkDebeziumEngineEnded(service: ExecutorService, changeConsumer: SdlbDebeziumChangeConsumerState): Boolean = {
+
+      if(service.isShutdown) {
+        logger.trace("Executor service is shutdown")
+        return true
+      }
+
+      val lastRecordTimestamp = changeConsumer.lastRecordTimestamp
+      if(maxWaitTimeAfterLastBatchMilliSeconds.isDefined && ZonedDateTime.now().isAfter(lastRecordTimestamp.plus(Duration.ofMillis(maxWaitTimeAfterLastBatchMilliSeconds.get)))) {
+        logger.trace("Max waiting time after last batch reached")
+        return true
+      }
+
+      false
+    }
+
     def createEmptyDataFrame(): DataFrame = {
 
         val schemaProperties = debeziumPropertiesForEngine
