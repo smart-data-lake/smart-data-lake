@@ -27,6 +27,8 @@ import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCall
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.source.SourceRecord
@@ -35,7 +37,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import java.util
-import java.util.Properties
+import java.util.{Properties, UUID}
 import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -118,6 +120,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = DebeziumCdcDataObject
 
+  private var tempSchema: Option[StructType] = None
+
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
     val spark = context.sparkSession
@@ -173,17 +177,37 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     def createEmptyDataFrame(): DataFrame = {
 
-        val schemaProperties = debeziumPropertiesForEngine
+        val schema = if (tempSchema.isDefined) {
+          tempSchema.get
+        } else {
+          val schemaProperties = debeziumPropertiesForEngine
 
-        Seq("offset.storage", "offset.storage.sdlb.data.object.id").foreach(schemaProperties.remove(_))
+          Seq("offset.storage", "offset.storage.sdlb.data.object.id", "snapshot.mode", "name").foreach(schemaProperties.remove(_))
 
-        schemaProperties.put("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
+          schemaProperties.put("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
+          schemaProperties.put("snapshot.mode", "initial_only")
+          schemaProperties.put("name", UUID.randomUUID().toString)
 
-        val records = getRecordsFromDebeziumEngine(schemaProperties, changeConsumer = new DebeziumSchemaConsumer, timeoutMilliSeconds = maxWaitTimeMilliSeconds)
+          val records = getRecordsFromDebeziumEngine(schemaProperties, changeConsumer = new DebeziumSchemaConsumer)
 
-        val df = DebeziumEventConverter.convert(records)(spark)
-
-        val schema = df.schema
+          if (records.isEmpty) {
+            schemaMin match {
+              case Some(schemaMin) => {
+                tempSchema = Some(schemaMin.asInstanceOf[SparkSchema].inner)
+                tempSchema.get
+              }
+              case None => throw new IllegalArgumentException(
+                s"""($id) missing schemaMin on empty table.
+                   |Schema could not be determined by SDLB, because Debezium did not return a record.
+                   |Please set schemaMin parameter in the data object.
+                   |Use the data types that Debezium would return, not the one JDBC would return. Check the Debezium Connector documentation.
+                   |""".stripMargin)
+            }
+          } else {
+            val df = DebeziumEventConverter.convert(records)(spark)
+            df.schema
+          }
+        }
 
         spark.createDataFrame(new util.ArrayList[Row](), schema)
 
