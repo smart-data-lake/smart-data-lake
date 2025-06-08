@@ -69,11 +69,12 @@ import scala.jdk.CollectionConverters._
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
                                  table: Table,
+                                 schemaMin: Option[GenericSchema] = None,
                                  debeziumProperties: Option[Map[String, String]] = None,
                                  maxWaitTimeMilliSeconds: Int = 2000,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
+  extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation {
 
   val connection: DebeziumConnection = getConnection[DebeziumConnection](connectionId)
 
