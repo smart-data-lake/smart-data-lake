@@ -173,9 +173,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     }
 
-    if (context.isExecPhase) {
+    val df = if (context.isExecPhase) {
 
-      val records = getRecordsFromDebeziumEngine(debeziumPropertiesForEngine, changeConsumer = new DebeziumChangeConsumer, timeoutMilliSeconds = maxWaitTimeMilliSeconds)
+      val records = getRecordsFromDebeziumEngine(debeziumPropertiesForEngine, changeConsumer = new DebeziumChangeConsumer)
 
       records.headOption match {
         case Some(_) => {
@@ -187,6 +187,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     } else {
       createEmptyDataFrame()
     }
+
+    validateSchemaMin(SparkSchema(df.schema), "read")
+    df
 
   }
 
