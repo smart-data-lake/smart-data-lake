@@ -74,12 +74,15 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
   }
 
   override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
-
     values.asScala.foreach(state => {
       val key = byteBufferToString(state._1)
       val value = byteBufferToString(state._2)
       instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.put(key, value)
     })
+
+    if(callback != null) {
+      callback.onCompletion(null, null)
+    }
 
     CompletableFuture.completedFuture(null)
   }
