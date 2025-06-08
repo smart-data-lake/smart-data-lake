@@ -162,8 +162,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
         val endCount = changeConsumer.records.size
         isConsuming = endCount > startCount
 
-        logger.info(s"${changeConsumer.isSnapshotting}/${changeConsumer.records.size}/${changeConsumer.lastRecordTimestamp}/${changeConsumer.getClass.toString}")
-
       } while(changeConsumer.isSnapshotting
         && isConsuming
         && ZonedDateTime.now().isBefore(snapshotStarted.plus(Duration.ofMillis(maxSnapshotWaitTimeMilliSeconds.get)))
