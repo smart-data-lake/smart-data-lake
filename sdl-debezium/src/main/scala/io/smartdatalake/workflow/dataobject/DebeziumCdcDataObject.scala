@@ -227,6 +227,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
           val Array(key, value) = pair.split(":")
           incrementalState.put(key, value)
         }
+      case _ => incrementalState = mutable.Map()
     }
   }
 
