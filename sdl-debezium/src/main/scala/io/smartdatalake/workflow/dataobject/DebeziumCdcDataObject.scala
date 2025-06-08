@@ -23,7 +23,8 @@ import io.debezium.embedded.Connect
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer, HasRecords}
+import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer, SdlbDebeziumChangeConsumerState}
+import io.smartdatalake.util.concurrent.Await
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
@@ -36,6 +37,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
+import java.time.{Duration, ZonedDateTime}
 import java.util
 import java.util.{Properties, UUID}
 import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
@@ -50,8 +52,9 @@ import scala.jdk.CollectionConverters._
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.DebeziumConnection]]
  * @param table Source table to get change data from
  * @param debeziumProperties Properties for the specific Debezium connector
- * @param metadata optional data object metadata
- * @param maxWaitTimeMilliSeconds Waiting time interval for debezium to finish
+ * @param metadata (optional) data object metadata
+ * @param maxWaitTimeAfterLastBatchMilliSeconds (optional) Waiting time interval for debezium to finish (when a batch arrived, the engine waits the defined interval for completion), default = 10 seconds
+ * @param maxSnapshotWaitTimeMilliSeconds (optional) The maximum duration waiting for the snapshot to end, default = 5 seconds
  *
  * Example config:
  *
@@ -65,7 +68,6 @@ import scala.jdk.CollectionConverters._
  *		"schema.history.internal" = "io.debezium.storage.file.history.FileSchemaHistory"
  *		"schema.history.internal.file.filename" = "C://TEMP/schemahistory.dat"
  *	}
- *	maxWaitTimeMilliSeconds = 20
  * }
  */
 case class DebeziumCdcDataObject(override val id: DataObjectId,
@@ -73,7 +75,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  table: Table,
                                  schemaMin: Option[GenericSchema] = None,
                                  debeziumProperties: Option[Map[String, String]] = None,
-                                 maxWaitTimeMilliSeconds: Int = 2000,
+                                 maxWaitTimeAfterLastBatchMilliSeconds: Option[Int] = Some(10000),
+                                 maxSnapshotWaitTimeMilliSeconds: Option[Int] = Some(5000),
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation {
@@ -127,10 +130,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     val spark = context.sparkSession
 
     def getRecordsFromDebeziumEngine(
-                           properties: Properties,
-                           changeConsumer: DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with HasRecords[SourceRecord],
-                           executorService: ExecutorService = Executors.newSingleThreadExecutor,
-                           timeoutMilliSeconds: Int = 10000
+                                      properties: Properties,
+                                      changeConsumer: DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState,
+                                      executorService: ExecutorService = Executors.newSingleThreadExecutor
                          ): Seq[SourceRecord] = {
 
       val completionCallback = new DebeziumCompletionCallback(executorService)
@@ -143,15 +145,37 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       executorService.execute(engine)
 
+      val snapshotStarted = ZonedDateTime.now()
+      var isConsuming = false
+
       do {
-        if(executorService.isShutdown) {
-          engine.close()
-        } else {
-          executorService.shutdown()
-          logger.info(s"Waiting $timeoutMilliSeconds milliseconds for Debezium engine to shut down")
-        }
+
+        logger.trace(s"Start consuming records from Debezium")
+        val startCount = changeConsumer.records.size
+
+        Await.until({
+          logger.trace(s"Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
+          checkDebeziumEngineEnded(executorService, changeConsumer)
+
+        }, Duration.ofSeconds(1))
+
+        val endCount = changeConsumer.records.size
+        isConsuming = endCount > startCount
+
+        logger.info(s"${changeConsumer.isSnapshotting}/${changeConsumer.records.size}/${changeConsumer.lastRecordTimestamp}/${changeConsumer.getClass.toString}")
+
+      } while(changeConsumer.isSnapshotting
+        && isConsuming
+        && ZonedDateTime.now().isBefore(snapshotStarted.plus(Duration.ofMillis(maxSnapshotWaitTimeMilliSeconds.get)))
+      )
+
+      engine.close()
+
+      executorService.shutdown()
+
+      while(!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+        logger.trace("Waiting another 5 seconds for the Debezium embedded engine to shutdown")
       }
-      while(!executorService.awaitTermination(timeoutMilliSeconds, TimeUnit.MILLISECONDS))
 
       completionCallback.error.foreach(err => throw new Exception(err))
 
