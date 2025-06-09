@@ -150,11 +150,11 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       do {
 
-        logger.trace(s"Start consuming records from Debezium")
+        logger.info(s"Start consuming records from Debezium")
         val startCount = changeConsumer.records.size
 
         Await.until({
-          logger.trace(s"Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
+          logger.info(s"Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
           checkDebeziumEngineEnded(executorService, changeConsumer)
 
         }, Duration.ofSeconds(1))
@@ -184,13 +184,13 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     def checkDebeziumEngineEnded(service: ExecutorService, changeConsumer: SdlbDebeziumChangeConsumerState): Boolean = {
 
       if(service.isShutdown) {
-        logger.trace("Executor service is shutdown")
+        logger.info("Executor service is shutdown")
         return true
       }
 
       val lastRecordTimestamp = changeConsumer.lastRecordTimestamp
       if(maxWaitTimeAfterLastBatchMilliSeconds.isDefined && ZonedDateTime.now().isAfter(lastRecordTimestamp.plus(Duration.ofMillis(maxWaitTimeAfterLastBatchMilliSeconds.get)))) {
-        logger.trace("Max waiting time after last batch reached")
+        logger.info("Max waiting time after last batch reached")
         return true
       }
 
