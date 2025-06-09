@@ -123,8 +123,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def factory: FromConfigFactory[DataObject] = DebeziumCdcDataObject
 
-  private var tempSchema: Option[StructType] = None
-
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
     val spark = context.sparkSession
@@ -199,8 +197,18 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
     def createEmptyDataFrame(): DataFrame = {
 
-        val schema = if (tempSchema.isDefined) {
-          tempSchema.get
+      /**
+       * Schema for empty dataframe is created based on one of the following cases:
+       * 1. Init Phase
+       *    Debezium is called with the custom SchemaConsumer
+       *    - Table is empty with no previous events: -> No records are returned so schema is inferred from schemaMin. If not set an exception is thrown.
+       *    - Table has records: -> Schema is inferred from the first record
+       * 2. Exec Phase -> Schema is inferred from schemaMin
+       */
+
+
+        val schema = if (schemaMin.isDefined && context.isExecPhase) {
+          schemaMin.get.asInstanceOf[SparkSchema].inner
         } else {
           val schemaProperties = debeziumPropertiesForEngine
 
@@ -214,10 +222,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
           if (records.isEmpty) {
             schemaMin match {
-              case Some(schemaMin) => {
-                tempSchema = Some(schemaMin.asInstanceOf[SparkSchema].inner)
-                tempSchema.get
-              }
+              case Some(schemaMin) => schemaMin.asInstanceOf[SparkSchema].inner
               case None => throw new IllegalArgumentException(
                 s"""($id) missing schemaMin on empty table.
                    |Schema could not be determined by SDLB, because Debezium did not return a record.
