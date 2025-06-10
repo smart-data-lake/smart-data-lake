@@ -24,6 +24,10 @@ import org.scalatest.FunSuite
 
 class PythonCodeDfTransformerTest extends FunSuite {
 
+	// To ensure consistent comparisons across different environments, we normalize line endings.
+	def normalizeLineEndings(text: String): String =
+		text.replace("\r\n", "\n")
+
 	test("dedent maintaining relative indentation") {
 		val input = """
 			def foo():
@@ -38,7 +42,7 @@ class PythonCodeDfTransformerTest extends FunSuite {
 			|	if True:
 			|		print("again")
 			|""".stripMargin
-		assert(output == expected)
+		assert(normalizeLineEndings(output) == normalizeLineEndings(expected))
 	}
 
 	test("ignore empty lines") {
@@ -63,7 +67,7 @@ class PythonCodeDfTransformerTest extends FunSuite {
 			|	print("again")
 			|
 			|""".stripMargin
-		assert(output == expected)
+		assert(normalizeLineEndings(output) == normalizeLineEndings(expected))
 	}
 
 	test("handle scala margin indicator") {
@@ -74,7 +78,7 @@ class PythonCodeDfTransformerTest extends FunSuite {
 		val output = dedent(input)
 		val expected = """
 			|print("test")""".stripMargin
-	assert(output == expected)
+		assert(normalizeLineEndings(output) == normalizeLineEndings(expected))
 	}
 }
 
