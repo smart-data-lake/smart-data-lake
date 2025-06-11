@@ -26,6 +26,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfTransformer.dedent
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -88,7 +89,7 @@ case class PythonCodeDfsTransformer(
           """.stripMargin
       PythonUtil.execPythonSparkCode(
         entryPoint,
-        additionalInitCode + sys.props("line.separator") + pythonCode.stripMargin
+        additionalInitCode + sys.props("line.separator") + dedent(pythonCode)
       )
       entryPoint.outputDfs.getOrElse(
         throw new IllegalStateException(
