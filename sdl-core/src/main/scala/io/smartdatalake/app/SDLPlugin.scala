@@ -47,3 +47,5 @@ trait SDLPlugin {
   def shutdown(): Unit = ()
 
 }
+
+case class SDLPluginWithClassName(plugin: SDLPlugin, className: String)

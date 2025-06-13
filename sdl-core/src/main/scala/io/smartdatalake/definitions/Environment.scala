@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.definitions
 
-import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
+import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener, SDLPluginWithClassName}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
 import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil, SmartDataLakeLogger}
@@ -604,16 +604,24 @@ object Environment extends SmartDataLakeLogger {
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
   val runIdPartitionColumnName = "run_id"
 
-  // instantiate sdl plugin if configured
-  private[smartdatalake] def sdlPlugin: Option[SDLPlugin] = {
-    if (_sdlPlugin.isEmpty) {
-      _sdlPlugin = Some(EnvironmentUtil.getSdlParameter("pluginClassName")
-        .map(CustomCodeUtil.getClassInstanceByName[SDLPlugin]))
 
+  // instantiate sdl plugins if configured. The class names must be separated by a comma.
+  // initializes with envVars pluginClassName (deprecated) and pluginClassNames
+  private[smartdatalake] def sdlPlugins: Seq[SDLPlugin] = {
+    def pluginList(pluginsString: String): Seq[SDLPlugin] =
+      pluginsString.split(",").map(_.trim).filterNot(_.isEmpty).map(CustomCodeUtil.getClassInstanceByName[SDLPlugin]).toSeq
+    if (_sdlPlugins.isEmpty) {
+      _sdlPlugins = (EnvironmentUtil.getSdlParameter("pluginClassNames"), EnvironmentUtil.getSdlParameter("pluginClassName")) match {
+        case (Some(ps), Some(p)) =>  pluginList(s"$ps, $p")
+        case (Some(ps), None) => pluginList(ps)
+        case (None, Some(p)) => pluginList(p)
+        case _ => Seq()
+      }
     }
-    _sdlPlugin.get
+    _sdlPlugins
   }
-  private[smartdatalake] var _sdlPlugin: Option[Option[SDLPlugin]] = None
+
+  private[smartdatalake] var _sdlPlugins: Seq[SDLPlugin] = Seq()
 
   // dynamically shared environment for custom code (see also #106)
   // attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDLB code, but might be used in custom code on your own risk.
