@@ -88,7 +88,7 @@ object DebeziumCdcDataObjectMySqlS3SchemaHistoryIT extends App with SmartDataLak
   // Setup data objects
 
   val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "database.allowPublicKeyRetrieval" -> "true",
-    "schema.history.internal" -> "shaded.io.debezium.storage.s3.history.S3SchemaHistory",
+    "schema.history.internal" -> "io.debezium.storage.s3.history.S3SchemaHistory",
     "schema.history.internal.s3.access.key.id" -> sys.env("AWS_ACCESS_KEY"),
     "schema.history.internal.s3.secret.access.key" -> sys.env("AWS_SECRET_KEY"),
     "schema.history.internal.s3.region.name" -> "eu-central-2",
