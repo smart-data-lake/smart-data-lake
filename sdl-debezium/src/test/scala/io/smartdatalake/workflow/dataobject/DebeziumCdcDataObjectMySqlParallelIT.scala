@@ -30,7 +30,6 @@ import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.connection.{DebeziumConnection}
-import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlIT.{COMMIT_TIMESTAMP_COLUMN_NAME, COMMIT_TYPE_COLUMN_NAME, connection, df, instanceRegistry, jdbcConnection, sparkSession, statePath}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit}
 
