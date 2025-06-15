@@ -40,7 +40,7 @@ private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.Chang
 
       val r = record.value()
 
-      if(r.sourceOffset().containsKey("snapshot") && r.sourceOffset().get("snapshot_completed").equals(true.toString)) {
+      if(r.sourceOffset().containsKey("snapshot") && r.sourceOffset().containsKey("snapshot_completed") && r.sourceOffset().get("snapshot_completed").equals(false.toString)) {
         _isSnapshotting = true
       } else {
         _isSnapshotting = false
