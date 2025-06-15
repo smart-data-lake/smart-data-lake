@@ -19,15 +19,6 @@
 
 package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
-import io.debezium.connector.db2.Db2Connector
-import io.debezium.connector.mariadb.MariaDbConnector
-import io.debezium.connector.mongodb.MongoDbConnector
-import io.debezium.connector.mysql.MySqlConnector
-import io.debezium.connector.oracle.OracleConnector
-import io.debezium.connector.postgresql.PostgresConnector
-import io.debezium.connector.spanner.SpannerConnector
-import io.debezium.connector.sqlserver.SqlServerConnector
-import io.debezium.connector.vitess.VitessConnector
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
@@ -116,24 +107,30 @@ object DebeziumConnection extends FromConfigFactory[Connection] {
 private object DbEngineHelper {
 
   private val dbEngineConnectorClassNames: Map[String, String] = Map(
-    "mysql" -> classOf[MySqlConnector].getName,
-    "postgresql" -> classOf[PostgresConnector].getName,
-    "oracle" -> classOf[OracleConnector].getName,
-    "mariadb" -> classOf[MariaDbConnector].getName,
-    "mongodb" -> classOf[MongoDbConnector].getName,
-    "sqlserver" -> classOf[SqlServerConnector].getName,
-    "db2" -> classOf[Db2Connector].getName,
-    "vitess" -> classOf[VitessConnector].getName,
-    "spanner" -> classOf[SpannerConnector].getName
+    "mysql" -> "io.debezium.connector.mysql.MySqlConnector",
+    "postgresql" -> "io.debezium.connector.postgresql.PostgresConnector",
+    "oracle" -> "io.debezium.connector.oracle.OracleConnector",
+    "mariadb" -> "io.debezium.connector.mariadb.MariaDbConnector",
+    "mongodb" -> "io.debezium.connector.mongodb.MongoDbConnector",
+    "sqlserver" -> "io.debezium.connector.sqlserver.SqlServerConnector",
+    "db2" -> "io.debezium.connector.db2.Db2Connector",
+    "vitess" -> "io.debezium.connector.vitess.VitessConnector",
+    "spanner" -> "io.debezium.connector.spanner.SpannerConnector"
   )
 
   def getDbEngineConnectorClassName(dbName: String): Option[String] = {
-    // check if this is a class name or just the database name
-    if (dbName.contains(".")) {
-      // check if class exists
-      Environment.classLoader().loadClass(dbName)
-      Some(dbName)
-    } else dbEngineConnectorClassNames.get(dbName.toLowerCase)
+
+    val dbEngineConnectorClassName = dbEngineConnectorClassNames.get(dbName.toLowerCase)
+
+    try {
+      // check if class exists on classpath
+      Environment.classLoader().loadClass(dbEngineConnectorClassName.get)
+    } catch {
+      case e: ClassNotFoundException =>
+        throw new ClassNotFoundException(s"Class not found: '${dbEngineConnectorClassName.get}'. Make sure to add the debezium connector dependency for $dbName. Pay attention to the correct configuration of the maven dependency (see SDLB documentation).", e)
+    }
+
+    dbEngineConnectorClassName
   }
 
   def supportedDbEngines(): Seq[String] = {
