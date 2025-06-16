@@ -20,7 +20,7 @@
 package io.smartdatalake.util.misc
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
-import scaladoc.Markup._
+import scaladoc.Markup._ // https://github.com/andyglow/scaladoc
 import scaladoc.{Markup, Scaladoc, Tag}
 
 import scala.reflect.runtime.universe.Annotation
@@ -59,9 +59,33 @@ private[smartdatalake] object ScaladocUtil {
     }
   }
 
+  def formatScaladocStringLinkTag(capture_group1: String, capture_group2: String): String = {
+    // Do not wrap urls in inline code blocks
+    if (capture_group1.contains("https://")){
+      val split_hyperref = capture_group1.split(" ")
+      if (split_hyperref.length > 1){
+        // If the Url contained an alias (pretty name), preserve it
+        s" [${split_hyperref.drop(1).mkString(" ")}](${split_hyperref(0)}) "
+      }else{
+        s" ${capture_group1} "
+      }
+    } else {
+      // Plural s handling
+      if (capture_group2 != null && capture_group2.nonEmpty) s" `${capture_group1}`s " else s" `${capture_group1}` "
+    }
+  }
+
   def formatScaladocString(str: String): String = {
-    str.replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
+    // Remove link square brackets (including plural s handling)
+    // If the link is followed by a single s, remove the space
+    val bracket_removal_pattern = raw"\[\[(.+?)\]\](\s?s(?![a-zA-Z]))?".r
+    bracket_removal_pattern.replaceAllIn(str, m =>
+      formatScaladocStringLinkTag(m.group(1), m.group(2))
+    )
+      .replaceAll(raw"\s+(,|\.|\s|\))", "$1") // Reduce multiple spaces down to one
+      .replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
       .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
+      .replace("->", "\u2192") // Prettify right arrow
       .trim // remove leading and trailing line separators
   }
 
@@ -74,8 +98,9 @@ private[smartdatalake] object ScaladocUtil {
       case x: Document =>
         val contentStr = x.elements.map(formatScaladocMarkup).mkString("")
         formatScaladocString(contentStr)
-          .replaceAll(raw"\{\{\{", "```") // convert wiki code block to markup code block
-          .replaceAll(raw"}}}", "```"); // convert wiki code block to markup code block
+          // Additional new line char inside the code block for correct rendering in markdown
+          .replaceAll(raw"\{\{\{", "```\n") // convert wiki code block to markup code block
+          .replaceAll(raw"(.*)}}}", "$1\n```") // convert wiki code block to markup code block
     }
   }
 
