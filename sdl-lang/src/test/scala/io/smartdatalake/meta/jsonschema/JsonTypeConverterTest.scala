@@ -155,7 +155,7 @@ class JsonTypeConverterTest extends FunSuite {
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
     assert(jsonTypeDef.properties("secret").isInstanceOf[JsonStringDef])
-    assert(jsonTypeDef.properties("secret").asInstanceOf[JsonStringDef].description.get.contains("```###<PROVIDERID>#<SECRETNAME>###```"))
+    assert(jsonTypeDef.properties("secret").asInstanceOf[JsonStringDef].description.get.contains("```\n###<PROVIDERID>#<SECRETNAME>###\n```"))
   }
 
   case class TestClassWithSecretsInOptions(options: Map[String, StringOrSecret])
@@ -165,7 +165,7 @@ class JsonTypeConverterTest extends FunSuite {
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
     assert(jsonTypeDef.properties("options").isInstanceOf[JsonMapDef])
-    assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.get.contains("```###<PROVIDERID>#<SECRETNAME>###```"))
+    assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.get.contains("```\n###<PROVIDERID>#<SECRETNAME>###\n```"))
   }
 
   case class TestClassWithoutSecretsInOptions(options: Map[String, String])
