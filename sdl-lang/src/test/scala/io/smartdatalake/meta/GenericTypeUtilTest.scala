@@ -43,7 +43,7 @@ class GenericTypeUtilTest extends FunSuite {
   test("scala doc from case class attribute and from overridden method as fallback") {
     val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestObject])
     assert(testObjectTypeDef.name == "TestObject")
-    assert(testObjectTypeDef.description.contains("ScalaDoc on case class\n\nTest line break\n\nSEE: OverrideTest for details"))
+    assert(testObjectTypeDef.description.contains("ScalaDoc on case class\n\nTest line break\n\nSEE: `OverrideTest` for details"))
     assert(testObjectTypeDef.attributes.find(_.name == "id").get.description.contains("parameter test"))
     assert(testObjectTypeDef.attributes.find(_.name == "overrideTestFirstMethod").get.description.contains("override test first method"))
     assert(testObjectTypeDef.attributes.find(_.name == "overrideTestSecondMethod").get.description.contains("override test second method"))
