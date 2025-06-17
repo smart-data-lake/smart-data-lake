@@ -82,7 +82,7 @@ private[smartdatalake] object ScaladocUtil {
     bracket_removal_pattern.replaceAllIn(str, m =>
       formatScaladocStringLinkTag(m.group(1), m.group(2))
     )
-      .replaceAll(raw"\s+(,|\.|\s|\))", "$1") // Reduce multiple spaces down to one
+      .replaceAll(raw"[^\S\n]+(,|\.|[^\S\n]|\))", "$1") // Reduce multiple spaces down to one
       .replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
       .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
       .replace("->", "\u2192") // Prettify right arrow
