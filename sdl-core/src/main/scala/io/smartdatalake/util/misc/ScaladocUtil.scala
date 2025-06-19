@@ -66,7 +66,7 @@ private[smartdatalake] object ScaladocUtil {
       if (split_hyperref.length > 1){
         // If the Url contained an alias (pretty name), preserve it
         s" [${split_hyperref.drop(1).mkString(" ")}](${split_hyperref(0)}) "
-      }else{
+      } else {
         s" ${capture_group1} "
       }
     } else {
