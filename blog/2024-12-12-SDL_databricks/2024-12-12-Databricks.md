@@ -19,6 +19,7 @@ In this article, we describe the seamless integration of Smart Data Lake Builder
 - Display contents of DataObjects in your Notebooks
 - Use code completion to browse through Actions and DataObjects
 - Execute individual Actions from a Notebook Cell
+<!-- truncate -->
 
 We will use our [getting-started guide](../../docs/getting-started/setup) as an example data pipeline. This will download data about airports and plane departures and do some calculations.
 Feel free to check out our guide for a step-by-step walkthrough on what it does.

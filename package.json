@@ -14,24 +14,27 @@
     "write-heading-ids": "docusaurus write-heading-ids"
   },
   "dependencies": {
-    "@docusaurus/core": "3.0.0",
-    "@docusaurus/preset-classic": "3.0.0",
-    "@emotion/react": "^11.11.0",
-    "@emotion/styled": "^11.11.0",
-    "@mdx-js/react": "^3.0.0",
-    "@mui/icons-material": "^5.11.16",
-    "@mui/joy": "^5.0.0-alpha.82",
-    "@mui/material": "^5.13.3",
+    "@base-ui-components/react": "^1.0.0-beta.0",
+    "@docusaurus/core": "^3.8.1",
+    "@docusaurus/preset-classic": "^3.8.1",
+    "@emotion/react": "11.x",
+    "@emotion/styled": "11.x",
+    "@mui/icons-material": "^7.1.1",
+    "@mui/joy": "^5.0.0-beta.52",
+    "@mui/material": "^7.1.1",
+    "@mui/system": "^7.1.1",
     "clsx": "^1.2.1",
-    "d3": "^7.8.4",
+    "d3": "7.x",
     "prism-react-renderer": "^2.1.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "sdlb-schema-viewer": "^1.2.0"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sdlb-schema-viewer": "2.0.0"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.0.0",
-    "@docusaurus/types": "3.0.0"
+    "@docusaurus/module-type-aliases": "^3.8.1",
+    "@docusaurus/types": "^3.8.1"
   },
   "browserslist": {
     "production": [
@@ -46,6 +49,7 @@
     ]
   },
   "engines": {
-    "node": ">=18.0"
-  }
+    "node": ">=22.0"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

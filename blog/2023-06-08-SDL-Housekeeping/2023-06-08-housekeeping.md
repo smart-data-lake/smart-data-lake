@@ -11,6 +11,7 @@ hide_table_of_contents: false
 
 # Housekeeping
 In this article, we're taking a look on how we use SDLB's housekeeping features to keep our pipelines running efficiently.
+<!-- truncate -->
 
 Some DataObject contain housekeeping features of their own. 
 Make sure you use them!
