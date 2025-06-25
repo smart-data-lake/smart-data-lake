@@ -49,6 +49,55 @@ class GenericTypeUtilTest extends FunSuite {
     assert(testObjectTypeDef.attributes.find(_.name == "overrideTestSecondMethod").get.description.contains("override test second method"))
   }
 
+  test("scala doc link tag parsing"){
+    val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestLinkTag])
+    assert(testObjectTypeDef.description.contains("This is an example of a raw URI https://www.example.com.  \nThis is an example of a [Pretty Link](https://www.example.com).  \nThis is a `DataObject` containing multiple `ActionObject`s."))
+  }
+
+  test("scala doc code indention correction"){
+    val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestCodeBlocks])
+    assert(testObjectTypeDef.description.exists(_.contains("```\nspaces {\n  assert = true\n}\n```")))
+    assert(testObjectTypeDef.description.exists(_.contains("```\nmixed {\n  assert = true\n  config = \"test/directory\"\n  config2 = \"test/directory\"\n}\n```")))
+    assert(testObjectTypeDef.description.exists(_.contains("```\ntabs {\n\tassert = true\n}\n```")))
+  }
+}
+
+/**
+ * This is an example of a raw URI [[https://www.example.com]].
+ * This is an example of a [[https://www.example.com Pretty Link]].
+ * This is a [[DataObject]] containing multiple [[ActionObject]]s.
+ */
+
+case class TestLinkTag() {
+
+}
+
+/**
+ * See the following Example:
+ * {{{
+ *   spaces {
+ *     assert = true
+ *   }
+ * }}}
+ *
+ * {{{
+ * 	 	mixed {
+ * 		   assert = true
+ *		    config = "test/directory"
+ *	  	  config2 = "test/directory"
+ * 		 }
+ * }}}
+ *
+ * {{{
+ *	tabs {
+ *		assert = true
+ *	}
+ * }}}
+ *
+ */
+
+case class TestCodeBlocks() {
+
 }
 
 /**
@@ -61,23 +110,23 @@ class GenericTypeUtilTest extends FunSuite {
  * @see [[OverrideTest]] for details
  */
 case class TestObject (
-                       id: String,
-                       @Deprecated javaDeprecated: String,
-                       @deprecated scalaDeprecated: String, // scala annotations are *not* kept for runtime and will not be reflected in type def...
-                       optional: Option[String], default: String = "",
-                       override val overrideTestFirstMethod: String,
-                       override val overrideTestSecondMethod: String
-                     ) extends OverrideTest
+												id: String,
+												@Deprecated javaDeprecated: String,
+												@deprecated scalaDeprecated: String, // scala annotations are *not* kept for runtime and will not be reflected in type def...
+												optional: Option[String], default: String = "",
+												override val overrideTestFirstMethod: String,
+												override val overrideTestSecondMethod: String
+											) extends OverrideTest
 
 trait OverrideTest {
-  /**
-   * override test first method
-    */
-  def overrideTestFirstMethod: String
+	/**
+	 * override test first method
+	 */
+	def overrideTestFirstMethod: String
 
-  /**
-   * override test second method
-   */
+	/**
+	 * override test second method
+	 */
   def overrideTestSecondMethod: String
 
   def methodTest(): String = ""
