@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil

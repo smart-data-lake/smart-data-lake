@@ -26,6 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer, SdlbDebeziumChangeConsumerState}
 import io.smartdatalake.util.concurrent.Await
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -38,9 +39,8 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import java.time.{Duration, ZonedDateTime}
-import java.util
-import java.util.{Properties, UUID}
 import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
+import java.util.{Properties, UUID}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
@@ -125,7 +125,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
-    val spark = context.sparkSession
+    implicit val spark: SparkSession = context.sparkSession
 
     def getRecordsFromDebeziumEngine(
                                       properties: Properties,
@@ -156,6 +156,8 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
           checkDebeziumEngineEnded(executorService, changeConsumer)
 
         }, Duration.ofSeconds(1))
+
+        logger.info(s"checkDebeziumEngineEnded done")
 
         val endCount = changeConsumer.records.size
         isConsuming = endCount > startCount
@@ -206,7 +208,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
        * 2. Exec Phase -> Schema is inferred from schemaMin
        */
 
-
         val schema = if (schemaMin.isDefined && context.isExecPhase) {
           schemaMin.get.asInstanceOf[SparkSchema].inner
         } else {
@@ -236,7 +237,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
           }
         }
 
-        spark.createDataFrame(new util.ArrayList[Row](), schema)
+      DataFrameUtil.getEmptyDataFrame(schema)
 
     }
 
@@ -245,9 +246,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       val records = getRecordsFromDebeziumEngine(debeziumPropertiesForEngine, changeConsumer = new DebeziumChangeConsumer)
 
       records.headOption match {
-        case Some(_) => {
-          DebeziumEventConverter.convert(records)(spark)
-        }
+        case Some(_) => DebeziumEventConverter.convert(records)(spark)
         case None => createEmptyDataFrame()
       }
 

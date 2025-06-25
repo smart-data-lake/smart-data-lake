@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
+import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -28,9 +28,9 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
+import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.connection.DebeziumConnection
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{col, lit}
 
@@ -101,6 +101,10 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
       ))
     )
     instanceRegistry.register(srcDO1)
+
+    jdbcConnection.execJdbcStatement("CREATE TABLE IF NOT EXISTS demo.test (value varchar(100), timestampCol timestamp, decimalCol decimal(38,10))")
+    jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
+    jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INIT 1', '1994-11-30 01:00:00', 19.94)")
 
     val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
     instanceRegistry.register(tgtDO1)

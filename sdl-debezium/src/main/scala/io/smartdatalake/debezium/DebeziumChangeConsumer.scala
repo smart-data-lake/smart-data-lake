@@ -20,6 +20,7 @@
 package io.smartdatalake.debezium
 
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.kafka.connect.source.SourceRecord
 
 import java.time.ZonedDateTime
@@ -28,7 +29,7 @@ import java.util
 /**
  * Custom change consumer that stores the resulting change events as a list of [SourceRecord].
  */
-private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState {
+private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState with SmartDataLakeLogger {
 
   private var _records: List[SourceRecord] = List()
   private var _isSnapshotting: Boolean = false
@@ -36,13 +37,15 @@ private[smartdatalake] class DebeziumChangeConsumer extends DebeziumEngine.Chang
 
   override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
 
+    logger.debug("handleBatch size=" + batch.size())
+
     _lastRecordTimestamp = ZonedDateTime.now()
 
     batch.forEach(record => {
 
       val r = record.value()
 
-      if(r.sourceOffset().containsKey("snapshot") && r.sourceOffset().get("snapshot_completed").equals(true.toString)) {
+      if (r.sourceOffset().containsKey("snapshot") && r.sourceOffset().containsKey("snapshot_completed") && r.sourceOffset().get("snapshot_completed").equals(true.toString)) {
         _isSnapshotting = true
       } else {
         _isSnapshotting = false

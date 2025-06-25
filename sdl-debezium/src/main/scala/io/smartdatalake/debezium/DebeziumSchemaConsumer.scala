@@ -20,6 +20,7 @@
 package io.smartdatalake.debezium
 
 import io.debezium.engine.{ChangeEvent, DebeziumEngine}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.kafka.connect.source.SourceRecord
 
 import java.time.ZonedDateTime
@@ -28,13 +29,15 @@ import java.util
 /**
  * Custom change consumer that returns only the first change event record for schema extraction.
  */
-private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState {
+private[smartdatalake] class DebeziumSchemaConsumer extends DebeziumEngine.ChangeConsumer[ChangeEvent[SourceRecord, SourceRecord]] with SdlbDebeziumChangeConsumerState with SmartDataLakeLogger {
 
   private var _records: List[SourceRecord] = List()
   private var _isSnapshotting: Boolean = false
   private var _lastRecordTimestamp: ZonedDateTime = ZonedDateTime.now()
 
   override def handleBatch(batch: util.List[ChangeEvent[SourceRecord, SourceRecord]], recordCommitter: DebeziumEngine.RecordCommitter[ChangeEvent[SourceRecord, SourceRecord]]): Unit = {
+
+    logger.debug("handleBatch size=" + batch.size())
 
     batch.forEach(record => {
 

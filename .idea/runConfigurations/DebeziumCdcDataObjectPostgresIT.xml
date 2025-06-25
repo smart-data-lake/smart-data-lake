@@ -2,14 +2,14 @@
   <configuration default="false" name="DebeziumCdcDataObjectPostgresIT" type="Application" factoryName="Application">
     <option name="ALTERNATIVE_JRE_PATH" value="temurin-11" />
     <envs>
-      <env name="PSQL_DB" value="" />
-      <env name="PSQL_HOSTNAME" value="" />
-      <env name="PSQL_PASSWORD" value="" />
-      <env name="PSQL_PORT" value="" />
-      <env name="PSQL_USER" value="" />
+      <env name="PSQL_DB" value="demo" />
+      <env name="PSQL_HOSTNAME" value="172.23.240.151" />
+      <env name="PSQL_USER" value="postgres" />
+      <env name="PSQL_PASSWORD" value="debezium" />
+      <env name="PSQL_PORT" value="5432" />
     </envs>
     <option name="MAIN_CLASS_NAME" value="io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectPostgresqlIT" />
-    <module name="sdl-debezium" />
+    <module name="sdl-debezium_2.12" />
     <shortenClasspath name="ARGS_FILE" />
     <option name="VM_PARAMETERS" value="--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED" />
     <extension name="coverage">

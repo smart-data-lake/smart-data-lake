@@ -44,8 +44,6 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   /**
    * Init tests
-   *
-   * podman run --rm --name some-mariadb -p 3306:3306 --env MARIADB_ROOT_PASSWORD=my-secret-pw --env MARIADB_DATABASE=demo docker.io/mariadb:latest
    */
 
   val sdlb = DefaultSmartDataLakeBuilder
@@ -62,20 +60,17 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   val connection = DebeziumConnection(
     id = "dbzCon",
     dbEngine = "mariadb",
-    hostname = "172.23.240.151",
+    hostname = sys.env("MARIADB_HOSTNAME"),
     //db = Some("test"),
-    port = 3306,
-    authMode = BasicAuthMode(Some(StringOrSecret("root")),
-      Some(StringOrSecret("my-secret-pw")))
+    port = sys.env("MARIADB_PORT").toInt,
+    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "psqlCon",
-    url = s"jdbc:mariadb" +
-      s"://172.23.240.151:3306/demo",
+    url = s"jdbc:mariadb://${sys.env("MARIADB_HOSTNAME")}:${sys.env("MARIADB_PORT")}",
     driver = "org.mariadb.jdbc.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret("root")),
-      Some(StringOrSecret("my-secret-pw"))))
+    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))),
   )
 
   val appName = "sdlb-debezium-sequential-integration-test"
@@ -87,8 +82,8 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   instanceRegistry.register(connection)
 
-  //jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
   jdbcConnection.execJdbcStatement("CREATE TABLE IF NOT EXISTS demo.test (value varchar(100), timestampCol timestamp, decimalCol decimal(38,10))")
+  jdbcConnection.execJdbcStatement("TRUNCATE demo.test")
   jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INIT 1', '1994-11-30 01:00:00', 19.94)")
 
   // Setup data objects
@@ -112,15 +107,8 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   var df = tgtDO1.getSparkDataFrame()
 
-  assert(df.columns.contains("id") &&
-    df.columns.contains("value") &&
-    df.columns.contains("timestampCol") &&
-    df.columns.contains("decimalCol") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
-    df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
-  )
-
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+  assert(df.columns.toSet == Set("value", "timestampCol", "decimalCol", COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME))
+  assert(df.select(col(COMMIT_TYPE_COLUMN_NAME)).as[String].collect.forall(_ == "read"))
 
   // 2. Insert test
   jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INSERT TEST', '1994-07-30 07:07:07', 30.0)")
