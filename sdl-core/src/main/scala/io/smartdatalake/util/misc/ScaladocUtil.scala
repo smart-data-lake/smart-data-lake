@@ -59,30 +59,61 @@ private[smartdatalake] object ScaladocUtil {
     }
   }
 
-  def formatScaladocStringLinkTag(capture_group1: String, capture_group2: String): String = {
+  // Remove leading spaces in code blocks
+  def dedentCodeBlock(code: String): String = {
+    val lines = code.stripMargin.linesIterator.toList
+    val nonEmptyLines = lines.filter(line => line.trim.nonEmpty && ! List("{{{", "}}}").contains(line.trim))
+    val firstLineIndentation = if (nonEmptyLines.isEmpty) (0, 0) else spacesAndTabs(nonEmptyLines.head) // Assume nicely formatted code
+    val dedentedLines = lines.map(removeSpacesAndTabs(_, firstLineIndentation))
+    dedentedLines.mkString("\n")
+  }
+
+  // Leading number of (spaces, tabs)
+  def spacesAndTabs(line: String): (Int, Int) = {
+    line.takeWhile(Seq(' ', '\t').contains(_)).foldLeft((0, 0))((spacesTabs, char) => {
+      if (char == ' ') (spacesTabs._1 + 1, spacesTabs._2) else (spacesTabs._1, spacesTabs._2 + 1)
+    })
+  }
+
+  def removeSpacesAndTabs(line: String, spacesTabs: (Int, Int)): String = {
+    require(spacesTabs._1 >= 0 && spacesTabs._2 >= 0, "Indentation error. The line has either too many spaces or too many tabs")
+    if (line.isEmpty) ""
+    else if (List("{{{","}}}").contains(line.trim)) line.trim
+    else line.head match {
+      case c if ((0, 0) == spacesTabs) => line
+      case ' ' => removeSpacesAndTabs(line.tail, (spacesTabs._1 - 1, spacesTabs._2))
+      case '\t' => removeSpacesAndTabs(line.tail, (spacesTabs._1, spacesTabs._2 - 1))
+      case _ => throw new Exception("The line doesn't have enough indentation characters to remove the entire common indentation")
+    }
+  }
+
+  def formatScaladocLinkTag(captureGroup1: String, captureGroup2: String): String = {
+    var parsedLink = ""
+
     // Do not wrap urls in inline code blocks
-    if (capture_group1.contains("https://")){
-      val split_hyperref = capture_group1.split(" ")
-      if (split_hyperref.length > 1){
-        // If the Url contained an alias (pretty name), preserve it
-        s" [${split_hyperref.drop(1).mkString(" ")}](${split_hyperref(0)}) "
-      } else {
-        s" ${capture_group1} "
+    if (captureGroup1.contains("https://")){
+      val splitHyperref = captureGroup1.split(" ")
+      if (splitHyperref.length > 1){
+        // If the Url contains an alias (pretty name), preserve it
+        parsedLink = s"[${splitHyperref.drop(1).mkString(" ")}](${splitHyperref(0)})"
+      }else{
+        parsedLink = captureGroup1
       }
     } else {
-      // Plural s handling
-      if (capture_group2 != null && capture_group2.nonEmpty) s" `${capture_group1}`s " else s" `${capture_group1}` "
+      parsedLink = s"`${captureGroup1}`"
     }
+
+    s"${parsedLink}${if (captureGroup2 != null) captureGroup2 else " "}"
   }
 
   def formatScaladocString(str: String): String = {
     // Remove link square brackets (including plural s handling)
     // If the link is followed by a single s, remove the space
-    val bracket_removal_pattern = raw"\[\[(.+?)\]\](\s?s(?![a-zA-Z]))?".r
-    bracket_removal_pattern.replaceAllIn(str, m =>
-      formatScaladocStringLinkTag(m.group(1), m.group(2))
+    val bracketRemovalPattern = raw"\[\[(.+?)\]\] (\.|s|,)?".r
+    bracketRemovalPattern.replaceAllIn(str, m =>
+      formatScaladocLinkTag(m.group(1), m.group(2))
     )
-      .replaceAll(raw"[^\S\n]+(,|\.|[^\S\n]|\))", "$1") // Reduce multiple spaces down to one
+      .replaceAll(raw"\.\n(?!\n)", ".  \n") // Add carriage return for Markdown formatting
       .replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
       .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
       .replace("->", "\u2192") // Prettify right arrow
@@ -93,14 +124,13 @@ private[smartdatalake] object ScaladocUtil {
     markup match {
       case x: Heading => s"\n\n${x.trimmed.plainString}\n\n"
       case x: Paragraph => s"\n\n${x.trimmed.plainString}"
-      case x: CodeBlock => s"\n${x.trimmed.plainString}\n"
+      case x: CodeBlock => dedentCodeBlock(s"\n${x.plainString}\n")
       case x: Span => s" ${x.trimmed.plainString}"
       case x: Document =>
         val contentStr = x.elements.map(formatScaladocMarkup).mkString("")
         formatScaladocString(contentStr)
-          // Additional new line char inside the code block for correct rendering in markdown
-          .replaceAll(raw"\{\{\{", "```\n") // convert wiki code block to markup code block
-          .replaceAll(raw"(.*)}}}", "$1\n```") // convert wiki code block to markup code block
+          .replaceAll(raw"\{\{\{\n?", "```\n") // convert wiki code block to markup code block
+          .replaceAll(raw"(.*)\n?}}}", "$1\n```\n") // convert wiki code block to markup code block
     }
   }
 
