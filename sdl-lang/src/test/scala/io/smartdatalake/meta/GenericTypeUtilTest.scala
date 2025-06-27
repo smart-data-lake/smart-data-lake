@@ -121,12 +121,12 @@ case class TestObject (
 trait OverrideTest {
   /**
    * override test first method
-   */
+    */
   def overrideTestFirstMethod: String
 
   /**
    * override test second method
-  */
+   */
   def overrideTestSecondMethod: String
 
   def methodTest(): String = ""
