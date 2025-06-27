@@ -110,23 +110,23 @@ case class TestCodeBlocks() {
  * @see [[OverrideTest]] for details
  */
 case class TestObject (
-												id: String,
-												@Deprecated javaDeprecated: String,
-												@deprecated scalaDeprecated: String, // scala annotations are *not* kept for runtime and will not be reflected in type def...
-												optional: Option[String], default: String = "",
-												override val overrideTestFirstMethod: String,
-												override val overrideTestSecondMethod: String
-											) extends OverrideTest
+            id: String,
+            @Deprecated javaDeprecated: String,
+            @deprecated scalaDeprecated: String, // scala annotations are *not* kept for runtime and will not be reflected in type def...
+            optional: Option[String], default: String = "",
+            override val overrideTestFirstMethod: String,
+            override val overrideTestSecondMethod: String
+           ) extends OverrideTest
 
 trait OverrideTest {
-	/**
-	 * override test first method
-	 */
-	def overrideTestFirstMethod: String
+ /**
+  * override test first method
+  */
+ def overrideTestFirstMethod: String
 
-	/**
-	 * override test second method
-	 */
+ /**
+  * override test second method
+  */
   def overrideTestSecondMethod: String
 
   def methodTest(): String = ""
