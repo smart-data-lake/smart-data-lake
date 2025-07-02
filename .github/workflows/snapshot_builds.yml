@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
     - name: Set up JDK 17
@@ -57,8 +57,6 @@ jobs:
       run: mvn -P scala-2.12,test-sonar -B clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
 
     - name: Build with Maven for Scala 2.13
-      env:
-      #GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
       # scoverage and sonar are only run for scala-2.12 and not for scala-2.13.
       run: mvn -P scala-2.13 -B clean test -f pom.xml
 
