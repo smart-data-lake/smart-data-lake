@@ -25,8 +25,8 @@ const config = {
         },
         blog: {
           showReadingTime: true,
-          editUrl:
-            'https://github.com/smart-data-lake/smart-data-lake/tree/documentation',
+          editUrl: 'https://github.com/smart-data-lake/smart-data-lake/tree/documentation',
+          onInlineAuthors: 'ignore'
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
