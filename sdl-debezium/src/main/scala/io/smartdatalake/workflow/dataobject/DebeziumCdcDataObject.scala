@@ -27,7 +27,7 @@ import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCall
 import io.smartdatalake.util.concurrent.Await
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -185,6 +185,11 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       if(service.isShutdown) {
         logger.info("Executor service is shutdown")
+        return true
+      }
+
+      if(changeConsumer.records.nonEmpty && context.phase == ExecutionPhase.Init){
+        logger.info("Got first record for schema detection.")
         return true
       }
 
