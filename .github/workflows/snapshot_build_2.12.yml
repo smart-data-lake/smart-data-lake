@@ -82,8 +82,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
+          key: ${{ runner.os }}-maven-2.12-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-2-12
 
       - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
         if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}

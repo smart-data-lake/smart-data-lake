@@ -114,7 +114,7 @@ jobs:
         git config --local user.name "GitHub Action"
 
     - name: Maven Get Version
-      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.13 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
     - name: Set Release Version
       run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
 
