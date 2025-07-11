@@ -43,6 +43,28 @@ case class ScalaColumn[A](metadata: ScalaColumnDefinition, inner: Seq[A]) extend
     }
   }
 
+
+  //Workaround for casting cols in other methods.
+  def getAType: String = {
+    if (this.isEmpty) throw new NoSuchElementException("The Column is empty, therefore no Ordering[A] object found")
+    else metadata.dataType.inner match {
+      case STRING => "String"
+      case BOOLEAN => "Boolean"
+      case NUMBER if this.inner.head.isInstanceOf[Int] => "Int"
+      case NUMBER if this.inner.head.isInstanceOf[Double] => "Double"
+      case NOTHING => "Nothing"
+      case _ => throw new IllegalStateException("Unknown datatype A in column")
+    }
+  }
+
+  def explicitCast = getAType match {
+    case "String" => this.asInstanceOf[ScalaColumn[String]]
+    case "Boolean" => this.asInstanceOf[ScalaColumn[Boolean]]
+    case "Int" => this.asInstanceOf[ScalaColumn[Int]]
+    case "Double" => this.asInstanceOf[ScalaColumn[Double]]
+    case _ => throw new IllegalStateException("Unknown datatype A in column. Cannot get Ordering[A]")
+  }
+
   def doubleCasting: ScalaColumn[Double] = {
     if (this.isEmpty) ScalaColumn[Double](this.name, NUMBER, Seq())
     else metadata.dataType.inner match {
@@ -225,7 +247,7 @@ case class ScalaColumn[A](metadata: ScalaColumnDefinition, inner: Seq[A]) extend
 
   override def exprSql: String = throw new NotImplementedError("The 'exprSql' method is not applicable for ScalaColumns")
 
-  override def subFeedType: universe.Type = typeOf[ScalaSubFeed]
+  override def subFeedType: universe.Type = ???//typeOf[ScalaSubFeed]
 
   override def isin(list: Any*): GenericColumn = ScalaColumn(f"${this.metadata.name}_IS_IN_LIST", BOOLEAN, inner.map(list.contains(_)))
 }
