@@ -19,18 +19,19 @@
 
 package io.smartdatalake.workflow.dataframe.plainScala
 
-import io.smartdatalake.workflow.dataframe.GenericField
+import io.smartdatalake.workflow.dataframe.GenericRow
 import scala.reflect.runtime.universe
 
-case class ScalaColumnDefinition(name: String,
-                                 dataType: ScalaDataType,
-                                 nullable: Boolean = false,
-                                 comment: Option[String] = None) extends GenericField {
-  def makeNullable: ScalaColumnDefinition = this.copy(nullable = true)
+case class ScalaRow(value: Seq[Any]) extends GenericRow {
+  def apply(ix: Int) = value(ix)
 
-  def toLowerCase: ScalaColumnDefinition = this.copy(name = name.toLowerCase)
+  override def get(index: Int): Any = value(index)
 
-  def removeMetadata: ScalaColumnDefinition = this //not applicable
+  override def getStruct(index: Int): GenericRow = this //not relevant for our tests
 
-  override def subFeedType: universe.Type = ???//universe.typeOf[ScalaSubFeed]
+  override def getAs[T](index: Int): T = value(index).asInstanceOf[T]
+
+  override def toSeq: Seq[Any] = value
+
+  override def subFeedType: universe.Type =  ???//universe.typeOf[ScalaSubFeed]
 }

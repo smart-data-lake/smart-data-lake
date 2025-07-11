@@ -29,11 +29,11 @@ case class ScalaSchema(_fields: List[ScalaColumnDefinition], isInferred: Boolean
 
   //only ignores upper / lower case difference
   override def diffSchema(schema: GenericSchema): Option[GenericSchema] = schema match {
-      case scalaSchema: ScalaSchema => {
-        val (thisFieldsSet, otherFieldsSet) = (this.toLowerCase.fields.toSet, scalaSchema.toLowerCase.fields.toSet)
-        Some(ScalaSchema(thisFieldsSet.diff(otherFieldsSet).toList))
-      }
-      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
+    case scalaSchema: ScalaSchema => {
+      val (thisFieldsSet, otherFieldsSet) = (this.toLowerCase.fields.toSet, scalaSchema.toLowerCase.fields.toSet)
+      Some(ScalaSchema(thisFieldsSet.diff(otherFieldsSet).toList))
+    }
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
   }
 
   override def fields: Seq[ScalaColumnDefinition] = _fields.toSeq
@@ -41,26 +41,22 @@ case class ScalaSchema(_fields: List[ScalaColumnDefinition], isInferred: Boolean
   override def columns: Seq[String] = fields.map(_.name)
 
   //not really relevant...
-  override def sql: String = fields.map(sc => s"${sc.name} ${sc.dataType.inner} ${if (sc.nullable) "" else "not null"}" ).mkString(",\n")
+  override def sql: String = fields.map(sc => s"${sc.name} ${sc.dataType.inner} ${if (sc.nullable) "" else "not null"}").mkString(",\n")
 
   override def add(colName: String, dataType: GenericDataType): GenericSchema = dataType match {
     case scalaType: ScalaDataType => add(ScalaColumnDefinition(colName, dataType.asInstanceOf[ScalaDataType]))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
   }
 
-  override def add(field: GenericField): ScalaSchema = field match{
+  override def add(field: GenericField): ScalaSchema = field match {
     case scalaCol: ScalaColumnDefinition => ScalaSchema(_fields :+ field.asInstanceOf[ScalaColumnDefinition])
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(field)
   }
 
   override def remove(colName: String): ScalaSchema = ScalaSchema(_fields.filterNot(_.name == colName))
 
-  override def filter(func: GenericField => Boolean): GenericSchema = filterTyped(func)
+  override def filter(func: GenericField => Boolean): ScalaSchema = ScalaSchema(_fields.filter(func))
 
-  def filterTyped[T >: GenericField](func: T => Boolean): GenericSchema = universe.typeOf[T] match {
-    case scalaField if scalaField =:= universe.typeOf[ScalaColumnDefinition] => ScalaSchema(_fields.filter(func))
-    case t => throw new IllegalArgumentException(f"The provided function 'func' needs to have the type 'ScalaColumnDefinition => Boolean' and not $t")
-  }
 
   override def getDataType(colName: String): ScalaDataType = {
     require(fields.map(_.name).contains(colName), s"The column $colName does not exist in the ScalaSchema")
@@ -77,7 +73,7 @@ case class ScalaSchema(_fields: List[ScalaColumnDefinition], isInferred: Boolean
 
   override def treeString(level: Int): String = fields.map(f => f"${f.name} (${f.dataType})").mkString("  |  "); //only flat structure as of now
 
-  override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
+  override def subFeedType: universe.Type = ???//universe.typeOf[ScalaSubFeed]
 }
 
 object ScalaSchema {
