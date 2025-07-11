@@ -25,7 +25,6 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameObservation, GenericColumn, GenericDataFrame, GenericGroupedDataFrame, GenericRow, GenericSchema}
 import io.smartdatalake.workflow.dataframe.plainScala.ScalaDataTypeEnum.ScalaDataTypeEnum
-import jdk.jshell.spi.ExecutionControl.NotImplementedException
 
 import scala.reflect.runtime.universe
 import annotation.tailrec
@@ -92,7 +91,7 @@ case class ScalaDataframe(cols: Seq[ScalaColumn[Any]]) extends GenericDataFrame 
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
-  override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): GenericDataFrame = throw new NotImplementedException("Joining using a ScalaColumn[A] expression is not supported at the moment")
+  override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): GenericDataFrame = throw new NotImplementedError("Joining using a ScalaColumn[A] expression is not supported at the moment")
 
   def select(columnNames: List[String]): ScalaDataframe = {
     checkColumnsExist(this, colNames = columnNames)
@@ -109,7 +108,7 @@ case class ScalaDataframe(cols: Seq[ScalaColumn[Any]]) extends GenericDataFrame 
 
   override def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame = ???
 
-  override def agg(columns: Seq[GenericColumn]): GenericDataFrame = throw new NotImplementedException("Aggregations using the agg-expression are not supported at the moment")
+  override def agg(columns: Seq[GenericColumn]): GenericDataFrame = throw new NotImplementedError("Aggregations using the agg-expression are not supported at the moment")
 
   override def unionByName(other: GenericDataFrame): GenericDataFrame = other match {
     case otherScala: ScalaDataframe => {
