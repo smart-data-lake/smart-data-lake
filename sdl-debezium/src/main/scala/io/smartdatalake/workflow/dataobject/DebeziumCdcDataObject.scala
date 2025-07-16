@@ -93,7 +93,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     val defaultOffsetProperties: Map[String, String] = Map(
       "offset.storage" -> "io.smartdatalake.debezium.SDLBDebeziumOffsetStorage",
       "offset.storage.sdlb.data.object.id" -> this.id.id,
-      "offset.flush.interval.ms" -> "10000")
+      "offset.flush.interval.ms" -> "1000")
 
     // If duplicate offset properties are set, prefer the ones the user has set in the config file
     props = props ++ defaultOffsetProperties.map {
