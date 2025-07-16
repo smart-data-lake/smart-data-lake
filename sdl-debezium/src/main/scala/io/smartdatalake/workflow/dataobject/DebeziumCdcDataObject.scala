@@ -54,7 +54,6 @@ import scala.jdk.CollectionConverters._
  * @param debeziumProperties Properties for the specific Debezium connector
  * @param metadata (optional) data object metadata
  * @param maxWaitTimeAfterLastBatchMilliSeconds (optional) Waiting time interval for debezium to finish (when a batch arrived, the engine waits the defined interval for completion), default = 10 seconds
- * @param maxSnapshotWaitTimeMilliSeconds (optional) The maximum duration waiting for the snapshot to end, default = 5 seconds
  *
  * Example config:
  *
@@ -76,7 +75,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  schemaMin: Option[GenericSchema] = None,
                                  debeziumProperties: Option[Map[String, String]] = None,
                                  maxWaitTimeAfterLastBatchMilliSeconds: Option[Int] = Some(10000),
-                                 maxSnapshotWaitTimeMilliSeconds: Option[Int] = Some(5000),
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation {
@@ -143,30 +141,15 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       executorService.execute(engine)
 
-      val snapshotStarted = ZonedDateTime.now()
-      var isConsuming = false
+      logger.info(s"($id) Start consuming records from Debezium")
 
-      do {
+      Await.until({
+        logger.info(s"($id) Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
+        checkDebeziumEngineEnded(executorService, changeConsumer)
 
-        logger.info(s"($id) Start consuming records from Debezium")
-        val startCount = changeConsumer.records.size
+      }, Duration.ofSeconds(1))
 
-        Await.until({
-          logger.info(s"($id) Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
-          checkDebeziumEngineEnded(executorService, changeConsumer)
-
-        }, Duration.ofSeconds(1))
-
-        logger.info(s"($id) checkDebeziumEngineEnded done")
-
-        val endCount = changeConsumer.records.size
-        isConsuming = endCount > startCount
-
-      } while(changeConsumer.isSnapshotting
-        && isConsuming
-        && ZonedDateTime.now().isBefore(snapshotStarted.plus(Duration.ofMillis(maxSnapshotWaitTimeMilliSeconds.get)))
-      )
-
+      logger.info(s"($id) checkDebeziumEngineEnded done")
       engine.close()
 
       executorService.shutdown()
