@@ -111,11 +111,8 @@ private object DbEngineHelper {
     "postgresql" -> "io.debezium.connector.postgresql.PostgresConnector",
     "oracle" -> "io.debezium.connector.oracle.OracleConnector",
     "mariadb" -> "io.debezium.connector.mariadb.MariaDbConnector",
-    "mongodb" -> "io.debezium.connector.mongodb.MongoDbConnector",
     "sqlserver" -> "io.debezium.connector.sqlserver.SqlServerConnector",
-    "db2" -> "io.debezium.connector.db2.Db2Connector",
-    "vitess" -> "io.debezium.connector.vitess.VitessConnector",
-    "spanner" -> "io.debezium.connector.spanner.SpannerConnector"
+    "db2" -> "io.debezium.connector.db2.Db2Connector"
   )
 
   def getDbEngineConnectorClassName(dbName: String): Option[String] = {
