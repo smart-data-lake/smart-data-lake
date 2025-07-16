@@ -44,7 +44,7 @@ object OpenApiUtil extends SmartDataLakeLogger {
   private val definitionsPath = "components"
   private val specCache = mutable.Map[String, OpenApiSpec]()
   val defaultApiDocsPath = "v3/api-docs"
-  val defaultResponseContentType = "application/json"
+  val defaultResponseContentType: String = MediaType.ApplicationJson.toString
   @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend()
 
   /**

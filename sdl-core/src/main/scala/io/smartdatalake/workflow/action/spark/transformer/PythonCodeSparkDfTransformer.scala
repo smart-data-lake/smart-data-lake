@@ -69,7 +69,7 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
           |def setOutputDf( df ):
           |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
-      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator") + pythonCode.stripMargin)
+      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator") + PythonCodeDfTransformer.dedent(pythonCode))
       entryPoint.outputDf.getOrElse(throw new IllegalStateException(s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"))
     } catch {
       case e: Throwable => throw new PythonTransformationException(s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}", e)
@@ -82,8 +82,16 @@ object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PythonCodeDfTransformer = {
     extract[PythonCodeDfTransformer](config)
   }
-}
 
+  /** Dedent multiline strings by removing common leading spaces */
+  def dedent(code: String): String = {
+    val lines = code.stripMargin.linesIterator.toList
+    val nonEmptyLines = lines.filter(line => line.trim.nonEmpty)
+    val minIndentLength = if (nonEmptyLines.isEmpty) 0 else nonEmptyLines.map(_.prefixLength(c => c == ' ' || c == '\t')).min
+    val dedentedLines = lines.map(_.drop(minIndentLength))
+    dedentedLines.mkString(System.lineSeparator())
+  }
+}
 
 private[smartdatalake] class DfTransformerPythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends PythonSparkEntryPoint(session, options) {
   // it seems that py4j needs getter functions for attributes

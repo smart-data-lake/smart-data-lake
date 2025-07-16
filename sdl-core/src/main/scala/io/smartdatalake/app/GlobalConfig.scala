@@ -22,7 +22,7 @@ package io.smartdatalake.app
 import com.typesafe.config.Config
 import configs.ConfigReader
 import configs.syntax._
-import io.smartdatalake.config.ConfigImplicits
+import io.smartdatalake.config.{ConfigImplicits, ConfigurationException}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
@@ -105,8 +105,10 @@ extends SmartDataLakeLogger {
     SecretsUtil.registerProvider(id, providerConfig.provider)
   }
 
-  // configure SDLPlugin
-  Environment.sdlPlugin.foreach(_.configure(pluginOptions))
+  /**
+  pluginOptions are global for all plugins
+   */
+    Environment.sdlPlugins.foreach(_.configure(pluginOptions))
 
   /**
    * Get Hadoop configuration as Spark would see it.

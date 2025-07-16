@@ -70,7 +70,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
     }
     // check lazy parsed schemaMin (note that it can match schema and schemaMin, and we therefore need two match statements)
     this match {
-      case x: SchemaValidation => try{
+      case x: SchemaValidation => try {
         x.schemaMin.foreach(_.columns)
       } catch {
         case e: Exception => throw ConfigurationException.fromException(s"($id) error parsing 'schemaMin'", "schemaMin", e)
@@ -114,6 +114,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
         throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
     }
   }
+
   protected def getConnectionReg[T <: Connection](connectionId: ConnectionId, registry: InstanceRegistry)(implicit ct: ClassTag[T], tt: TypeTag[T]): T = {
     implicit val registryImpl: InstanceRegistry = registry
     getConnection[T](connectionId)
@@ -130,16 +131,18 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
    * - lastCommitMsg
    * - location
    * - columns -> column statistics
+   *
    * @param update if true, more costly operations such as "analyze table" are executed before returning results.
    * @return a map with statistics about this DataObject
    */
-  def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String,Any] = Map()
+  def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = Map()
 
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
   }
 
   override def atlasName: String = id.id
+
 }
 
 /**

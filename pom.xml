@@ -346,14 +346,14 @@
             <id>release-sonatype</id>
             <distributionManagement>
                 <snapshotRepository>
-                    <id>ossrh</id>
-                    <name>Central Repository OSSRH</name>
-                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                    <id>central</id>
+                    <name>Sonatype Snapshot Repository</name>
+                    <url>https://central.sonatype.com/repository/maven-snapshots/</url>
                 </snapshotRepository>
                 <repository>
-                    <id>ossrh</id>
-                    <name>Central Repository OSSRH</name>
-                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+                    <id>central</id>
+                    <name>Maven Central Repository</name>
+                    <url>https://repo1.maven.org/maven2</url>
                 </repository>
             </distributionManagement>
             <build>
@@ -399,17 +399,16 @@
                             </execution>
                         </executions>
                     </plugin>
-                    <!-- deploy to sonatype / maven central -->
+                    <!-- deploy to sonatype central -->
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>1.6.13</version>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.8.0</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                            <stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>false</autoPublish>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -440,8 +439,7 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
         <spark.version>3.5.5</spark.version>
-        <spark-extensions.version>3.5.2</spark-extensions.version>
-        <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark-extensions.version>3.5.3</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.5</spark.minor.version>
         <spark.version331>3.3.1</spark.version331>
         <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->
@@ -614,7 +612,7 @@
 
     <repositories>
         <repository>
-            <id>maven central</id>
+            <id>maven-central</id>
             <name>Maven Central Repository</name>
             <url>https://repo1.maven.org/maven2/</url>
         </repository>
@@ -625,9 +623,9 @@
         </repository>
         <!-- smartdatalake snapshots -->
         <repository>
-            <id>ossrh</id>
-            <name>ossrh snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+            <id>sonatype-snapshots</id>
+            <name>Sonatype Snapshots Repository</name>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
             <releases>
                 <enabled>false</enabled>
             </releases>
@@ -1146,7 +1144,7 @@
             <dependency>
                 <groupId>commons-beanutils</groupId>
                 <artifactId>commons-beanutils</artifactId>
-                <version>1.9.4</version>
+                <version>1.11.0</version>
             </dependency>
             <dependency>
                 <groupId>commons-logging</groupId>

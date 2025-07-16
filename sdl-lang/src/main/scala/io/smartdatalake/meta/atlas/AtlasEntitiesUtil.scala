@@ -23,11 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.{SttpWebserviceClient, HttpTimeoutConfig}
 import io.smartdatalake.workflow.AtlasExportable
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.{DataObject, HttpTimeoutConfig, WebserviceFileDataObject}
+import io.smartdatalake.workflow.dataobject.{DataObject, WebserviceFileDataObject}
 import org.json4s.DefaultFormats
 import org.json4s.Extraction.decompose
 import org.json4s.jackson.JsonMethods.{pretty, render}
@@ -222,7 +222,7 @@ case class AtlasEntitiesUtil(atlasConfig: AtlasConfig) extends SmartDataLakeLogg
   def exportToAtlas(entities: Set[AtlasEntity])(implicit instanceRegistry: InstanceRegistry): Array[Byte] = {
     val target = "/api/atlas/v2/entity/bulk?"
     val webserviceDO = WebserviceFileDataObject("atlasWebservice", url = atlasConfig.getAtlasUrl + target, authMode = atlasConfig.getAtlasAuth, timeouts = Some(HttpTimeoutConfig(30000, 60000)))
-    val webservice = ScalaJWebserviceClient(webserviceDO)
+    val webservice = SttpWebserviceClient(webserviceDO)
     implicit val formats: DefaultFormats.type = DefaultFormats
     val body = pretty(render(decompose("entities" -> entities.toSeq)))
     webservice.post(body.getBytes(), "application/json")

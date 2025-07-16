@@ -1,0 +1,103 @@
+name: Snapshot Build 2.12
+
+on:
+  push:
+    branches:
+      - 'develop-spark*'
+  pull_request:
+    branches:
+      - 'develop-spark*'
+    types: [opened, synchronize]
+  # allow for manual snapshot releases from bugfix & feature branches
+  # this extracts issue number from branch name as additional attribute in the created version, e.g. <mvnVersion>-<issueNb>-SNAPSHOT
+  workflow_dispatch:
+    inputs:
+      skipBuild:
+        description: 'skip build job'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: ${{ !inputs.skipBuild }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: 17
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+        restore-keys: ${{ runner.os }}-sonar
+    - name: Cache Maven
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-maven-
+
+    - name: Build with Maven for Scala 2.12
+      # scoverage and sonar are only run for scala-2.13 and not for scala-2.12.
+      run: mvn -P scala-2.12 -B clean test -f pom.xml
+
+
+  deploy:
+    needs: build
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Git Config
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"          
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-2.12-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-2-12
+
+      - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
+        if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
+        run: |
+          MVN_CURRENT_VERSION=$(mvn -B -P scala-2.12 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+          BRANCH_ISSUE_NB_STR=$(echo $GITHUB_REF_NAME | sed -n 's/^.*\(feature\|bugfix\)\/\([0-9]*\).*$/-\2/p')
+          MVN_NEW_VERSION=$(echo $MVN_CURRENT_VERSION | sed -n "s/-SNAPSHOT$/${BRANCH_ISSUE_NB_STR}-SNAPSHOT/p")
+          if [ -z "$MVN_NEW_VERSION" ]; then exit -1; fi
+          echo "setting version to $MVN_NEW_VERSION"
+          mvn versions:set -B -DnewVersion=${MVN_NEW_VERSION} -f pom.xml
+
+      - name: Maven deploy to sonatype for Scala 2.12
+        run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -DskipTests
+        env:
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
