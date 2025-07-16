@@ -223,6 +223,9 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
           schemaProperties.put("offset.storage", "org.apache.kafka.connect.storage.MemoryOffsetBackingStore")
           schemaProperties.put("snapshot.mode", "initial_only")
           schemaProperties.put("name", UUID.randomUUID().toString)
+          schemaProperties.put("snapshot.select.statement.overrides", table.fullName)
+          schemaProperties.put(s"snapshot.select.statement.overrides.${table.fullName}", s"SELECT * FROM ${table.fullName} LIMIT 1")
+
 
           val records = getRecordsFromDebeziumEngine(schemaProperties, changeConsumer = new DebeziumSchemaConsumer)
 
