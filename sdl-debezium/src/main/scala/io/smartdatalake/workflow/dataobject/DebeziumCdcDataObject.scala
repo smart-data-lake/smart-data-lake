@@ -148,16 +148,16 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
       do {
 
-        logger.info(s"Start consuming records from Debezium")
+        logger.info(s"($id) Start consuming records from Debezium")
         val startCount = changeConsumer.records.size
 
         Await.until({
-          logger.info(s"Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
+          logger.info(s"($id) Waiting for Debezium engine to shutdown or if maxWaitTimeAfterLastBatch is reached")
           checkDebeziumEngineEnded(executorService, changeConsumer)
 
         }, Duration.ofSeconds(1))
 
-        logger.info(s"checkDebeziumEngineEnded done")
+        logger.info(s"($id) checkDebeziumEngineEnded done")
 
         val endCount = changeConsumer.records.size
         isConsuming = endCount > startCount
@@ -172,7 +172,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
       executorService.shutdown()
 
       while(!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-        logger.trace("Waiting another 5 seconds for the Debezium embedded engine to shutdown")
+        logger.info(s"($id) Waiting another 5 seconds for the Debezium embedded engine to shutdown")
       }
 
       completionCallback.error.foreach(err => throw new Exception(err))
@@ -184,18 +184,18 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     def checkDebeziumEngineEnded(service: ExecutorService, changeConsumer: SdlbDebeziumChangeConsumerState): Boolean = {
 
       if(service.isShutdown) {
-        logger.info("Executor service is shutdown")
+        logger.info(s"($id) Executor service is shutdown")
         return true
       }
 
       if(changeConsumer.records.nonEmpty && context.phase == ExecutionPhase.Init){
-        logger.info("Got first record for schema detection.")
+        logger.info(s"($id) Got first record for schema detection.")
         return true
       }
 
       val lastRecordTimestamp = changeConsumer.lastRecordTimestamp
       if(maxWaitTimeAfterLastBatchMilliSeconds.isDefined && ZonedDateTime.now().isAfter(lastRecordTimestamp.plus(Duration.ofMillis(maxWaitTimeAfterLastBatchMilliSeconds.get)))) {
-        logger.info("Max waiting time after last batch reached")
+        logger.info(s"($id) Max waiting time after last batch reached")
         return true
       }
 
