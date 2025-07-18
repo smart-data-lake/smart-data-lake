@@ -306,7 +306,7 @@
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
 
-        <spark.version>3.5.5</spark.version>
+        <spark.version>3.5.6</spark.version>
         <spark-extensions.version>3.5.3
         </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.5</spark.minor.version>
