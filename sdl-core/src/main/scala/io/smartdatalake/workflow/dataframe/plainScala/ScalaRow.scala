@@ -33,5 +33,5 @@ case class ScalaRow(value: Seq[Any]) extends GenericRow {
 
   override def toSeq: Seq[Any] = value
 
-  override def subFeedType: universe.Type =  ???//universe.typeOf[ScalaSubFeed]
+  override def subFeedType: universe.Type =  universe.typeOf[ScalaSubFeed]
 }

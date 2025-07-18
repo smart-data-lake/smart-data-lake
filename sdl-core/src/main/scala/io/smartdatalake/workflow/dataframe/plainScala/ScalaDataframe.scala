@@ -201,22 +201,19 @@ case class ScalaDataframe(cols: Seq[ScalaColumn[Any]]) extends GenericDataFrame 
    */
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (GenericDataFrame, DataFrameObservation) = ???
 
-  /**
-   * Observe metrics on this DataFrame.
-   * Note that this doesn't create a listener. These metrics will only be collected together using setupObservation.
-   *
-   * @param name             name of the observation
-   * @param aggregateColumns aggregate columns to observe on the DataFrame
-   * @return the modified DataFrame
-   */
-  override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = ???
+  override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
+    logger.warn("The 'observe' method in ScalaDataFrames will not change the dataframe")
+    this
+  }
 
   /**
    * Create an empty SubFeed for this subFeedType.
    */
   override def getDataFrameSubFeed(dataObjectId: SdlConfigObject.DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = ???
 
-  override def subFeedType: universe.Type = ???
+  override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
+
+  def returnEmpty: ScalaDataframe = ScalaDataframe.returnEmpty(this.schema)
 }
 
 
@@ -249,5 +246,9 @@ object ScalaDataframe {
       }
       case Failure(e) => throw e
     }
+  }
+
+  def returnEmpty(schema: ScalaSchema) = {
+    ScalaDataframe(Seq(), Some(schema))
   }
 }

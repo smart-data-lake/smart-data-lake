@@ -250,6 +250,8 @@ case class ScalaColumn[A](metadata: ScalaColumnDefinition, inner: Seq[A]) extend
   override def subFeedType: universe.Type = ???//typeOf[ScalaSubFeed]
 
   override def isin(list: Any*): GenericColumn = ScalaColumn(f"${this.metadata.name}_IS_IN_LIST", BOOLEAN, inner.map(list.contains(_)))
+
+  def distinct: ScalaColumn[A] = this.copy(inner = inner.distinct)
 }
 
 
