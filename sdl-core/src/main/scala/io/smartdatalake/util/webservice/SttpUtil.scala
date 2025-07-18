@@ -44,12 +44,12 @@ object SttpUtil extends SmartDataLakeLogger {
     val response = try {
       retry(retries) {
         val r = request.send(sttpBackend)
-        logger.debug("response received: ${request.method} ${request.uri}")
+        logger.debug(s"response received: ${request.method} ${request.uri}")
         r
       }
     } catch {
       case ex: Exception =>
-        logger.debug("request failed: ${request.method} ${request.uri}")
+        logger.debug(s"request failed: ${request.method} ${request.uri}")
         throw SttpBackendError(ex)
     }
     getContent(response, context)

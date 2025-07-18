@@ -82,9 +82,13 @@ case class OAuth2Response(access_token: String, refresh_token: Option[String], e
 
   def isExpired: Boolean = System.currentTimeMillis() > expirationTsMillis
 
-  def getAuthHeader(useIdToken: Boolean): (String, String) = {
-    val tokenToUse = if (useIdToken) this.id_token.getOrElse(throw new IllegalStateException("id_token not defined!"))
+  def token(useIdToken: Boolean): String = {
+    if (useIdToken) this.id_token.getOrElse(throw new IllegalStateException("id_token not defined!"))
     else this.access_token
+  }
+
+  def getAuthHeader(useIdToken: Boolean): (String, String) = {
+    val tokenToUse = token(useIdToken)
     unapply(Header.authorization(token_type, tokenToUse)).get
   }
 }
