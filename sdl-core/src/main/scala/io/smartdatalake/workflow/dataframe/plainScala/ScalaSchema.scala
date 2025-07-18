@@ -73,7 +73,7 @@ case class ScalaSchema(_fields: List[ScalaColumnDefinition], isInferred: Boolean
 
   override def treeString(level: Int): String = fields.map(f => f"${f.name} (${f.dataType})").mkString("  |  "); //only flat structure as of now
 
-  override def subFeedType: universe.Type = ???//universe.typeOf[ScalaSubFeed]
+  override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
 }
 
 object ScalaSchema {
