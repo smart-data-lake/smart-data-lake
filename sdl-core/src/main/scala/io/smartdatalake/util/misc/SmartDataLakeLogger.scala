@@ -19,11 +19,9 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.Environment
-import org.apache.spark.annotation.DeveloperApi
 import org.slf4j.event.Level
 import org.slf4j.{Logger, LoggerFactory}
 
-@DeveloperApi
 trait SmartDataLakeLogger {
   @transient
   protected lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)

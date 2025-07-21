@@ -22,7 +22,7 @@ package io.smartdatalake.util.misc
 /**
  * Helper functions for Graph traversals and algorithms.
  */
-private[smartdatalake] object GraphUtil {
+object GraphUtil {
 
   /**
    * A simple directed graph defined by a list of edges (pairs of connected nodes)

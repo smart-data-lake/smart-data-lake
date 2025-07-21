@@ -23,7 +23,7 @@ import org.apache.spark.SparkContext
 /**
  * Provides utility functions for logging with Spark.
  */
-private[smartdatalake] object LogUtil {
+object LogUtil {
 
   /**
    * Overrides the Spark log level with system property "loglevel" if it is set.
