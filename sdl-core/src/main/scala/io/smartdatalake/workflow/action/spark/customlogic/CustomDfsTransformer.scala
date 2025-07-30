@@ -219,14 +219,14 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
         val paramName = dfParam.name
         val dfName = paramName.stripPrefix("df")
         val df = tolerantGet(dfs, dfName)
-          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dfName for parameter $paramName"))
+          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dfName for parameter $paramName. DataFrames available are ${dfs.keys.mkString(", ")}."))
         (dfParam, df)
       case dsParam if dsParam.tpe <:< typeOf[Dataset[_]] =>
         val paramName = dsParam.name
         val dsName = paramName.stripPrefix("ds")
         val dsType = dsParam.tpe.typeArgs.head
         val df = tolerantGet(dfs, dsName)
-          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName"))
+          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName. DataFrames available are ${dfs.keys.mkString(", ")}."))
         val dfWithSelect = {
           val columnNames = ProductUtil.classAccessorNames(dsType)
           df.select(columnNames.map(col): _*)
