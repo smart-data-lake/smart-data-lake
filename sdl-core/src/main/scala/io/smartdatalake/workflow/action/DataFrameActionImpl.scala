@@ -205,8 +205,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             // recreate DataFrame from DataObject if not skipped
             if (!subFeed.isSkipped && (!isRecursive || isDataExisting)) {
               try {
-                logger.info(s"($id) enrichSubFeedDataFrame: getting DataFrame for ${input.id} filtered by partition values ${subFeed.partitionValues.mkString(" ")}" +
-                  subFeed.filter.map(strainer => s" filtered by $strainer").getOrElse(""))
+                logger.info(s"($id) enrichSubFeedDataFrame: getting DataFrame for ${input.id}" +
+                  (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else "") +
+                  subFeed.filter.map(f => s" filtered by $f").getOrElse(""))
                 input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
                   .withFilter(subFeed.partitionValues, subFeed.filter)
               } catch {
