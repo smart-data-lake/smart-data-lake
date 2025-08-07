@@ -259,7 +259,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Default command line parsing method
    */
   private[smartdatalake] def parse(args: Seq[String], parserToUse: OParser[_, SmartDataLakeBuilderConfig] = parser): Option[SmartDataLakeBuilderConfig] = {
-    OParser.parse(parserToUse, args, SmartDataLakeBuilderConfig())
+    val argsPrep = args.filter(_.nonEmpty) // ignore empty arguments for more flexibility when called through templating engines (e.g. optional Databricks job parameters)
+    OParser.parse(parserToUse, argsPrep, SmartDataLakeBuilderConfig())
   }
 
   private[smartdatalake] def logProgramStart(): Unit = {
