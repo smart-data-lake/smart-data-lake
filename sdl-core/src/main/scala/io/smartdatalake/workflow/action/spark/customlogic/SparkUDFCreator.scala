@@ -19,11 +19,13 @@
 
 package io.smartdatalake.workflow.action.spark.customlogic
 
+import ch.zzeekk.spark.expressions.ExpressionEvaluatorFactory
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.LogUtil.getRootCause
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.expressions.UserDefinedFunction
-
 
 /**
  * Configuration to register a UserDefinedFunction in the spark session of SmartDataLake.
@@ -31,7 +33,7 @@ import org.apache.spark.sql.expressions.UserDefinedFunction
  * @param className fully qualified class name of class implementing SparkUDFCreator interface. The class needs a constructor without parameters.
  * @param options Options are passed to SparkUDFCreator apply method.
  */
-case class SparkUDFCreatorConfig(className: String, options: Option[Map[String,String]] = None) {
+case class SparkUDFCreatorConfig(className: String, options: Option[Map[String, String]] = None) extends SmartDataLakeLogger {
   // instantiate SparkUDFCreator
   private[smartdatalake] val creator: SparkUDFCreator = try {
     val clazz = Environment.classLoader().loadClass(className)
@@ -44,6 +46,17 @@ case class SparkUDFCreatorConfig(className: String, options: Option[Map[String,S
       throw ConfigurationException(s"Cannot instantiate SparkUDFCreatorConfig class $className: ${cause.getClass.getSimpleName} ${cause.getMessage}", Some("globalConfig.sparkUDFs"), e)
   }
   private[smartdatalake] def getUDF: UserDefinedFunction = creator.get(options.getOrElse(Map()))
+
+  def registerUdf(name: String, session: SparkSession): Unit = {
+    session.udf.register(name, getUDF)
+  }
+
+  def registerUdf(name: String, expressionEvaluatorFactory: ExpressionEvaluatorFactory[_]): Unit = {
+    // invoke dynamic
+    val applyUdfMethod = expressionEvaluatorFactory.getClass.getMethods.find(_.getName == "registerSparkUdf")
+    applyUdfMethod.map(_.invoke(expressionEvaluatorFactory, name, getUDF))
+      .getOrElse(throw new ConfigurationException(s"Could not register Spark UDF '$name': ${expressionEvaluatorFactory.getClass.getSimpleName} has no method 'registerSparkUdf'", Some("global.sparkUDFs")))
+  }
 }
 
 /**

@@ -30,8 +30,6 @@ import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
-import org.apache.spark.sql.custom.ExpressionEvaluator
-import org.apache.spark.sql.functions.expr
 
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
@@ -286,7 +284,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
   private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
+    val conditionEvaluator = Environment.expressionEvaluatorFactory.getEvaluator[Metric, Boolean](condition)
     val metrics = subFeeds.flatMap{ subFeed =>
       val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric
       metricsRaw.map{

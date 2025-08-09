@@ -25,7 +25,6 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.action.executionMode.DefaultExecutionModeExpressionData
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.{col, min, udf}
 import org.scalatest.FunSuite
 
@@ -84,7 +83,7 @@ class SparkExpressionUtilTest extends FunSuite {
   }
 
   test("register & apply udf") {
-    ExpressionEvaluator.registerUdf("udfAdd1", udf((v: Int) => v + 1))
+    SparkExpressionUtil.registerSparkUdf("udfAdd1", udf((v: Int) => v + 1))
     val result = SparkExpressionUtil.evaluate[DefaultExecutionModeExpressionData, Int](DataObjectId("test"), Some("testCondition"), "udfAdd1(runId)", data)
     assert(result.contains(2))
   }

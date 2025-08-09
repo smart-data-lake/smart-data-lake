@@ -18,10 +18,10 @@
  */
 package io.smartdatalake.definitions
 
-import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener, SDLPluginWithClassName}
+import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
-import io.smartdatalake.util.misc.{CustomCodeUtil, EnvironmentUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc._
 import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
@@ -48,6 +48,26 @@ object Environment extends SmartDataLakeLogger {
     _classLoader.get
   }
   var _classLoader: Option[ClassLoader] = None
+
+  // look for ExpressionEvaluator implementation and initialize
+  def expressionEvaluatorFactory(): ExpressionEvaluatorFactory[_] = {
+    if (_expressionEvaluatorFactory.isEmpty) {
+      _expressionEvaluatorFactory = Some(
+        EnvironmentUtil.getSdlParameter("expressionEvaluatorFactory")
+          .map(ScalaUtil.companionOf[ExpressionEvaluatorFactory[_]])
+          .getOrElse {
+            val defaultFactories = Seq("ch.zzeekk.spark.expressions.SparkExpressionEvaluatorFactory", "org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory")
+              .flatMap(CustomCodeUtil.getClassByNameIfExists)
+            assert(defaultFactories.nonEmpty, "No ExpressionEvaluatorFactory found. Make sure spark-extensions or spark-expressions-standalone library is in the classpath.")
+            if (defaultFactories.size > 1) logger.warn(s"Multiple ExpressionEvaluatorFactory implementations found. Using ${defaultFactories.head.getName}. Make sure only one of spark-extensions or spark-expressions-standalone library is in the classpath.")
+            ScalaUtil.companionOf[ExpressionEvaluatorFactory[_]](defaultFactories.head.getName)
+          }
+      )
+    }
+    _expressionEvaluatorFactory.get
+  }
+
+  var _expressionEvaluatorFactory: Option[ExpressionEvaluatorFactory[_]] = None
 
   /**
    * List of hadoop authorities for which acls must be configured
