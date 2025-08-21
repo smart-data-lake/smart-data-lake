@@ -41,10 +41,10 @@ import io.smartdatalake.workflow.dataobject.{DataObject, TableDataObject}
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
  *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
  * @param precision Number of digits to keep when calculating fraction. Default is 4.
- * @param approximate If approximate count distinct function should be used for counting distinct
- *                    Note that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,
+ * @param approximate If approximate count distinct function should be used for counting distinct.
+ * Default is "False", as primary key validation is normally expected to be exact and not approximated.
+ * Performance note for Spark: exact count_distinct is not allowed as DataFrame observation and needs a separate query on the DataFrame,
  *                    but approx_count_distinct can be calculated as DataFrame observation.
- *                    On the other hand primary key validation is normally expected to be exact and not approximated.
  * @param approximateRsd Optional Relative Standard Deviation for approximate count distinct.
  *                       Note that not all calculation engines support configuring Rsd with approximate count distinct function.
  */
