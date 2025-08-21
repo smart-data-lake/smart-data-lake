@@ -1520,55 +1520,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "UniqueKeyExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "key" : {
-                    "type" : "array",
-                    "items" : {
-                      "type" : "string"
-                    },
-                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "approximate" : {
-                    "type" : "boolean",
-                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.  \nOn the other hand primary key validation is normally expected to be exact and not approximated."
-                  },
-                  "approximateRsd" : {
-                    "type" : "number",
-                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "UniqueKeyExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
@@ -1713,6 +1664,55 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.  \nThe SQL query will be evaluated in a separate Spark job against the DataFrame.  \nIt supports scope Job and All, but not JobPartition."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct.  \nDefault is \"False\", as primary key validation is normally expected to be exact and not approximated.  \nPerformance note for Spark: exact count_distinct is not allowed as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2106,55 +2106,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "UniqueKeyExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "key" : {
-                    "type" : "array",
-                    "items" : {
-                      "type" : "string"
-                    },
-                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "approximate" : {
-                    "type" : "boolean",
-                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.  \nOn the other hand primary key validation is normally expected to be exact and not approximated."
-                  },
-                  "approximateRsd" : {
-                    "type" : "number",
-                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "UniqueKeyExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
@@ -2299,6 +2250,55 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.  \nThe SQL query will be evaluated in a separate Spark job against the DataFrame.  \nIt supports scope Job and All, but not JobPartition."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct.  \nDefault is \"False\", as primary key validation is normally expected to be exact and not approximated.  \nPerformance note for Spark: exact count_distinct is not allowed as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2478,55 +2478,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "UniqueKeyExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "key" : {
-                    "type" : "array",
-                    "items" : {
-                      "type" : "string"
-                    },
-                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "approximate" : {
-                    "type" : "boolean",
-                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.  \nOn the other hand primary key validation is normally expected to be exact and not approximated."
-                  },
-                  "approximateRsd" : {
-                    "type" : "number",
-                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "UniqueKeyExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
@@ -2671,6 +2622,55 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.  \nThe SQL query will be evaluated in a separate Spark job against the DataFrame.  \nIt supports scope Job and All, but not JobPartition."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct.  \nDefault is \"False\", as primary key validation is normally expected to be exact and not approximated.  \nPerformance note for Spark: exact count_distinct is not allowed as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -2872,55 +2872,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "UniqueKeyExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "key" : {
-                    "type" : "array",
-                    "items" : {
-                      "type" : "string"
-                    },
-                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "approximate" : {
-                    "type" : "boolean",
-                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.  \nOn the other hand primary key validation is normally expected to be exact and not approximated."
-                  },
-                  "approximateRsd" : {
-                    "type" : "number",
-                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "UniqueKeyExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
@@ -3065,6 +3016,55 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.  \nThe SQL query will be evaluated in a separate Spark job against the DataFrame.  \nIt supports scope Job and All, but not JobPartition."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct.  \nDefault is \"False\", as primary key validation is normally expected to be exact and not approximated.  \nPerformance note for Spark: exact count_distinct is not allowed as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -4744,55 +4744,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "UniqueKeyExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "key" : {
-                    "type" : "array",
-                    "items" : {
-                      "type" : "string"
-                    },
-                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
-                  },
-                  "approximate" : {
-                    "type" : "boolean",
-                    "description" : "If approximate count distinct function should be used for counting distinct\nNote that for Spark exact count_distinct is not allows as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation.  \nOn the other hand primary key validation is normally expected to be exact and not approximated."
-                  },
-                  "approximateRsd" : {
-                    "type" : "number",
-                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
-                  },
-                  "scope" : {
-                    "type" : "string",
-                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
-                    "enum" : [ "All", "JobPartition", "Job" ]
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "UniqueKeyExpectation",
-                "required" : [ "name", "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "AvgCountPerPartitionExpectation"
                   },
                   "name" : {
@@ -4937,6 +4888,55 @@
                 "required" : [ "name", "code", "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of an expectation based on a SQL query to be evaluate on dataset-level.  \nThe SQL query will be evaluated in a separate Spark job against the DataFrame.  \nIt supports scope Job and All, but not JobPartition."
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "UniqueKeyExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "key" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present."
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "string",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
+                    "existingJavaType" : "scala.Short"
+                  },
+                  "approximate" : {
+                    "type" : "boolean",
+                    "description" : "If approximate count distinct function should be used for counting distinct.  \nDefault is \"False\", as primary key validation is normally expected to be exact and not approximated.  \nPerformance note for Spark: exact count_distinct is not allowed as DataFrame observation and needs a separate query on the DataFrame,\nbut approx_count_distinct can be calculated as DataFrame observation."
+                  },
+                  "approximateRsd" : {
+                    "type" : "number",
+                    "description" : "Optional Relative Standard Deviation for approximate count distinct.  \nNote that not all calculation engines support configuring Rsd with approximate count distinct function."
+                  },
+                  "scope" : {
+                    "type" : "string",
+                    "description" : "The aggregation scope used to evaluate the aggregate expression.  \nDefault is 'Job', which evaluates the records transformed by the current job. This is implemented without big performance impacts on Spark.  \nOther options are 'All' and 'JobPartition', which are implemented by reading the output data again.",
+                    "enum" : [ "All", "JobPartition", "Job" ]
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "UniqueKeyExpectation",
+                "required" : [ "name", "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on uniqueness of a given key.  \nUniqueness is calculated as the fraction of output count distinct on key columns over output count.  \nIt supports scope Job and All, but not JobPartition."
               }, {
                 "type" : "object",
                 "properties" : {
@@ -7301,7 +7301,7 @@
           },
           "rankingExpression" : {
             "type" : "string",
-            "description" : "Ranking expression to choose the record to keep if there are duplicates."
+            "description" : "Optional ranking expression to choose the record to keep if there are duplicates.  \nIf not defined this might be not deterministic. Spark will use df.dropDuplicates(cols) function."
           },
           "primaryKeyColumns" : {
             "type" : "array",
@@ -7312,7 +7312,7 @@
           }
         },
         "title" : "DeduplicateTransformer",
-        "required" : [ "type", "rankingExpression" ],
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Returns dataframe with only unique columns based on a primary key.\n\nIf primaryKeyColumns is left empty, the primaryKey of the Actions output DataObject must be defined."
       },
