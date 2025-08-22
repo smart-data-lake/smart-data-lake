@@ -43,8 +43,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
  * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
  *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
  *                               Default is None which keeps the whole filename (without path).
- * @param breakFileRefLineage If set to true, file references passed on from previous action are ignored by this action.
- *                            The action will detect on its own what files it is going to process.
  */
 case class FileTransferAction(override val id: ActionId,
                               inputId: DataObjectId,
@@ -53,6 +51,7 @@ case class FileTransferAction(override val id: ActionId,
                               maxParallelism: Option[Int] = None,
                               filenameExtractorRegex: Option[String] = None,
                               override val breakFileRefLineage: Boolean = false,
+                              override val createFileRefLineage: Boolean = true,
                               override val executionMode: Option[ExecutionMode] = None,
                               override val executionCondition: Option[Condition] = None,
                               override val metricsFailCondition: Option[String] = None,
@@ -105,7 +104,7 @@ case class FileTransferAction(override val id: ActionId,
           }
       }
     }
-    subFeed
+    super.postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
   }
 
   override def factory: FromConfigFactory[Action] = FileTransferAction

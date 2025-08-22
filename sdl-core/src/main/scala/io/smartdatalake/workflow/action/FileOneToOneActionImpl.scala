@@ -44,10 +44,18 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
   override def recursiveInputs: Seq[FileRefDataObject with CanCreateInputStream] = Seq()
 
   /**
-   * Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.
+   * If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.
    * This is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.
+   * Default is false.
    */
-  def breakFileRefLineage: Boolean
+  def breakFileRefLineage: Boolean = false
+
+  /**
+   * If set to false, this action does not propagate output FileRefs to further actions.
+   * This helps to avoid performance and memory problems with too many FileRefs.
+   * Default is true.
+   */
+  def createFileRefLineage: Boolean = true
 
   override def validateConfig(): Unit = {
     super.validateConfig()
@@ -84,5 +92,11 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
     if (subFeed.fileRefs.isEmpty || breakFileRefLineage) {
       subFeed.copy(fileRefs = Some(input.getFileRefs(subFeed.partitionValues)))
     } else subFeed
+  }
+
+  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
+    // remove fileRefs if createFileRefLineage is false
+    if (!createFileRefLineage) subFeed.copy(fileRefs = None)
+    else subFeed
   }
 }
