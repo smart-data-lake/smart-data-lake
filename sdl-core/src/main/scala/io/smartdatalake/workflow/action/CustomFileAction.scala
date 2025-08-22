@@ -48,6 +48,7 @@ case class CustomFileAction(override val id: ActionId,
                             transformer: CustomFileTransformerConfig,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
+                            override val createFileRefLineage: Boolean = true,
                             override val executionMode: Option[ExecutionMode] = None,
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
@@ -132,7 +133,7 @@ case class CustomFileAction(override val id: ActionId,
           }
       }
     }
-    subFeed
+    super.postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
   }
 
   override def factory: FromConfigFactory[Action] = CustomFileAction
