@@ -6157,7 +6157,11 @@
           },
           "breakFileRefLineage" : {
             "type" : "boolean",
-            "description" : "Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.  \nThis is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action."
+            "description" : "If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.  \nThis is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.  \nDefault is false."
+          },
+          "createFileRefLineage" : {
+            "type" : "boolean",
+            "description" : "If set to false, this action does not propagate output FileRefs to further actions.  \nThis helps to avoid performance and memory problems with too many FileRefs.  \nDefault is true."
           },
           "executionMode" : {
             "oneOf" : [ {
@@ -6450,7 +6454,11 @@
           },
           "breakFileRefLineage" : {
             "type" : "boolean",
-            "description" : "If set to true, file references passed on from previous action are ignored by this action.  \nThe action will detect on its own what files it is going to process."
+            "description" : "If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.  \nThis is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.  \nDefault is false."
+          },
+          "createFileRefLineage" : {
+            "type" : "boolean",
+            "description" : "If set to false, this action does not propagate output FileRefs to further actions.  \nThis helps to avoid performance and memory problems with too many FileRefs.  \nDefault is true."
           },
           "executionMode" : {
             "oneOf" : [ {
