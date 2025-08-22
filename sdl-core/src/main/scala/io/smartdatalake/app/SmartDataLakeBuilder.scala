@@ -492,7 +492,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
       case ex: Throwable if Environment.simplifyFinalExceptionLog =>
-        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDL uses)
+        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDLB uses)
         throw LogUtil.simplifyStackTrace(ex)
     }
 

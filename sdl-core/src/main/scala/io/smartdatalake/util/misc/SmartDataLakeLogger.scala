@@ -32,11 +32,6 @@ trait SmartDataLakeLogger {
     throw e
   }
 
-  private[smartdatalake] def logException(e: Exception): Exception = {
-    logger.error( s"${e.getClass.getSimpleName} - ${e.getMessage}" )
-    e
-  }
-
   private[smartdatalake] def logWithSeverity(severity: Level, msg: String, cause: Throwable): Unit = {
     severity match {
       case Level.ERROR if Environment.includeDAGResultExceptionInLog => logger.error(msg, cause)

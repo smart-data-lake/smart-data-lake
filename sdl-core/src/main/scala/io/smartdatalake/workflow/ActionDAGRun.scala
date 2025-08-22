@@ -24,7 +24,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper._
 import io.smartdatalake.util.dag._
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.LogUtil.getRootCause
+import io.smartdatalake.util.misc.LogUtil.{getRootCause, limitLines}
 import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
@@ -96,7 +96,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     dagExceptions.distinct.foreach { ex =>
       val loggerSeverity = if (ex.severity <= ExceptionSeverity.FAILED_DONT_STOP) Level.ERROR
       else Environment.taskSkippedExceptionLogLevel
-      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${ex.getMessage}", getRootCause(ex))
+      logWithSeverity(loggerSeverity, s"$phase: ${ex.getClass.getSimpleName}: ${limitLines(ex.getMessage, 1, "... for details see INFO/WARN message earlier in the Log.")}", getRootCause(ex))
     }
     // log dag on error
     if (dagExceptionsToStop.nonEmpty) ActionDAGRun.logDag(s"$phase ${dagExceptionsToStop.head.severity} for ${context.application} runId=${context.executionId.runId} attemptId=${context.executionId.runId}", dag, Some(executionId))
@@ -272,9 +272,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
     override def onNodeFailure(exception: Throwable, partialResults: Seq[DAGResult])(node: Action): Unit = {
       // only first line of message included as logical plan of AnalysisException might have several 100 lines...
-      val exceptionMsg = s"${exception.getClass.getSimpleName}: ${Option(exception.getMessage).map(_.linesIterator.next()).getOrElse("null")}"
+      val exceptionMsg = LogUtil.getExceptionSummary(exception)
       node.addRuntimeEvent(executionId, phase, RuntimeEventState.FAILED, Some(exceptionMsg), results = partialResults.collect { case x: SubFeed => x })
-      logger.warn(s"${node.toStringShort}: $phase failed with $exceptionMsg")
+      logger.warn(s"${node.toStringShort}: $phase failed with: $exceptionMsg")
       saveState(phase, Some(node.id))
     }
 
