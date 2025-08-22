@@ -31,6 +31,7 @@ import org.apache.commons.pool2.{BasePooledObjectFactory, PooledObject}
 
 import java.net.{InetSocketAddress, Proxy}
 import java.time.Duration
+import scala.util.{Try, Using}
 
 /**
  * SFTP Connection information
@@ -43,7 +44,6 @@ import java.time.Duration
  * @param ignoreHostKeyVerification do not validate host key if true, default is false
  * @param maxParallelConnections number of parallel sftp connections created by an instance of this connection
  * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool
- * @param metadata
  */
 case class SFtpFileRefConnection(override val id: ConnectionId,
                                  host: String,
@@ -71,7 +71,10 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
 
   def execWithSFtpClient[A]( func: SFTPClient => A ): A = {
     WithResourcePool.exec(pool){
-      sftp => func(sftp)
+      sftp =>
+        Using.resource(sftp.newSFTPClient()) {
+          client => func(client)
+        }
     }
   }
 
@@ -80,14 +83,23 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   }
 
   // setup connection pool
-  val pool = new GenericObjectPool[SFTPClient](new SFtpClientPoolFactory)
+  val pool = new GenericObjectPool[SSHClient](new SFtpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
-  private class SFtpClientPoolFactory extends BasePooledObjectFactory[SFTPClient] {
-    override def create(): SFTPClient = createSshClient.newSFTPClient()
-    override def wrap(sftp: SFTPClient): PooledObject[SFTPClient] = new DefaultPooledObject(sftp)
-    override def destroyObject(p: PooledObject[SFTPClient]): Unit = p.getObject.close()
-}
+
+  private class SFtpClientPoolFactory extends BasePooledObjectFactory[SSHClient] {
+    override def create(): SSHClient = createSshClient
+
+    override def wrap(sftp: SSHClient): PooledObject[SSHClient] = new DefaultPooledObject(sftp)
+
+    override def validateObject(p: PooledObject[SSHClient]): Boolean = {
+      Try {
+        super.validateObject(p) && p.getObject.isConnected && p.getObject.isAuthenticated
+      }.getOrElse(false)
+    }
+
+    override def destroyObject(p: PooledObject[SSHClient]): Unit = p.getObject.close()
+  }
 
   override def factory: FromConfigFactory[Connection] = SFtpFileRefConnection
 }
