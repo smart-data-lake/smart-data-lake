@@ -54,7 +54,7 @@ case class OAuthMode (
                        timeouts: Option[HttpTimeoutConfig] = None,
                        followRedirects: Boolean = false,
                        retries: Int = 1
-                     ) extends HttpAuthMode with SmartDataLakeLogger {
+                     ) extends HttpAuthMode with TokenAuth with SmartDataLakeLogger {
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   private lazy val oAuth2Service = OAuth2Service(oauthUrl.resolve(), Some(clientId.resolve()), clientCredentialsInit, proxy, timeouts, followRedirects, retries)
@@ -88,6 +88,10 @@ case class OAuthMode (
 
   override def getHeaders: Map[String, String] = {
     Map(oAuth2Service.getToken.getAuthHeader(useIdToken))
+  }
+
+  override def getToken: String = {
+    oAuth2Service.getToken.token(useIdToken)
   }
 
   override def factory: FromConfigFactory[HttpAuthMode] = OAuthMode
