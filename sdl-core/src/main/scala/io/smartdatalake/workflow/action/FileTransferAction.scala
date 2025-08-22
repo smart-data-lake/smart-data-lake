@@ -65,7 +65,7 @@ case class FileTransferAction(override val id: ActionId,
   override val outputs: Seq[FileRefDataObject] = Seq(output)
 
   // initialize FileTransfer
-  private val parallelism = Seq(maxParallelism,input.recommendedParallelism,output.recommendedParallelism).flatten.sorted.headOption.getOrElse(1) // take minimum value
+  private val parallelism = Seq(maxParallelism, input.recommendedParallelism, output.recommendedParallelism).flatten.sorted.headOption.getOrElse(1) // take first value
   private val fileTransfer = new StreamFileTransfer(input, output, overwrite, parallelism)
 
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {

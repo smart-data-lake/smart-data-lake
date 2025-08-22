@@ -195,10 +195,7 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
     }
   }
 
-  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    // make sure empty partitions are created as well
-    if (partitionValues.nonEmpty) createMissingPartitions(partitionValues)
-  }
+  override def endWritingOutputStreams(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 
   override def createOutputStream(path: String, overwrite: Boolean)(implicit context: ActionPipelineContext): OutputStream = {
     Try {
