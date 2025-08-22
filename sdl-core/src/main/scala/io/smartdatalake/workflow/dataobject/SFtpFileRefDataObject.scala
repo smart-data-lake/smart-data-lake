@@ -164,8 +164,15 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
 
   override def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
     Try {
-      implicit val sftp = connection.pool.borrowObject
-      SshUtil.getInputStream(path, () => Try(connection.pool.returnObject(sftp)))
+      val ssh = connection.pool.borrowObject
+      val sftpClient = ssh.newSFTPClient()
+
+      def close(): Unit = Try {
+        sftpClient.close()
+        connection.pool.returnObject(ssh)
+      }
+
+      SshUtil.getInputStream(path, close)(sftpClient)
     } match {
       case Success(r) => Iterator(r)
       case Failure(e) => throw new RuntimeException(s"Can't create InputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
@@ -195,8 +202,15 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
 
   override def createOutputStream(path: String, overwrite: Boolean)(implicit context: ActionPipelineContext): OutputStream = {
     Try {
-      implicit val sftp = connection.pool.borrowObject
-      SshUtil.getOutputStream(path, overwrite, () => Try(connection.pool.returnObject(sftp)))
+      val ssh = connection.pool.borrowObject
+      val sftpClient = ssh.newSFTPClient()
+
+      def close(): Unit = Try {
+        sftpClient.close()
+        connection.pool.returnObject(ssh)
+      }
+
+      SshUtil.getOutputStream(path, overwrite, close)(sftpClient)
     } match {
       case Success(r) => r
       case Failure(e) => throw new RuntimeException(s"Can't create OutputStream for $id and $path: ${e.getClass.getSimpleName} - ${e.getMessage}", e)
