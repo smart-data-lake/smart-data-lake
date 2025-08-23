@@ -23,9 +23,12 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
-import io.smartdatalake.util.misc.AclDef
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
+import io.smartdatalake.util.misc.{AclDef, NestedColumnUtil}
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import org.apache.spark.sql.DataFrame
 
 /**
  * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an Avro data source.
@@ -66,6 +69,19 @@ case class AvroFileDataObject( override val id: DataObjectId,
   override val fileName: String = "*.avro*"
 
   override val options: Map[String, String] = avroOptions.getOrElse(Map())
+
+  // Avro files implicitly contain a schema.
+  // If a schema is defined for the DataObject, it will be applied in customizeContent and not by SparkFileDataObject.getDataFrame directly.
+  override val ignoreSchemaForReader: Boolean = true
+
+  /**
+   * Convert to target schema if defined
+   */
+  override def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
+    schema.map(s => NestedColumnUtil.selectSchema(SparkDataFrame(df), s).asInstanceOf[SparkDataFrame].inner)
+      .getOrElse(df)
+  }
+
 
   override def factory: FromConfigFactory[DataObject] = AvroFileDataObject
 }

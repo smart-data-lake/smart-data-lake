@@ -62,13 +62,13 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     assert(dataObjPartitioned.getFileRefs(pv1).size == 2)
 
     // read with list of partition values
-    val dfResult1 = dataObjPartitioned.getSparkDataFrame(pv1).cache
+    val dfResult1 = dataObjPartitioned.getSparkDataFrame(pv1)(contextExec).cache
     assert(dfResult1.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     assert(dfResult1.drop("_filename").isEqual(df1))
     assert(dfResult1.where($"_filename".isNull).isEmpty)
 
     // read all
-    val dfResult2 = dataObjPartitioned.getSparkDataFrame().cache
+    val dfResult2 = dataObjPartitioned.getSparkDataFrame()(contextExec).cache
     assert(dfResult2.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     assert(dfResult2.drop("_filename").isEqual(df1))
     assert(dfResult2.where($"_filename".isNull).isEmpty)
@@ -123,7 +123,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     session.conf.set("spark.sql.optimizer.expression.nestedPruning.enabled", false)
     session.conf.set("spark.sql.optimizer.nestedSchemaPruning.enabled", false)
     // test L0: should include 1 updated L0 and 1 deleted record
-    val dfResultL0 = dataObj.getSparkDataFrame().cache
+    val dfResultL0 = dataObj.getSparkDataFrame()(contextExec).cache
       .withColumn("cntDesc", functions.size($"descriptions.description"))
       .withColumn("cntChildren", functions.size($"nodes.node"))
     val resultL0 = dfResultL0.select($"name",$"cntDesc",$"cntChildren").as[(String,Int,Int)].collect.toSeq
@@ -159,7 +159,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     )
 
     // read and check
-    val dfResult = dataObj.getSparkDataFrame().cache
+    val dfResult = dataObj.getSparkDataFrame()(contextExec).cache
     val cntDescriptions = dfResult.select(functions.size($"descriptions.description")).as[Int].collect.toSeq
     assert(cntDescriptions == Seq(2))
   }

@@ -200,7 +200,7 @@ object DataFrameTestHelper {
       (dfExpected, dfActual)
     }
 
-    assertSchemasEqual(expectedPrime.schema, actualPrime.schema)
+    assertSchemasEqual(expectedPrime.schema, actualPrime.schema, ignoreNullability)
 
     // now compare data
     val expectedPrimeCount = expectedPrime.groupBy(expectedPrime.columns.map(col): _*).agg(count("*").as("rowcount"))
@@ -209,21 +209,25 @@ object DataFrameTestHelper {
     val sameData = expectedMinusActual.count() == 0 && actualMinusExpected.count() == 0
 
     if (!sameData) {
-      val messageRows = s"non-equal rows\nrows which appear in expected but not in actual:\n " +
-        s"${DatasetHelper.showString(expectedMinusActual, 100)}\n" +
-        s"rows which appear in actual but not in expected:\n ${DatasetHelper.showString(actualMinusExpected, 100)}"
+      val messageRows =
+        s"""
+        non-equal rows
+        rows which appear in expected but not in actual:
+        ${DatasetHelper.showString(expectedMinusActual, 100)}
+        rows which appear in actual but not in expected:
+        ${DatasetHelper.showString(actualMinusExpected, 100)}
+      """
 
       // compute difference at column-level. This is tricky because the equality of rows involve all columns
       // What we can do is to take the rows which show a difference at row-level, and check whether we have columns
       // which do not appear in the other df
       val colsToCheck = expectedMinusActual.columns
-      val colsWhichDiff = colsToCheck.collect { case c if {
+      val colsWhichDiff = colsToCheck.filter { c =>
         val (lmr, rml) = symmetricDifference(expectedMinusActual, actualMinusExpected, col(c))
         lmr.union(rml).count() > 0 // col diffs
-      } => c
       }
       val messageColumns = if (colsWhichDiff.nonEmpty) s"The difference is probably in columns : ${colsWhichDiff.mkString(",")}" else ""
-      assert(assertion = false, Seq(messageRows, messageColumns).filter(message => !message.isEmpty).mkString("\n"))
+      assert(assertion = false, Seq(messageRows, messageColumns).filter(message => message.nonEmpty).mkString("\n"))
     }
   }
 
@@ -246,19 +250,19 @@ object DataFrameTestHelper {
     }
 
     if (!sameSchema) {
-      val expectedTypes = expected.map(structType => structType.name -> structType.dataType).toMap
-      val actualTypes = actual.map(structType => structType.name -> structType.dataType).toMap
       val differentTypes = expected.toSet.diff(actual.toSet)
       val differentTypesString = differentTypes.map(structType => {
-        val treeStringExpected = new StructType(Array(StructField(structType.name, expectedTypes(structType.name), structType.nullable))).treeString
-        val treeStringActual = new StructType(Array(StructField(structType.name, actualTypes(structType.name), structType.nullable))).treeString
-        s"Actual schema differs from expected schema.\n" +
-          s"Column: ${structType.name}\n" +
-          s"Expected type: $treeStringExpected,\n" +
-          s"Actual type:   $treeStringActual" +
-          (if (treeStringActual.length > 20 && treeStringExpected.length > 20) s"In expected but not actual:    ${treeStringExpected diff treeStringActual}\nIn actual but not expected:   ${treeStringActual diff treeStringExpected}" else "")
-      }).mkString("\n\n")
-      assert(differentTypes.isEmpty, differentTypesString)
+        val treeStringExpected = StructType(expected.fields.filter(_.name == structType.name)).treeString
+        val treeStringActual = StructType(actual.fields.filter(_.name == structType.name)).treeString
+        s"""
+           |- Column: ${structType.name}
+           |  Expected type:
+           |  ${treeStringExpected.linesIterator.drop(1).mkString(System.lineSeparator() + "  ")}
+           |  Actual type:
+           |  ${treeStringActual.linesIterator.drop(1).mkString(System.lineSeparator() + "  ")}
+        """.stripMargin.trim
+      }).mkString("\n")
+      assert(differentTypes.isEmpty, "Actual schema differs from expected schema:\n" + differentTypesString)
     }
   }
 

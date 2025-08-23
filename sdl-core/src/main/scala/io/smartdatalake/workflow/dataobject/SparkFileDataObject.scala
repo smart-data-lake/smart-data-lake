@@ -26,7 +26,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDe
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
+import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, getEmptyDataFrame}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -208,7 +208,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
     val schemaOpt = getSchema.map(_.inner)
-    if (schemaOpt.isEmpty && !checkFilesExisting) {
+    val filesExisting = checkFilesExisting
+    if (schemaOpt.isEmpty && !filesExisting) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
     }
@@ -221,18 +222,20 @@ trait SparkFileDataObject extends HadoopFileDataObject
     else Map[String,String]()
 
     // get and customize content
-    var df = if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    val doCreateEmptyDataFrame = (!context.isExecPhase || !filesExisting) && schema.isDefined && format == readFormat
+    var df = if (doCreateEmptyDataFrame) createEmptyDataFrame(schema.get)
+    else if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     else if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     df = customizeContent(df)
 
     // early check for no data to process.
     // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
-    if (context.isExecPhase && Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.tryGetFilesProcessedFromSparkPlan(id.id, df).exists(_.isEmpty))
+    if (context.isExecPhase && ((!filesExisting && doCreateEmptyDataFrame) || (Environment.enableSparkFileDataObjectNoDataCheck && SparkFileDataObject.tryGetFilesProcessedFromSparkPlan(id.id, df).exists(_.isEmpty))))
       throw NoDataToProcessWarning(id.id, s"($id) No files to process found in execution plan")
 
     // add filename column
-    df = df.withOptionalColumn(filenameColumn, input_file_name())
+    df = df.withOptionalColumn(filenameColumn, if (!doCreateEmptyDataFrame) input_file_name() else lit(""))
 
     // configure observer to get files processed for incremental execution mode
     if (filesObservers.nonEmpty && context.isExecPhase) {
@@ -241,6 +244,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // finalize & return DataFrame
     afterRead(df)
+  }
+
+  private[smartdatalake] def createEmptyDataFrame(schema: GenericSchema)(implicit session: SparkSession): DataFrame = {
+    var df = getEmptyDataFrame(schema.asInstanceOf[SparkSchema].inner)
+    partitions.foreach(p => if (!df.columns.contains(p)) df = df.withColumn(p, lit(null).cast(StringType))) // add missing partition columns as null
+    df
   }
 
   /**
