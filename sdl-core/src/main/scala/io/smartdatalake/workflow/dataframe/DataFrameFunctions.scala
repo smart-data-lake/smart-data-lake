@@ -69,6 +69,8 @@ trait DataFrameFunctions {
   def regexp_extract(e: GenericColumn, regexp: String, groupIdx: Int): GenericColumn
   def raise_error(column: GenericColumn): GenericColumn
 
+  def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn
+
   def hash(column: GenericColumn): GenericColumn
   /**
    * Get a DataFrame with the result of the given sql statement.

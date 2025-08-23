@@ -21,6 +21,8 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkMapDataType
+import org.apache.spark.sql.types.{MapType, StringType}
 
 
 /**
@@ -57,6 +59,9 @@ object NestedColumnUtil extends SmartDataLakeLogger {
         val keyTransformed = functions.transform_keys(column, (k, v) => selectColumn(k, ct.valueDataType, tt.keyDataType))
         val mapTransformed = functions.transform_values(keyTransformed, (k, v) => selectColumn(v, ct.valueDataType, tt.valueDataType))
         mapTransformed
+      // special case json object: string -> map<string,string>
+      case (ct: GenericSimpleDataType, tt: GenericMapDataType) if ct.typeName == "string" && tt.keyDataType.typeName == "string" && tt.valueDataType.typeName == "string" =>
+        functions.from_json(column, SparkMapDataType(MapType(StringType, StringType)))
       case (ct, tt) if ct.sql != tt.sql => column.cast(tt)
       case _ => column
     }
