@@ -51,7 +51,7 @@ case class SparkUDFCreatorConfig(className: String, options: Option[Map[String, 
     session.udf.register(name, getUDF)
   }
 
-  def registerUdf(name: String, expressionEvaluatorFactory: ExpressionEvaluatorFactory[_]): Unit = {
+  def registerUdf(name: String, expressionEvaluatorFactory: ExpressionEvaluatorFactory): Unit = {
     // invoke dynamic
     val applyUdfMethod = expressionEvaluatorFactory.getClass.getMethods.find(_.getName == "registerSparkUdf")
     applyUdfMethod.map(_.invoke(expressionEvaluatorFactory, name, getUDF))
