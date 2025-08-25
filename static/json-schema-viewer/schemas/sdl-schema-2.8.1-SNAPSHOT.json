@@ -6159,10 +6159,6 @@
             "type" : "boolean",
             "description" : "If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.  \nThis is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.  \nDefault is false."
           },
-          "createFileRefLineage" : {
-            "type" : "boolean",
-            "description" : "If set to false, this action does not propagate output FileRefs to further actions.  \nThis helps to avoid performance and memory problems with too many FileRefs.  \nDefault is true."
-          },
           "executionMode" : {
             "oneOf" : [ {
               "$ref" : "#/definitions/ExecutionMode/CustomMode"
@@ -6452,13 +6448,13 @@
             "type" : "string",
             "description" : "A regex to extract a part of the filename to keep in the translated FileRef.  \nIf the regex contains group definitions, the first group is taken, otherwise the whole regex match.  \nDefault is None which keeps the whole filename (without path)."
           },
-          "breakFileRefLineage" : {
-            "type" : "boolean",
-            "description" : "If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.  \nThis is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.  \nDefault is false."
-          },
           "createFileRefLineage" : {
             "type" : "boolean",
             "description" : "If set to false, this action does not propagate output FileRefs to further actions.  \nThis helps to avoid performance and memory problems with too many FileRefs.  \nDefault is true."
+          },
+          "breakFileRefLineage" : {
+            "type" : "boolean",
+            "description" : "If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.  \nThis is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.  \nDefault is false."
           },
           "executionMode" : {
             "oneOf" : [ {
