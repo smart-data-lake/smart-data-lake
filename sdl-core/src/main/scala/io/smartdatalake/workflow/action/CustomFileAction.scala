@@ -22,7 +22,6 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
-import io.smartdatalake.util.filetransfer.StreamFileTransfer
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
@@ -48,7 +47,6 @@ case class CustomFileAction(override val id: ActionId,
                             transformer: CustomFileTransformerConfig,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
-                            override val createFileRefLineage: Boolean = true,
                             override val executionMode: Option[ExecutionMode] = None,
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
@@ -122,14 +120,13 @@ case class CustomFileAction(override val id: ActionId,
           // exec only if output returned a sample file to create
           sampleFile.foreach {
             file =>
-              val sampleFileTransfer = new StreamFileTransfer(input, output, overwrite = true)
               val hadoopSrcPath = new Path(sampleFileRefMapping.src.fullPath)
               val hadoopTgtPath = new Path(file)
-              val result = Using.resource(input.filesystem.open(hadoopSrcPath)) { is =>
+              Using.resource(input.filesystem.open(hadoopSrcPath)) { is =>
                 Using.resource(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
                   transformer.transform(is, os)
                 }
-              }
+              }.foreach(ex => throw ex)
           }
       }
     }

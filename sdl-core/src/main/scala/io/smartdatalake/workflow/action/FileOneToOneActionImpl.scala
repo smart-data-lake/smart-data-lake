@@ -50,13 +50,6 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
    */
   def breakFileRefLineage: Boolean = false
 
-  /**
-   * If set to false, this action does not propagate output FileRefs to further actions.
-   * This helps to avoid performance and memory problems with too many FileRefs.
-   * Default is true.
-   */
-  def createFileRefLineage: Boolean = true
-
   override def validateConfig(): Unit = {
     super.validateConfig()
     // make sure all output partitions exist in input
@@ -92,11 +85,5 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
     if (subFeed.fileRefs.isEmpty || breakFileRefLineage) {
       subFeed.copy(fileRefs = Some(input.getFileRefs(subFeed.partitionValues)))
     } else subFeed
-  }
-
-  override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
-    // remove fileRefs if createFileRefLineage is false
-    if (!createFileRefLineage) subFeed.copy(fileRefs = None)
-    else subFeed
   }
 }
