@@ -1768,7 +1768,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "`SDLSaveMode` to use when writing files, default is \"overwrite\". Overwrite, Append and Merge are supported for now.",
+            "description" : "`SDLSaveMode` to use when writing files, default is \"Overwrite\". Overwrite, Append and Merge are supported for now.",
             "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
@@ -2342,7 +2342,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "spark`SaveMode` to use when writing files, default is \"overwrite\"",
+            "description" : "spark`SaveMode` to use when writing files, default is \"Overwrite\"",
             "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "acl" : {
@@ -2710,7 +2710,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "`SDLSaveMode` to use when writing files, default is \"overwrite\". Overwrite, Append and Merge are supported for now.",
+            "description" : "`SDLSaveMode` to use when writing files, default is \"Overwrite\". Overwrite, Append and Merge are supported for now.",
             "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
@@ -4992,7 +4992,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "description" : "spark`SDLSaveMode` to use when writing files, default is \"overwrite\"",
+            "description" : "spark`SDLSaveMode` to use when writing files, default is \"Overwrite\"",
             "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "connectionId" : {
@@ -7444,9 +7444,13 @@
             "type" : "string",
             "description" : "Optional description of the transformer"
           },
+          "file" : {
+            "type" : "string",
+            "description" : "File where SQL code for transformation is loaded from.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary input view names.  \nThe input name is either the name of the DataObject, or the name of the previous transformation if this is not the first transformation of the chain.  \nMake sure to set the name of the previous transformation in that case."
+          },
           "code" : {
             "type" : "string",
-            "description" : "SQL code for transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary view name.  \nThe input name is either the name of the DataObject, or the name of the previous transformation\nif this is not the first transformation of the chain. Make sure to change the standard name of\nthe previous transformation in that case."
+            "description" : "SQL code for transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName}`or`%{inputViewName_<input_name>}` can be used to insert the temporary input view names.  \nThe input name is either the name of the DataObject, or the name of the previous transformation if this is not the first transformation of the chain.  \nMake sure to set the name of the previous transformation in that case."
           },
           "options" : {
             "type" : "object",
@@ -7464,9 +7468,9 @@
           }
         },
         "title" : "SQLDfTransformer",
-        "required" : [ "type", "code" ],
+        "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code.  \nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain. Also note that to create\nthe name of temporary view, special characters are replaced by underscores and a postfix `_sdltemp` is added.  \nIt is therefore recommended to use special token `%{inputViewName}` or `%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
+        "description" : "Configuration of a custom GenericDataFrame transformation between one input and one output (1:1) as SQL code or file.  \nThe input data is available as temporary view in SQL. The inputs name is either the name of the DataObject,\nor the name of the previous transformation, if this is not the first transformation of the chain.  \nAlso note that to create the name of temporary view, special characters are replaced by underscores and a postfix `_sdltemp` is added.  \nIt is therefore recommended to use special token `%{inputViewName}` or `%{inputViewName_<input name>}` that will be\nreplaced with the name of the temporary view at runtime."
       },
       "ScalaClassGenericDfTransformer" : {
         "type" : "object",
@@ -8373,12 +8377,19 @@
             "type" : "string",
             "description" : "Optional description of the transformer"
           },
+          "files" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Map of output names to corresponding Files where SQL code for transformation is loaded from for transformation.  \nIf this is the last transformation in the chain, the output name has to match an output DataObject id,\notherwise it can be any name which will then be available in the next transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName_<input_name>}` can be used to insert the name of temporary views.  \nThe input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.  \nMake sure to set the name of the previous transformation in that case."
+          },
           "code" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Map of output names and corresponding SQL code for transformation.  \nIf this is the last transformation in the chain, the output name has to match an output DataObject id,\notherwise it can be any name which will then be available in the next transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName_<input_name>}` can be used to insert the name of temporary views.  \nThe input name is either the id of an input DataObject, or the name of an output of the previous transformation\nif this is not the first transformation of the chain."
+            "description" : "Map of output names to corresponding SQL code for transformation.  \nIf this is the last transformation in the chain, the output name has to match an output DataObject id,\notherwise it can be any name which will then be available in the next transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName_<input_name>}` can be used to insert the name of temporary views.  \nThe input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.  \nMake sure to set the name of the previous transformation in that case."
           },
           "options" : {
             "type" : "object",
@@ -8396,7 +8407,7 @@
           }
         },
         "title" : "SQLDfsTransformer",
-        "required" : [ "type", "code" ],
+        "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.  \nThe input data is available as temporary views in SQL. As name for the temporary views the input DataObjectId is used\n(special characters are replaces by underscores).  \nThe input data is available as temporary view in SQL. The input name is either an id of the input DataObject,\nor the name of an output of the previous transformation if this is not the first transformation of the chain.  \nAlso note that to create the name of temporary view, special characters are replaced by underscores and a postfix `_sdltemp` is added.  \nIt is therefore recommended to use the special token `%{inputViewName_<input name>}` , that will be replaced with the name\nof the temporary view at runtime.\n\nNote that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB\nto access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project."
       },
