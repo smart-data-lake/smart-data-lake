@@ -47,9 +47,14 @@ trait PartitionValueTransformer extends Transformer {
   def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
 
   private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct, executionModeResultOptions) // note that stream is lazy -> distinct is only calculated if transformPartitionValues creates a mapping.
-    thisPartitionValuesMap.map(newMapping => partitionValuesMap.mapValues(newMapping).toMap)
-      .getOrElse(partitionValuesMap)
+    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.to(LazyList).distinct, executionModeResultOptions) // LazyList: distinct is only calculated if transformPartitionValues creates a mapping.
+    thisPartitionValuesMap.map { newMapping =>
+      // transform is mapping is defined
+      def lookupNewValue(key: PartitionValues) =
+        newMapping.getOrElse(key, throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
+
+      partitionValuesMap.view.mapValues(lookupNewValue).toMap
+    }.getOrElse(partitionValuesMap)
   }
 }
 
