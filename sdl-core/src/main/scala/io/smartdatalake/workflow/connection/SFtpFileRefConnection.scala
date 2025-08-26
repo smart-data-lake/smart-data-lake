@@ -88,6 +88,8 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   val pool = new GenericObjectPool[SSHClient](new SFtpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
   pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
+  pool.setTestOnBorrow(true)
+  pool.setTestOnReturn(true)
 
   private class SFtpClientPoolFactory extends BasePooledObjectFactory[SSHClient] {
     override def create(): SSHClient = createSshClient
