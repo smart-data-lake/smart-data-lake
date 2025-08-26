@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.filetransfer.SshUtil
-import io.smartdatalake.util.misc.WithResourcePool
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, WithResourcePool}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode, PublicKeyAuthMode}
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.SFTPClient
@@ -54,7 +54,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
                                  maxParallelConnections: Int = 1,
                                  connectionPoolMaxIdleTimeSec: Int = 3,
                                  override val metadata: Option[ConnectionMetadata] = None
-                                 ) extends Connection {
+                                ) extends Connection with SmartDataLakeLogger {
   require(maxParallelConnections > 0, s"maxParallelConnections must be greater than 0, but is $maxParallelConnections")
 
   // Allow only supported authentication modes
@@ -62,11 +62,13 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   require(supportedAuths.contains(authMode.getClass), s"${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
   private def createSshClient: SSHClient = {
-    authMode match {
+    val sshClient = authMode match {
       case m: BasicAuthMode => SshUtil.connectWithUserPw(host, port, m.userSecret.resolve(), m.passwordSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification)
       case m: PublicKeyAuthMode => SshUtil.connectWithPublicKey(host, port, m.userSecret.resolve(), proxy.map(_.instance), ignoreHostKeyVerification)
       case _ => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     }
+    logger.info(s"($id) SSH client created")
+    sshClient
   }
 
   def execWithSFtpClient[A]( func: SFTPClient => A ): A = {
@@ -93,9 +95,11 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
     override def wrap(sftp: SSHClient): PooledObject[SSHClient] = new DefaultPooledObject(sftp)
 
     override def validateObject(p: PooledObject[SSHClient]): Boolean = {
-      Try {
+      val isValid = Try {
         super.validateObject(p) && p.getObject.isConnected && p.getObject.isAuthenticated
       }.getOrElse(false)
+      logger.info(s"($id) SSH client isValid=$isValid")
+      isValid
     }
 
     override def destroyObject(p: PooledObject[SSHClient]): Unit = p.getObject.close()
