@@ -55,7 +55,7 @@ import scala.jdk.CollectionConverters._
  * @param dateColumnType type of date column
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param saveMode spark [[SaveMode]] to use when writing files, default is "overwrite"
+ * @param saveMode  spark [[SaveMode]] to use when writing files, default is "Overwrite"
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
