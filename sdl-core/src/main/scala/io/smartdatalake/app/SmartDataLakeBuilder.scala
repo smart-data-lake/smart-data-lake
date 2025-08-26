@@ -238,9 +238,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   def parseKeyValue(arg: String): (String, String) = {
-    val keyValues = arg.split("=")
-    if (keyValues.size != 2) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
-    val Array(key, value) = keyValues
+    if (!arg.contains('=')) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
+    val key = arg.takeWhile(_ != '=')
+    val value = arg.drop(key.length + 1)
     (key, value)
   }
 
