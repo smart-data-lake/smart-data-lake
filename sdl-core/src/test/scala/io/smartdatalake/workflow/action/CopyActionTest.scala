@@ -217,8 +217,8 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load with positive constraint and expectation evaluation
-    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = "select * from %{inputViewName} where rating = 5")
-    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = "select * from %{inputViewName} where rating = 5") // test multiple transformers - it doesnt matter if they do the same.
+    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = Some("select * from %{inputViewName} where rating = 5"))
+    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = Some("select * from %{inputViewName} where rating = 5")) // test multiple transformers - it doesnt matter if they do the same.
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
       transformers = Seq(customTransformerConfig1, customTransformerConfig2),
       expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
@@ -581,7 +581,7 @@ class CopyActionTest extends FunSuite with BeforeAndAfter {
     val tgtDO = MockDataObject("tgt1").register
 
     // prepare & start load with positive constraint and expectation evaluation
-    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = "select * from %{inputViewName}")
+    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = Some("select * from %{inputViewName}"))
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig1))
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextInit).head

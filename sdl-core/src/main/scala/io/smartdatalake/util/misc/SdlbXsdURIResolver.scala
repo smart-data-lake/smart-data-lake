@@ -39,12 +39,12 @@ class SdlbXsdURIResolver(implicit hadoopConf: Configuration) extends CollectionU
 
     // try reading baseUri/schemaLocation
     val content = Option(baseUri).map(uri => new Path(new Path(uri), schemaLocation))
-      .flatMap(p => Try(SchemaUtil.readFromPath(p)).toOption)
+      .flatMap(p => Try(FileUtil.readFromPath(p)).toOption)
     // try reading collectionUri/schemaLocation
       .orElse(collectionBaseURI.map(uri => new Path(new Path(uri), schemaLocation))
-        .flatMap(p => Try(SchemaUtil.readFromPath(p)).toOption))
+      .flatMap(p => Try(FileUtil.readFromPath(p)).toOption))
     // read from schemaLocation
-      .getOrElse(SchemaUtil.readFromPath(new Path(schemaLocation)))
+    .getOrElse(FileUtil.readFromPath(new Path(schemaLocation)))
 
     new InputSource(new StringReader(content))
   }
@@ -68,7 +68,7 @@ object SdlbXsdURIResolver {
     xmlSchemaCollection.setBaseUri(xsdFile.getParent.toString)
 
     // read from hadoop and convert
-    val xsdString = SchemaUtil.readFromPath(xsdFile)
+    val xsdString = FileUtil.readFromPath(xsdFile)
     val xmlSchema = xmlSchemaCollection.read(new StringReader(xsdString))
     new XsdSchemaConverter(xmlSchema, maxRecursion).getStructType
   }

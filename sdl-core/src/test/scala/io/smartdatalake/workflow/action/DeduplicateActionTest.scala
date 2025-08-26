@@ -216,7 +216,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id,
-      transformers = Seq(SQLDfTransformer(code = "select lastname, firstname, rating as Rating from %{inputViewName}"))
+      transformers = Seq(SQLDfTransformer(code = Some("select lastname, firstname, rating as Rating from %{inputViewName}")))
     )
     val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)

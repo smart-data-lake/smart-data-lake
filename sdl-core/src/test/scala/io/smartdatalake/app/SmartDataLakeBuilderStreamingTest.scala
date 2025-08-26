@@ -97,7 +97,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // start streaming dag run
     // use only first partition col (dt) for partition diff mode
     val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1)
 
     // create state listener to control execution
@@ -181,7 +181,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare streaming action
     val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1)
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
@@ -289,10 +289,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare partition diff action
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
     val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
     instanceRegistry.register(Seq(actionA, actionB))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
@@ -370,10 +370,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[RuntimeFailTransformer].getName)))
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
     val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
@@ -459,10 +459,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare partition diff action
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
     val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
@@ -531,10 +531,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[RuntimeFailTransformer].getName)))
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare partition diff action
     val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // start run failing actionA
     instanceRegistry.register(Seq(actionAFail, actionB))
@@ -615,10 +615,10 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     // prepare partition diff action
     val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
     val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener: StreamingQueryListener = new StreamingQueryListener {
