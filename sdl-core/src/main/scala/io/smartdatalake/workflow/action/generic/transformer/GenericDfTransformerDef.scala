@@ -52,7 +52,8 @@ trait PartitionValueTransformer extends Transformer {
       // transform is mapping is defined
       def lookupNewValue(key: PartitionValues) =
         newMapping.getOrElse(key, throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
-      partitionValuesMap.view.mapValues(lookupNewValue).toMap
+
+      partitionValuesMap.mapValues(lookupNewValue).toMap
     }.getOrElse(partitionValuesMap)
   }
 }
