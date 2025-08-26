@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil, SchemaUtil}
+import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
 import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -45,9 +45,9 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+
 import java.sql.{SQLException, Timestamp}
 import java.time.{Duration, LocalDateTime}
-
 import scala.util.Try
 
 /**
@@ -89,7 +89,7 @@ import scala.util.Try
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
  *                   explicitly defined, the ones present in the configured "table" object are used.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
- * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
+ * @param saveMode     [[SDLSaveMode]] to use when writing files, default is "Overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param updateColumnComments If set to false, the column comments (read from the provided schema) will only be updated for newly created columns.
  *                             If set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in

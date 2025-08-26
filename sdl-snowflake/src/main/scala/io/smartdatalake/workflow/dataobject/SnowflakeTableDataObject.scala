@@ -69,7 +69,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. It uses the SnowflakeConnection for the target database.
  * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. It uses the SnowflakeConnection for the target database.
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. It uses the SnowflakeConnection for the target database.
- * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
+ * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "Overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
  * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
