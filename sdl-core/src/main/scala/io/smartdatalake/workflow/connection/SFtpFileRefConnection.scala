@@ -100,7 +100,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
       val isValid = Try {
         super.validateObject(p) && p.getObject.isConnected && p.getObject.isAuthenticated
       }.getOrElse(false)
-      logger.info(s"($id) SSH client isValid=$isValid")
+      logger.debug(s"($id) SSH client isValid=$isValid")
       isValid
     }
 
