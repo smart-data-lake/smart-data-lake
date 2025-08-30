@@ -247,7 +247,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   private[smartdatalake] def createEmptyDataFrame(schema: GenericSchema)(implicit session: SparkSession): DataFrame = {
-    var df = getEmptyDataFrame(schema.asInstanceOf[SparkSchema].inner)
+    val sparkSchema = schema.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema]
+    var df = getEmptyDataFrame(sparkSchema.inner)
     partitions.foreach(p => if (!df.columns.contains(p)) df = df.withColumn(p, lit(null).cast(StringType))) // add missing partition columns as null
     df
   }
