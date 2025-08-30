@@ -86,6 +86,11 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
     }
   }
+
+  override def limit(n: Int): SnowparkDataFrame = {
+    SnowparkDataFrame(inner.limit(n))
+  }
+
   override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
   override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {

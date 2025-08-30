@@ -144,13 +144,14 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
-    context.sparkSession
+    val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getJdbcAuthOptions(table.db.get))
       .options(instanceSparkOptions)
       .options(queryOrTableOption)
       .load()
+    if (!context.isExecPhase) df.limit(1) else df
   }
 
   // Write a Spark DataFrame to the Snowflake table
@@ -267,7 +268,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
-    val df = SnowparkDataFrame(snowparkSession.table(table.fullName))
+    var df = SnowparkDataFrame(snowparkSession.table(table.fullName))
+    if (!context.isExecPhase) df = df.limit(1)
     val dfTransformed = applyReadTransformer(partitionValues, df)
       .asInstanceOf[SnowparkDataFrame].inner
     validateSchemaMin(SnowparkSchema(dfTransformed.schema), "read")

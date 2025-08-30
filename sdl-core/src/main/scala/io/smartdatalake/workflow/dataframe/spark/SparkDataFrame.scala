@@ -94,6 +94,10 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     }
   }
 
+  override def limit(n: Int): SparkDataFrame = {
+    SparkDataFrame(inner.limit(n))
+  }
+
   override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
 
   override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
