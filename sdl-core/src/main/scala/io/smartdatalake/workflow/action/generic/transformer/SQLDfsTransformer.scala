@@ -60,7 +60,7 @@ import org.apache.hadoop.fs.Path
  *                       If this is the last transformation in the chain, the output name has to match an output DataObject id,
  *                       otherwise it can be any name which will then be available in the next transformation.
  *                       Use tokens `%{<key>}` to replace with runtimeOptions in SQL code.
- *                       Example: `select * from test where run = %{runId}`
+ *                       Example: `select * from test where run = %{runId}`.
  *                       The special token `%{inputViewName_<input_name>}` can be used to insert the name of temporary views.
  *                       The input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.
  *                       Make sure to set the name of the previous transformation in that case.
