@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.dataobject._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 
+@deprecated(since = "2.8.0")
 object CompactionUtil extends SmartDataLakeLogger {
 
   /**
