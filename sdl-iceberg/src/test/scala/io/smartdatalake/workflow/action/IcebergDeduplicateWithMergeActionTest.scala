@@ -22,7 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, IcebergModulePlugin, IcebergTableDataObject, IcebergTestUtils, Table}
+import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -69,7 +69,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -87,7 +87,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
       // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
       val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -109,7 +109,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     {
       val expected = Seq(("doe", "john", 10, Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", 5, None, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, None, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context3)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
@@ -140,7 +140,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     {
       val expected = Seq(("doe", "john", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -158,7 +158,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
       // note that we expect pan/peter/5, pan/peter2/3 and pan/peter3/null with old refTimestamp because all attributes stay the same
       val expected = Seq(("doe", "john", Some(10), Timestamp.valueOf(refTimestamp2)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -180,7 +180,7 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     {
       val expected = Seq(("doe", "john", Some(10), Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", Some(5), None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), None, Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), None, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context3)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
