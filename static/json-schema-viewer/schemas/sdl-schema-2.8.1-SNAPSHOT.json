@@ -8389,7 +8389,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Map of output names to corresponding SQL code for transformation.  \nIf this is the last transformation in the chain, the output name has to match an output DataObject id,\notherwise it can be any name which will then be available in the next transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`The special token`%{inputViewName_<input_name>}` can be used to insert the name of temporary views.  \nThe input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.  \nMake sure to set the name of the previous transformation in that case."
+            "description" : "Map of output names to corresponding SQL code for transformation.  \nIf this is the last transformation in the chain, the output name has to match an output DataObject id,\notherwise it can be any name which will then be available in the next transformation.  \nUse tokens`%{<key>}`to replace with runtimeOptions in SQL code.  \nExample:`select * from test where run = %{runId}`.  \nThe special token`%{inputViewName_<input_name>}` can be used to insert the name of temporary views.  \nThe input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.  \nMake sure to set the name of the previous transformation in that case."
           },
           "options" : {
             "type" : "object",
