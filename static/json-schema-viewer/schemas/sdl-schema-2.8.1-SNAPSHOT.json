@@ -7103,13 +7103,13 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "optional list of column names to be dropped. A RuntimeError will occur if a column does not exist after applying all previous operations.  \nExample Config:\nmultiply {\ntype = CopyAction\ninputId = src1DO\noutputId = tgt1DO\nmetadata.feed = test_feed_name\ntransformers = [\n{type = ColumnsTransformer, additionalDerivedColumns = {rating_doubled = \"rating * 2\"}, renamedColumns = {rating_doubled = rating_doubled_renamed}, droppedColumns = [name]}\n]\n}"
+            "description" : "optional list of column names to be dropped. A RuntimeError will occur if a column does not exist after applying all previous operations."
           }
         },
         "title" : "ColumnsTransformer",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Add, Rename or Drop columns from the Input DataFrame. The order of execution of the operations is the same as the parameters of the transformer: (1. add context info, 2. add custom sql, 3. rename, 4. drop).  \nNote that you can mix and match these operations to your liking and reference the same column from a previous operation if needed."
+        "description" : "Add, Rename or Drop columns from the Input DataFrame. The order of execution of the operations is the same as the parameters of the transformer: (1. add context info, 2. add custom sql, 3. rename, 4. drop).  \nNote that you can mix and match these operations to your liking and reference the same column from a previous operation if needed. Example Config:\n```\nmultiply {\n  type = CopyAction\n  inputId = src1DO\n  outputId = tgt1DO\n  metadata.feed = test_feed_name\n  transformers = [\n    {type = ColumnsTransformer, additionalDerivedColumns = {rating_doubled = \"rating * 2\"}, renamedColumns = {rating_doubled = rating_doubled_renamed}, droppedColumns = [name]}\n  ]\n}\n```\n"
       },
       "ConvertNullValuesTransformer" : {
         "type" : "object",
