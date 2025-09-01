@@ -41,7 +41,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   test("Reading from an empty file with header=true and inferSchema=false results in an empty, schema-less data frame.") {
     val tempDir = Files.createTempDirectory("csv")
-    val tempFile = Files.createTempFile(tempDir, "temp", "csv") // attention, this creates not a proper .csv file type, but just appends <filename>csv...
+    val tempFile = Files.createTempFile(tempDir, "temp", ".csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -66,7 +66,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   test("Reading from an empty file with header=true and inferSchema=true results in an empty, schema-less data frame.") {
     val tempDir = Files.createTempDirectory("csv")
-    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", ".csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -91,7 +91,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   test("Reading from an empty file with header=false and inferSchema=true results in an empty, schema-less data frame.") {
     val tempDir = Files.createTempDirectory("csv")
-    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", ".csv")
     try {
       val config = ConfigFactory.parseString(
         s"""

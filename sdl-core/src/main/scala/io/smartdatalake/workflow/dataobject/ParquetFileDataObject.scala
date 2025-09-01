@@ -67,7 +67,7 @@ case class ParquetFileDataObject( override val id: DataObjectId,
   // this is only needed for FileRef actions
   override val fileName: String = "*.parquet*"
 
-  override val options: Map[String, String] = parquetOptions.getOrElse(Map())
+  override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ parquetOptions.getOrElse(Map())
 
   // Parquet files implicitly contain a schema.
   // If a schema is defined for the DataObject, it will be applied in customizeContent and not by SparkFileDataObject.getDataFrame directly.
