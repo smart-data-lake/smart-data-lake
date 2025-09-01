@@ -135,7 +135,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
    */
-  private val connection = connectionId.map(c => getConnection[DeltaLakeTableConnection](c))
+  val connection: Option[DeltaLakeTableConnection] = connectionId.map(c => getConnection[DeltaLakeTableConnection](c))
 
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _

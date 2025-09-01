@@ -124,7 +124,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
    */
-  private val connection = connectionId.map(c => getConnection[IcebergTableConnection](c))
+  val connection: Option[IcebergTableConnection] = connectionId.map(c => getConnection[IcebergTableConnection](c))
 
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _

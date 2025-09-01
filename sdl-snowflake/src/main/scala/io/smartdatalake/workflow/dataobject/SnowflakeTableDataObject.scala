@@ -101,7 +101,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
-  private val connection = getConnection[SnowflakeConnection](connectionId)
+  val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
 
   // Define partition columns
   override val partitions: Seq[String] = if (Environment.caseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
