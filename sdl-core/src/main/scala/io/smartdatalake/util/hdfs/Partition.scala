@@ -159,7 +159,7 @@ object PartitionValues {
   def fromDataFrame(df: GenericDataFrame): Seq[PartitionValues] = {
     val cols = if (Environment.caseSensitive) df.schema.columns else df.schema.columns.map(_.toLowerCase)
     df.distinct.collect.map {
-      row => PartitionValues(cols.zipWithIndex.map{ case (c,idx) => (c,row.getAs[Any](idx).toString)}.toMap)
+      row => PartitionValues(cols.zipWithIndex.map { case (c, idx) => (c, Option(row.getAs[Any](idx)).map(_.toString)) }.toMap)
     }
   }
 
