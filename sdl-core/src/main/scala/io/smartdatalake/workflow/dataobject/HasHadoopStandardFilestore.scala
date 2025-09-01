@@ -29,7 +29,7 @@ trait HasHadoopStandardFilestore extends CanHandlePartitions { this: DataObject 
   /**
    * Creates a cached hadoop [[FileSystem]] with the Hadoop configuration of the context.
    */
-  private[smartdatalake] def filesystem(implicit context: ActionPipelineContext): FileSystem = {
+  def filesystem(implicit context: ActionPipelineContext): FileSystem = {
     if (filesystemHolder == null) {
       serializableHadoopConfHolder = context.serializableHadoopConf
       filesystemHolder = getFilesystem(hadoopPath)
