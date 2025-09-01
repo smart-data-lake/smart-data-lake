@@ -20,7 +20,7 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
-import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
+import io.smartdatalake.util.misc.FileUtil.readFromPath
 import io.smartdatalake.util.webservice.OpenApiUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
 import io.smartdatalake.workflow.dataframe._
@@ -313,15 +313,6 @@ object SchemaUtil {
     OpenApiUtil.queryOperationSchema(specUrl, operationId, responseContentType) match {
       case (contentType, x: StructType) => x
       case (contentType, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema for $operationId, but needs StructType ($specUrl)")
-    }
-  }
-
-  def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
-    val path = addHadoopDefaultSchemaAuthority(inputPath)
-    if (ResourceUtil.canHandleScheme(path)) ResourceUtil.readResourceAsString(path)
-    else {
-      val filesystem = getHadoopFsWithConf(path)
-      readHadoopFile(path)(filesystem)
     }
   }
 

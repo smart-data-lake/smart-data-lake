@@ -238,9 +238,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   def parseKeyValue(arg: String): (String, String) = {
-    val keyValues = arg.split("=")
-    if (keyValues.size != 2) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
-    val Array(key, value) = keyValues
+    if (!arg.contains('=')) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
+    val key = arg.takeWhile(_ != '=')
+    val value = arg.drop(key.length + 1)
     (key, value)
   }
 
@@ -259,7 +259,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Default command line parsing method
    */
   private[smartdatalake] def parse(args: Seq[String], parserToUse: OParser[_, SmartDataLakeBuilderConfig] = parser): Option[SmartDataLakeBuilderConfig] = {
-    OParser.parse(parserToUse, args, SmartDataLakeBuilderConfig())
+    val argsPrep = args.filter(_.nonEmpty) // ignore empty arguments for more flexibility when called through templating engines (e.g. optional Databricks job parameters)
+    OParser.parse(parserToUse, argsPrep, SmartDataLakeBuilderConfig())
   }
 
   private[smartdatalake] def logProgramStart(): Unit = {
@@ -491,7 +492,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
       case ex: Throwable if Environment.simplifyFinalExceptionLog =>
-        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDL uses)
+        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDLB uses)
         throw LogUtil.simplifyStackTrace(ex)
     }
 

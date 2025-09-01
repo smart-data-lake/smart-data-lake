@@ -21,6 +21,7 @@ package io.smartdatalake.lab
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -40,7 +41,7 @@ class LabSparkActionWrapperTest extends FunSuite {
   test("test applying transformers") {
     // setup DataObjects
     val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
+    val srcDO2 = MockDataObject("src2", partitions = Seq("lastname")).register
     val tgtDO1 = MockDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
     val tgtDO2 = MockDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -68,6 +69,16 @@ class LabSparkActionWrapperTest extends FunSuite {
 
     {
       val dfs = action1wrapper.buildDataFrames.get
+      assert(dfs.keys == Set("src1", "src2", "tgt1", "tgt2"))
+    }
+
+    {
+      val dfs = action1wrapper.buildDataFrames.withPartitionValues(Seq(PartitionValues(Map("lastname" -> "doe")))).get
+      assert(dfs.keys == Set("src1", "src2", "tgt1", "tgt2"))
+    }
+
+    {
+      val dfs = action1wrapper.buildDataFrames.withPartitionValues("lastname", "doe").get
       assert(dfs.keys == Set("src1", "src2", "tgt1", "tgt2"))
     }
 

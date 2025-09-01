@@ -69,7 +69,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param postReadSql SQL-statement to be executed in exec phase after reading input table and before action is finished. It uses the SnowflakeConnection for the target database.
  * @param preWriteSql SQL-statement to be executed in exec phase before writing output table. It uses the SnowflakeConnection for the target database.
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. It uses the SnowflakeConnection for the target database.
- * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "overwrite"
+ * @param saveMode     spark [[SDLSaveMode]] to use when writing files, default is "Overwrite"
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
  * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
@@ -101,7 +101,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
-  private val connection = getConnection[SnowflakeConnection](connectionId)
+  val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
 
   // Define partition columns
   override val partitions: Seq[String] = if (Environment.caseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
@@ -144,13 +144,14 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
-    context.sparkSession
+    val df = context.sparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getJdbcAuthOptions(table.db.get))
       .options(instanceSparkOptions)
       .options(queryOrTableOption)
       .load()
+    if (!context.isExecPhase) df.limit(1) else df
   }
 
   // Write a Spark DataFrame to the Snowflake table
@@ -267,7 +268,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
-    val df = SnowparkDataFrame(snowparkSession.table(table.fullName))
+    var df = SnowparkDataFrame(snowparkSession.table(table.fullName))
+    if (!context.isExecPhase) df = df.limit(1)
     val dfTransformed = applyReadTransformer(partitionValues, df)
       .asInstanceOf[SnowparkDataFrame].inner
     validateSchemaMin(SnowparkSchema(dfTransformed.schema), "read")

@@ -18,12 +18,13 @@
  */
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.util.dag.TaskFailedException
 import org.apache.spark.SparkContext
 
 /**
  * Provides utility functions for logging with Spark.
  */
-private[smartdatalake] object LogUtil {
+object LogUtil {
 
   /**
    * Overrides the Spark log level with system property "loglevel" if it is set.
@@ -50,23 +51,42 @@ private[smartdatalake] object LogUtil {
    * Split string into lines, removing empty lines
    */
   def splitLines(s: String): Seq[String] = {
-    if (s == null) return Seq()
-    s.split("(\r)?\n").toSeq.filter(_.nonEmpty)
+    s.linesIterator.filter(_.nonEmpty).toSeq
+  }
+
+  def limitLines(s: String, maxLines: Int = 1, continuationText: String = "..."): String = {
+    if (s == null) return "null"
+    val lines = s.linesIterator.filter(_.nonEmpty)
+    val limitedLines = lines.take(maxLines) ++ (if (lines.hasNext) Seq(continuationText) else Seq())
+    limitedLines.mkString(System.lineSeparator())
   }
 
   /**
    * Get Exception class simple name and message, and the same for the root cause.
+   *
+   * @param maxMessageLines maximum number of lines to show from the root exception message. Default is 1.
    */
-  def getExceptionSummary(ex: Exception): String = {
-    val rootCause = Option(ex.getCause).map(getRootCause)
-    val rootCauseString = rootCause.map(c => s", RootCause: ${getSimpleExceptionStr(c)}")
-    s"Exception: ${getSimpleExceptionStr(ex)}${rootCauseString.getOrElse("")}"
+  def getExceptionSummary(ex: Throwable, maxMessageLines: Int = 1, shortenOwnMessages: Boolean = false): String = {
+    ex match {
+      case ex: TaskFailedException => ex.getMessage
+      case _ =>
+        val rootCause = Option(ex.getCause).map(getRootCause)
+        val rootCauseString = rootCause.map(c => s", RootCause: ${getSimpleExceptionStr(c, maxMessageLines)}")
+        val maxExMessageLines = if (rootCause.isEmpty) maxMessageLines else 1
+        s"Exception: ${getSimpleExceptionStr(ex, maxExMessageLines)}${rootCauseString.getOrElse("")}"
+    }
   }
 
   /**
    * Get Exception class simple name and message, e.g. 'ConfigurationException: test msg'
    */
-  def getSimpleExceptionStr(ex: Throwable) = s"${ex.getClass.getSimpleName}: ${ex.getMessage}"
+  def getSimpleExceptionStr(ex: Throwable, maxMessageLines: Int = 1, shortenOwnMessages: Boolean = false) = {
+    val message = ex match {
+      case ex if ex.getClass.toString.startsWith("io.smartdatalake") && !shortenOwnMessages => ex.getMessage
+      case _ => limitLines(ex.getMessage, maxMessageLines, "...")
+    }
+    s"${ex.getClass.getSimpleName}: $message"
+  }
 
   /**
    * recursively get root cause of exception

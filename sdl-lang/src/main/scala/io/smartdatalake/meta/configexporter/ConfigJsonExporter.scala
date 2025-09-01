@@ -117,7 +117,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         val writer = ExportWriter.apply(config.target, config.configPaths)
 
         // write export config
-        val version = if (!config.target.contains("version=")) BuildVersionInfo.appVersionInfo.map(_.version).orElse(Some(UploadDefaults.versionDefault)) else None
+        val version = if (!config.target.contains("version=")) Some(getAppVersion()) else None
         writer.writeConfig(configAsJson, version)
 
         // write descriptions
@@ -126,6 +126,10 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
+  }
+
+  def getAppVersion(): String = {
+    BuildVersionInfo.appVersionInfo.map(_.version).getOrElse(UploadDefaults.versionDefault)
   }
 
   def exportConfigJson(config: ConfigJsonExporterConfig)(implicit hadoopConf: Configuration): String = {

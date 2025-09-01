@@ -90,8 +90,8 @@ object SparkAndSnowparkDataPipelineIT extends App {
       ColumnsTransformer(additionalColumns = Map("run_id" -> "runId")),
       // a custom generic transformer
       ScalaClassGenericDfTransformer(className = classOf[TestAdd1GenericDfTransformer].getName, options = Map("column" -> "rating")),
-      SQLDfTransformer(code = "select %{inputViewName}.*, run_id + 1 as run_id2 from %{inputViewName}"),
-      SQLDfTransformer(code = "select %{inputViewName}.*, run_id2 + 1 as run_id3 from %{inputViewName}")
+      SQLDfTransformer(code = Some("select %{inputViewName}.*, run_id + 1 as run_id2 from %{inputViewName}")),
+      SQLDfTransformer(code = Some("select %{inputViewName}.*, run_id2 + 1 as run_id3 from %{inputViewName}"))
     )
   )
   instanceRegistry.register(action2)

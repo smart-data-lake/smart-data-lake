@@ -23,19 +23,14 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.json.DefaultFlatteningParser
 import io.smartdatalake.util.misc.AclDef
-import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DataFrameReaderUtils
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import org.apache.hadoop.fs.{Path, PathFilter}
-import org.apache.spark.sql.functions.{input_file_name, lit}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.DataFrame
 
 /**
  * A [[DataObject]] backed by an XML data source.
@@ -79,7 +74,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
   // this is only needed for FileRef actions
   override val fileName: String = "*.xml*"
 
-  override val options: Map[String, String] = xmlOptions.getOrElse(Map()) ++ Seq(rowTag.map("rowTag" -> _)).flatten
+  override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ xmlOptions.getOrElse(Map()) ++ Seq(rowTag.map("rowTag" -> _)).flatten
 
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.afterRead(df)

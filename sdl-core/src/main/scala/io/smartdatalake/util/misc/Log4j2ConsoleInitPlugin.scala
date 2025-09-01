@@ -37,7 +37,7 @@ class Log4j2ConsoleInitPlugin extends SDLPlugin with SmartDataLakeLogger {
 
   override def configure(options: Map[String, StringOrSecret]): Unit = {
 
-    val loggerNames = options.get("loggerNames").map(_.resolve().split(',').toSeq).getOrElse(Seq("io.smartdatalake", "ch.sbb"))
+    val loggerNames = options.get("loggerNames").map(_.resolve().split(',').toSeq).getOrElse(Seq("io.smartdatalake"))
     val pattern = options.get("patternLayout").map(_.resolve()).getOrElse("%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1} - %m [%t]%n")
     // By default some irrelevant Error messages on (Azure) Databricks are excluded. This can be overridden by setting loggerNamesToIgnore.
     val loggerNamesToIgnore = options.get("loggerNamesToIgnore").map(_.resolve().split(',').toSeq)

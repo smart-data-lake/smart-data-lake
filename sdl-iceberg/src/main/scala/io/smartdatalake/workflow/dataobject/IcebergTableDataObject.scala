@@ -83,7 +83,7 @@ import scala.util.Try
  *             If Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure.
  * @param options Options for Iceberg tables see: [[https://iceberg.apache.org/docs/latest/configuration/]]
  * @param table Iceberg table to be written by this output
- * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
+ * @param saveMode [[SDLSaveMode]] to use when writing files, default is "Overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param historyRetentionPeriod Optional Iceberg retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
  * @param acl override connection permissions for files created tables hadoop directory with this connection
@@ -124,7 +124,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
    */
-  private val connection = connectionId.map(c => getConnection[IcebergTableConnection](c))
+  val connection: Option[IcebergTableConnection] = connectionId.map(c => getConnection[IcebergTableConnection](c))
 
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _

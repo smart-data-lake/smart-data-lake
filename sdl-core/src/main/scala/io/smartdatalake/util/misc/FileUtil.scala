@@ -19,6 +19,10 @@
 
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.util.hdfs.HdfsUtil.{addHadoopDefaultSchemaAuthority, getHadoopFsWithConf, readHadoopFile}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+
 import java.io.File
 import scala.io.Source
 import scala.util.Using
@@ -29,5 +33,14 @@ object FileUtil
     Using(Source.fromFile(file)) {
       _.getLines().mkString(System.lineSeparator)
     }.get
+  }
+
+  def readFromPath(inputPath: Path)(implicit hadoopConfiguration: Configuration): String = {
+    val path = addHadoopDefaultSchemaAuthority(inputPath)
+    if (ResourceUtil.canHandleScheme(path)) ResourceUtil.readResourceAsString(path)
+    else {
+      val filesystem = getHadoopFsWithConf(path)
+      readHadoopFile(path)(filesystem)
+    }
   }
 }

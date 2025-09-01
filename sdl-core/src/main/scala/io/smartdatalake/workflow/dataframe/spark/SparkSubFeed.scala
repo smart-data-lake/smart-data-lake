@@ -263,6 +263,13 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = {
+    (column, dataType) match {
+      case (sparkColumn: SparkColumn, sparkDataType: SparkDataType) => SparkColumn(functions.from_json(sparkColumn.inner, sparkDataType.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
   override def hash(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.hash(sparkColumn.inner))

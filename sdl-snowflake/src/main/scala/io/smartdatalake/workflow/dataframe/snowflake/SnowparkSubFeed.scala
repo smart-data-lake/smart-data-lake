@@ -250,6 +250,10 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     }
   }
 
+  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = {
+    throw new NotImplementedError("from_json is not implemented in Snowpark")
+  }
+
   override def hash(column: GenericColumn): GenericColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.hash(snowparkColumn.inner))
