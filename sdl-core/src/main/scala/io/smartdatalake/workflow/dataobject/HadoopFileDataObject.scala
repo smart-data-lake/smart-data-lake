@@ -82,19 +82,19 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * Check if the input files exist.
    * Note that hadoopDir can be a specific file or a directory.
    */
-  def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
+  def checkFilesExisting(recursive: Boolean = false)(implicit context: ActionPipelineContext): Boolean = {
     val status = try {
       filesystem.getFileStatus(hadoopPath)
     } catch {
       case _: FileNotFoundException => return false
     }
-    status.isFile || (status.isDirectory && listDataFiles().nonEmpty)
+    status.isFile || (status.isDirectory && listDataFiles(recursive = recursive).nonEmpty)
   }
 
-  def listDataFiles(pv: PartitionValues = PartitionValues(Map()))(implicit context: ActionPipelineContext): Iterator[Path] = {
+  def listDataFiles(pv: PartitionValues = PartitionValues(Map()), recursive: Boolean = false)(implicit context: ActionPipelineContext): Iterator[Path] = {
     val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(pv.getPartitionString(partitionLayout().get), fileName).toString)
     else new GlobPattern(fileName)
-    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, partitions.nonEmpty))
+    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, recursive || partitions.nonEmpty))
       .filter(_.isFile)
       .map(_.getPath)
       .filter(p => pathPattern.matches(relativizePath(p.toString)))

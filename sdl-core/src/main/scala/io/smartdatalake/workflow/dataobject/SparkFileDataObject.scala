@@ -189,10 +189,16 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
+  protected def recursiveFileLookup: Boolean = options.get("recursiveFileLookup").contains("true")
+
   /**
    * Hook to use different options for reading
    */
   protected def readOptions: Map[String, String] = options // hook to use different provider for reading
+
+  override def checkFilesExisting(recursive: Boolean = recursiveFileLookup)(implicit context: ActionPipelineContext): Boolean = {
+    super.checkFilesExisting(recursive)
+  }
 
   /**
    * Constructs an Apache Spark [[DataFrame]] from the underlying file content.
@@ -208,7 +214,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
 
     val schemaOpt = getSchema.map(_.inner)
-    val filesExisting = checkFilesExisting
+    val filesExisting = checkFilesExisting()
     if (schemaOpt.isEmpty && !filesExisting) {
       //without either schema or data, no data frame can be created
       require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined if there are no existing files.")
