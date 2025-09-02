@@ -84,9 +84,9 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   // helper methods
   def validate(): Unit = {
-    assert(!applicationName.exists(_.contains({
-      HadoopFileActionDAGRunStateStore.fileNamePartSeparator
-    })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!applicationName.exists(_.contains(HadoopFileActionDAGRunStateStore.fileNamePartSeparator)),
+      s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!applicationName.exists(_.matches(".*\\s.*")), s"Application name must not contain spaces ($applicationName)")
     assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
     assert(configuration.nonEmpty, "Configuration files are empty")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
