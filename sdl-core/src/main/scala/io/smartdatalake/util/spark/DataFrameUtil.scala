@@ -19,11 +19,11 @@
 
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 import java.text.Normalizer
@@ -341,11 +341,18 @@ object DataFrameUtil {
   }
 
   /**
+   * Transforms name with dashs and underscores to CamelCase.
+   */
+  def strToCamelCase(x: String): String = {
+    val parts = x.split("[_\\- ]")
+    parts.map(_.capitalize).mkString
+  }
+
+  /**
    * Transforms name with dashs and underscores to LowerCamelCase.
    */
   def strToLowerCamelCase(x: String): String = {
-    val parts = x.split("[_\\- ]")
-    val camelCase = parts.map(_.capitalize).mkString
+    val camelCase = strToCamelCase(x)
     // lowercase first letter
     camelCase.head.toLower +: camelCase.tail
   }
