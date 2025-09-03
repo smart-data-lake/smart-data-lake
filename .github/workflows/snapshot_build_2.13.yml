@@ -57,7 +57,7 @@ jobs:
 
   deploy:
     needs: build
-    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (!inputs.skipBuild || (inputs.skipBuilds && always()))) }}
 
     runs-on: ubuntu-latest
 
