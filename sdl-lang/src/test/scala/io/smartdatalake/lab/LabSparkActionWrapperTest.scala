@@ -59,7 +59,10 @@ class LabSparkActionWrapperTest extends FunSuite {
       className = classOf[Tgt4DfsTransformer].getName
     )
 
-    val action1 = CustomDataFrameAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id), transformers = Seq(customTransformerConfig1, customTransformerConfig2))
+    customTransformerConfig1.recompileFromSrc("./sdl-lang/src/test/scala")
+
+    val action1 = CustomDataFrameAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id),
+      transformers = Seq(customTransformerConfig1, customTransformerConfig2))
     instanceRegistry.register(action1)
     val action1wrapper = LabSparkDfsActionWrapper(action1, contextExec)
 
@@ -98,15 +101,6 @@ class LabSparkActionWrapperTest extends FunSuite {
         .withAdditionalTransformerOptions(0, Map("option1" -> "test")).get
       assert(dfs.keys == Set("src1", "src2", "tgt2", "tgt3"))
     }
-  }
-}
-
-class Tgt1DfsTransformer extends CustomDfsTransformer {
-  def transform(session: SparkSession, increment1: Int, dfSrc1: DataFrame, dfSrc2: DataFrame): Map[String,DataFrame] = {
-    import session.implicits._
-    Map(
-      "tgt1" -> dfSrc1.withColumn("rating", $"rating" + increment1)
-    )
   }
 }
 

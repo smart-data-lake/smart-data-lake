@@ -23,7 +23,7 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, MethodParameterInfo, ProductU
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, extractSeqVal, getConverterFor}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, extractSeqVal, getConverterFor, stdTransformMethodSignature}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.{prepareTolerantKey, tolerantGet}
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer}
@@ -73,7 +73,7 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with TransformInfo w
   // lookup custom transform method
   @transient override private[smartdatalake] lazy val customTransformMethod = {
     val transformMethods = CustomCodeUtil.getClassMethodsByName(getClass, "transform")
-      .filter(_.owner != typeOf[CustomDfsTransformer].typeSymbol) // remove default transform-method implementation of CustomDfsTransformer
+      .filterNot(_.typeSignature =:= stdTransformMethodSignature) // remove default transform-method implementation of CustomDfsTransformer
     require(transformMethods.size == 1, """
                                                    | CustomDfsTransformer implementations need to implement exactly one method with name 'transform'.
                                                    | Traditionally the signature of the transform method is 'transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]',
@@ -164,6 +164,8 @@ object CustomDfsTransformer {
       case _ if tpe =:= typeOf[Float] => _.toFloat
     }
   }
+
+  val stdTransformMethodSignature: universe.Type = typeOf[CustomDfsTransformer].members.find(_.name.toString == "transform").head.typeSignature
 }
 
 /**
