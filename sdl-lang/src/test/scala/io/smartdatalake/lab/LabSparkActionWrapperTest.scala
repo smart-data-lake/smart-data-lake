@@ -22,6 +22,7 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -59,7 +60,6 @@ class LabSparkActionWrapperTest extends FunSuite {
       className = classOf[Tgt4DfsTransformer].getName
     )
 
-    customTransformerConfig1.recompileFromSrc("./sdl-lang/src/test/scala")
 
     val action1 = CustomDataFrameAction("action1", List(srcDO1.id, srcDO2.id), List(tgtDO1.id, tgtDO2.id),
       transformers = Seq(customTransformerConfig1, customTransformerConfig2))
@@ -71,6 +71,13 @@ class LabSparkActionWrapperTest extends FunSuite {
     srcDO2.writeSparkDataFrame(l1, Seq())
 
     {
+      val dfs = action1wrapper.buildDataFrames.get
+      assert(dfs.keys == Set("src1", "src2", "tgt1", "tgt2"))
+    }
+
+    // path is not found on linux / github action :-(
+    if (EnvironmentUtil.isWindowsOS) {
+      customTransformerConfig1.recompileFromSrc("./sdl-lang/src/test/scala")
       val dfs = action1wrapper.buildDataFrames.get
       assert(dfs.keys == Set("src1", "src2", "tgt1", "tgt2"))
     }
@@ -99,7 +106,7 @@ class LabSparkActionWrapperTest extends FunSuite {
       val dfs = action1wrapper.buildDataFrames
         .withReplacedTransformer(0, customTransformerConfig4)
         .withAdditionalTransformerOptions(0, Map("option1" -> "test")).get
-      assert(dfs.keys == Set("src1", "src2", "tgt2", "tgt3"))
+      assert(dfs.keys == Set("src1", "src2", "tgt2", "tgt4"))
     }
   }
 }
@@ -114,9 +121,9 @@ class Tgt2DfsTransformer extends CustomDfsTransformer {
 }
 
 class Tgt3DfsTransformer extends CustomDfsTransformer {
-  def transform(session: SparkSession, dfSrc1: DataFrame, dfSrc2: DataFrame): Map[String,DataFrame] = {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     Map(
-      "tgt3" -> dfSrc2
+      "tgt3" -> dfs("src2")
     )
   }
 }
@@ -124,7 +131,7 @@ class Tgt3DfsTransformer extends CustomDfsTransformer {
 class Tgt4DfsTransformer extends CustomDfsTransformer {
   def transform(session: SparkSession, dfSrc1: DataFrame, dfSrc2: DataFrame, option1: String): Map[String, DataFrame] = {
     Map(
-      "tgt3" -> dfSrc2
+      "tgt4" -> dfSrc2
     )
   }
 }
