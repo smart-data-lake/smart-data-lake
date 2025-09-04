@@ -199,7 +199,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
       // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
       val skippedSubFeeds = subFeeds.filter(_.isSkipped)
       if (skippedSubFeeds.nonEmpty) {
-        Some(s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}""")
+        Some(s"""($id) execution skipped because input subFeeds are skipped: ${skippedSubFeeds.map(_.dataObjectId).mkString(", ")}""")
       } else None
     }
     // check execution condition result
