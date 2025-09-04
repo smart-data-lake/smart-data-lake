@@ -52,6 +52,7 @@ case class SmartDataLakeBuilderLab[D,A](
                                        private val actionCatalogFactory: (InstanceRegistry, ActionPipelineContext) => A,
                                        private val userClassLoader: Option[ClassLoader] = None
                                        ) extends SmartDataLakeLogger {
+
   @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader, session.sparkContext.hadoopConfiguration)
   @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
   @transient val dataObjects: D = dataObjectCatalogFactory(registry, context)
