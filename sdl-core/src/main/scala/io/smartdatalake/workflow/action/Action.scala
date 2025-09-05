@@ -84,6 +84,17 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def outputs: Seq[DataObject]
 
   /**
+   * Hook to define main input in sub classes
+   */
+  def mainInputId: Option[DataObjectId] = None
+
+  /**
+   * Hook to define main output in sub classes
+   */
+  def mainOutputId: Option[DataObjectId] = None
+
+
+  /**
    * Optional execution condition for this action.
    * By default, an Action is executed if all inputs are available, e.g. no input from a previous Action is skipped.
    * Override the default behaviour by specifying an executionCondition in Spark SQL expression syntax.
@@ -190,16 +201,17 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     //noinspection MapGetOrElseBoolean
     val skipMsg = executionCondition.map { c =>
       // evaluate condition if existing
-      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
+      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds, mainInputId.getOrElse(inputs.head.id))
       if (!c.evaluate(id, Some("executionCondition"), data)) {
         val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
         Some(s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data""")
       } else None
     }.getOrElse {
-      // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
-      val skippedSubFeeds = subFeeds.filter(_.isSkipped)
-      if (skippedSubFeeds.nonEmpty) {
-        Some(s"""($id) execution skipped because input subFeeds are skipped: ${skippedSubFeeds.map(_.dataObjectId).mkString(", ")}""")
+      // default behaviour: if no executionCondition is defined, Action is executed if main input subFeed is not skipped.
+      val inputId = mainInputId.getOrElse(inputs.head.id)
+      val inputSubFeed = subFeeds.find(_.dataObjectId == inputId).getOrElse(throw new IllegalStateException(s"SubFeed ${inputId.id} not found"))
+      if (inputSubFeed.isSkipped) {
+        Some(s"($id) execution skipped because mainInput subFeed ${inputId.id} is skipped")
       } else None
     }
     // check execution condition result
