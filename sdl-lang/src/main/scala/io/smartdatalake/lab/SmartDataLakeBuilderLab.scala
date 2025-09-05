@@ -22,7 +22,6 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.lab.DataFrameBaseBuilder.DEFAULT_DATAOBJECT_ID
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
@@ -51,7 +50,7 @@ case class SmartDataLakeBuilderLab[D,A](
                                        private val dataObjectCatalogFactory: (InstanceRegistry, ActionPipelineContext) => D,
                                        private val actionCatalogFactory: (InstanceRegistry, ActionPipelineContext) => A,
                                        private val userClassLoader: Option[ClassLoader] = None
-                                       ) extends SmartDataLakeLogger {
+                                       ) {
 
   @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader, session.sparkContext.hadoopConfiguration)
   @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
@@ -88,8 +87,7 @@ case class SmartDataLakeBuilderLab[D,A](
       }
       val unapplyMsg = dfs.keys.map(key => s"""val df${DataFrameUtil.strToCamelCase(key)} = dfs("$key")""")
         .mkString(System.lineSeparator())
-      logger.info(s"""DataFrames built: ${dfs.keys.mkString(", ")} - unapply using:\n$unapplyMsg""")
-      println()
+      println(s"""DataFrames built: ${dfs.keys.mkString(", ")} - unapply using:\n$unapplyMsg\n""")
       dfs
     }
 

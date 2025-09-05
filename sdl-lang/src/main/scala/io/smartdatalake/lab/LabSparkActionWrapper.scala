@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport, FromConfigFactory}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}
@@ -213,7 +214,9 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
      */
     def get: Map[String,DataFrame] = {
       val dfs = getDataFrames(partitionValues, filters, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers, additionalTransformerOptions)
-      println(s"DataFrames built: ${dfs.keys.mkString(", ")}")
+      val unapplyMsg = dfs.keys.map(key => s"""val df${DataFrameUtil.strToCamelCase(key)} = dfs("$key")""")
+        .mkString(System.lineSeparator())
+      println(s"""DataFrames built: ${dfs.keys.mkString(", ")} - unapply using:\n$unapplyMsg\n""")
       dfs
     }
 
