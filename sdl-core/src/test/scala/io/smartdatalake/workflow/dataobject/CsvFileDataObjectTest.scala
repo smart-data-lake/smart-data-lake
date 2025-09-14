@@ -194,7 +194,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename=Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1, filename = Some("data.csv"))))
     tgtDO.writeSparkDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv")
@@ -205,7 +205,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=5, filename=Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 5, filename = Some("data.csv"))))
     tgtDO.writeSparkDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.1.csv","data.2.csv","data.3.csv","data.4.csv","data.5.csv")
@@ -217,7 +217,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dfInit = (1 to 1000).map( i => ("test"+Random.nextInt(2), i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), partitions = Seq("name"), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, keyCols = Seq("name"), filename = Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("name"), sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1, keyCols = Seq("name"), filename = Some("data.csv"))))
     tgtDO.writeSparkDataFrame(dfInit, Seq(PartitionValues(Map("name"->"test0")), PartitionValues(Map("name"->"test1"))))
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv","data.csv")
@@ -229,7 +229,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val df = Seq(("A", "B"), ("B", "1")).toDF("a", "b")
 
     // write
-    val dataObject = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), csvOptions = Map("compression" -> classOf[ZipCsvCodec].getName), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename = Some(testFilename))))
+    val dataObject = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, csvOptions = Map("compression" -> classOf[ZipCsvCodec].getName), sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1, filename = Some(testFilename))))
     dataObject.writeSparkDataFrame(df)
 
     // verify file
@@ -255,7 +255,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
 
     // setup DataObject
-    val csvDO = CsvFileDataObject( "src1", path = escapedFilePath(tempDir.toFile.getPath))
+    val csvDO = CsvFileDataObject("src1", path = tempDir.toFile.getPath)
     val fileRefs = csvDO.getFileRefs(Seq())
     assert(fileRefs.map(_.fileName) == Seq(resourceFile))
 
@@ -286,7 +286,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val df1 = data1.toDF("h1", "h2", "h3")
     val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
 
-    val dataObj = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
+    val dataObj = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("h1"), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
     dataObj.writeSparkDataFrame(df1, pv1)
 
     val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache
@@ -303,7 +303,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val df1 = data1.toDF("h1", "h2", "h3")
     val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
 
-    val dataObj = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"),
+    val dataObj = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("h1"),
       schema = Some(SparkSchema(df1.drop("h1").schema)), filenameColumn = Some("_filename"))
     dataObj.writeSparkDataFrame(df1, pv1)
 

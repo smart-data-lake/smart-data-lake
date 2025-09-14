@@ -22,7 +22,6 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
-import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
@@ -43,8 +42,8 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with Smart
   protected implicit val session : SparkSession = IcebergTestUtils.session
   import session.implicits._
 
-  val tempDir = Files.createTempDirectory("tempHadoopDO")
-  val tempPath: String = tempDir.toAbsolutePath.toString
+  private val tempDir = Files.createTempDirectory("tempHadoopDO")
+  private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -595,7 +594,7 @@ class IcebergTableDataObjectTest extends FunSuite with BeforeAndAfter with Smart
       .toDF("tpe", "lastname", "firstname", "rating")
     parquetDO.writeSparkDataFrame(df1)
 
-    RemoteIteratorWrapper(parquetDO.filesystem.listFiles(parquetDO.hadoopPath, true))
+    HdfsUtil.listFiles(parquetDO.hadoopPath, recursive = true)(parquetDO.filesystem)
       .filter(s => s.isFile && s.getPath.getName.endsWith(".snappy.parquet"))
       .map(_.getPath.toString)
       .foreach { p =>
