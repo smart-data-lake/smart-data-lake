@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
-import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -92,12 +91,12 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   }
 
   def listDataFiles(pv: PartitionValues = PartitionValues(Map()), recursive: Boolean = false)(implicit context: ActionPipelineContext): Iterator[Path] = {
-    val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(pv.getPartitionString(partitionLayout().get), fileName).toString)
-    else new GlobPattern(fileName)
-    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, recursive || partitions.nonEmpty))
-      .filter(_.isFile)
+    val partitionPattern = if (partitions.nonEmpty) Some(new GlobPattern(new Path(pv.getPartitionString(partitionLayout().get), fileName).toString)) else None
+    val fileNamePattern = new GlobPattern(fileName)
+    val filterFun = (status: FileStatus) => if (status.isDirectory) !status.getPath.toString.startsWith(".") else fileNamePattern.matches(status.getPath.getName)
+    HdfsUtil.listFiles(hadoopPath, recursive || partitions.nonEmpty, filterFun)(filesystem)
       .map(_.getPath)
-      .filter(p => pathPattern.matches(relativizePath(p.toString)))
+      .filter(p => partitionPattern.forall(_.matches(relativizePath(p.toString)))) // filter files matching partition pattern if defined
   }
 
   def listPartitionPathsStatus(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[FileStatus] = {
@@ -311,7 +310,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   def deleteAllFiles(path: Path)(implicit context: ActionPipelineContext): Unit = {
     logger.info(s"($id) deleteAllFiles $path")
-    val dirEntries = RemoteIteratorWrapper(filesystem.listFiles(path, false))
+    val dirEntries = HdfsUtil.listFiles(path, recursive = false)(filesystem)
     dirEntries.foreach { s =>
       if (s.isDirectory) filesystem.delete(hadoopPath, /*recursive*/ true)
       else filesystem.delete(s.getPath, false)

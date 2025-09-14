@@ -19,15 +19,13 @@
 package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.definitions.{Environment, TableStatsType}
-import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.io.IOException
 import java.net.URI
-import java.sql.Timestamp
-import java.time.Instant
 import scala.collection.AbstractIterator
 import scala.io.{Codec, Source}
 import scala.util.{Try, Using}
@@ -349,6 +347,26 @@ object HdfsUtil extends SmartDataLakeLogger {
     val numFiles = summary.getFileCount
     val lastModifiedAt = status.getModificationTime
     Map(TableStatsType.SizeInBytes.toString -> sizeInBytes, TableStatsType.NumFiles.toString -> numFiles, TableStatsType.LastModifiedAt.toString -> lastModifiedAt)
+  }
+
+  def listFiles(path: Path, recursive: Boolean, filterFun: FileStatus => Boolean = _ => true)(implicit filesystem: FileSystem): Iterator[FileStatus] = {
+    listFileStatus(filesystem.getFileStatus(path), recursive, filterFun)
+  }
+
+  /**
+   * List all files in a directory (recursive) using filesystem.listStatusIterator instead of filesystem.listFiles.
+   * This is more generic as it also works for non-HDFS file systems, e.g. Databricks has problems reading from Workspace File System using filesystem.listFiles.
+   */
+  def listFileStatus(status: FileStatus, recursive: Boolean, filterFun: FileStatus => Boolean = _ => true)(implicit filesystem: FileSystem): Iterator[FileStatus] = {
+    if (status.isFile) Iterator(status)
+    else {
+      // separate files and directories to handle files directly for performance reasons
+      val (files, dirs) = HdfsUtil.RemoteIteratorWrapper(filesystem.listStatusIterator(status.getPath))
+        .filter(filterFun)
+        .partition(_.isFile)
+      if (recursive) files ++ dirs.flatMap(dirStatus => listFileStatus(dirStatus, recursive))
+      else files
+    }
   }
 
   /**

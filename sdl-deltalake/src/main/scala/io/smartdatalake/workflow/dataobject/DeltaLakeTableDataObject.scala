@@ -25,7 +25,6 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.SparkStageMetricsListener
-import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
@@ -522,7 +521,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   protected def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
     val hasFiles = filesystem.exists(hadoopPath.getParent) &&
-      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.endsWith(filetype))
+      HdfsUtil.listFiles(hadoopPath, recursive = true, filterFun = s => s.isDirectory || s.getPath.getName.endsWith(filetype))(filesystem).nonEmpty
     if (!hasFiles) {
       logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")
