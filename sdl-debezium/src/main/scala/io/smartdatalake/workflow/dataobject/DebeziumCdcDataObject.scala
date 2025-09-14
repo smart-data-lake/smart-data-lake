@@ -27,10 +27,10 @@ import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCall
 import io.smartdatalake.util.concurrent.Await
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
 import org.apache.kafka.connect.source.SourceRecord
@@ -47,6 +47,7 @@ import scala.jdk.CollectionConverters._
 /**
  * [[DataObject]] of type DebeziumCdcDataObject.
  * Provides details to access Change data over Debezium Engine.
+ * Note that this implementation is not yet tested on production, and must therefore be seen as experimental.
  *
  * @param id unique name of this data object
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.DebeziumConnection]]
