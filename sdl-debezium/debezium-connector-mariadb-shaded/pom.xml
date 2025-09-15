@@ -14,6 +14,36 @@
     <packaging>jar</packaging>
     <name>debezium-connector-mariadb-shaded</name>
 
+    <licenses>
+        <license>
+            <name>GNU General Public License (GPL) version 3</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+        </license>
+    </licenses>
+
+    <description>Shaded jar file for mariadb because of dependency conflicts with Apache Spark.</description>
+    <url>http://www.smartdatalake.io</url>
+    <inceptionYear>2019</inceptionYear>
+    <organization>
+        <name>ELCA Informatique SA</name>
+        <url>https://www.elca.ch</url>
+    </organization>
+
+    <developers>
+        <developer>
+            <name>Smart Data Lake</name>
+            <email>smartdatalake@elca.ch</email>
+            <organization>ELCA Informatik AG</organization>
+            <organizationUrl>http://www.elca.ch</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/smart-data-lake/smart-data-lake.git</connection>
+        <developerConnection>scm:git:ssh://github.com/smart-data-lake/smart-data-lake.git</developerConnection>
+        <url>http://github.com/smart-data-lake/smart-data-lake/tree/master</url>
+    </scm>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
