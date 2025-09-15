@@ -39,6 +39,11 @@
         <url>http://github.com/smart-data-lake/smart-data-lake/tree/master</url>
     </scm>
 
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.release>8</maven.compiler.release>
+    </properties>
 
     <profiles>
         <profile>
@@ -52,22 +57,17 @@
             </distributionManagement>
             <build>
                 <plugins>
-                    <!-- create scala-doc -->
+                    <!-- create javadoc -->
                     <plugin>
-                        <groupId>net.alchim31.maven</groupId>
-                        <artifactId>scala-maven-plugin</artifactId>
-                        <version>4.5.6</version>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.3</version>
                         <executions>
                             <execution>
-                                <id>scala-doc</id>
+                                <id>attach-docs</id>
                                 <goals>
-                                    <goal>doc-jar</goal>
+                                    <goal>jar</goal>
                                 </goals>
-                                <configuration>
-                                    <args>
-                                        <arg>-no-link-warnings</arg>
-                                    </args>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -145,6 +145,9 @@
     </dependencies>
 
     <build>
+
+        <sourceDirectory>src/main/java</sourceDirectory>
+
         <plugins>
             <!-- Creates a JAR file with the source files of the project. -->
             <plugin>

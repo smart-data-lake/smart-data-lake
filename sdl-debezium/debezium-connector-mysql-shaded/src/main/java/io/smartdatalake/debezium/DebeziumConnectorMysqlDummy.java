@@ -17,12 +17,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.debezium
+package io.smartdatalake.debezium;
 
 /**
  * This is a dummy object with no purpose for the actual implementation.
  * It serves only as an object to be compiled by the maven-source-plugin during deployment to maven repo.
  */
-object DebeziumConnectorMariaDbDummy {
-
+public class DebeziumConnectorMysqlDummy {
 }
