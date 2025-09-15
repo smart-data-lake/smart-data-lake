@@ -55,7 +55,7 @@ jobs:
 
     - name: Build with Maven for Scala 2.12
       # scoverage and sonar are only run for scala-2.13 and not for scala-2.12.
-      run: mvn -P scala-2.12 -B clean test -f pom.xml
+      run: mvn -P scala-2.12 -B clean test -f pom.xml  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 
 
   deploy:

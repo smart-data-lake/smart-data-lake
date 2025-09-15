@@ -57,7 +57,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # to avoid running tests twice, phase 'compile' instead of 'test' is used, as tests are also executed by scoverage:report
-        run: mvn -P scala-2.13,test-sonar -B clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake
+        run: mvn -P scala-2.13,test-sonar -B clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 
   deploy:
     needs: build
