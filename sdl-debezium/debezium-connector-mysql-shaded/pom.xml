@@ -77,6 +77,13 @@
             <version>9.1.0</version>
         </dependency>
 
+        <!-- this dependency defines scaladoc annotation used by compiler plugin for scala-maven-plugin -->
+        <dependency>
+            <groupId>com.github.takezoe</groupId>
+            <artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
+            <version>${scaladoc.reader.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>
