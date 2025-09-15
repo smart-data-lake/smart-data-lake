@@ -11,6 +11,10 @@ on:
   # allow for manual snapshot releases from bugfix & feature branches
   # this extracts issue number from branch name as additional attribute in the created version, e.g. <mvnVersion>-<issueNb>-SNAPSHOT
   workflow_dispatch:
+    branches:
+      - 'bugfix/*'
+      - 'feature/*'
+      - 'develop-spark*'
     inputs:
       skipBuild:
         description: 'skip build job'
@@ -56,7 +60,7 @@ jobs:
 
   deploy:
     needs: build
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (!inputs.skipBuild || (inputs.skipBuilds && always()))) }}
+    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
 
     runs-on: ubuntu-latest
 
@@ -96,7 +100,7 @@ jobs:
           mvn versions:set -B -DnewVersion=${MVN_NEW_VERSION} -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.12
-        run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -DskipTests
+        run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}

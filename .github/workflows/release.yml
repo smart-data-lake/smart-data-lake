@@ -61,14 +61,14 @@ jobs:
         mvn versions:set -B -DnewVersion=${MVN_RELEASE_VERSION} -f pom.xml
 
     - name: Maven deploy to sonatype for Scala 2.12
-      run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy
+      run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
       env:
         MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
         MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     - name: Maven deploy to sonatype for Scala 2.13
-      run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy
+      run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
       env:
         MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
         MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
