@@ -32,7 +32,7 @@ import scala.util.{Failure, Success, Try}
   */
 object CustomCodeUtil {
 
-  private val runtimeMirror = scala.reflect.runtime.currentMirror
+  private lazy val runtimeMirror = universe.runtimeMirror(Environment.classLoader())
 
   // get Scala Toolbox to compile code at runtime
   private lazy val tb = runtimeMirror.mkToolBox()

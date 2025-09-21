@@ -28,7 +28,7 @@ import org.apache.hadoop.conf.Configuration
   * @param conf
   */
 
-private[smartdatalake] class SerializableHadoopConfiguration(var conf: Configuration) extends Serializable  {
+class SerializableHadoopConfiguration(var conf: Configuration) extends Serializable {
   def get: Configuration = conf
 
   private def writeObject (out: java.io.ObjectOutputStream): Unit = {

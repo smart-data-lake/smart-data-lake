@@ -42,11 +42,6 @@ import scala.reflect.runtime.universe._
  */
 abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
-  // Hook to override main input/output in sub classes
-  def mainInputId: Option[DataObjectId] = None
-
-  def mainOutputId: Option[DataObjectId] = None
-
   // Hook to ignore filters for specific inputs
   def inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
 
@@ -66,9 +61,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   private[smartdatalake] lazy val mainOutput: DataObject = getMainDataObjectCandidates(mainOutputId, outputs, "output").head
 
   private[smartdatalake] def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
-    // take first data object which has as SubFeed which is not skipped
-    prioritizedMainInputCandidates.find(dataObject => !inputSubFeeds.find(_.dataObjectId == dataObject.id).get.isSkipped || context.appConfig.isDryRun)
-      .getOrElse(prioritizedMainInputCandidates.head) // otherwise just take first candidate
+    prioritizedMainInputCandidates.head // otherwise just take first candidate
   }
 
   private[smartdatalake] def getMainPartitionValues(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
@@ -401,10 +394,11 @@ case class SubFeedExpressionData(partitionValues: Seq[Map[String, String]],
                                  isSkipped: Boolean,
                                  metrics: Map[String, String])
 
-case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData])
+case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData], mainInputSubFeed: SubFeedExpressionData)
 
 object SubFeedsExpressionData {
-  def fromSubFeeds(subFeeds: Seq[SubFeed]): SubFeedsExpressionData = {
-    SubFeedsExpressionData(subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).mapValues(_.toString).toMap))).toMap)
+  def fromSubFeeds(subFeeds: Seq[SubFeed], mainInputId: DataObjectId): SubFeedsExpressionData = {
+    val subFeedDataMap = subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).mapValues(_.toString).toMap))).toMap
+    SubFeedsExpressionData(inputSubFeeds = subFeedDataMap, mainInputSubFeed = subFeedDataMap(mainInputId.id))
   }
 }

@@ -191,7 +191,7 @@ class ActionDAGTest extends FunSuite with BeforeAndAfter {
     val l1 = Seq(("doe-john", 5)).toDF("name", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
-    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformers = Seq(SQLDfTransformer(code = "select _filename, rating from tgt1")))
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformers = Seq(SQLDfTransformer(code = Some("select _filename, rating from tgt1"))))
     instanceRegistry.register(Seq(action1, action2))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 

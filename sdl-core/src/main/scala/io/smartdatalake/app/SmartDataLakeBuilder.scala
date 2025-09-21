@@ -84,9 +84,9 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   // helper methods
   def validate(): Unit = {
-    assert(!applicationName.exists(_.contains({
-      HadoopFileActionDAGRunStateStore.fileNamePartSeparator
-    })), s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!applicationName.exists(_.contains(HadoopFileActionDAGRunStateStore.fileNamePartSeparator)),
+      s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
+    assert(!applicationName.exists(_.matches(".*\\s.*")), s"Application name must not contain spaces ($applicationName)")
     assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
     assert(configuration.nonEmpty, "Configuration files are empty")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
@@ -238,9 +238,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   def parseKeyValue(arg: String): (String, String) = {
-    val keyValues = arg.split("=")
-    if (keyValues.size != 2) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
-    val Array(key, value) = keyValues
+    if (!arg.contains('=')) throw new IllegalArgumentException(s"key/value $arg doesn't match format '<key>=<value>'")
+    val key = arg.takeWhile(_ != '=')
+    val value = arg.drop(key.length + 1)
     (key, value)
   }
 
@@ -492,7 +492,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         logger.warn(s"At least one action is ${ex.severity}")
         Seq()
       case ex: Throwable if Environment.simplifyFinalExceptionLog =>
-        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDL uses)
+        // simplify stacktrace of exceptions thrown... filter all entries once an entry appears from monix (the parallel execution framework SDLB uses)
         throw LogUtil.simplifyStackTrace(ex)
     }
 

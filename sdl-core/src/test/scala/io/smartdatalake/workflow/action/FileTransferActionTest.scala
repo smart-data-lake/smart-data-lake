@@ -91,7 +91,37 @@ class FileTransferActionTest extends FunSuite with BeforeAndAfter with BeforeAnd
     // prepare & start load
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
-    action1.exec(Seq(srcSubFeed))
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.asInstanceOf[FileSubFeed].fileRefMapping.nonEmpty && tgtSubFeed.asInstanceOf[FileSubFeed].fileRefs.nonEmpty)
+
+    val r1 = tgtDO.getFileRefs(Seq())
+    assert(r1.size == 1)
+    assert(r1.head.fileName == resourceFile)
+  }
+
+  test("copy file from sftp to hadoop without partitions, no file ref lineage") {
+
+    val feed = "filetransfer"
+    val ftpDir = "testSrc"
+    val hadoopDir = "testTgt"
+    val resourceFile = "AB_NYC_2019.csv"
+    val tempDir = Files.createTempDirectory(feed)
+
+    // copy data file to ftp
+    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+
+    // setup DataObjects
+    val srcDO = SFtpFileRefDataObject("src1", tempDir.resolve(ftpDir).toString.replace('\\', '/'), "con1")
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+
+    // prepare & start load
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, breakFileRefLineage = false, createFileRefLineage = false)
+    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
+    val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
+    assert(tgtSubFeed.asInstanceOf[FileSubFeed].fileRefMapping.isEmpty && tgtSubFeed.asInstanceOf[FileSubFeed].fileRefs.isEmpty)
 
     val r1 = tgtDO.getFileRefs(Seq())
     assert(r1.size == 1)

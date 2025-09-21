@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow
 
-import org.apache.spark.sql.AnalysisException
+import io.smartdatalake.util.misc.LogUtil.limitLines
 import org.apache.spark.sql.catalyst.ExtendedAnalysisException
 
 /**
@@ -31,12 +31,8 @@ class SimplifiedAnalysisException (analysisException: ExtendedAnalysisException)
   setStackTrace(analysisException.getStackTrace)
   private val logicalPlanMaxLines = 5
   override def getMessage: String = {
-    val planAnnotation = Option(analysisException.plan).map(p => limitLines(s";\n$p", logicalPlanMaxLines)).getOrElse("")
+    val planAnnotation = Option(analysisException.plan)
+      .map(p => limitLines(s";\n$p", logicalPlanMaxLines, s"... logical plan is truncated to $logicalPlanMaxLines lines. See Environment.simplifyFinalExceptionLog to disable this.")).getOrElse("")
     analysisException.getSimpleMessage + planAnnotation
-  }
-  private def limitLines(s: String, lines: Int) = {
-    val lines = s.linesIterator
-    val limitedLines = lines.take(logicalPlanMaxLines) ++ (if(lines.hasNext) Seq("... logical plan is truncated to 5 lines. See Environment.simplifyFinalExceptionLog to disable this.") else Seq())
-    limitedLines.mkString(System.lineSeparator())
   }
 }

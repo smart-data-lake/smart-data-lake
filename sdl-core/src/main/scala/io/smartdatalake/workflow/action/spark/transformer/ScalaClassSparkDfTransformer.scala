@@ -20,14 +20,16 @@
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.misc.{CustomCodeUtil, FileUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{CanRecompileFromSrc, GenericDfTransformer, OptionsSparkDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -45,14 +47,30 @@ import org.apache.spark.sql.DataFrame
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class ScalaClassSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
-  private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](className)
+case class ScalaClassSparkDfTransformer(override val name: String = "scalaSparkTransform",
+                                        override val description: Option[String] = None,
+                                        className: String,
+                                        options: Map[String, String] = Map(),
+                                        runtimeOptions: Map[String, String] = Map()
+                                       ) extends OptionsSparkDfTransformer with CanRecompileFromSrc with SmartDataLakeLogger {
+  private var customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfTransformer](className)
+
+  override def recompileFromSrc(srcDir: String): Unit = {
+    implicit val defaultHadoopConf: Configuration = new Configuration()
+    val file = s"$srcDir/${className.replace('.', '/')}.scala"
+    logger.info(s"recompiling $file")
+    val code = FileUtil.readFromPath(new Path(file)) + s"; new $className"
+    customTransformer = CustomCodeUtil.compileCode[CustomDfTransformer](code)
+  }
+
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
     customTransformer.transform(context.sparkSession, options, df, dataObjectId.id)
   }
+
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
    customTransformer.transformPartitionValues(options, partitionValues)
   }
+
   override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassSparkDfTransformer
 }
 

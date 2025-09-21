@@ -19,12 +19,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.testutils.DataFrameTestHelper.assertDataFramesEqual
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, Row, SaveMode}
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{DataFrame, SaveMode}
 
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -40,7 +41,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   test("Reading from an empty file with header=true and inferSchema=false results in an empty, schema-less data frame.") {
     val tempDir = Files.createTempDirectory("csv")
-    val tempFile = Files.createTempFile(tempDir, "temp", "csv") // attention, this creates not a proper .csv file type, but just appends <filename>csv...
+    val tempFile = Files.createTempFile(tempDir, "temp", ".csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -65,7 +66,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   test("Reading from an empty file with header=true and inferSchema=true results in an empty, schema-less data frame.") {
     val tempDir = Files.createTempDirectory("csv")
-    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", ".csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -90,7 +91,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   test("Reading from an empty file with header=false and inferSchema=true results in an empty, schema-less data frame.") {
     val tempDir = Files.createTempDirectory("csv")
-    val tempFile = Files.createTempFile(tempDir, "temp", "csv")
+    val tempFile = Files.createTempFile(tempDir, "temp", ".csv")
     try {
       val config = ConfigFactory.parseString(
         s"""
@@ -118,13 +119,12 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   test("User-defined schema takes precedence over schema inference from header.") {
     val tempDir = Files.createTempDirectory("csv")
 
-    session.createDataFrame(session.sparkContext.makeRDD(Seq(
-      Row.fromTuple("A", "B"),
-      Row.fromTuple("B", "1")
-    )),
-      StructType.fromDDL("h1 STRING, h2 STRING"))
-      .write.mode(SaveMode.Overwrite).format("com.databricks.spark.csv")
-      .save(tempDir.toFile.getPath)
+    val dfInput = Seq(("B", "1")).toDF("h1", "h2")
+    val dfExpected = Seq(("B", 1)).toDF("header1", "header2")
+
+    dfInput.write.mode(SaveMode.Overwrite)
+      .option("header", "true")
+      .csv(tempDir.toFile.getPath)
 
     try {
       val config = ConfigFactory.parseString(
@@ -140,23 +140,10 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempDir.toFile.getPath)}"
            |}
          """.stripMargin)
-
       val dataObj = CsvFileDataObject.fromConfig(config)
+      val df = dataObj.getSparkDataFrame()(contextExec)
 
-      val df = dataObj.getSparkDataFrame()
-
-      df.schema should contain theSameElementsInOrderAs Seq(
-        StructField("header1", StringType, nullable = true),
-        StructField("header2", IntegerType, nullable = true)
-      )
-      df.count() shouldBe 1
-      df.collect().foreach { row =>
-        row(0).isInstanceOf[String] shouldBe true
-        row(0) should equal ("B")
-        row(1).isInstanceOf[Int] shouldBe true
-        row(1) should equal (1)
-      }
-
+      assertDataFramesEqual(df, dfExpected)
     } finally {
       FileUtils.forceDelete(tempDir.toFile)
     }
@@ -165,13 +152,14 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   test("User-defined schema takes precedence over schema inference.") {
     val tempDir = Files.createTempDirectory("csv")
 
-    session.createDataFrame(session.sparkContext.makeRDD(Seq(
-      Row.fromTuple("A", "B"),
-      Row.fromTuple("B", "1")
-    )),
-      StructType.fromDDL("h1 STRING, h2 STRING"))
-      .write.mode(SaveMode.Overwrite).format("com.databricks.spark.csv")
-      .save(tempDir.toFile.getPath)
+    val dfInput = Seq(("B", "1")).toDF("h1", "h2")
+    // header is expected in output, as csv is read using header=false
+    // h2 is null because it cannot be cast to INT
+    val dfExpected = Seq(("h1", None), ("B", Some(1))).toDF("header1", "header2")
+
+    dfInput.write.mode(SaveMode.Overwrite)
+      .option("header", "true")
+      .csv(tempDir.toFile.getPath)
 
     try {
       val config = ConfigFactory.parseString(
@@ -187,17 +175,10 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
            | path = "${escapedFilePath(tempDir.toFile.getPath)}"
            |}
          """.stripMargin)
-
       val dataObj = CsvFileDataObject.fromConfig(config)
+      val df = dataObj.getSparkDataFrame()(contextExec)
 
-      val df = dataObj.getSparkDataFrame()
-
-      df.schema should contain theSameElementsInOrderAs Seq(
-        StructField("header1", StringType, nullable = true),
-        StructField("header2", IntegerType, nullable = true)
-      )
-      df.count() shouldBe 2
-
+      assertDataFramesEqual(df, dfExpected)
     } finally {
       FileUtils.forceDelete(tempDir.toFile)
     }
@@ -213,7 +194,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename=Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1, filename = Some("data.csv"))))
     tgtDO.writeSparkDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv")
@@ -224,7 +205,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dfInit = (1 to 1000).map( i => ("test", i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=5, filename=Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 5, filename = Some("data.csv"))))
     tgtDO.writeSparkDataFrame(dfInit, Seq())
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.1.csv","data.2.csv","data.3.csv","data.4.csv","data.5.csv")
@@ -236,7 +217,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dfInit = (1 to 1000).map( i => ("test"+Random.nextInt(2), i)).toDF("name", "cnt")
       .repartition(10)
-    val tgtDO = CsvFileDataObject(id="test1", path=escapedFilePath(tempDir.toFile.getPath), partitions = Seq("name"), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, keyCols = Seq("name"), filename = Some("data.csv"))))
+    val tgtDO = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("name"), sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1, keyCols = Seq("name"), filename = Some("data.csv"))))
     tgtDO.writeSparkDataFrame(dfInit, Seq(PartitionValues(Map("name"->"test0")), PartitionValues(Map("name"->"test1"))))
     val resultFileRefs = tgtDO.getFileRefs(Seq())
     resultFileRefs.map(_.fileName).sorted shouldBe Seq("data.csv","data.csv")
@@ -248,7 +229,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val df = Seq(("A", "B"), ("B", "1")).toDF("a", "b")
 
     // write
-    val dataObject = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), csvOptions = Map("compression" -> classOf[ZipCsvCodec].getName), sparkRepartition=Some(SparkRepartitionDef(numberOfTasksPerPartition=1, filename = Some(testFilename))))
+    val dataObject = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, csvOptions = Map("compression" -> classOf[ZipCsvCodec].getName), sparkRepartition = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1, filename = Some(testFilename))))
     dataObject.writeSparkDataFrame(df)
 
     // verify file
@@ -274,7 +255,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
 
     // setup DataObject
-    val csvDO = CsvFileDataObject( "src1", path = escapedFilePath(tempDir.toFile.getPath))
+    val csvDO = CsvFileDataObject("src1", path = tempDir.toFile.getPath)
     val fileRefs = csvDO.getFileRefs(Seq())
     assert(fileRefs.map(_.fileName) == Seq(resourceFile))
 
@@ -305,10 +286,10 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val df1 = data1.toDF("h1", "h2", "h3")
     val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
 
-    val dataObj = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
+    val dataObj = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("h1"), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
     dataObj.writeSparkDataFrame(df1, pv1)
 
-    val dfResult = dataObj.getSparkDataFrame(pv1).cache
+    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache
 
     assert(dfResult.columns.toSet == Set("h2", "h3", "h1", "_filename"))
     assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == data1.toSet)
@@ -322,11 +303,11 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     val df1 = data1.toDF("h1", "h2", "h3")
     val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
 
-    val dataObj = CsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"),
+    val dataObj = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("h1"),
       schema = Some(SparkSchema(df1.drop("h1").schema)), filenameColumn = Some("_filename"))
     dataObj.writeSparkDataFrame(df1, pv1)
 
-    val dfResult = dataObj.getSparkDataFrame(pv1).cache
+    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache
 
     assert(dfResult.columns.toSet == Set("h2", "h3", "h1", "_filename"))
     assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == data1.toSet)

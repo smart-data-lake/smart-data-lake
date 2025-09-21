@@ -100,7 +100,7 @@ import java.time.LocalDateTime
          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
          ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-       val actual = tgtDO.getSparkDataFrame()(context1)
+       val actual = tgtDO.getSparkDataFrame()(context2)
          .drop(Historization.historizeHashColName)
        val resultat = expected.isEqual(actual)
        if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)

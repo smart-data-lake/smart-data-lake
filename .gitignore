@@ -11,6 +11,8 @@ venv
 spark-warehouse
 **/spark-warehouse
 *.versionsBackup
+**/dependency-reduced-pom.xml
+**/pom.xml.versionsBackup
 
 # User-specific stuff
 .idea/**/workspace.xml

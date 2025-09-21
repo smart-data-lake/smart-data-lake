@@ -7,7 +7,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DataFrameUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -15,7 +15,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
-import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.ExprUtils
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
@@ -101,6 +101,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   private val formatOptionsOverride = Map(
     "header" -> "true", // header must be the first line of every file
     "inferSchema" -> "false", // no schema inference, schema is given for the DataObject
+    "pathGlobFilter" -> fileName
   )
 
   override val options: Map[String, String] = formatOptionsDefault ++ csvOptions ++ formatOptionsOverride
