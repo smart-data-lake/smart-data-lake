@@ -381,7 +381,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>3.1.0</version>
+                        <version>3.2.8</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -407,7 +407,6 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
-                            <tokenAuth>true</tokenAuth>
                             <autoPublish>false</autoPublish>
                         </configuration>
                     </plugin>
@@ -438,8 +437,8 @@
         <jetty.deps.scope>compile</jetty.deps.scope>
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
-        <spark.version>3.5.5</spark.version> <!-- delta-lake 3.3.2 is not yet compatible with Spark 3.5.6 because of https://github.com/delta-io/delta/issues/4671 -->
-        <spark-extensions.version>3.5.3</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark.version>3.5.5</spark.version><!-- delta-lake 3.3.2 is not yet compatible with Spark 3.5.6 because of https://github.com/delta-io/delta/issues/4671 -->
+        <spark-extensions.version>3.5.4</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.5</spark.minor.version>
         <spark.version331>3.3.1</spark.version331>
         <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->

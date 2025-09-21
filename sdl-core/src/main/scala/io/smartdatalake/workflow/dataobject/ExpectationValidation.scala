@@ -174,7 +174,7 @@ private[smartdatalake] trait ExpectationValidation {
     // the evaluation of expectations is made using Spark expressions
     val validationResults = expectationValidationCols.map {
       case (expectation, col) =>
-        val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner, defaultExpressionData)
+        val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner.expr.sql, defaultExpressionData)
         (expectation, errorMsg)
     }.toMap.filter(_._2.nonEmpty).mapValues(_.get) // keep only failed results
     // log all failed results (before throwing exception)

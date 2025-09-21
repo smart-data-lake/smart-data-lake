@@ -19,6 +19,7 @@
 
 package io.smartdatalake.workflow.dataframe
 
+import io.smartdatalake.config.ConfigParser
 import io.smartdatalake.util.misc.{ReflectionUtil, ScalaUtil}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import org.reflections.Reflections
@@ -44,7 +45,7 @@ private[smartdatalake] trait SchemaConverter {
 private[smartdatalake] object SchemaConverter {
 
   // search for converters by using reflection
-  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
+  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
   private lazy val converters = ReflectionUtil.getTraitImplClasses[SchemaConverter]
     .map(c => ScalaUtil.companionOf[SchemaConverter](c.getName))
     .map(o => ((o.fromSubFeedType,o.toSubFeedType), o)).toMap

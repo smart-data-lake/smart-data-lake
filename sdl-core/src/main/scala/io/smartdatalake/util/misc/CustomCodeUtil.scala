@@ -64,6 +64,14 @@ object CustomCodeUtil {
     clazz.getConstructor().newInstance().asInstanceOf[T]
   }
 
+  def getClassByNameIfExists(classname: String): Option[Class[_]] = {
+    try {
+      Some(Environment.classLoader().loadClass(classname))
+    } catch {
+      case _: ClassNotFoundException => None
+    }
+  }
+
   def readResourceFile( filename:String ) : String = {
     val stream : InputStream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
       .getOrElse(throw new FileNotFoundException(filename))

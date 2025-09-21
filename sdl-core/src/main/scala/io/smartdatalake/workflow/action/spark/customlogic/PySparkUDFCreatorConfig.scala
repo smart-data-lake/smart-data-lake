@@ -26,7 +26,7 @@ import org.apache.spark.sql.SparkSession
 
 /**
  * Configuration to register a Python UDF in the spark session of SmartDataLake.
- * Define a python function with type hints i python code and register it in global configuration.
+ * Define a python function with type hints in python code and register it in global configuration.
  * The name of the function must match the name you use to declare it in GlobalConf.
  * The Python function can then be used in Spark SQL expressions.
  *

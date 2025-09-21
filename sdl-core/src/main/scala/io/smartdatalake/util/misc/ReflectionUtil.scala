@@ -28,7 +28,7 @@ import scala.reflect.runtime.universe._
 object ReflectionUtil {
 
   private val mirror = scala.reflect.runtime.currentMirror
-  private val reflectionsCache = mutable.Map[String,Reflections]()
+  private val reflectionsCache = mutable.Map[String, Reflections]()
 
   def getReflections(packageName: String): Reflections = {
     reflectionsCache.getOrElseUpdate(packageName, new Reflections(packageName))

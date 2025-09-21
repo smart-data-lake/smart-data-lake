@@ -5,6 +5,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig, SttpWebserviceClient, WebserviceMethod}
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
@@ -14,7 +15,6 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions.{col, date_format, expr, max}
 import org.apache.spark.sql.types._
 import org.json4s.{DefaultFormats, Formats}
@@ -469,7 +469,7 @@ case class ODataDataObject(override val id: DataObjectId,
    * @return OData representation of the new incrementalOutputExpr value
    */
   def getNextODataState(df: DataFrame): Option[String] = {
-    val incExpr = ExpressionEvaluator.resolveExpression(expr(this.incrementalOutputExpr.get), df.schema, caseSensitive = false)
+    val incExpr = SparkExpressionUtil.resolveExpression(this.incrementalOutputExpr.get, df.schema)
     val incExprDataType = incExpr.dataType
 
     var work_df = df.select(max(expr(this.incrementalOutputExpr.get)).alias("nextState"))

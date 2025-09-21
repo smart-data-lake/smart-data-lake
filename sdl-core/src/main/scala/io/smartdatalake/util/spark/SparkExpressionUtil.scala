@@ -21,11 +21,13 @@ package io.smartdatalake.util.spark
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.Column
-import org.apache.spark.sql.custom.ExpressionEvaluator
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.expr
+import org.apache.spark.sql.types.StructType
 
 import java.sql.Timestamp
 import scala.reflect.ClassTag
@@ -91,29 +93,15 @@ private[smartdatalake] object SparkExpressionUtil {
    *
    * @param id         id of the config object for meaningful exception text
    * @param configName optional configuration name for meaningful exception text
-   * @param expression expression to be evaluated as String
-   * @param data       case class instance
-   * @tparam T class of object the expression should be evaluated on
-   * @tparam R class of expressions expected return type
-   */
-  def evaluate[T <: Product : TypeTag, R: TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[R] = {
-    evaluate[T, R](id, configName, expr(expression), data)
-  }
-
-  /**
-   * Evaluate an expression against a given case class instance
-   *
-   * @param id         id of the config object for meaningful exception text
-   * @param configName optional configuration name for meaningful exception text
    * @param expression expression to be evaluated as Spark column
    * @param data       case class instance
    * @tparam T class of object the expression should be evaluated on
    * @tparam R class of expressions expected return type
    */
   def evaluate[T <: Product : TypeTag, R: TypeTag : ClassTag]
-  (id: ConfigObjectId, configName: Option[String], expression: Column, data: T): Option[R] = {
+  (id: ConfigObjectId, configName: Option[String], expression: String, data: T): Option[R] = {
     try {
-      val evaluator = new ExpressionEvaluator[T, R](expression)
+      val evaluator = Environment.expressionEvaluatorFactory.getEvaluator[T, R](expression)
       Option(evaluator(data))
     } catch {
       case e: Exception =>
@@ -133,7 +121,7 @@ private[smartdatalake] object SparkExpressionUtil {
    */
   def evaluateSeq[T <: Product : TypeTag, R: TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String, data: Seq[T]): Seq[(T, Option[R])] = {
     try {
-      val evaluator = new ExpressionEvaluator[T, R](expr(expression))
+      val evaluator = Environment.expressionEvaluatorFactory.getEvaluator[T, R](expression)
       data.map(d => (d, Option(evaluator(d))))
     } catch {
       case e: Exception =>
@@ -152,7 +140,7 @@ private[smartdatalake] object SparkExpressionUtil {
    */
   def syntaxCheck[T <: Product : TypeTag, R: TypeTag : ClassTag](id: ConfigObjectId, configName: Option[String], expression: String): Unit = {
     try {
-      new ExpressionEvaluator[T, R](expr(expression))
+      Environment.expressionEvaluatorFactory.getEvaluator[T, R](expression)
     } catch {
       case e: Exception =>
         throw ConfigurationException(s"($id) spark expression syntax check for '$expression'${getConfigNameMsg(configName)} failed: ${e.getMessage}", configName, e)
@@ -170,6 +158,23 @@ private[smartdatalake] object SparkExpressionUtil {
       })
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
+  }
+
+  def resolveExpression(exprStr: String, schema: StructType): Expression = {
+    resolveExpression(expr(exprStr).expr, schema)
+  }
+
+  def resolveExpression(exprCol: Expression, schema: StructType): Expression = {
+    // invoke dynamically to allow different implementations
+    val resolveExpressionMethod = Environment.expressionEvaluatorFactory.getClass.getMethod("resolveExpression", classOf[Expression], classOf[StructType])
+    resolveExpressionMethod.invoke(Environment.expressionEvaluatorFactory, exprCol, schema).asInstanceOf[Expression]
+  }
+
+  def registerSparkUdf(name: String, udf: UserDefinedFunction) = {
+    // invoke dynamic
+    val applyUdfMethod = Environment.expressionEvaluatorFactory.getClass.getMethods.find(_.getName == "registerSparkUdf")
+    applyUdfMethod.map(_.invoke(Environment.expressionEvaluatorFactory, name, udf))
+      .getOrElse(throw new ConfigurationException(s"Could not register Spark UDF '$name': ${Environment.expressionEvaluatorFactory.getClass.getSimpleName} has no method 'registerSparkUdf'", Some("global.sparkUDFs")))
   }
 
   private def getConfigNameMsg(configName: Option[String]) = configName.map(" from config " + _).getOrElse("")
