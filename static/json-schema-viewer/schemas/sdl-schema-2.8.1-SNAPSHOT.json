@@ -8772,7 +8772,7 @@
             },
             "title" : "PythonUDFCreatorConfig",
             "additionalProperties" : false,
-            "description" : "Configuration to register a Python UDF in the spark session of SmartDataLake.  \nDefine a python function with type hints i python code and register it in global configuration.  \nThe name of the function must match the name you use to declare it in GlobalConf.  \nThe Python function can then be used in Spark SQL expressions."
+            "description" : "Configuration to register a Python UDF in the spark session of SmartDataLake.  \nDefine a python function with type hints in python code and register it in global configuration.  \nThe name of the function must match the name you use to declare it in GlobalConf.  \nThe Python function can then be used in Spark SQL expressions."
           },
           "description" : "Define UDFs in python to be registered in spark session. The registered UDFs are available in Spark SQL transformations\nbut not for expression evaluation."
         },
