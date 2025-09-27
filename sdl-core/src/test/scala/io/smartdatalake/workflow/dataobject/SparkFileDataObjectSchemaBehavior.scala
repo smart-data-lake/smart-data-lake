@@ -76,9 +76,6 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
                       (implicit context: ActionPipelineContext): Unit = {
 
     test("Reading an empty file creates an empty data frame with the user-defined schema.") {
-      val embeddedSchema = Seq(
-        StructField("_c1", StringType, nullable = true)
-      )
       val userSchema = Seq(
         StructField("header1", StringType, nullable = true),
         StructField("header2", IntegerType, nullable = true)
@@ -87,7 +84,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       val path = tempFilePath(fileExtension)
       implicit val session: SparkSession = context.sparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
-      createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
+      createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(userSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
       try {
         val dataObj = createDataObject(path, Some(StructType(userSchema)))

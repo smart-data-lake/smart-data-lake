@@ -19,11 +19,9 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.Environment
-import org.apache.spark.annotation.DeveloperApi
 import org.slf4j.event.Level
 import org.slf4j.{Logger, LoggerFactory}
 
-@DeveloperApi
 trait SmartDataLakeLogger {
   @transient
   protected lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
@@ -32,11 +30,6 @@ trait SmartDataLakeLogger {
   private[smartdatalake] def logAndThrowException(msg: String, e: Exception): Unit = {
     logger.error( s"$msg: ${e.getClass.getSimpleName} - ${e.getMessage}" )
     throw e
-  }
-
-  private[smartdatalake] def logException(e: Exception): Exception = {
-    logger.error( s"${e.getClass.getSimpleName} - ${e.getMessage}" )
-    e
   }
 
   private[smartdatalake] def logWithSeverity(severity: Level, msg: String, cause: Throwable): Unit = {

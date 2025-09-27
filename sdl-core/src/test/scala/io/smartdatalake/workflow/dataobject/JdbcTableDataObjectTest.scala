@@ -18,13 +18,14 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+
 import java.nio.file.Files
 
 class JdbcTableDataObjectTest extends DataObjectTestSuite {
@@ -43,7 +44,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
-    val dfRead = dataObject.getSparkDataFrame(Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
 
@@ -56,7 +57,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
-    val dfRead = dataObject.getSparkDataFrame(Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.symmetricDifference(df).isEmpty)
     dataObject.deleteAllData()
   }
@@ -97,8 +98,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
       , ("preRead", "smith", "feedTest", 3), ("preWrite", "emma", "feedTest", 3)
       , ("postRead", "smith", "feedTest", 3), ("postWrite", "emma", "feedTest", 3)
     ).toDF("type", "lastname", "firstname", "rating")
-    srcDO.getSparkDataFrame().symmetricDifference(dfSrcExpected).show()
-    assert(srcDO.getSparkDataFrame().symmetricDifference(dfSrcExpected).isEmpty)
+    assert(srcDO.getSparkDataFrame()(contextExec).symmetricDifference(dfSrcExpected).isEmpty)
   }
 
   // query parameter doesn't work with hsqldb
@@ -163,9 +163,8 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     dataObject.prepare
-    dataObject.getSparkDataFrame(Seq()).show()
     assert(dataObject.isTableExisting)
-    val partitionValues = dataObject.listPartitions
+    val partitionValues = dataObject.listPartitions(contextExec)
     assert(partitionValues.toSet == Set(PartitionValues(Map("abc" -> "ext")), PartitionValues(Map("abc" -> "int"))))
   }
 
@@ -178,9 +177,8 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     dataObject.prepare
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
-    dataObject.getSparkDataFrame(Seq()).show()
     assert(dataObject.isTableExisting)
-    val partitionValues = dataObject.listPartitions
+    val partitionValues = dataObject.listPartitions(contextExec)
     assert(partitionValues.toSet == Set(PartitionValues(Map("abc" -> "ext")), PartitionValues(Map("abc" -> "int"))))
     dataObject.getSparkDataFrame().select($"abc").show()
   }
@@ -197,7 +195,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
+    val actual = targetDO.getSparkDataFrame()(contextExec)
     val resultat = df1.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
@@ -206,10 +204,10 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()
+    val actual2 = targetDO.getSparkDataFrame()(contextExec)
     val expected2 = Seq(("ext","doe","john",10),("ext","smith","peter",3),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating")
-    val resultat2: Boolean = expected2.isEqual(actual2)
+    val resultat2 = expected2.isEqual(actual2)
     if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(resultat2)
   }
@@ -226,7 +224,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
+    val actual = targetDO.getSparkDataFrame()(contextExec)
     val resultat = df1.isEqual(actual)
     if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
@@ -238,10 +236,10 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
       .toDF("type", "lastname", "firstname", "rating2")
     targetDO.initSparkDataFrame(df2, Seq())
     targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()
+    val actual2 = targetDO.getSparkDataFrame()(contextExec)
     val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
       .toDF("type", "lastname", "firstname", "rating", "rating2")
-    val resultat2: Boolean = expected2.isEqual(actual2)
+    val resultat2 = expected2.isEqual(actual2)
     if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(resultat2)
   }
@@ -276,7 +274,9 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val newState2 = targetDO.getState
     assert(newState1.get < newState2.get)
 
-    targetDO.getSparkDataFrame()(contextInit).count() shouldEqual 5
+    // disable incremental output and query all data
+    targetDO.setState(None)
+    targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 5
   }
 
   test("write to jdbc table with different order of columns") {
@@ -288,7 +288,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val dfColumnsSwitched = df.select("type", "rating", "firstname", "lastname")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(dfColumnsSwitched, Seq())
-    val dfRead = dataObject.getSparkDataFrame(Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
 
@@ -301,7 +301,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
-    val dfRead = dataObject.getSparkDataFrame(Seq())
+    val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.symmetricDifference(df).isEmpty)
   }
 

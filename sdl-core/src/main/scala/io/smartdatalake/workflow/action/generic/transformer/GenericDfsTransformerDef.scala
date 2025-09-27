@@ -160,3 +160,12 @@ trait OptionsSparkDfsTransformer extends OptionsGenericDfsTransformer {
   }
   override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
 }
+
+
+/**
+ * Interface for transformers that can recompile their code from source files.
+ * This is mainly used to recompile scala class based transformers inside Notebooks.
+ */
+trait CanRecompileFromSrc {
+  def recompileFromSrc(srcDir: String): Unit
+}

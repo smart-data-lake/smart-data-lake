@@ -21,8 +21,8 @@ package io.smartdatalake.lab
 
 import io.smartdatalake.lab.DataFrameBaseBuilder.DEFAULT_DATAOBJECT_ID
 import io.smartdatalake.util.hdfs.PartitionValues
-import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions.{col, expr, lit}
+import org.apache.spark.sql.{Column, DataFrame}
 
 abstract class DataFrameBaseBuilder[R] {
   def partitionValues: Seq[PartitionValues]
@@ -34,21 +34,21 @@ abstract class DataFrameBaseBuilder[R] {
    * Filter partitions based on a list of partitions, each with one or multiple columns and corresponding values.
    */
   def withPartitionValues(partitionValues: Seq[PartitionValues]): R = {
-    assert(partitionValues.isEmpty, "partitionValues are already set, they can not be overwritten.")
+    assert(this.partitionValues.isEmpty, "partitionValues are already set, they can not be overwritten.")
     setPartitionValues(partitionValues)
   }
   /**
    * Filter partitions based on one column and multiple values for this column.
    */
   def withPartitionValues(colName: String, values: Seq[String]): R = {
-    assert(partitionValues.isEmpty, "partitionValues are already set, they can not be overwritten.")
+    assert(this.partitionValues.isEmpty, "partitionValues are already set, they can not be overwritten.")
     setPartitionValues(values.map(v => PartitionValues(Map(colName -> v))))
   }
   /**
    * Filter partitions by choosing one column and one value.
    */
   def withPartitionValues(colName: String, value: String): R = {
-    assert(partitionValues.isEmpty, "partitionValues are already set, they can not be overwritten.")
+    assert(this.partitionValues.isEmpty, "partitionValues are already set, they can not be overwritten.")
     setPartitionValues(Seq(PartitionValues(Map(colName -> value))))
   }
 
@@ -73,8 +73,9 @@ abstract class DataFrameBaseBuilder[R] {
    */
   def withFilterEquals(colName: String, literal: Any): R = {
     val literalExpr = literal match {
-      case x: String => lit(x)
-      case x: AnyRef => throw new IllegalArgumentException("Only AnyVal (Int, Long, ... ) and String supported as parameter of withFilterEquals method")
+      case x: String => x
+      case Long | Int | Short | Byte => lit(literal)
+      case x: AnyRef => throw new IllegalArgumentException("Only AnyVal (Int, Long, ... ), String and Column supported as parameter of withFilterEquals method")
       case x => lit(x) // if type is not AnyRef, it is AnyVal; but Scala can not match against AnyVal...
     }
     setFilters(filters + (colName -> (col(colName) === literalExpr)))

@@ -15,9 +15,7 @@
   ~
   ~ You should have received a copy of the GNU General Public License
   ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
-  -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  --><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.smartdatalake</groupId>
@@ -35,6 +33,9 @@
         <module>sdl-snowflake</module>
         <module>sdl-azure</module>
         <module>sdl-lang</module>
+        <module>sdl-debezium</module>
+        <module>sdl-debezium/debezium-connector-mariadb-shaded</module>
+        <module>sdl-debezium/debezium-connector-mysql-shaded</module>
     </modules>
 
     <licenses>
@@ -56,10 +57,10 @@
 
     <developers>
         <developer>
-            <name>Smart Data Lake</name>
-            <email>smartdatalake@elca.ch</email>
-            <organization>ELCA Informatik AG</organization>
-            <organizationUrl>http://www.elca.ch</organizationUrl>
+          <name>Smart Data Lake</name>
+          <email>smartdatalake@elca.ch</email>
+          <organization>ELCA Informatik AG</organization>
+          <organizationUrl>http://www.elca.ch</organizationUrl>
         </developer>
     </developers>
 
@@ -86,6 +87,72 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <id>shade-jar-with-dependencies</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                                <!-- handle some duplicate warnings: these files are not needed -->
+                                                <exclude>META-INF/DEPENDENCIES</exclude>
+                                                <exclude>META-INF/LICENSE</exclude>
+                                                <exclude>META-INF/LICENSE.txt</exclude>
+                                                <exclude>META-INF/NOTICE</exclude>
+                                                <exclude>META-INF/NOTICE.txt</exclude>
+                                                <exclude>META-INF/ASL2.0</exclude>
+                                                <exclude>META-INF/NOTICE</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/maven/**/*</exclude>
+                                                <exclude>META-INF/README.txt</exclude>
+                                                <exclude>LICENSE</exclude>
+                                                <exclude>LICENSE.txt</exclude>
+                                                <exclude>NOTICE.txt</exclude>
+                                                <!-- shading doesnt respect Java Modularisation (>JDK9) -->
+                                                <exclude>module-info.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                                    <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                                    <artifactSet>
+                                        <includes>
+                                            <include>*:*</include>
+                                        </includes>
+                                    </artifactSet>
+                                    <transformers>
+                                        <transformer
+                                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <manifestEntries>
+                                                <Main-Class>io.smartdatalake.app.SparkSmartDataLakeBuilder</Main-Class>
+                                                <Implementation-Version>${project.version}</Implementation-Version>
+                                                <Multi-Release>true</Multi-Release>
+                                            </manifestEntries>
+                                        </transformer>
+                                        <transformer
+                                                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                        <transformer
+                                                implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.logging.log4j</groupId>
+                                <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                                <version>0.1.0</version>
+                            </dependency>
+                        </dependencies>
                     </plugin>
                 </plugins>
             </build>
@@ -98,6 +165,72 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.6.0</version>
+                        <executions>
+                            <execution>
+                                <id>shade-jar-with-dependencies</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                                <!-- handle some duplicate warnings: these files are not needed -->
+                                                <exclude>META-INF/DEPENDENCIES</exclude>
+                                                <exclude>META-INF/LICENSE</exclude>
+                                                <exclude>META-INF/LICENSE.txt</exclude>
+                                                <exclude>META-INF/NOTICE</exclude>
+                                                <exclude>META-INF/NOTICE.txt</exclude>
+                                                <exclude>META-INF/ASL2.0</exclude>
+                                                <exclude>META-INF/NOTICE</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/maven/**/*</exclude>
+                                                <exclude>META-INF/README.txt</exclude>
+                                                <exclude>LICENSE</exclude>
+                                                <exclude>LICENSE.txt</exclude>
+                                                <exclude>NOTICE.txt</exclude>
+                                                <!-- shading doesnt respect Java Modularisation (>JDK9) -->
+                                                <exclude>module-info.class</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                                    <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                                    <artifactSet>
+                                        <includes>
+                                            <include>*:*</include>
+                                        </includes>
+                                    </artifactSet>
+                                    <transformers>
+                                        <transformer
+                                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                            <manifestEntries>
+                                                <Main-Class>io.smartdatalake.app.SparkSmartDataLakeBuilder</Main-Class>
+                                                <Implementation-Version>${project.version}</Implementation-Version>
+                                                <Multi-Release>true</Multi-Release>
+                                            </manifestEntries>
+                                        </transformer>
+                                        <transformer
+                                                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                        <transformer
+                                                implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.logging.log4j</groupId>
+                                <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                                <version>0.1.0</version>
+                            </dependency>
+                        </dependencies>
                     </plugin>
                 </plugins>
             </build>
@@ -127,7 +260,7 @@
                         <version>3.1.1</version>
                         <executions>
                             <execution>
-				<id>copy-libs-exec</id>
+                                <id>copy-libs-exec</id>
                                 <phase>package</phase>
                                 <goals>
                                     <goal>copy-dependencies</goal>
@@ -155,7 +288,7 @@
                         <version>3.1.1</version>
                         <executions>
                             <execution>
-				                <id>copy-libs-with-exec</id>
+                                <id>copy-libs-with-exec</id>
                                 <phase>package</phase>
                                 <goals>
                                     <goal>copy-dependencies</goal>
@@ -180,14 +313,16 @@
             </activation>
             <properties>
                 <scala.minor.version>2.12</scala.minor.version>
-                <scala.version>${scala.minor.version}.18</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+                <scala.version>${scala.minor.version}.18</scala.version>
+                <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
             </properties>
         </profile>
         <profile>
             <id>scala-2.13</id>
             <properties>
                 <scala.minor.version>2.13</scala.minor.version>
-                <scala.version>${scala.minor.version}.12</scala.version> <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
+                <scala.version>${scala.minor.version}.12</scala.version>
+                <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
             </properties>
         </profile>
         <profile>
@@ -211,14 +346,14 @@
             <id>release-sonatype</id>
             <distributionManagement>
                 <snapshotRepository>
-                    <id>ossrh</id>
-                    <name>Central Repository OSSRH</name>
-                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                    <id>central</id>
+                    <name>Sonatype Snapshot Repository</name>
+                    <url>https://central.sonatype.com/repository/maven-snapshots/</url>
                 </snapshotRepository>
                 <repository>
-                    <id>ossrh</id>
-                    <name>Central Repository OSSRH</name>
-                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+                    <id>central</id>
+                    <name>Maven Central Repository</name>
+                    <url>https://repo1.maven.org/maven2</url>
                 </repository>
             </distributionManagement>
             <build>
@@ -264,17 +399,16 @@
                             </execution>
                         </executions>
                     </plugin>
-                    <!-- deploy to sonatype / maven central -->
+                    <!-- deploy to sonatype central -->
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <version>1.6.13</version>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.8.0</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                            <stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>false</autoPublish>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -285,11 +419,9 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <license.header.file>src/license/gplv3-header.txt</license.header.file>
-
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.release>8</maven.compiler.release>
-
         <scala.deps.scope>compile</scala.deps.scope>
         <spark.deps.scope>compile</spark.deps.scope>
         <hadoop.deps.scope>compile</hadoop.deps.scope>
@@ -306,13 +438,11 @@
         <jetty.deps.scope>compile</jetty.deps.scope>
         <scala.minor.version>2.12</scala.minor.version>
         <scala.version>${scala.minor.version}.15</scala.version>
-
-        <spark.version>3.5.5</spark.version>
-        <spark-extensions.version>3.5.2
-        </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark.version>3.5.5</spark.version> <!-- delta-lake 3.3.2 is not yet compatible with Spark 3.5.6 because of https://github.com/delta-io/delta/issues/4671 -->
+        <spark-extensions.version>3.5.3</spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark.minor.version>3.5</spark.minor.version>
-        <spark.version331>3.3.1</spark.version331> <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->
-
+        <spark.version331>3.3.1</spark.version331>
+        <!-- some libraries are still only available for spark 3.3, e.g. spark-excel -->
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
         <!-- attention - manually adapted are: zookeeper, scala.version, scala.binary.version -->
         <asm.version>9.5</asm.version>
@@ -376,8 +506,8 @@
         <scalafmt.validateOnly>true</scalafmt.validateOnly>
         <scalafmt.changedOnly>true</scalafmt.changedOnly>
         <codehaus.jackson.version>1.9.13</codehaus.jackson.version>
-        <fasterxml.jackson.version>2.15.2</fasterxml.jackson.version>
-        <fasterxml.jackson.databind.version>2.15.2</fasterxml.jackson.databind.version>
+        <fasterxml.jackson.version>2.18.3</fasterxml.jackson.version>
+        <fasterxml.jackson.databind.version>2.18.3</fasterxml.jackson.databind.version>
         <snappy.version>1.1.9.1</snappy.version>
         <netlib.ludovic.dev.version>3.0.3</netlib.ludovic.dev.version>
         <commons-codec.version>1.16.0</commons-codec.version>
@@ -455,7 +585,7 @@
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>3.1.1</snowflake-spark.version>
         <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
-        <delta.version>3.3.0</delta.version>
+        <delta.version>3.3.2</delta.version>
         <iceberg.version>1.8.1</iceberg.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
@@ -464,6 +594,7 @@
 
         <scalatest.test.version>3.0.8</scalatest.test.version>
         <sshd.test.version>2.10.0</sshd.test.version>
+        <debezium.version>3.1.0.Final</debezium.version>
 
         <!-- Sonar related -->
         <sonar.organization>smart-data-lake</sonar.organization>
@@ -481,7 +612,7 @@
 
     <repositories>
         <repository>
-            <id>maven central</id>
+            <id>maven-central</id>
             <name>Maven Central Repository</name>
             <url>https://repo1.maven.org/maven2/</url>
         </repository>
@@ -492,9 +623,9 @@
         </repository>
         <!-- smartdatalake snapshots -->
         <repository>
-            <id>ossrh</id>
-            <name>ossrh snapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+            <id>sonatype-snapshots</id>
+            <name>Sonatype Snapshots Repository</name>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
             <releases>
                 <enabled>false</enabled>
             </releases>
@@ -684,74 +815,6 @@
                     </executions>
                 </plugin>
 
-                <!-- Builds executable fat-jar that includes all dependencies -->
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-shade-plugin</artifactId>
-                    <version>3.5.0</version>
-                    <executions>
-                        <execution>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>shade</goal>
-                            </goals>
-                            <configuration>
-                                <filters>
-                                    <filter>
-                                        <artifact>*:*</artifact>
-                                        <excludes>
-                                            <exclude>META-INF/*.SF</exclude>
-                                            <exclude>META-INF/*.DSA</exclude>
-                                            <exclude>META-INF/*.RSA</exclude>
-                                            <!-- handle some duplicate warnings: these files are not needed -->
-                                            <exclude>META-INF/DEPENDENCIES</exclude>
-                                            <exclude>META-INF/LICENSE</exclude>
-                                            <exclude>META-INF/LICENSE.txt</exclude>
-                                            <exclude>META-INF/NOTICE</exclude>
-                                            <exclude>META-INF/NOTICE.txt</exclude>
-                                            <exclude>META-INF/ASL2.0</exclude>
-                                            <exclude>META-INF/NOTICE</exclude>
-                                            <exclude>META-INF/MANIFEST.MF</exclude>
-                                            <exclude>META-INF/maven/**/*</exclude>
-                                            <exclude>META-INF/README.txt</exclude>
-                                            <exclude>LICENSE</exclude>
-                                            <exclude>LICENSE.txt</exclude>
-                                            <exclude>NOTICE.txt</exclude>
-                                            <!-- shading doesnt respect Java Modularisation (>JDK9) -->
-                                            <exclude>module-info.class</exclude>
-                                        </excludes>
-                                    </filter>
-                                </filters>
-                                <shadedArtifactAttached>true</shadedArtifactAttached>
-                                <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
-                                <artifactSet>
-                                    <includes>
-                                        <include>*:*</include>
-                                    </includes>
-                                </artifactSet>
-                                <transformers>
-                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                        <manifestEntries>
-                                            <Main-Class>io.smartdatalake.app.SparkSmartDataLakeBuilder</Main-Class>
-                                            <Implementation-Version>${project.version}</Implementation-Version>
-                                            <Multi-Release>true</Multi-Release>
-                                        </manifestEntries>
-                                    </transformer>
-                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                                    <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer" />
-                                </transformers>
-                            </configuration>
-                        </execution>
-                    </executions>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.apache.logging.log4j</groupId>
-                            <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
-                            <version>0.1.0</version>
-                        </dependency>
-                    </dependencies>
-                </plugin>
-
                 <!-- Executes units tests with scalatest  -->
                 <plugin>
                     <groupId>org.scalatest</groupId>
@@ -831,8 +894,10 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>3.1.0</version>
+                    <configuration>
+                        <longClasspath>true</longClasspath>
+                    </configuration>
                 </plugin>
-
             </plugins>
         </pluginManagement>
 

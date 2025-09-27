@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -68,10 +68,9 @@ case class JsonFileDataObject( override val id: DataObjectId,
 
   override val format = "json"
 
-  // this is only needed for FileRef actions
   override val fileName: String = "*.json*"
 
-  private val formatOptionsDefault = Map("multiLine" -> "true")
+  private val formatOptionsDefault = Map("multiLine" -> "true", "pathGlobFilter" -> fileName)
   override val options: Map[String, String] = formatOptionsDefault ++ jsonOptions.getOrElse(Map())
 
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {

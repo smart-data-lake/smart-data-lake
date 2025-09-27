@@ -43,8 +43,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
  * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
  *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
  *                               Default is None which keeps the whole filename (without path).
- * @param breakFileRefLineage If set to true, file references passed on from previous action are ignored by this action.
- *                            The action will detect on its own what files it is going to process.
+ * @param createFileRefLineage   If set to false, this action does not propagate output FileRefs to further actions.
+ *                               This helps to avoid performance and memory problems with too many FileRefs.
+ *                               Default is true.
  */
 case class FileTransferAction(override val id: ActionId,
                               inputId: DataObjectId,
@@ -52,6 +53,7 @@ case class FileTransferAction(override val id: ActionId,
                               overwrite: Boolean = true,
                               maxParallelism: Option[Int] = None,
                               filenameExtractorRegex: Option[String] = None,
+                              createFileRefLineage: Boolean = true,
                               override val breakFileRefLineage: Boolean = false,
                               override val executionMode: Option[ExecutionMode] = None,
                               override val executionCondition: Option[Condition] = None,
@@ -66,7 +68,7 @@ case class FileTransferAction(override val id: ActionId,
   override val outputs: Seq[FileRefDataObject] = Seq(output)
 
   // initialize FileTransfer
-  private val parallelism = Seq(maxParallelism,input.recommendedParallelism,output.recommendedParallelism).flatten.sorted.headOption.getOrElse(1) // take minimum value
+  private val parallelism = Seq(maxParallelism, input.recommendedParallelism, output.recommendedParallelism).flatten.sorted.headOption.getOrElse(1) // take first value
   private val fileTransfer = new StreamFileTransfer(input, output, overwrite, parallelism)
 
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
@@ -83,12 +85,16 @@ case class FileTransferAction(override val id: ActionId,
     var fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) fileRefMapping = fileTransfer.exec(fileRefMapping)
-    val outputSubFeed = subFeed.copy(fileRefMapping = Some(fileRefMapping))
+    var outputSubFeed = subFeed.copy(fileRefMapping = Some(fileRefMapping))
     output.endWritingOutputStreams(outputSubFeed.partitionValues)
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
     val metrics = Map("files_written"->filesWritten) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    subFeed.withMetrics(metrics).asInstanceOf[FileSubFeed]
+    outputSubFeed = subFeed.withMetrics(metrics).asInstanceOf[FileSubFeed]
+    // remove fileRefMapping if createFileRefLineage is false
+    if (!createFileRefLineage) outputSubFeed = outputSubFeed.copy(fileRefMapping = None, fileRefs = None)
+    // return
+    outputSubFeed
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
@@ -105,7 +111,7 @@ case class FileTransferAction(override val id: ActionId,
           }
       }
     }
-    subFeed
+    super.postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
   }
 
   override def factory: FromConfigFactory[Action] = FileTransferAction

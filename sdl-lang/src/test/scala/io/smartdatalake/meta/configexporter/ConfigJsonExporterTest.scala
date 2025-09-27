@@ -44,7 +44,7 @@ class ConfigJsonExporterTest extends FunSuite {
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))
     assert((actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "b.[].b1").asInstanceOf[JString].s.linesIterator.toSeq === Seq("Beschreibung B1", "2nd line B1 text"))
     assert(((actualJsonOutput \ "actions" \ "actionId6" \ "transformers")(0) \ "_parameters")(0) \ "name" === JString("session"))
-    assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" === JString("Documentation for TestTransformer.\nThis should be exported by ConfigJsonExporter!"))
+    assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" === JString("Documentation for TestTransformer.  \nThis should be exported by ConfigJsonExporter!"))
   }
 
   test("test main file export") {

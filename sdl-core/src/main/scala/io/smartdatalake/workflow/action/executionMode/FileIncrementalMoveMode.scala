@@ -20,8 +20,8 @@
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -73,7 +73,7 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None, archiveIn
         if (fileRefs.isEmpty) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${inputDataObject.id}, partitionValues=${inputSubFeed.partitionValues.mkString(", ")}")
         Some(ExecutionModeResult(fileRefs = Some(fileRefs), inputPartitionValues = inputSubFeed.partitionValues, outputPartitionValues = inputSubFeed.partitionValues))
       case (inputDataObject: SparkFileDataObject, inputSubFeed: SparkSubFeed) =>
-        if (!inputDataObject.checkFilesExisting) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
+        if (!inputDataObject.checkFilesExisting()) throw NoDataToProcessWarning(actionId.id, s"($actionId) No files to process found for ${mainInput.id} by FileIncrementalMoveMode.")
         if (inputDataObject.isV2ReadDataSource) { // for V1 DataSources this needs to be implemented in postExec
           // setup observation of files processed
           sparkFilesObserver = Some(inputDataObject.setupFilesObserver(actionId))

@@ -19,18 +19,18 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
+import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.apache.spark.sql.types.TimestampType
+import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.nio.file.Files
 class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
@@ -57,7 +57,7 @@ class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
   test("deduplication test with primary key") {
 
     // prepare
-    val deduplicateTransformer = DeduplicateTransformer(rankingExpression = "coalesce(updated_at, created_at)", primaryKeyColumns = Some(Seq("id")))
+    val deduplicateTransformer = DeduplicateTransformer(rankingExpression = Some("coalesce(updated_at, created_at)"), primaryKeyColumns = Some(Seq("id")))
 
     val df = SparkDataFrame(Seq(
       (1, "2019-04-25 12:23:29", "2020-06-21 22:51:48"),
@@ -80,7 +80,7 @@ class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
   test("deduplication test with primary key and different rankingExpression") {
 
     // prepare
-    val deduplicateTransformer = DeduplicateTransformer(rankingExpression = "created_at", primaryKeyColumns = Some(Seq("id")))
+    val deduplicateTransformer = DeduplicateTransformer(rankingExpression = Some("created_at"), primaryKeyColumns = Some(Seq("id")))
 
     val df = SparkDataFrame(Seq(
       (1, "2019-04-25 12:23:29", "2020-06-21 22:51:48"),
@@ -103,7 +103,7 @@ class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
   test("deduplication test with multiple primary key columns") {
 
     // prepare
-    val deduplicateTransformer = DeduplicateTransformer(rankingExpression = "coalesce(updated_at, created_at)", primaryKeyColumns = Some(Seq("pk1", "pk2")))
+    val deduplicateTransformer = DeduplicateTransformer(rankingExpression = Some("coalesce(updated_at, created_at)"), primaryKeyColumns = Some(Seq("pk1", "pk2")))
 
     val df = SparkDataFrame(Seq(
       (1, 1, "2019-04-25 12:23:29", "2020-06-21 22:51:48"),
@@ -149,7 +149,9 @@ class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
     Environment.instanceRegistry.register(tgtDO)
 
     // setup action
-    val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id, transformers = Seq(DeduplicateTransformer(rankingExpression = "coalesce(updated_at, created_at)")))(Environment.instanceRegistry)
+    val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id,
+      transformers = Seq(DeduplicateTransformer(rankingExpression = Some("coalesce(updated_at, created_at)")))
+    )(Environment.instanceRegistry)
     Environment.instanceRegistry.register(action)
 
     // setup DAG
@@ -193,7 +195,9 @@ class DeduplicateTransformerTest extends FunSuite with BeforeAndAfter {
 
 
     // setup action
-    val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id, transformers = Seq(DeduplicateTransformer(rankingExpression = "coalesce(updated_at, created_at)")))(Environment.instanceRegistry)
+    val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id,
+      transformers = Seq(DeduplicateTransformer(rankingExpression = Some("coalesce(updated_at, created_at)")))
+    )(Environment.instanceRegistry)
     Environment.instanceRegistry.register(action)
 
     // setup DAG

@@ -20,10 +20,6 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.workflow.action.spark.customlogic.NotFoundError
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.tolerantGet
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-import org.apache.spark.sql.functions.col
 
 import java.io.{FileNotFoundException, InputStream}
 import scala.reflect.runtime.universe
@@ -34,9 +30,9 @@ import scala.util.{Failure, Success, Try}
   * Helper functions to work with custom code,
   * either compiled at runtime or from classes in classpath
   */
-private[smartdatalake] object CustomCodeUtil {
+object CustomCodeUtil {
 
-  private val runtimeMirror = scala.reflect.runtime.currentMirror
+  private lazy val runtimeMirror = universe.runtimeMirror(Environment.classLoader())
 
   // get Scala Toolbox to compile code at runtime
   private lazy val tb = runtimeMirror.mkToolBox()

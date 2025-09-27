@@ -20,12 +20,11 @@
 package io.smartdatalake.workflow.action.script
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId}
+import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
-import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable
 
@@ -121,7 +120,7 @@ trait CmdScriptBase extends ParsableScriptDef with SmartDataLakeLogger {
   private def translateWinToWslPath(path: String): String = {
     assert(EnvironmentUtil.isWindowsOS)
     import sys.process._
-    val wslPath = s"wsl wslpath '$path'".!!
+    val wslPath = s"wsl wslpath '${path.replace('\\', '/')}'".!!
     wslPath.linesIterator.find(_.nonEmpty).get.trim
   }
 }

@@ -37,10 +37,11 @@ private[smartdatalake] case class TaskFailedException(id: NodeId, msg: String, c
 private[smartdatalake] object TaskFailedException {
   def apply(id: NodeId, cause: Throwable, results: Option[Seq[SubFeed]]): TaskFailedException = {
     // get root cause to show create message of this exception
-    val rootCause = getRootCause(cause)
+    val rootCause = Option(getRootCause(cause))
     // create message including first line of cause message
-    val rootCauseFirstLine = LogUtil.splitLines(rootCause.getMessage).headOption
-    val msg = s"Task $id failed. Root cause is '${rootCause.getClass.getSimpleName}${rootCauseFirstLine.map(": "+_).getOrElse("")}'"
+    val rootCauseFirstLine = rootCause.map(ex => LogUtil.limitLines(ex.getMessage))
+    val rootCauseMsg = rootCause.map(ex => s"${ex.getClass.getSimpleName}${rootCauseFirstLine.map(": " + _).getOrElse("")}").getOrElse("null")
+    val msg = s"Task $id failed. Root cause is '$rootCauseMsg'"
     // create exception
     val ex = cause match {
       case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity, results)

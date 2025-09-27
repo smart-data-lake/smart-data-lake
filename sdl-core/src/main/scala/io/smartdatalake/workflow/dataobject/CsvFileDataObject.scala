@@ -24,7 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -92,7 +92,8 @@ case class CsvFileDataObject( override val id: DataObjectId,
     "header" -> "true",
     "inferSchema" -> "false",
     "delimiter" -> ",",
-    "quote" -> null
+    "quote" -> null,
+    "pathGlobFilter" -> fileName
   )
 
   /**

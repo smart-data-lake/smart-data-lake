@@ -89,7 +89,7 @@ case class CustomDfTransformerConfig( className: Option[String] = None, scalaFil
   }.orElse{
     scalaCode.map(code => ScalaCodeSparkDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse {
-    sqlCode.map(code => SQLDfTransformer(code = code, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
+      sqlCode.map(code => SQLDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse {
     pythonFile.map(file => PythonCodeDfTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
   }.orElse{

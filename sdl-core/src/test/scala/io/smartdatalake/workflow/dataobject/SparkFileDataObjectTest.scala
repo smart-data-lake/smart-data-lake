@@ -253,7 +253,9 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     )
 
     // test received DataFrame
-    val df = dataObject.getSparkDataFrame()
+    val dfInit = dataObject.getSparkDataFrame()(contextInit)
+    dfInit.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
+    val df = dataObject.getSparkDataFrame()(contextExec)
     df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
     df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
 

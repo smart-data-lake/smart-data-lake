@@ -44,10 +44,11 @@ abstract class FileOneToOneActionImpl extends ActionSubFeedsImpl[FileSubFeed] {
   override def recursiveInputs: Seq[FileRefDataObject with CanCreateInputStream] = Seq()
 
   /**
-   * Stop propagating input FileRefs through action and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.
+   * If set to true, file references passed on from previous action are ignored by this action. and instead get new FileRefs from DataObject according to the SubFeed's partitionValue.
    * This is needed to reprocess all files of a path/partition instead of the FileRef's passed from the previous Action.
+   * Default is false.
    */
-  def breakFileRefLineage: Boolean
+  def breakFileRefLineage: Boolean = false
 
   override def validateConfig(): Unit = {
     super.validateConfig()
