@@ -20,18 +20,19 @@
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.dataframe.GenericRow
+
 import scala.reflect.runtime.universe
 
-case class ScalaRow(value: Seq[Any]) extends GenericRow {
-  def apply(ix: Int) = value(ix)
+case class ScalaRow(values: IndexedSeq[Any]) extends GenericRow {
+  def apply(ix: Int) = values(ix)
 
-  override def get(index: Int): Any = value(index)
+  override def get(index: Int): Any = values(index)
 
   override def getStruct(index: Int): GenericRow = this //not relevant for our tests
 
-  override def getAs[T](index: Int): T = value(index).asInstanceOf[T]
+  override def getAs[T](index: Int): T = values(index).asInstanceOf[T]
 
-  override def toSeq: Seq[Any] = value
+  override def toSeq: Seq[Any] = values
 
   override def subFeedType: universe.Type =  universe.typeOf[ScalaSubFeed]
 }

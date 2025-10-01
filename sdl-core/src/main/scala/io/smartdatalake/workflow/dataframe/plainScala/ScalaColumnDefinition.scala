@@ -20,17 +20,26 @@
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.dataframe.GenericField
-import scala.reflect.runtime.universe
 
-case class ScalaColumnDefinition(name: String,
-                                 dataType: ScalaDataType,
-                                 nullable: Boolean = false,
-                                 comment: Option[String] = None) extends GenericField {
-  def makeNullable: ScalaColumnDefinition = this.copy(nullable = true)
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
-  def toLowerCase: ScalaColumnDefinition = this.copy(name = name.toLowerCase)
+case class ScalaColumnDefinition[A: ClassTag](name: String,
+                                              nullable: Boolean = false,
+                                              comment: Option[String] = None) extends GenericField {
 
-  def removeMetadata: ScalaColumnDefinition = this //not applicable
+  // datatype is deduced from generic type A.
+  val dataType: ScalaDataType[A] = ScalaDataType.getFor[A]
 
-  override def subFeedType: universe.Type = ???//universe.typeOf[ScalaSubFeed]
+  def makeNullable: ScalaColumnDefinition[A] = copy(nullable = true)
+
+  def toLowerCase: ScalaColumnDefinition[A] = copy(name = name.toLowerCase)
+
+  def removeMetadata: ScalaColumnDefinition[A] = copy(comment = None)
+
+  def createColumn(data: IndexedSeq[_]): ScalaColumn[A] = {
+    ScalaColumn(this, data.asInstanceOf[IndexedSeq[A]])
+  }
+
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
 }
