@@ -21,54 +21,180 @@ package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericSimpleDataType}
-import io.smartdatalake.workflow.dataframe.plainScala.ScalaDataTypeEnum.{NUMBER, STRING, ScalaDataTypeEnum}
 import org.json4s.{JString, JValue}
 
-import scala.reflect.runtime.universe
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
 
+object ScalaStringDataType extends ScalaDataType[String] {
+  def isNumeric: Boolean = false
 
-case class ScalaDataType(inner: ScalaDataTypeEnum) extends GenericDataType with GenericSimpleDataType{
-  def isSortable: Boolean = !Seq(STRING, NUMBER).contains(inner)
+  def ordering: Ordering[String] = Ordering[String]
 
-  def isNumeric: Boolean = inner == ScalaDataTypeEnum.NUMBER
+  def getCastFunction(fromDataType: ScalaDataType[_]): (Any => String) = {
+    fromDataType match {
+      case ScalaStringDataType => (x => x.asInstanceOf[String])
+      case ScalaIntDataType => (x => x.asInstanceOf[Int].toString)
+      case ScalaDoubleDataType => (x => x.asInstanceOf[Double].toString)
+      case ScalaBooleanDataType => (x => x.asInstanceOf[Boolean].toString)
+    }
+  }
 
-  def isBoolean: Boolean = inner == ScalaDataTypeEnum.BOOLEAN
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = {
+    other match {
+      case _ => this
+    }
+  }
+}
+
+object ScalaDoubleDataType extends ScalaDataType[Double] {
+  def isNumeric: Boolean = true
+
+  private val fractional = implicitly[Fractional[Double]]
+
+  override def numeric: Numeric[Double] = fractional
+
+  override def numericDiv: ((Double, Double) => Double) = fractional.div
+
+  def ordering: Ordering[Double] = Ordering[Double]
+
+  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Double) = {
+    fromDataType match {
+      case ScalaDoubleDataType => (x => x.asInstanceOf[Double])
+      case ScalaStringDataType => (x => x.asInstanceOf[String].toDouble)
+      case ScalaIntDataType => (x => x.asInstanceOf[Int].toDouble)
+      case ScalaBooleanDataType => (x => if (x.asInstanceOf[Boolean]) 1d else 0d)
+    }
+  }
+
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = {
+    other match {
+      case ScalaStringDataType => other
+      case _ => this
+    }
+  }
+}
+
+object ScalaIntDataType extends ScalaDataType[Int] {
+  def isNumeric: Boolean = true
+
+  private val integral = implicitly[Integral[Int]]
+
+  override def numeric: Numeric[Int] = integral
+
+  override def numericDiv: ((Int, Int) => Int) = integral.quot
+
+  def ordering: Ordering[Int] = Ordering[Int]
+
+  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Int) = {
+    fromDataType match {
+      case ScalaIntDataType => (x => x.asInstanceOf[Int])
+      case ScalaStringDataType => (x => x.asInstanceOf[String].toInt)
+      case ScalaDoubleDataType => (x => x.asInstanceOf[Double].toInt)
+      case ScalaBooleanDataType => (x => if (x.asInstanceOf[Boolean]) 1 else 0)
+    }
+  }
+
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = {
+    other match {
+      case ScalaStringDataType | ScalaDoubleDataType => other
+      case _ => this
+    }
+  }
+}
+
+object ScalaBooleanDataType extends ScalaDataType[Boolean] {
+  def isNumeric: Boolean = false
+
+  def ordering: Ordering[Boolean] = Ordering[Boolean]
+
+  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Boolean) = {
+    fromDataType match {
+      case ScalaBooleanDataType => (x => x.asInstanceOf[Boolean])
+      case ScalaStringDataType => (x => x.asInstanceOf[String].toLowerCase == "true")
+      case ScalaIntDataType => (x => x.asInstanceOf[Int] > 0)
+      case ScalaDoubleDataType => (x => x.asInstanceOf[Double] > 0d)
+    }
+  }
+
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = {
+    other match {
+      case ScalaStringDataType | ScalaIntDataType | ScalaDoubleDataType => other
+      case _ => this
+    }
+  }
+}
+
+abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSimpleDataType {
+
+  val scalaClass: Class[_] = implicitly[ClassTag[A]].runtimeClass
+
+  def typeName: String = scalaClass.getSimpleName.toLowerCase
+
+  def isSortable: Boolean = true
+
+  def ordering: Ordering[A]
+
+  def numeric: Numeric[A] = throw new IllegalStateException("'numeric' not implemented for this DataType")
+
+  def numericDiv: ((A, A) => A) = throw new IllegalStateException("'numericDiv' not implemented for this DataType")
 
   def getDecimalSpec: Option[(Int, Int)] = None; //not relevant as java.math.BigDecimal is not accepted as input
 
   override def isSimpleType: Boolean = true; //only simple types as of now
 
-  def typeName: String = inner.toString;
+  def sql: String = typeName
 
-  def sql: String = throw new NotImplementedError("The 'sql' operation for the ScalaDataType is not applicable");
+  def makeNullable: ScalaDataType[A] = this // this is for only for non-simple types
 
-  def makeNullable: ScalaDataType = this;
+  def toLowerCase: ScalaDataType[A] = this // this is for only for non-simple types
 
-  def toLowerCase: ScalaDataType = this;
+  def removeMetadata: ScalaDataType[A] = this // this is for only for non-simple types
 
-  def removeMetadata: ScalaDataType = this;
-
-  def toJson: JValue = JString(inner.toString);
+  def toJson: JValue = JString(typeName)
 
   override def isSameType(other: GenericDataType): Boolean = {
     other match {
-      case scalaOther: ScalaDataType => inner == scalaOther.inner
+      case scalaOther: ScalaDataType[A] => this == scalaOther // this works as trait implementations are case objects
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
-  override def subFeedType: universe.Type = ???//universe.typeOf[ScalaSubFeed]
+  def getCastFunction(fromDataType: ScalaDataType[_]): (Any => A)
+
+  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_]
+
+  def createColumnDefinition(name: String, nullable: Boolean = false, comment: Option[String] = None): ScalaColumnDefinition[A] = {
+    ScalaColumnDefinition[A](name, nullable, comment)
+  }
+
+  def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
+    ScalaColumnDefinition[A](fromColumnDefinition.name, fromColumnDefinition.nullable, fromColumnDefinition.comment)
+  }
+
+  def castColumn(fromColumn: ScalaColumn[_]): ScalaColumn[A] = {
+    if (fromColumn.definition.dataType.scalaClass == this.scalaClass) fromColumn.asInstanceOf[ScalaColumn[A]]
+    else {
+      val castFun = getCastFunction(fromColumn.definition.dataType)
+      castColumnDefinition(fromColumn.definition)
+        .createColumn(fromColumn.data.map(x => castFun(x)))
+    }
+  }
+
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
 }
 
 object ScalaDataType {
-  def fromValue(v: Any): ScalaDataType = {
-    val enumType = v match {
-      case _: Int | _: Double => ScalaDataTypeEnum.NUMBER
-      case _: String => ScalaDataTypeEnum.STRING
-      case _: Boolean => ScalaDataTypeEnum.BOOLEAN
-      case _ => throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with value $v")
+  def getFor[A](implicit ct: ClassTag[A]): ScalaDataType[A] = getFor(ct.runtimeClass).asInstanceOf[ScalaDataType[A]]
+
+  def getFor(cls: Class[_]): ScalaDataType[_] = {
+    cls match {
+      case cls if cls == classOf[String] => ScalaStringDataType
+      case cls if cls == classOf[Int] || cls == classOf[Integer] => ScalaIntDataType
+      case cls if cls == classOf[Double] => ScalaDoubleDataType
+      case cls if cls == classOf[Boolean] => ScalaBooleanDataType
+      case _ => throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with class ${cls.getSimpleName}")
     }
-    ScalaDataType(enumType)
   }
 }
 

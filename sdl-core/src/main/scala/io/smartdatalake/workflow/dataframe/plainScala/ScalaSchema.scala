@@ -19,13 +19,13 @@
 
 package io.smartdatalake.workflow.dataframe.plainScala
 
-import ScalaDataTypeEnum._
 import io.smartdatalake.config.SdlConfigObject
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericDataType, GenericField, GenericSchema}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
-case class ScalaSchema(_fields: List[ScalaColumnDefinition], isInferred: Boolean = false) extends GenericSchema {
+
+case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInferred: Boolean = false) extends GenericSchema {
 
   //only ignores upper / lower case difference
   override def diffSchema(schema: GenericSchema): Option[GenericSchema] = schema match {
@@ -36,55 +36,42 @@ case class ScalaSchema(_fields: List[ScalaColumnDefinition], isInferred: Boolean
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
   }
 
-  override def fields: Seq[ScalaColumnDefinition] = _fields.toSeq
-
   override def columns: Seq[String] = fields.map(_.name)
 
-  //not really relevant...
-  override def sql: String = fields.map(sc => s"${sc.name} ${sc.dataType.inner} ${if (sc.nullable) "" else "not null"}").mkString(",\n")
+  override def sql: String = fields.map(sc => s"${sc.name} ${sc.dataType.sql}${if (sc.nullable) "" else " not null"}").mkString(", ")
 
   override def add(colName: String, dataType: GenericDataType): GenericSchema = dataType match {
-    case scalaType: ScalaDataType => add(ScalaColumnDefinition(colName, dataType.asInstanceOf[ScalaDataType]))
+    case scalaType: ScalaDataType[_] => add(scalaType.createColumnDefinition(colName))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
   }
 
   override def add(field: GenericField): ScalaSchema = field match {
-    case scalaCol: ScalaColumnDefinition => ScalaSchema(_fields :+ field.asInstanceOf[ScalaColumnDefinition])
+    case scalaCol: ScalaColumnDefinition[_] => copy(fields = fields :+ scalaCol)
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(field)
   }
 
-  override def remove(colName: String): ScalaSchema = ScalaSchema(_fields.filterNot(_.name == colName))
+  override def remove(colName: String): ScalaSchema = copy(fields = fields.filterNot(_.name == colName))
 
-  override def filter(func: GenericField => Boolean): ScalaSchema = ScalaSchema(_fields.filter(func))
+  override def filter(func: GenericField => Boolean): ScalaSchema = copy(fields = fields.filter(func))
 
-
-  override def getDataType(colName: String): ScalaDataType = {
-    require(fields.map(_.name).contains(colName), s"The column $colName does not exist in the ScalaSchema")
-    fields.collectFirst({case field if field.name == colName => field.dataType}).get
+  override def getDataType(colName: String): ScalaDataType[_] = {
+    fields.collectFirst({ case field if field.name == colName => field.dataType })
+      .getOrElse(throw new IllegalArgumentException(s"The column $colName does not exist in the ScalaSchema"))
   }
 
-  override def makeNullable: ScalaSchema = ScalaSchema(_fields.map(_.makeNullable))
+  override def makeNullable: ScalaSchema = copy(fields = fields.map(_.makeNullable))
 
-  override def toLowerCase: ScalaSchema = ScalaSchema(_fields.map(_.makeNullable))
+  override def toLowerCase: ScalaSchema = copy(fields = fields.map(_.makeNullable))
 
-  override def removeMetadata: ScalaSchema = ScalaSchema(_fields.map(_.removeMetadata))
+  override def removeMetadata: ScalaSchema = copy(fields = fields.map(_.removeMetadata))
 
-  override def getEmptyDataFrame(dataObjectId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = ???
+  override def getEmptyDataFrame(dataObjectId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    // TODO
+    null
+  }
 
   override def treeString(level: Int): String = fields.map(f => f"${f.name} (${f.dataType})").mkString("  |  "); //only flat structure as of now
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
 }
 
-object ScalaSchema {
-
-  def apply(pairs: Seq[(String, ScalaDataTypeEnum)]): ScalaSchema = {
-    val fields = pairs.map(p => ScalaColumnDefinition(p._1, ScalaDataType(p._2))).toList
-    ScalaSchema(fields)
-  }
-
-  def inferredFromFields(pairs: Seq[(String, ScalaDataTypeEnum)]): ScalaSchema = {
-    val fields = pairs.map(p => ScalaColumnDefinition(p._1, ScalaDataType(p._2))).toList
-    ScalaSchema(fields, true)
-  }
-}

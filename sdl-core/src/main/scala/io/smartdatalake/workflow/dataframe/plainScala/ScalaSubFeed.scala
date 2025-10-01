@@ -23,13 +23,13 @@ import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import io.smartdatalake.workflow.dataframe.{DataFrameObservation, GenericArrayDataType, GenericColumn, GenericDataFrame, GenericDataType, GenericField, GenericMapDataType, GenericRow, GenericSchema, GenericStructDataType, GenericUnaryUdf, GenericWhen}
+import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-case class ScalaSubFeed(override val dataFrame: Option[ScalaDataframe],
+case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues] = Seq(),
                         override val isDAGStart: Boolean = false,
@@ -48,7 +48,7 @@ case class ScalaSubFeed(override val dataFrame: Option[ScalaDataframe],
 
   override def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
 
-  override def withDataFrame(dataFrame: Option[GenericDataFrame]): ScalaSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[ScalaDataframe]))
+  override def withDataFrame(dataFrame: Option[GenericDataFrame]): ScalaSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[ScalaDataFrame]))
 
   override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
 
@@ -65,12 +65,12 @@ case class ScalaSubFeed(override val dataFrame: Option[ScalaDataframe],
       case _ =>
         (None, false)
     }
-    var resultSubfeed: ScalaSubFeed = this.copy(dataFrame = dataFrame.asInstanceOf[Option[ScalaDataframe]]
+    var resultSubfeed: ScalaSubFeed = this.copy(dataFrame = dataFrame.asInstanceOf[Option[ScalaDataFrame]]
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
     )
-    if (dummy && dataFrame.isDefined) resultSubfeed = this.copy(dataFrame = Some(ScalaDataframe.returnEmpty(dataFrame.get.asInstanceOf[ScalaDataframe].schema)), isDummy = true)
+    if (dummy && dataFrame.isDefined) resultSubfeed = this.copy(dataFrame = Some(ScalaDataFrame.returnEmpty(dataFrame.get.asInstanceOf[ScalaDataFrame].schema)), isDummy = true)
     // return
     resultSubfeed
   }
@@ -93,7 +93,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
     if (fields.isEmpty) throw new IllegalArgumentException("Please provide at least one field to create a schema")
     fields.head match {
-      case scalaField: ScalaColumnDefinition => ScalaSchema(fields.asInstanceOf[Seq[ScalaColumnDefinition]].toList)
+      case scalaField: ScalaColumnDefinition[_] => ScalaSchema(fields.map(_.asInstanceOf[ScalaColumnDefinition[_]]).toList)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(fields.head)
     }
   }
@@ -102,13 +102,13 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   override def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     dataFrame match {
-      case scalaDf: ScalaDataframe => ScalaSubFeed(Some(scalaDf), dataObjectId, partitionValues)
+      case scalaDf: ScalaDataFrame => ScalaSubFeed(Some(scalaDf), dataObjectId, partitionValues)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataFrame)
     }
   }
 
   def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = schema match {
-    case ss: ScalaSchema => ScalaDataframe.returnEmpty(ss)
+    case ss: ScalaSchema => ScalaDataFrame.returnEmpty(ss)
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
   }
 
@@ -197,6 +197,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = throwNotImplementedError
 
+  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = throwNotImplementedError
 }
 
 

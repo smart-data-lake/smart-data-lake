@@ -19,26 +19,19 @@
 
 package io.smartdatalake.workflow.dataframe.plainScala
 
-import ScalaDataTypeEnum.STRING
+import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericGroupedDataFrame}
 
 import scala.reflect.runtime.universe
 
 
-case class ScalaGroupedDataframe(keyColNames: Seq[String], groups: Map[Seq[Any], Seq[Int]], df: ScalaDataframe) extends GenericGroupedDataFrame {
+case class ScalaGroupedDataframe(keyColNames: Seq[String], df: ScalaDataFrame) extends GenericGroupedDataFrame {
 
-  override def agg(columns: Seq[GenericColumn]): GenericDataFrame = throw new NotImplementedError("For aggregations please use another signature providing an aggregation expression")
+  override def agg(columns: Seq[GenericColumn]): GenericDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    val scalaCols = columns.map(_.asInstanceOf[ScalaColumn[_]])
+    throw new NotImplementedError("agg not implemented yet for ScalaGroupedDataframe")
+  }
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
-
-  def agg[A >: Any](colName: String, aggExpr: (A, A) => A, newColName: String = "groupbyExpr"): ScalaDataframe = {
-    val colIx: Int = df.cols.indexWhere(_.name == colName)
-    val rows = groups.map(kv => {
-      val (key, rowIndices) = (kv._1, kv._2)
-      key ++ Seq((for (i <- rowIndices) yield df(i)(colIx)).reduce(aggExpr))
-    }).toSeq
-    val newType = if (rows.isEmpty || rows(0).isEmpty) ScalaDataType(STRING) else ScalaDataType.fromValue(rows.head.last)
-    val newSchema: ScalaSchema = ScalaSchema(df.schema._fields.filter(field => keyColNames.contains(field.name))).add(newColName, newType).asInstanceOf[ScalaSchema]
-    ScalaDataframe(schema = Some(newSchema), rows = rows)
-  }
 }
