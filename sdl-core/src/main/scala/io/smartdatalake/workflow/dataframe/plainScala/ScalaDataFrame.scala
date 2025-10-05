@@ -144,18 +144,18 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   override def distinct: ScalaDataFrame = ScalaDataFrame.fromScalaRows(rows = rows.distinct, schemaIn = Some(schema))
 
   //In order for "filter" to work, the new column must be written at the last index
-  def withColumnScala[_](colName: String, expression: ScalaColumn[_]): ScalaDataFrame = {
-    ScalaDataFrame(cols = this.cols :+ expression.as(colName))
+  def withColumnScala[_](colName: String, expression: ScalaAbstractColumn): ScalaDataFrame = {
+    ScalaDataFrame(cols = this.cols :+ expression.as(colName).toScalaColumn(this))
   }
 
   override def withColumn(colName: String, expression: GenericColumn): ScalaDataFrame = expression match {
-    case sc: ScalaColumn[_] => withColumnScala(colName, sc)
+    case sc: ScalaAbstractColumn => withColumnScala(colName, sc.toScalaColumn(this))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
   }
 
   override def withColumnRenamed(colName: String, newName: String): ScalaDataFrame = {
     // TODO: throw exception if colName not found
-    val newCols = cols.map(c => if (c.definition.name == colName) c.as(newName) else c)
+    val newCols = cols.map(c => if (c.definition.name == colName) c.as(newName).toScalaColumn(this) else c)
     ScalaDataFrame(newCols)
   }
 
