@@ -139,7 +139,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def coalesce(columns: GenericColumn*): GenericColumn = throwNotImplementedError
 
-  def col(colName: String): GenericColumn = throwNotImplementedError
+  def col(colName: String): GenericColumn = ScalaColumnReference(colName)
 
   def concat(exprs: GenericColumn*): GenericColumn = throwNotImplementedError
 
@@ -155,7 +155,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def hash(column: GenericColumn): GenericColumn = throwNotImplementedError
 
-  def lit(value: Any): GenericColumn = throwNotImplementedError
+  def lit(value: Any): ScalaAbstractColumn = ScalaDataType.getFor(value.getClass).createLiteral(value)
 
   def mapType(keyType: GenericDataType, valueType: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 

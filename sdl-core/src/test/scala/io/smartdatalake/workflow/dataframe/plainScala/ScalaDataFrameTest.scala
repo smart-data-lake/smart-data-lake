@@ -67,7 +67,6 @@ class ScalaDataFrameTest extends FunSuite {
     assert(df.collect.map(_.toSeq) == expected)
   }
 
-  // TODO: literal
   test("add literal column") {
     import ScalaSubFeed._
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
@@ -77,7 +76,6 @@ class ScalaDataFrameTest extends FunSuite {
     assert(df.collect.map(_.toSeq) == expected)
   }
 
-  // TODO: literal
   test("calculate with literal") {
     import ScalaSubFeed._
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
@@ -87,5 +85,16 @@ class ScalaDataFrameTest extends FunSuite {
       .withColumn("c", df("a") * lit(-1))
     assert(df1.collect.map(_.toSeq) == expected)
   }
+
+  test("calculate with column reference") {
+    import ScalaSubFeed._
+    val data = Seq(Seq(1, "A"), Seq(2, "B"))
+    val expected = Seq(Seq(1, "A", -1), Seq(2, "B", -2))
+    val df = data.toDF("a", "b")
+    val df1 = df
+      .withColumn("c", col("a") * lit(-1))
+    assert(df1.collect.map(_.toSeq) == expected)
+  }
+
 
 }

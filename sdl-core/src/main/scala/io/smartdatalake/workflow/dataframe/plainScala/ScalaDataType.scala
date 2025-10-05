@@ -168,6 +168,10 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
     ScalaColumnDefinition[A](name, nullable, comment)
   }
 
+  def createLiteral(value: Any): ScalaLiteral[A] = {
+    ScalaLiteral(value.asInstanceOf[A])
+  }
+
   def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
     ScalaColumnDefinition[A](fromColumnDefinition.name, fromColumnDefinition.nullable, fromColumnDefinition.comment)
   }
@@ -190,10 +194,12 @@ object ScalaDataType {
   def getFor(cls: Class[_]): ScalaDataType[_] = {
     cls match {
       case cls if cls == classOf[String] => ScalaStringDataType
-      case cls if cls == classOf[Int] || cls == classOf[Integer] => ScalaIntDataType
+      case cls if cls == classOf[Int] || cls == classOf[java.lang.Integer] => ScalaIntDataType
       case cls if cls == classOf[Double] => ScalaDoubleDataType
-      case cls if cls == classOf[Boolean] => ScalaBooleanDataType
-      case _ => throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with class ${cls.getSimpleName}")
+      case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
+      case _ =>
+        println(cls.getName)
+        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with class ${cls.getSimpleName}")
     }
   }
 }
