@@ -99,7 +99,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
   val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
 

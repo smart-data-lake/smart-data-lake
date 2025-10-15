@@ -69,7 +69,7 @@ object ProductUtil {
     case obj: ConfigObjectId => obj.id
   }
 
-  private def getRawFieldData(obj: Product, fieldName: String): Option[Any] = {
+  private[smartdatalake] def getRawFieldData(obj: Product, fieldName: String): Option[Any] = {
     obj.getClass.getDeclaredFields.find(_.getName == fieldName)
       .map {
         x =>
@@ -201,10 +201,30 @@ object ProductUtil {
   }
 
   /**
+   * Given the name of a Product class, return its attribute names.
+   */
+  def classAccessorNames[A <: Product : ClassTag](): List[String] = {
+    val cls = implicitly[ClassTag[A]].runtimeClass
+    val mirror = scala.reflect.runtime.currentMirror
+    val tpe: universe.Type = mirror.classSymbol(cls).toType
+    classAccessorNames(tpe)
+  }
+
+  /**
    * Given the type of a Product class, return its attribute names.
    */
   def classAccessorNames(tpe: universe.Type): List[String] = {
     classAccessors(tpe).map(_.name.toString)
+  }
+
+  /**
+   * Given the name of a Product class, return its attribute names.
+   */
+  def classAccessors[A <: Product : ClassTag](): List[MethodSymbol] = {
+    val cls = implicitly[ClassTag[A]].runtimeClass
+    val mirror = scala.reflect.runtime.currentMirror
+    val tpe: universe.Type = mirror.classSymbol(cls).toType
+    classAccessors(tpe)
   }
 
   /**

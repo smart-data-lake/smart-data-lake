@@ -96,5 +96,9 @@ class ScalaDataFrameTest extends FunSuite {
     assert(df1.collect.map(_.toSeq) == expected)
   }
 
+  // TODO: check null values handling
+
+  // TODO: implement explode function, so that FinalMetricsWriter can use ScalaDataFrame...
+
 
 }

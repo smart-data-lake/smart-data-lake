@@ -21,11 +21,12 @@ package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe._
 
 import scala.collection.immutable.Queue
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.util.{Failure, Success, Try}
 
@@ -230,6 +231,14 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 object ScalaDataFrame {
   def apply(rows: Seq[Seq[Any]], schema: Option[ScalaSchema] = None): ScalaDataFrame = {
     fromScalaRows(rows.map(row => ScalaRow(row.toIndexedSeq)), schema)
+  }
+
+  def apply[A <: Product : ClassTag](rows: Seq[A]): ScalaDataFrame = {
+    val classAccessors = ProductUtil.classAccessors[A]()
+    val mirror = scala.reflect.runtime.currentMirror
+    val schema = ScalaSchema(classAccessors.map(acc => ScalaDataType.getFor(mirror.runtimeClass(acc.returnType)).createColumnDefinition(acc.name.toTermName.toString)))
+    val cols = schema.columns
+    fromScalaRows(rows.map(row => ScalaRow(cols.map(ProductUtil.getRawFieldData(row, _)).toIndexedSeq)), Some(schema))
   }
 
   def apply(rows: Seq[Seq[Any]], colNames: Seq[String]): ScalaDataFrame = {

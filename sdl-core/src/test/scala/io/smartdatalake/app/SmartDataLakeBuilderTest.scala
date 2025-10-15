@@ -23,7 +23,7 @@ import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.StateUploader
@@ -106,7 +106,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
     // setup DataObjects
     // source table has partitions columns dt and type
-    val srcDO = MockDataObject("src1", partitions = Seq("dt", "type")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
@@ -204,7 +204,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
     // setup DataObjects
     // source table has partitions columns dt and type
-    val srcDO = MockDataObject("src1", partitions = Seq("dt", "type")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
@@ -281,12 +281,12 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
-    val tgt1DO = MockDataObject("tgt1", partitions = Seq("dt")).register
-    val tgt2DO = MockDataObject("tgt2", partitions = Seq("dt")).register
-    val tgt3DO = MockDataObject("tgt3", partitions = Seq("dt")).register
-    val tgt4DO = MockDataObject("tgt4", partitions = Seq("dt")).register
-    val tgt5DO = MockDataObject("tgt5", partitions = Seq("dt")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt")).register
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt")).register
+    val tgt3DO = MockSparkDataObject("tgt3", partitions = Seq("dt")).register
+    val tgt4DO = MockSparkDataObject("tgt4", partitions = Seq("dt")).register
+    val tgt5DO = MockSparkDataObject("tgt5", partitions = Seq("dt")).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -375,9 +375,9 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
-    val tgt1DO = MockDataObject("tgt1", partitions = Seq("dt")).register
-    val tgt2DO = MockDataObject("tgt2", partitions = Seq("dt")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt")).register
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt")).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -425,9 +425,9 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
-    val tgt1DO = MockDataObject("tgt1", partitions = Seq("dt")).register
-    val tgt2DO = MockDataObject("tgt2", partitions = Seq("dt")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt")).register
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt")).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -479,12 +479,12 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val src1DO = MockDataObject("src1").register
-    val src2DO = MockDataObject("src2").register
-    val tgt1DO = MockDataObject("tgt1").register
-    val tgt2DO = MockDataObject("tgt2").register
-    val tgt3DO = MockDataObject("tgt3").register
-    val tgt4DO = MockDataObject("tgt4").register
+    val src1DO = MockSparkDataObject("src1").register
+    val src2DO = MockSparkDataObject("src2").register
+    val tgt1DO = MockSparkDataObject("tgt1").register
+    val tgt2DO = MockSparkDataObject("tgt2").register
+    val tgt3DO = MockSparkDataObject("tgt3").register
+    val tgt4DO = MockSparkDataObject("tgt4").register
 
     // prepare data
     val dfSrc1 = Seq((1, "20180101", "person", "doe", "john", 5), (2, "20190101", "company", "olmo", "-", 10))
@@ -854,9 +854,9 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     assert(filesystem.exists(new Path("target/ext-state/state-test")))
     assert(filesystem.exists(new Path(uploadStagePath)))
     assert(filesystem.listFiles(new Path(uploadStagePath), true).hasNext)
-    val dfActionLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("actionLog")).getSparkDataFrame()
+    val dfActionLog = sdlb.instanceRegistry.get[TransactionalTableDataObject with CanCreateSparkDataFrame](DataObjectId("actionLog")).getSparkDataFrame()
     assert(dfActionLog.select($"run_id", $"action_id", $"attempt_id", $"state").as[(Long, String, Int, String)].collect().toSet == Set((1L, "act", 1, "SUCCEEDED")))
-    val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject](DataObjectId("metricsLog")).getSparkDataFrame()
+    val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject with CanCreateSparkDataFrame](DataObjectId("metricsLog")).getSparkDataFrame()
     assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long, String, String, Long)].collect().toSet == Set((1L, "act", "tgt", 1L)))
 
     // check StateUploader retry
@@ -880,10 +880,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
     // setup DataObjects
     // partition columns: dt, type
-    val srcDO = MockDataObject("src1", partitions = Seq("dt", "type")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = MockDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
-    val tgt2DO = MockDataObject("tgt2", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))

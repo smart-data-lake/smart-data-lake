@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject.expectations
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.action.CopyAction
@@ -48,8 +48,8 @@ class UniqueKeyExpectationTest extends AnyFunSuite with BeforeAndAfter {
 
   test("succeed and fail primary key validation with scope=Job") {
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
-    val tgtDO = MockDataObject("tgt1", primaryKey = Some(Seq("lastname")), saveMode = SDLSaveMode.Append,
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname")), saveMode = SDLSaveMode.Append,
       expectations = Seq(UniqueKeyExpectation("primaryKeyTest", approximate = false))
     ).register
 
@@ -84,8 +84,8 @@ class UniqueKeyExpectationTest extends AnyFunSuite with BeforeAndAfter {
 
   test("succeed and fail primary key validation with scope=All") {
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
-    val tgtDO = MockDataObject("tgt1", primaryKey = Some(Seq("lastname")), saveMode = SDLSaveMode.Append,
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname")), saveMode = SDLSaveMode.Append,
       expectations = Seq(UniqueKeyExpectation("primaryKeyTest", approximate = false, scope = ExpectationScope.All))
     ).register
 

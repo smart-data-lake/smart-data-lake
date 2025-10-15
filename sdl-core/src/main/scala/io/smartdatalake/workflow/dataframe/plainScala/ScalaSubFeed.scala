@@ -98,8 +98,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
-  override protected def subFeedType: reflect.runtime.universe.Type = typeOf[ScalaSubFeed]
-
+  @transient override def subFeedType: reflect.runtime.universe.Type = typeOf[ScalaSubFeed]
   override def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     dataFrame match {
       case scalaDf: ScalaDataFrame => ScalaSubFeed(Some(scalaDf), dataObjectId, partitionValues)

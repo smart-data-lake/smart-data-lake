@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -39,9 +39,9 @@ class DebugTransformerTest extends AnyFunSuite {
   test("copy load with transformer, a regular and a skipped input, skipped input is reset after decision to execute Action was made") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare
     val customTransformerConfig = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1 union all select * from src2"))

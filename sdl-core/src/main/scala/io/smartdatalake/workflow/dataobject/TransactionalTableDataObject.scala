@@ -24,9 +24,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 /**
  * Trait to mark DataObjects that support transactional writes.
  */
-trait TransactionalTableDataObject extends TableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
-
-  override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
+trait TransactionalTableDataObject extends TableDataObject with CanWriteDataFrame {
 
   val preReadSql: Option[String] = None
   val postReadSql: Option[String] = None
