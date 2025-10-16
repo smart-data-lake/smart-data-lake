@@ -362,7 +362,6 @@
                     <plugin>
                         <groupId>net.alchim31.maven</groupId>
                         <artifactId>scala-maven-plugin</artifactId>
-                        <version>4.5.6</version>
                         <executions>
                             <execution>
                                 <id>scala-doc</id>
@@ -418,9 +417,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <license.header.file>src/license/gplv3-header.txt</license.header.file>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <maven.compiler.release>8</maven.compiler.release>
+        <maven.compiler.release>11</maven.compiler.release>
         <scala.deps.scope>compile</scala.deps.scope>
         <spark.deps.scope>compile</spark.deps.scope>
         <hadoop.deps.scope>compile</hadoop.deps.scope>
@@ -676,7 +673,7 @@
                 <plugin>
                     <groupId>net.alchim31.maven</groupId>
                     <artifactId>scala-maven-plugin</artifactId>
-                    <version>4.5.6</version> <!-- attention: maven build fails when upgrading version -->
+                    <version>4.9.6</version>
                     <executions>
                         <execution>
                             <goals>
@@ -695,7 +692,7 @@
                             <arg>-deprecation</arg>
                             <arg>-feature</arg>
                             <arg>-explaintypes</arg>
-                            <arg>-target:jvm-1.${maven.compiler.release}</arg>
+                            <arg>-release:${maven.compiler.release}</arg>
                         </args>
                         <jvmArgs>
                             <jvmArg>-Xms64m</jvmArg>
@@ -876,7 +873,7 @@
                                 <version>2.0.6</version>
                             </requireMavenVersion>
                             <requireJavaVersion>
-                                <version>1.8</version>
+                                <version>11</version>
                             </requireJavaVersion>
                             <dependencyConvergence/>
                             <requireProperty>
