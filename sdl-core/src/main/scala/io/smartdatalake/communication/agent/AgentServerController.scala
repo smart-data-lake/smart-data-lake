@@ -20,7 +20,7 @@
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.app.{SmartDataLakeBuilder, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{CanBuildAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
 import io.smartdatalake.communication.message.{AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
@@ -30,37 +30,44 @@ import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
+import org.apache.hadoop.conf.Configuration
 
 case class AgentServerController(
                                   sdlb: SmartDataLakeBuilder
                                 ) extends SmartDataLakeLogger {
 
-  def handle(message: SDLMessage, agentServerSDLBConfig: SmartDataLakeBuilderConfig): Option[SDLMessage] = {
+  def handle(message: SDLMessage, sdlbConfig: CanBuildAgentSmartDataLakeBuilderConfig[_]): Option[SDLMessage] = {
     message match {
       case SDLMessage(SDLMessageType.AgentInstruction, None, None, None, agentInstructionOpt, None) => agentInstructionOpt match {
         case Some(agentInstruction) =>
           try {
             // reset instance registry to avoid side effects from previous runs
             sdlb.instanceRegistry.clear()
-            implicit val instanceRegistryImplicit: InstanceRegistry = sdlb.instanceRegistry
+            implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+            implicit val hadoopConfig: Configuration = new Configuration() // use default configuration
 
-            val configFromString = ConfigFactory.parseString(agentInstruction.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
+            val receivedConfig = ConfigFactory.parseString(agentInstruction.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
-            val connectionsToRegister = getConnectionConfigMap(configFromString)
-              .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+            val connectionsToRegister = if (sdlbConfig.useOnlyLocalConnectionConfig) {
+              assert(sdlbConfig.configuration.nonEmpty, "No local configuration provided, set useOnlyLocalConnectionConfig=false or specify hocon configuration to use when starting the agent server.")
+              val localConfig = sdlbConfig.getHoconConfig(validateCompletness = false)
+              getConnectionConfigMap(localConfig)
+                .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+            } else {
+              getConnectionConfigMap(receivedConfig)
+                .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+            }
+            instanceRegistry.register(connectionsToRegister)
 
-            instanceRegistryImplicit.register(connectionsToRegister)
-
-            val dataObjects = getDataObjectConfigMap(configFromString)
+            val dataObjects = getDataObjectConfigMap(receivedConfig)
               .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
-            instanceRegistryImplicit.register(dataObjects)
+            instanceRegistry.register(dataObjects)
 
-            val actions = getActionConfigMap(configFromString)
+            val actions = getActionConfigMap(receivedConfig)
               .map { case (id, config) => (ActionId(id), parseConfigObjectWithId[Action](id, config)) }
+            instanceRegistry.register(actions)
 
-            instanceRegistryImplicit.register(actions)
-
-            val resultingSubfeeds = sdlb.agentExec(appConfig = agentServerSDLBConfig, phase = agentInstruction.phase)
+            val resultingSubfeeds = sdlb.agentExec(appConfig = sdlbConfig, phase = agentInstruction.phase)
             val resultingDataObjectIdToSchema = resultingSubfeeds.flatMap {
               case subFeed: DataFrameSubFeed => subFeed.schema.map(schema => DataObjectId(subFeed.dataObjectId.id) -> schema.sql)
               case _ => None

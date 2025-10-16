@@ -34,10 +34,18 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
     val builder = OParser.builder[LocalJettyAgentSmartDataLakeBuilderConfig]
     import builder._
     OParser.sequence(
-    parserGeneric(false),
+      parserGeneric(false),
       opt[Int]('p', "port")
-      .action((arg, config) => config.copy(port = arg))
-      .text(s"Port that this agent listens to. Default is ${JettyAgentServerConfig.DefaultPort}")
+        .action((arg, config) => config.copy(port = arg))
+        .text(s"Port that this agent listens to. Default is ${JettyAgentServerConfig.DefaultPort}"),
+      opt[Boolean]('b', "useOnlyLocalConnectionConfig")
+        .action((arg, config) => config.copy(useOnlyLocalConnectionConfig = arg))
+        .text(
+          s"""
+             | Dont allow receiving connection configurations from the client, only use local ones.
+             | This is a security feature to avoid that the client can connect to arbitrary data sources.
+             | Default is true.
+          """.stripMargin)
     )
   }
 
@@ -49,15 +57,7 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    val envConfig = LocalJettyAgentSmartDataLakeBuilderConfig(
-      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
-      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',').toSeq).getOrElse(Seq()),
-      parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
-      statePath = sys.env.get("SDL_STATE_PATH"),
-    )
-
-    OParser.parse(agentParser, args, envConfig) match {
+    OParser.parse(agentParser, args, LocalJettyAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
         val agentController = AgentServerController(this)
         JettyAgentServer.start(agentServerConfig, agentController)
@@ -79,6 +79,7 @@ case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: Strin
                                                      override val test: Option[TestMode.Value] = None,
                                                      override val streaming: Boolean = false,
                                                      port: Int = DefaultPort,
-                                                     maxPortRetries: Int = MaxPortRetries
+                                                     maxPortRetries: Int = MaxPortRetries,
+                                                     override val useOnlyLocalConnectionConfig: Boolean = true
                                                     )
-  extends CanBuildSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig]
+  extends CanBuildAgentSmartDataLakeBuilderConfig[LocalJettyAgentSmartDataLakeBuilderConfig]

@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.agent
 import com.microsoft.azure.relay.{HybridConnectionClient, RelayConnectionStringBuilder, TokenProvider}
 import com.typesafe.config.Config
 import io.smartdatalake.communication.agent.AgentClient
-import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
+import io.smartdatalake.communication.message.{AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -36,19 +36,15 @@ import java.nio.ByteBuffer
  * See the class SmartDataLakeBuilderAzureRelayAgentIT for an example.
  *
  * @param url         Connection URL on how the agent can be reached. See io.smartdatalake.app.SmartDataLakeBuilderAzureRelayAgentIT#azureRelayUrl for an example.
- * @param connections : Map of private connections that this agent has access to.
- *                    Connections defined in the agents section override connections defined in the global connections section when they are executed on the Agent.
- *                    This allows the Agent to use some connections that are only accessible in the Agent's environment and not on the Remote Instance.
- *                    When the Agent is deployed, it gets the necessary authentication information for these agent connections on startup and then just waits for instructions.
  */
-case class AzureRelayAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection])
+case class AzureRelayAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())
   extends Agent with AgentClient with SmartDataLakeLogger {
 
   override def factory: FromConfigFactory[Agent] = AzureRelayAgent
 
   override def getClient: AgentClient = this
 
-  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): Option[SDLMessage] = {
+  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): AgentResult = {
     val connectionParams = new RelayConnectionStringBuilder(url)
     val tokenProvider: TokenProvider = TokenProvider.createSharedAccessSignatureTokenProvider(connectionParams.getSharedAccessKeyName, connectionParams.getSharedAccessKey)
     val client = new HybridConnectionClient(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
@@ -65,17 +61,17 @@ case class AzureRelayAgent(override val id: AgentId, url: String, override val c
       try {
         val sdlMessage = SDLMessage.fromJson(response)
         require(sdlMessage.msgType == SDLMessageType.AgentResult, "AgentServer must respond with AgentResult")
-        Some(sdlMessage)
+        sdlMessage
       } catch {
         case e: Exception =>
           throw new RuntimeException("Response from AgentServer is not parseable. It probably died. Response=" + response)
       }
-    }
-    else {
-      Option.empty[SDLMessage]
+    } else {
+      throw new RuntimeException("Response from AgentServer was empty. Maybe the read operation was still pending when the connection closed?")
     }
     connection.closeAsync.join
-    response
+    assert(response.agentResult.isDefined, s"($id) Agent response must be a message of type AgentResult, but received ${response}")
+    response.agentResult.get
   }
 }
 

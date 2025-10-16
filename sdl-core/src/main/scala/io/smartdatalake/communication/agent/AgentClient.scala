@@ -20,7 +20,7 @@
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
-import io.smartdatalake.communication.message.{AgentInstruction, SDLMessage, SDLMessageType}
+import io.smartdatalake.communication.message.{AgentInstruction, AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -66,5 +66,5 @@ object AgentClient {
 }
 
 trait AgentClient {
-  def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): Option[SDLMessage]
+  def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): AgentResult
 }

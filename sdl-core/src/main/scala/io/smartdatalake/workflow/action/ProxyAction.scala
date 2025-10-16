@@ -78,7 +78,11 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
     val response = agentClient.sendSDLMessage(hoconInstructions)
 
-    response.get.agentResult.get.dataObjectIdToSchema.map {
+    // throw exception if execution on agent failed
+    response.exception.foreach(e => throw RemoteAgentException(e))
+
+    // if succeeded, create subfeeds with empty dataframes but correct schema
+    response.dataObjectIdToSchema.map {
       case (dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)
     }.toSeq
   }
@@ -91,3 +95,5 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
       isDummy = true, filter = None)
   }
 }
+
+case class RemoteAgentException(e: Exception) extends Exception(e.getMessage, e)

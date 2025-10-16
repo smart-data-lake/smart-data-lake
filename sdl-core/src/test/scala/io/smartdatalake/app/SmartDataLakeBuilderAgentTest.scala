@@ -55,9 +55,9 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
   test("Test Config Parsing") {
     val feedName = "test"
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq("cp:/configAgents/agent-test.conf"))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq("cp:/configAgents/agent-main.conf"))
 
-    sdlb.loadConfigIntoInstanceRegistry(sdlConfig, session)
+    sdlb.loadConfigIntoInstanceRegistry(sdlConfig, session.sparkContext.hadoopConfiguration)
 
     val actionToSend = sdlb.instanceRegistry.getActions.filter(_.id.id == "remote-to-cloud-jetty-agent").head.asInstanceOf[ProxyAction].wrappedAction
 
@@ -89,10 +89,10 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
     // setup remote SDLB agent
     val remoteSDLB = new SmartDataLakeBuilder {}
     val agentController = AgentServerController(remoteSDLB)
-    JettyAgentServer.start(LocalJettyAgentSmartDataLakeBuilderConfig(configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)), agentController)
+    JettyAgentServer.start(LocalJettyAgentSmartDataLakeBuilderConfig(configuration = Seq("cp:/configAgents/agent-remote-server.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)), agentController)
 
     // run SDLB Main Instance
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test-(jetty|main)", configuration = Seq("cp:/configAgents/agent-test.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test-(jetty|main)", configuration = Seq("cp:/configAgents/agent-main.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString))
     sdlb.run(sdlConfig)
 
     // remoteSDLB should have executed exactly one action: the remoteAction
@@ -122,7 +122,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
     import scala.concurrent.ExecutionContext.Implicits.global
     Future {
       while (doPoll) {
-        server.pollForInstructions(LocalStorageAgentSmartDataLakeBuilderConfig(path = tempDir.resolve("storage-agent1").toString, pollIntervalSec = 1, configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)))
+        server.pollForInstructions(LocalStorageAgentSmartDataLakeBuilderConfig(configuration = Seq("cp:/configAgents/agent-remote-server.conf"), path = tempDir.resolve("storage-agent1").toString, pollIntervalSec = 1, configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)))
       }
     }.onComplete {
       case Success(_) => logger.info(s"pollForInstructions done")
@@ -130,7 +130,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
     }
 
     // run SDLB Main Instance
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test-(storage|main)", configuration = Seq("cp:/configAgents/agent-test.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString))
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test-(storage|main)", configuration = Seq("cp:/configAgents/agent-main.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString))
     sdlb.run(sdlConfig)
     doPoll = false
 

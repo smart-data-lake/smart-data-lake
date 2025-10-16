@@ -32,11 +32,13 @@ private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConf
   override def id: AgentId
 
   /**
-   * Map of private connections that this agent has access to.
+   * Optional Map of private connections that this agent has access to.
    *
-   * Connections defined in the agents section override connections defined in the global connections section when they are executed on the Agent.
-   * This allows the Agent to use some connections that are only accessible in the Agent's environment and not on the Remote Instance.
-   * When the Agent is deployed, it gets the necessary authentication information for these agent connections on startup and then just waits for instructions.
+   * If an Agent has no own Hocon connection configuration in the remote location, connections can be defined here
+   * and they will override connections defined in the global connections section for execution on the Agent.
+   * This allows the Agent to use some connections that are only accessible in the Agent's environment.
+   *
+   * Note that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons.
    */
   def connections: Map[String, Connection]
 

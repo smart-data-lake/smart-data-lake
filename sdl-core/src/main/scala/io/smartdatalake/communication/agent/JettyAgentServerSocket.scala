@@ -19,13 +19,13 @@
 
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.app.{LocalJettyAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.LocalJettyAgentSmartDataLakeBuilderConfig
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageMetadata, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
 
 
-class JettyAgentServerSocket(localJettyConfig: LocalJettyAgentSmartDataLakeBuilderConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
+class JettyAgentServerSocket(agentConfig: LocalJettyAgentSmartDataLakeBuilderConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
 
   override def onWebSocketConnect(sess: Session): Unit = {
 
@@ -44,12 +44,7 @@ class JettyAgentServerSocket(localJettyConfig: LocalJettyAgentSmartDataLakeBuild
     super.onWebSocketText(message)
     logger.info("Received " + message)
     val sdlMessage = SDLMessage.fromJson(message)
-    val sdlConfig = SmartDataLakeBuilderConfig(localJettyConfig.feedSel, applicationName = localJettyConfig.applicationName, configuration = localJettyConfig.configuration,
-      partitionValues = localJettyConfig.partitionValues,
-      parallelism = localJettyConfig.parallelism, statePath = localJettyConfig.statePath,
-      test = localJettyConfig.test, streaming = localJettyConfig.streaming)
-
-    val responseMessageOpt = agentController.handle(sdlMessage, sdlConfig)
+    val responseMessageOpt = agentController.handle(sdlMessage, agentConfig)
     if(responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get)
     else closeConnection()
   }

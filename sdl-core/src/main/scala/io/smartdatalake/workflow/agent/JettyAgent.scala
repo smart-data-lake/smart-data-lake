@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.agent
 
 import com.typesafe.config.Config
 import io.smartdatalake.communication.agent.{AgentClient, JettyAgentClientSocket}
-import io.smartdatalake.communication.message.SDLMessage
+import io.smartdatalake.communication.message.{AgentResult, SDLMessage}
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -37,7 +37,7 @@ import java.net.URI
  *
  * @param url Connection URL on how the agent can be reached, example: "ws://localhost:4441/ws/"
  */
-case class JettyAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection])
+case class JettyAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())
   extends Agent with AgentClient with SmartDataLakeLogger {
 
   override def factory: FromConfigFactory[Agent] = JettyAgent
@@ -46,7 +46,7 @@ case class JettyAgent(override val id: AgentId, url: String, override val connec
 
   override def getClient: AgentClient = this
 
-  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): Option[SDLMessage] = {
+  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): AgentResult = {
     assert(message.agentInstruction.isDefined, s"($id) Message must contain an agent instruction")
     val socket = new JettyAgentClientSocket()
     val client = new WebSocketClient
@@ -64,7 +64,9 @@ case class JettyAgent(override val id: AgentId, url: String, override val connec
       throw new RuntimeException(s"($id) Lost connection!")
     }
     client.stop()
-    socket.agentServerResponse
+    val response = socket.agentServerResponse.get
+    assert(response.agentResult.isDefined, s"($id) Agent response must be a message of type AgentResult, but received ${response} for instruction $instructionId")
+    response.agentResult.get
   }
 }
 

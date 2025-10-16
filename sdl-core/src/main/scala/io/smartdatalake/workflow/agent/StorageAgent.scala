@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.agent
 import com.typesafe.config.Config
 import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.communication.agent.StorageAgentServer.{FileType, getFilename}
-import io.smartdatalake.communication.message.SDLMessage
+import io.smartdatalake.communication.message.{AgentResult, SDLMessage}
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -38,12 +38,12 @@ import org.apache.hadoop.fs.{FileSystem, Path}
  * @param startTimeoutSec maximum time to wait for the start of the processing by the agent in seconds (default: 300s)
  * @param execTimeoutSec  maximum time to wait for the execution result in seconds (default: 300s)
  */
-case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec: Int = 300, execTimeoutSec: Int = 300, override val connections: Map[String, Connection])
+case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec: Int = 300, execTimeoutSec: Int = 300, override val connections: Map[String, Connection] = Map())
   extends Agent with AgentClient with SmartDataLakeLogger {
 
   private val hadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(path))
 
-  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): Option[SDLMessage] = {
+  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): AgentResult = {
     assert(message.agentInstruction.isDefined, s"($id) Message must contain an agent instruction")
     val instructionId = message.agentInstruction.get.instructionId
     val instructionFile = getFilename(hadoopPath, instructionId, FileType.Instruction)
@@ -61,7 +61,9 @@ case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec:
     }
     val resultStr = HdfsUtil.readHadoopFile(resultFile)
     logger.info(s"($id) Received result for $instructionId")
-    Some(SDLMessage.fromJson(resultStr))
+    val response = SDLMessage.fromJson(resultStr)
+    assert(response.agentResult.isDefined, s"($id) Agent response must be a message of type AgentResult, but received ${response} for instruction $instructionId")
+    response.agentResult.get
   }
 
   override def getClient: AgentClient = this

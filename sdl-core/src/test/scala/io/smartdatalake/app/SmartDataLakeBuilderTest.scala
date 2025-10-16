@@ -83,7 +83,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   test("Test command line config value overwrite") {
     val appConfig = sdlb.parse(Seq("-c", "cp:/application.conf", "-f", "test", "-o", "global.abc=def", "-o", "global.synchronousStreamingTriggerIntervalSec=5")).get
-    val hoconConfig = appConfig.getHoconConfig(session.sparkContext.hadoopConfiguration)
+    val hoconConfig = appConfig.getHoconConfig()(session.sparkContext.hadoopConfiguration)
     assert(hoconConfig.getString("global.abc") == "def")
     assert(hoconConfig.getInt("global.synchronousStreamingTriggerIntervalSec") == 5)
     assert(hoconConfig.getString("global.sparkUDFs.udfAddX.className") == "io.smartdatalake.app.TestUDFAddXCreator")

@@ -41,7 +41,15 @@ object LocalStorageAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .text("Polling interval in Seconds. Default is 60 seconds."),
       opt[Int]("stopAfterSec")
         .action((value, c) => c.copy(stopAfterSec = Some(value)))
-        .text("Number of seconds the agent run, and stop afterwards.")
+        .text("Number of seconds the agent run, and stop afterwards."),
+      opt[Boolean]('b', "useOnlyLocalConnectionConfig")
+        .action((arg, config) => config.copy(useOnlyLocalConnectionConfig = arg))
+        .text(
+          s"""
+             | Dont allow receiving connection configurations from the client, only use local ones.
+             | This is a security feature to avoid that the client can connect to arbitrary data sources.
+             | Default is true.
+          """.stripMargin)
     )
   }
 
@@ -90,6 +98,7 @@ case class LocalStorageAgentSmartDataLakeBuilderConfig(override val feedSel: Str
                                                        override val streaming: Boolean = false,
                                                        path: String = null,
                                                        pollIntervalSec: Int = 60,
-                                                       stopAfterSec: Option[Int] = None
+                                                       stopAfterSec: Option[Int] = None,
+                                                       override val useOnlyLocalConnectionConfig: Boolean = true
                                                       )
-  extends CanBuildSmartDataLakeBuilderConfig[LocalStorageAgentSmartDataLakeBuilderConfig]
+  extends CanBuildAgentSmartDataLakeBuilderConfig[LocalStorageAgentSmartDataLakeBuilderConfig]

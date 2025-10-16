@@ -19,7 +19,7 @@
 
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.app.{LocalStorageAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{LocalStorageAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
 import io.smartdatalake.communication.agent.StorageAgentServer.FileType.FileType
 import io.smartdatalake.communication.agent.StorageAgentServer.{FileType, getFilename}
 import io.smartdatalake.communication.message.{ActionLog, SDLMessage, SDLMessageType}
@@ -38,17 +38,17 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder) extends SmartDataLakeLogger
 
   private implicit val hadoopConfiguration: Configuration = new Configuration()
 
-  def pollForInstructions(config: LocalStorageAgentSmartDataLakeBuilderConfig): Boolean = {
-    val hadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(config.path))
+  def pollForInstructions(agentConfig: LocalStorageAgentSmartDataLakeBuilderConfig): Boolean = {
+    val hadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(agentConfig.path))
     implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopPath)
     filesystem.mkdirs(hadoopPath)
 
-    logger.info(s"Polling for instructions in ${config.path}")
-    if (config.stopAfterSec.exists(_ + startTime < System.currentTimeMillis() / 1000)) {
-      logger.info(s"Agent is going to stop now, as it has been running for ${config.stopAfterSec.get} seconds")
+    logger.info(s"Polling for instructions in ${agentConfig.path}")
+    if (agentConfig.stopAfterSec.exists(_ + startTime < System.currentTimeMillis() / 1000)) {
+      logger.info(s"Agent is going to stop now, as it has been running for ${agentConfig.stopAfterSec.get} seconds")
       return false
     }
-    WaitUtil.sleepUntil(pollIntervalSec = config.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
+    WaitUtil.sleepUntil(pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
       () => getInstructionFileIterator(hadoopPath).nonEmpty
     }
 
@@ -70,11 +70,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder) extends SmartDataLakeLogger
           assert(message.agentInstruction.isDefined, s"Message must contain an agent instruction")
 
           // process instruction
-          val sdlbConfig = SmartDataLakeBuilderConfig(config.feedSel, applicationName = config.applicationName, configuration = config.configuration,
-            partitionValues = config.partitionValues,
-            parallelism = config.parallelism, statePath = config.statePath,
-            test = config.test, streaming = config.streaming)
-          val resultMessage = agentController.handle(message, sdlbConfig)
+          val resultMessage = agentController.handle(message, agentConfig)
             .getOrElse(throw new IllegalStateException("No result message received from instruction processing"))
 
           // write result

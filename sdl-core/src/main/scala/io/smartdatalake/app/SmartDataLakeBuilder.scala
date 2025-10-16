@@ -18,13 +18,12 @@
  */
 package io.smartdatalake.app
 
-import com.typesafe.config.Config
 import io.smartdatalake.app
 import io.smartdatalake.communication.statusinfo.StatusInfoServer
 import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
 import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -41,69 +40,6 @@ import scopt.{OParser, OParserBuilder}
 import java.time.{Duration, LocalDateTime}
 import scala.annotation.tailrec
 import scala.util.Try
-
-trait CanBuildSmartDataLakeBuilderConfig[R] {
-
-  //All builder functions for all fields of the common SmartDataLakeBuilderConfig
-  def withFeedSel(value: String): R = ProductUtil.dynamicCopy(this, "feedSel", value).asInstanceOf[R]
-  def withApplicationName(value: Option[String]): R = ProductUtil.dynamicCopy(this, "applicationName", value).asInstanceOf[R]
-
-  def addConfiguration(value: Seq[String]): R = ProductUtil.dynamicCopy(this, "configuration", configuration ++ value).asInstanceOf[R]
-
-  def addConfigurationValueOverwrite(value: (String, String)): R = ProductUtil.dynamicCopy(this, "configurationValueOverwrite", configurationValueOverwrite + value).asInstanceOf[R]
-  def addPartitionValues(value: Seq[PartitionValues]): R = ProductUtil.dynamicCopy(this, "partitionValues", Some(partitionValues.getOrElse(Seq()) ++ value)).asInstanceOf[R]
-  def withParallelism(value: Int): R = ProductUtil.dynamicCopy(this, "parallelism", value).asInstanceOf[R]
-  def withStatePath(value: Option[String]): R = ProductUtil.dynamicCopy(this, "statePath", value).asInstanceOf[R]
-  def withTest(value: Option[TestMode.Value]): R = ProductUtil.dynamicCopy(this, "test", value).asInstanceOf[R]
-  def withStreaming(value: Boolean): R = ProductUtil.dynamicCopy(this, "streaming", value).asInstanceOf[R]
-  def withMaster(value: Option[String]): R = ProductUtil.dynamicCopy(this, "master", value).asInstanceOf[R]
-  def withDeployMode(value: Option[String]): R = ProductUtil.dynamicCopy(this, "deployMode", value).asInstanceOf[R]
-
-  // abstract instance variables
-  def feedSel: String
-
-  def applicationName: Option[String]
-
-  def configuration: Seq[String]
-
-  def configurationValueOverwrite: Map[String, String]
-
-  def partitionValues: Option[Seq[PartitionValues]]
-
-  def parallelism: Int
-
-  def statePath: Option[String]
-
-  def test: Option[TestMode.Value]
-
-  def streaming: Boolean
-
-  def master: Option[String]
-
-  def deployMode: Option[String]
-
-  // helper methods
-  def validate(): Unit = {
-    assert(!applicationName.exists(_.contains(HadoopFileActionDAGRunStateStore.fileNamePartSeparator)),
-      s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
-    assert(!applicationName.exists(_.matches(".*\\s.*")), s"Application name must not contain spaces ($applicationName)")
-    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
-    assert(configuration.nonEmpty, "Configuration files are empty")
-    assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
-    assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
-  }
-
-  val appName: String = applicationName.getOrElse(feedSel)
-
-  def isDryRun: Boolean = test.contains(TestMode.DryRun)
-
-  def getHoconConfig(implicit hadoopConfiguration: Configuration): Config = {
-    val config = ConfigLoader.loadConfigFromFilesystem(configuration, hadoopConfiguration, configurationValueOverwrite)
-    require(config.hasPath("actions"), s"No configuration parsed or it does not have a section called actions")
-    require(config.hasPath("dataObjects"), s"No configuration parsed or it does not have a section called dataObjects")
-    config
-  }
-}
 
 /**
  * This case class represents a default configuration for the App.
@@ -390,12 +326,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * Starts a simulation run and registers all SDL first class objects that are defined in the config file which path is defined in parameter appConfig
    */
   def startSimulationWithConfigFile(appConfig: SmartDataLakeBuilderConfig, initialSubFeeds: Seq[SparkSubFeed], dataObjectsState: Seq[DataObjectState] = Seq())(session: SparkSession): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
-    loadConfigIntoInstanceRegistry(appConfig, session)
+    loadConfigIntoInstanceRegistry(appConfig, session.sparkContext.hadoopConfiguration)
     startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
   }
 
-  def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, session: SparkSession): Unit = {
-    ConfigParser.parse(appConfig.getHoconConfig(session.sparkContext.hadoopConfiguration), this.instanceRegistry)
+  def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, hadoopConfiguration: Configuration): Unit = {
+    ConfigParser.parse(appConfig.getHoconConfig()(hadoopConfiguration), this.instanceRegistry)
   }
 
   /**
@@ -414,7 +350,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.debug(s"System properties: " + sys.props.toMap.map(x => x._1 + "=" + x._2).mkString(" "))
 
     // load config
-    val config = appConfig.getHoconConfig
+    val config = appConfig.getHoconConfig()
 
     // parse global config
     val globalConfig = GlobalConfig.from(config)
@@ -499,12 +435,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // return result statistics as string
     (finalSubFeeds, actionDAGRun.getStatistics)
   }
-  private[smartdatalake] def agentExec(appConfig: SmartDataLakeBuilderConfig, phase: ExecutionPhase, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now(), attemptStartTime: LocalDateTime = LocalDateTime.now(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState]= Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq(), simulation: Boolean = false, globalConfig: GlobalConfig = GlobalConfig(enableHive = false))(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
+
+  private[smartdatalake] def agentExec(appConfig: CanBuildSmartDataLakeBuilderConfig[_], phase: ExecutionPhase, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now(), attemptStartTime: LocalDateTime = LocalDateTime.now(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq(), simulation: Boolean = false, globalConfig: GlobalConfig = GlobalConfig(enableHive = false))(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
     // create and execute DAG
     val actionsToExecute = instanceRegistry.getActions
     logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
     val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
-    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
+    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig.getStdAppConfig(), runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
     val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {
