@@ -19,13 +19,10 @@
 package io.smartdatalake.communication.statusinfo.websocket
 
 import io.smartdatalake.app.StateListener
-import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType, StatusUpdate}
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase}
-import org.json4s.ext.EnumNameSerializer
-import org.json4s.jackson.Serialization.writePretty
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 
 import scala.collection.mutable.ListBuffer
 
@@ -38,21 +35,20 @@ class IncrementalStatusInfoListener extends StateListener with SmartDataLakeLogg
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
 
-    val updateJSON: SDLMessage =
-      if (changedActionId.isDefined) {
-        val changedActions = state.actionsState.filter(_._1 == changedActionId.get)
+    val updateJSON: SDLMessage = if (changedActionId.isDefined) {
+      val changedActions = state.actionsState.filter(_._1 == changedActionId.get)
 
-        if (changedActions.size != 1) {
-          logger.warn(s"Not exactly one changedAction! Got: $changedActions")
-        }
-
-        val changedAction = changedActions.head
-        SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(Some(changedAction._1.id), Some(changedAction._2), context.phase, state.finalState)))
-      }
-      else {
-        SDLMessage(SDLMessageType.EndConnection, Some(StatusUpdate(None, None, context.phase, state.finalState)))
+      if (changedActions.size != 1) {
+        logger.warn(s"Not exactly one changedAction! Got: $changedActions")
       }
 
-    activeSockets.foreach(socket => socket.getRemote.sendString(writePretty(updateJSON)(AgentClient.messageFormat)))
+      val changedAction = changedActions.head
+      SDLMessage(SDLMessageType.StatusUpdate, Some(StatusUpdate(Some(changedAction._1.id), Some(changedAction._2), context.phase, state.finalState)))
+    }
+    else {
+      SDLMessage(SDLMessageType.EndConnection, Some(StatusUpdate(None, None, context.phase, state.finalState)))
+    }
+
+    activeSockets.foreach(socket => socket.getRemote.sendString(updateJSON.toJson))
   }
 }

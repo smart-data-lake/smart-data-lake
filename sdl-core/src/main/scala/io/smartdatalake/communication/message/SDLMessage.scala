@@ -19,7 +19,12 @@
 
 package io.smartdatalake.communication.message
 
+import io.smartdatalake.communication.message.SDLMessage.messageFormat
 import io.smartdatalake.communication.message.SDLMessageType.SDLMessageType
+import io.smartdatalake.workflow.{ActionDAGRunState, ExecutionPhase}
+import org.json4s.Formats
+import org.json4s.ext.EnumNameSerializer
+import org.json4s.jackson.Serialization.{read, writePretty}
 
 /**
  * Represents a message that can be sent from a Smart Datalake Builder Instance
@@ -35,5 +40,15 @@ case class SDLMessage(msgType: SDLMessageType,
                       messageMetadata: Option[SDLMessageMetadata] = None,
                       agentInstruction: Option[AgentInstruction] = None,
                       agentResult: Option[AgentResult] = None
-                     )
+                     ) {
+  def toJson: String = {
+    writePretty(this)(messageFormat)
+  }
+}
 
+object SDLMessage {
+
+  def fromJson(json: String): SDLMessage = read[SDLMessage](json)
+
+  implicit val messageFormat: Formats = ActionDAGRunState.formats + new EnumNameSerializer(SDLMessageType) + new EnumNameSerializer(ExecutionPhase)
+}

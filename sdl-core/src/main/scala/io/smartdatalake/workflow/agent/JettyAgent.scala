@@ -20,25 +20,52 @@
 package io.smartdatalake.workflow.agent
 
 import com.typesafe.config.Config
+import io.smartdatalake.communication.agent.{AgentClient, JettyAgentClientSocket}
+import io.smartdatalake.communication.message.SDLMessage
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.Connection
+import org.eclipse.jetty.websocket.client.WebSocketClient
+
+import java.net.URI
 
 /**
- * Simple, unsecured [[Agent]] for development use that communicates via a plain Jetty Websocket.
+ * Simple, unsecured SDLB Remote [[Agent]] for development use that communicates via a plain Jetty Websocket.
  * See the class SmartDataLakeBuilderAgentTest for an example.
  *
- * @param url         Connection URL on how the agent can be reached, example: "ws://localhost:4441/ws/"
- * @param connections : Map of private connections that this agent has access to.
- *                    Connections defined in the agents section override connections defined in the global connections section when they are executed on the Agent.
- *                    This allows the Agent to use some connections that are only accessible in the Agent's environment and not on the Remote Instance.
- *                    When the Agent is deployed, it gets the necessary authentication information for these agent connections on startup and then just waits for instructions.
+ * @param url Connection URL on how the agent can be reached, example: "ws://localhost:4441/ws/"
  */
-case class JettyAgent(override val id: AgentId, override val url: String, override val connections: Map[String, Connection]) extends Agent {
+case class JettyAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection])
+  extends Agent with AgentClient with SmartDataLakeLogger {
 
   override def factory: FromConfigFactory[Agent] = JettyAgent
 
-  override val agentClientClassName = "io.smartdatalake.communication.agent.JettyAgentClient"
+  private val uri = URI.create(url)
+
+  override def getClient: AgentClient = this
+
+  override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): Option[SDLMessage] = {
+    assert(message.agentInstruction.isDefined, s"($id) Message must contain an agent instruction")
+    val socket = new JettyAgentClientSocket()
+    val client = new WebSocketClient
+    client.start()
+    val session = client.connect(socket, uri).get
+    val messageStr = message.toJson
+    logger.info(s"($id) Sending " + messageStr)
+    session.getRemote.sendString(messageStr)
+    val instructionId = message.agentInstruction.get.instructionId
+    while (socket.isConnected && socket.agentServerResponse.isEmpty) {
+      Thread.sleep(1000)
+      logger.info(s"($id) Waiting to finish $instructionId...")
+    }
+    if (!socket.isConnected) {
+      throw new RuntimeException(s"($id) Lost connection!")
+    }
+    client.stop()
+    socket.agentServerResponse
+  }
 }
 
 object JettyAgent extends FromConfigFactory[Agent] {
@@ -46,5 +73,3 @@ object JettyAgent extends FromConfigFactory[Agent] {
     extract[JettyAgent](config)
   }
 }
-
-

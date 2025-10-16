@@ -422,7 +422,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // parse config objects
     ConfigParser.parse(config, instanceRegistry) // share instance registry for custom code
-    // Attention: if JVM is shared between different SDL jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
+    // Attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), this overrides values from earlier jobs!
     Environment._instanceRegistry = instanceRegistry
 
     val snapshotListener = new SnapshotStatusInfoListener()

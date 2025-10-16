@@ -20,7 +20,6 @@ package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
 import io.smartdatalake.communication.agent.{AgentServerController, JettyAgentServer, JettyAgentServerConfig}
-import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
@@ -50,18 +49,17 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    val envconfig = LocalJettyAgentSmartDataLakeBuilderConfig(
+    val envConfig = LocalJettyAgentSmartDataLakeBuilderConfig(
       master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
       deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
       configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',').toSeq).getOrElse(Seq()),
       parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
       statePath = sys.env.get("SDL_STATE_PATH"),
-      applicationName = Some("AgentServer")
     )
 
-    OParser.parse(agentParser, args, envconfig) match {
+    OParser.parse(agentParser, args, envConfig) match {
       case Some(agentServerConfig) =>
-        val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
+        val agentController = AgentServerController(this)
         JettyAgentServer.start(agentServerConfig, agentController)
       case None =>
         throwOParserError()
@@ -69,8 +67,8 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   }
 }
 
-case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = null,
-                                                     override val applicationName: Option[String] = None,
+case class LocalJettyAgentSmartDataLakeBuilderConfig(override val feedSel: String = "*", // agent normally executes all feeds in registry
+                                                     override val applicationName: Option[String] = Some("jetty-agent"),
                                                      override val configuration: Seq[String] = Seq(),
                                                      override val configurationValueOverwrite: Map[String, String] = Map(),
                                                      override val master: Option[String] = None,

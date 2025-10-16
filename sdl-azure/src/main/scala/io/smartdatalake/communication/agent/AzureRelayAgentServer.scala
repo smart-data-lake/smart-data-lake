@@ -23,14 +23,11 @@ import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListe
 import io.smartdatalake.app.{LocalAzureRelayAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.communication.message.SDLMessage
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.json4s.Formats
-import org.json4s.jackson.Serialization.{read, writePretty}
 
 import java.net.URI
 import java.nio.ByteBuffer
 
 object AzureRelayAgentServer extends SmartDataLakeLogger {
-  implicit val format: Formats = AgentClient.messageFormat
 
   def start(localAzureRelayAgentConfig: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
     val connectionParams = new RelayConnectionStringBuilder(localAzureRelayAgentConfig.azureRelayURL.get + System.getenv("SharedAccessKey"))
@@ -53,7 +50,7 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
           if (bytesReceived.remaining > 0) {
             val message = new String(bytesReceived.array, bytesReceived.arrayOffset, bytesReceived.remaining)
             logger.info("Received " + message)
-            val sdlMessage = read[SDLMessage](message)
+            val sdlMessage = SDLMessage.fromJson(message)
             val sdlConfig = SmartDataLakeBuilderConfig(localAzureRelayAgentConfig.feedSel, applicationName = localAzureRelayAgentConfig.applicationName, configuration = localAzureRelayAgentConfig.configuration,
               partitionValues = localAzureRelayAgentConfig.partitionValues,
               parallelism = localAzureRelayAgentConfig.parallelism, statePath = localAzureRelayAgentConfig.statePath,
@@ -81,7 +78,7 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
   }
 
   private def sendSDLMessage(sdlMessage: SDLMessage, connection: HybridConnectionChannel): Unit = {
-    val outputString = writePretty(sdlMessage)
+    val outputString = sdlMessage.toJson
     logger.info("Sending " + outputString)
     val msgToSend = ByteBuffer.wrap(outputString.getBytes)
     connection.writeAsync(msgToSend)

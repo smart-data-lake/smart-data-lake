@@ -19,7 +19,6 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer}
-import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
@@ -67,7 +66,7 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
     OParser.parse(agentParser, args, LocalAzureRelayAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
-        val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
+        val agentController = AgentServerController(this)
         AzureRelayAgentServer.start(agentServerConfig, agentController)
       case None =>
         throwOParserError()
