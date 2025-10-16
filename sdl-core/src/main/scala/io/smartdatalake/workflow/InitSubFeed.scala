@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import sun.reflect.generics.reflectiveObjects.NotImplementedException
+import org.apache.commons.lang3.NotImplementedException
 
 /**
  * An InitSubFeed is used to initialize first Nodes of a [[DAG]].
