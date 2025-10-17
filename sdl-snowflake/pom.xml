@@ -85,7 +85,7 @@
 		<!-- Note that there might be a version conflict in the transitive dependency snowflake-jdbc between snowpark and spark-snowflake -->
 		<dependency>
 			<groupId>com.snowflake</groupId>
-			<artifactId>snowpark</artifactId>
+			<artifactId>snowpark_${scala.minor.version}</artifactId>
 			<version>${snowflake-snowpark.version}</version>
 			<exclusions>
 				<exclusion>

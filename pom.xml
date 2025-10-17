@@ -580,7 +580,7 @@
         <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>3.1.1</snowflake-spark.version>
-        <snowflake-snowpark.version>1.15.0</snowflake-snowpark.version>
+        <snowflake-snowpark.version>1.17.0</snowflake-snowpark.version>
         <delta.version>3.3.2</delta.version>
         <iceberg.version>1.8.1</iceberg.version>
 
