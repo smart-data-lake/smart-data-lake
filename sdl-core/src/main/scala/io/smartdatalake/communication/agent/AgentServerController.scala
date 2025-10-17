@@ -48,12 +48,17 @@ case class AgentServerController(
 
             val receivedConfig = ConfigFactory.parseString(agentInstruction.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
-            val connectionsToRegister = if (sdlbConfig.useOnlyLocalConnectionConfig) {
-              assert(sdlbConfig.configuration.nonEmpty, "No local configuration provided, set useOnlyLocalConnectionConfig=false or specify hocon configuration to use when starting the agent server.")
+            val localConnections = if (sdlbConfig.configuration.nonEmpty) {
               val localConfig = sdlbConfig.getHoconConfig(validateCompletness = false)
               getConnectionConfigMap(localConfig)
                 .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+            } else Map()
+
+            val connectionsToRegister = if (sdlbConfig.useOnlyLocalConnectionConfig) {
+              assert(sdlbConfig.configuration.nonEmpty, "No local configuration provided, set useOnlyLocalConnectionConfig=false or specify hocon configuration to use when starting the agent server.")
+              localConnections
             } else {
+              localConnections ++
               getConnectionConfigMap(receivedConfig)
                 .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
             }
