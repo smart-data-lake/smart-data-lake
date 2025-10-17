@@ -107,7 +107,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   override val partitions: Seq[String] = if (Environment.caseSensitive) virtualPartitions else virtualPartitions.map(_.toLowerCase)
 
   def snowparkSession: snowpark.Session = {
-    connection.getSnowparkSession(table.db.get)
+    connection.getSnowparkSession
   }
 
   // check for invalid save modes

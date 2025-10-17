@@ -100,22 +100,21 @@ case class SnowflakeConnection(override val id: ConnectionId,
     connectionOptions ++ authOptions ++ getProxyOptions
   }
 
-  def getSnowparkSession(schema: String): Session = {
+  def getSnowparkSession: Session = {
     _snowparkSession.synchronized {
       if (_snowparkSession.isEmpty) {
-        _snowparkSession = Some(createSnowparkSession(schema))
+        _snowparkSession = Some(createSnowparkSession)
       }
     }
     _snowparkSession.get
   }
 
-  private def createSnowparkSession(schema: String): Session = {
+  private def createSnowparkSession: Session = {
     val commonOptions = Map(
       "URL" -> url,
       "ROLE" -> role,
       "WAREHOUSE" -> warehouse,
       "DB" -> database,
-      "SCHEMA" -> schema
     )
     val authOptions = authMode match {
       case m: BasicAuthMode => Map(
