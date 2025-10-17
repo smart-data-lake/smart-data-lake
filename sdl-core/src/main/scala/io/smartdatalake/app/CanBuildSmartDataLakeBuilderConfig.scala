@@ -19,6 +19,7 @@
 
 package io.smartdatalake.app
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.typesafe.config.Config
 import io.smartdatalake.config.ConfigLoader
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -89,6 +90,7 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   def isDryRun: Boolean = test.contains(TestMode.DryRun)
 
+  @JsonIgnore
   def getHoconConfig(validateCompletness: Boolean = true)(implicit hadoopConfiguration: Configuration): Config = {
     val config = ConfigLoader.loadConfigFromFilesystem(configuration, hadoopConfiguration, configurationValueOverwrite)
     require(config.hasPath("actions") || !validateCompletness, s"No configuration parsed or it does not have a section called actions")
@@ -96,6 +98,7 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
     config
   }
 
+  @JsonIgnore
   def getStdAppConfig(): SmartDataLakeBuilderConfig = {
     SmartDataLakeBuilderConfig(feedSel, applicationName, configuration, configurationValueOverwrite, master, deployMode, partitionValues, parallelism, statePath, test, streaming)
   }
