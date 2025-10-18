@@ -258,9 +258,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
   private def applyReadTransformer(partitionValues: Seq[PartitionValues], df: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    readTransformer.map { t =>
-      t.transform(context.currentAction.map(_.id).getOrElse(ActionId("undefined")), partitionValues, df, this.id, previousTransformerName = None, executionModeResultOptions = Map())
-    }.getOrElse(df)
+    readTransformer
+      .filter(t => t.getSubFeedSupportedType =:= df.subFeedType || t.getSubFeedSupportedType =:= typeOf[DataFrameSubFeed])
+      .map(t => t.transform(context.currentAction.map(_.id).getOrElse(ActionId(s"$id.read-transformer")), partitionValues, df, this.id, previousTransformerName = None, executionModeResultOptions = Map()))
+      .getOrElse(df)
   }
 
   /**
