@@ -111,8 +111,8 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       }
       // return true if no exception
       exportedSchema.forall(_._3)
-    }.maxOption
-    require(!atLeastOneSchemaSuccessful.contains(false), "Schema export failed for all DataObjects!")
+    }.reduceOption(_ || _).getOrElse(false)
+    require(atLeastOneSchemaSuccessful, "Schema export failed for all DataObjects!")
 
     // get and write Stats
     dataObjects.foreach { dataObject =>
