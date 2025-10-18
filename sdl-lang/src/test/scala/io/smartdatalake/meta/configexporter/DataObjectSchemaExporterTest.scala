@@ -34,7 +34,6 @@ import org.json4s.jackson.{JsonMethods, Serialization}
 import org.json4s.{Formats, NoTypeHints, StringInput}
 import org.scalatest.{BeforeAndAfter, FunSuite}
 
-import java.io.File
 import java.nio.file.{Files, Paths}
 
 class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
@@ -48,7 +47,7 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
   }
 
   test("export simple schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", target = target)
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", targets = Seq(target))
     DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
     val writer = FileExportWriter(exportPath)
     val actualOutput = writer.getLatestData("dataObjectCsv1", "schema")
@@ -77,9 +76,9 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
   }
 
   test("export complex schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", target = target)
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", targets = Seq(target))
     DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
-    val writer = FileExportWriter(Paths.get(exporterConfig.target.stripPrefix("file:")))
+    val writer = FileExportWriter(Paths.get(exporterConfig.targets.head.stripPrefix("file:")))
     val actualOutput = writer.getLatestData("dataObjectParquet6", "schema")
     val expectedFieldsJson =
       """ {
@@ -168,7 +167,7 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
       .toDF("type", "lastname", "firstname", "complex")
     hiveDO.writeSparkDataFrame(df, Seq())
     // export
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectHive14", target = target)
+    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectHive14", targets = Seq(target))
     DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
     // read stats and check
     implicit val formats: Formats = Serialization.formats(NoTypeHints)
