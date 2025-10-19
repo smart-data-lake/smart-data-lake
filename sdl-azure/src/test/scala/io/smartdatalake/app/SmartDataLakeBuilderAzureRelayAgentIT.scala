@@ -55,11 +55,10 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(), azureRelayURL = Some(azureRelayUrl))
   val remoteSDLB = DefaultSmartDataLakeBuilder
   //Make sure this string matches the config from the file application-azureRelayAgent.conf
-  val agentController: AgentServerController = AgentServerController(remoteSDLB.instanceRegistry, remoteSDLB)
-  val agentServerThread =
-    Future {
-      AzureRelayAgentServer.start(agentConfig, agentController)
-    }
+  val agentController = AgentServerController(remoteSDLB)
+  val agentServerThread = Future {
+    AzureRelayAgentServer.start(agentConfig, agentController)
+  }
 
   val configFileResource = getClass.getResource("/configAgents/application-azureRelayAgent.conf")
   require(configFileResource != null, "Please make sure the file application-azureRelayAgent.conf is included in the resources when running this test." +

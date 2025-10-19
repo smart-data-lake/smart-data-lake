@@ -22,8 +22,6 @@ package io.smartdatalake.communication.agent
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
-import org.json4s.Formats
-import org.json4s.jackson.Serialization.read
 
 class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger {
 
@@ -36,8 +34,7 @@ class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger
   override def onWebSocketText(message: String): Unit = {
     logger.info("Received " + message)
     super.onWebSocketText(message)
-    implicit val format: Formats = AgentClient.messageFormat
-    val sdlMessage = read[SDLMessage](message)
+    val sdlMessage = SDLMessage.fromJson(message)
     sdlMessage.msgType match {
       case SDLMessageType.AgentResult =>
         agentServerResponse = Some(sdlMessage)

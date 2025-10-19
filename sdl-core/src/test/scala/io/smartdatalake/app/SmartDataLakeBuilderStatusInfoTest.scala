@@ -31,7 +31,6 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.Future
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success}
 
@@ -70,21 +69,16 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     // The socket that receives events
     class UnitTestSocket() extends WebSocketAdapter with SmartDataLakeLogger {
       override def onWebSocketConnect(sess: Session): Unit = {}
-
       override def onWebSocketText(message: String): Unit = {
         receivedMessages += message
       }
-
       override def onWebSocketClose(statusCode: Int, reason: String): Unit = {}
-
       override def onWebSocketError(cause: Throwable): Unit = {}
     }
     val client = new WebSocketClient
-    val uri = URI.create("ws://localhost:4440/ws/")
     client.start()
-    val socket = new UnitTestSocket
-    val fut: Future[Session] = client.connect(socket, uri)
-    fut.get
+    val session = client.connect(new UnitTestSocket, URI.create("ws://localhost:4440/ws/")).get
+
 
     //Verify Rest API context endpoint is reachable and returns correct results
     val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
@@ -101,9 +95,9 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     //Known Issue: if you run this test with Java 11.0.4, you may see a Stackoverflow error.
     //The problem arises after the second call to the webservice (no matter what the call is)
     // If you encounter it, either: Comment out one of the Calls to the webservice, or use a different JDK version to run the test.
-    val webserviceDOContext2 = WebserviceFileDataObject("dummy2", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
-    val webserviceClientContext2 = SttpWebserviceClient(webserviceDOContext2)
-    webserviceClientContext2.get() match {
+    val webserviceDOState = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
+    val webserviceClientState = SttpWebserviceClient(webserviceDOState)
+    webserviceClientState.get() match {
       case Failure(exception) =>
         throw exception
       case Success(value) =>
@@ -112,6 +106,9 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     }
     //Verify a client websocket can connect
     assert(receivedMessages.head.contains("Hello from io.smartdatalake.communication.statusinfo.websocket.StatusInfoSocket"))
+
+    session.close()
+    client.stop()
   }
 }
 

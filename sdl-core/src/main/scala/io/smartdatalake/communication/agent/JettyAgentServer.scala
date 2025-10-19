@@ -46,7 +46,6 @@ object JettyAgentServer extends SmartDataLakeLogger {
 
   private def getServletContextHandler(config: LocalJettyAgentSmartDataLakeBuilderConfig, serverController: AgentServerController): ContextHandlerCollection = {
     val handlers: ContextHandlerCollection = new ContextHandlerCollection()
-
     val socketHandler = createWebsocketHandler(config, serverController)
     handlers.addHandler(socketHandler)
     handlers

@@ -20,20 +20,17 @@
 package io.smartdatalake.communication.agent
 
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
-import io.smartdatalake.app.{LocalAzureRelayAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilderConfig
 import io.smartdatalake.communication.message.SDLMessage
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.json4s.Formats
-import org.json4s.jackson.Serialization.{read, writePretty}
 
 import java.net.URI
 import java.nio.ByteBuffer
 
 object AzureRelayAgentServer extends SmartDataLakeLogger {
-  implicit val format: Formats = AgentClient.messageFormat
 
-  def start(localAzureRelayAgentConfig: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
-    val connectionParams = new RelayConnectionStringBuilder(localAzureRelayAgentConfig.azureRelayURL.get + System.getenv("SharedAccessKey"))
+  def start(agentConfig: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
+    val connectionParams = new RelayConnectionStringBuilder(agentConfig.azureRelayURL.get + System.getenv("SharedAccessKey"))
 
     val tokenProvider = TokenProvider.createSharedAccessSignatureTokenProvider(connectionParams.getSharedAccessKeyName, connectionParams.getSharedAccessKey)
     val listener = new HybridConnectionListener(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
@@ -53,12 +50,8 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
           if (bytesReceived.remaining > 0) {
             val message = new String(bytesReceived.array, bytesReceived.arrayOffset, bytesReceived.remaining)
             logger.info("Received " + message)
-            val sdlMessage = read[SDLMessage](message)
-            val sdlConfig = SmartDataLakeBuilderConfig(localAzureRelayAgentConfig.feedSel, applicationName = localAzureRelayAgentConfig.applicationName, configuration = localAzureRelayAgentConfig.configuration,
-              partitionValues = localAzureRelayAgentConfig.partitionValues,
-              parallelism = localAzureRelayAgentConfig.parallelism, statePath = localAzureRelayAgentConfig.statePath,
-              test = localAzureRelayAgentConfig.test, streaming = localAzureRelayAgentConfig.streaming)
-            val responseMessageOpt = agentController.handle(sdlMessage, sdlConfig)
+            val sdlMessage = SDLMessage.fromJson(message)
+            val responseMessageOpt = agentController.handle(sdlMessage, agentConfig)
             if (responseMessageOpt.isDefined) {
               sendSDLMessage(responseMessageOpt.get, connection)
               if(responseMessageOpt.get.agentResult.get.exception.isDefined){
@@ -81,7 +74,7 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
   }
 
   private def sendSDLMessage(sdlMessage: SDLMessage, connection: HybridConnectionChannel): Unit = {
-    val outputString = writePretty(sdlMessage)
+    val outputString = sdlMessage.toJson
     logger.info("Sending " + outputString)
     val msgToSend = ByteBuffer.wrap(outputString.getBytes)
     connection.writeAsync(msgToSend)
