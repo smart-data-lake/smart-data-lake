@@ -1,16 +1,15 @@
 package io.smartdatalake.meta.configexporter
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.config.exporter.ExportWriter
+import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.SDLExecutionId
-import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, SparkFileDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import org.json4s.JsonAST.JString
-import org.json4s.jackson.JsonMethods.pretty
 import org.json4s.jackson.Serialization
-import org.json4s.{Formats, JObject, NoTypeHints}
+import org.json4s.{Formats, NoTypeHints}
 import scopt.OptionParser
 
 import java.time.LocalDateTime
@@ -126,11 +125,6 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
           logger.warn(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
       }
     }
-  }
-
-  private[configexporter] def formatSchema(schema: Option[GenericSchema], info: Option[String]): String = {
-    val contentJson = JObject(Seq(info.toSeq.map("info" -> JString(_)), schema.toSeq.map("schema" -> _.toJson)).flatten:_*)
-    pretty(contentJson)
   }
 
   private[configexporter] def getCurrentVersion = System.currentTimeMillis() / 1000

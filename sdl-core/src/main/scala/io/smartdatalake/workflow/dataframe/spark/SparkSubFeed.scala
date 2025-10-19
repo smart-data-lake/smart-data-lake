@@ -363,6 +363,27 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  override def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = {
+    var field = StructField(name, dataType.asInstanceOf[SparkDataType].inner, nullable)
+    comment.foreach(c => field = field.withComment(c))
+    SparkField(field)
+  }
+
+  override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
+    SparkSimpleDataType(DataType.fromJson(s""""$tpe""""))
+  }
+
+  override def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = {
+    SparkStructDataType(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
+  }
+
+  override def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = {
+    SparkArrayDataType(ArrayType(valueTpe.asInstanceOf[SparkDataType].inner))
+  }
+
+  override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
+    SparkMapDataType(MapType(keyTpe.asInstanceOf[SparkDataType].inner, valueTpe.asInstanceOf[SparkDataType].inner))
+  }
 }
 
 trait SparkWhen extends GenericWhen {

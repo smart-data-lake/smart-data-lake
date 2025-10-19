@@ -243,6 +243,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case input: SparkFileDataObject if input.getSchema.isDefined => input.getSchema
       case input: UserDefinedSchema if input.schema.isDefined => input.schema
       case input: SchemaValidation if input.schemaMin.isDefined => input.schemaMin
+      case _ if context.globalConfig.dataObjectsSchemaSource.isDefined && !context.isExecPhase =>
+        context.globalConfig.getSchemaFromSource(dataObject.id)(context.hadoopConf)
       case _ => None
     }
     val readSchema = schema.map(dataObject.createReadSchema)
