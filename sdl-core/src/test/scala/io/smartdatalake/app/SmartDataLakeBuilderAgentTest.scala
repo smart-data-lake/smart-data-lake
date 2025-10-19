@@ -107,8 +107,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
 
   test("SDLB run with StorageAgent: Test starting remote action via Agent") {
 
-    val tempDir = Files.createTempDirectory("jetty-agent")
-    System.setProperty("java.sdlb.agents-test.tempDir", tempDir.toString)
+    val tempDir = Files.createTempDirectory("storage-agent")
 
     // setup input DataObject and data
     val srcDO = CsvFileDataObject("src1", tempDir.resolve("agent_src/remote_file").toString)(sdlb.instanceRegistry)
