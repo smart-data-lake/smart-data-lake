@@ -21,8 +21,10 @@ package io.smartdatalake.meta.configexporter
 
 import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.ExportWriter.formatSchema
+import io.smartdatalake.config.exporter.FileExportWriter
 import io.smartdatalake.definitions.ColumnStatsType
-import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.{formatSchema, getCurrentVersion}
+import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.getCurrentVersion
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -52,24 +54,24 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
     val writer = FileExportWriter(exportPath)
     val actualOutput = writer.getLatestData("dataObjectCsv1", "schema")
 
-    val expectedFieldsJson = """
-      | {
-      | "schema": [
-      |  {
-      |    "name" : "a",
-      |    "dataType" : "string",
-      |    "nullable" : true
-      |  }, {
-      |    "name" : "b",
-      |    "dataType" : "string",
-      |    "nullable" : true
-      |  }, {
-      |    "name" : "c",
-      |    "dataType" : "string",
-      |    "nullable" : true
-      |  }
-      | ]}
-      |""".stripMargin
+    val expectedFieldsJson =
+      """{
+      "schema": [{
+        "name" : "a",
+        "dataType" : "string",
+        "nullable" : true
+      }, {
+        "name" : "b",
+        "dataType" : "string",
+        "nullable" : true
+      }, {
+        "name" : "c",
+        "dataType" : "string",
+        "nullable" : true
+      }],
+      "subFeedType": "SparkSubFeed"
+    }
+    """.stripMargin
     val expectedFields = JsonMethods.parse(StringInput(expectedFieldsJson)).values
     val actualFields = JsonMethods.parse(StringInput(actualOutput.get)).values
     assert(actualFields == expectedFields)
@@ -81,48 +83,47 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
     val writer = FileExportWriter(Paths.get(exporterConfig.targets.head.stripPrefix("file:")))
     val actualOutput = writer.getLatestData("dataObjectParquet6", "schema")
     val expectedFieldsJson =
-      """ {
-        | "schema": [
-        |  {
-        |    "name" : "a",
-        |    "dataType" : "string",
-        |    "nullable" : true
-        |  }, {
-        |    "name" : "b",
-        |    "dataType" : {
-        |      "dataType" : "array",
-        |      "elementType" : {
-        |        "dataType" : "struct",
-        |        "fields" : [ {
-        |          "name" : "b1",
-        |          "dataType" : "string",
-        |          "nullable" : true
-        |        }, {
-        |          "name" : "b2",
-        |          "dataType" : "long",
-        |          "nullable" : true
-        |        } ]
-        |      }
-        |    },
-        |    "nullable" : true
-        |  }, {
-        |    "name" : "c",
-        |    "dataType" : {
-        |      "dataType" : "struct",
-        |      "fields" : [ {
-        |        "name" : "c1",
-        |        "dataType" : "string",
-        |        "nullable" : true
-        |      }, {
-        |        "name" : "c2",
-        |        "dataType" : "long",
-        |        "nullable" : true
-        |      } ]
-        |    },
-        |    "nullable" : true
-        |  }
-        | ]}
-        |""".stripMargin
+      """{
+      "schema": [{
+        "name" : "a",
+        "dataType" : "string",
+        "nullable" : true
+      }, {
+        "name" : "b",
+        "dataType" : {
+          "dataType" : "array",
+          "elementType" : {
+            "dataType" : "struct",
+            "fields" : [ {
+              "name" : "b1",
+              "dataType" : "string",
+              "nullable" : true
+            }, {
+              "name" : "b2",
+              "dataType" : "long",
+              "nullable" : true
+            } ]
+          }
+        },
+        "nullable" : true
+      }, {
+        "name" : "c",
+        "dataType" : {
+          "dataType" : "struct",
+          "fields" : [ {
+            "name" : "c1",
+            "dataType" : "string",
+            "nullable" : true
+          }, {
+            "name" : "c2",
+            "dataType" : "long",
+            "nullable" : true
+          } ]
+        },
+        "nullable" : true
+      }],
+      "subFeedType": "SparkSubFeed"
+    }"""
     val expectedFields = JsonMethods.parse(StringInput(expectedFieldsJson)).values
     val actualFields = JsonMethods.parse(StringInput(actualOutput.get)).values
     assert(actualFields == expectedFields)

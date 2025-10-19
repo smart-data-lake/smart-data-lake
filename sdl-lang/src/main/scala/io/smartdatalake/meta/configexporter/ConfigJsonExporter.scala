@@ -2,8 +2,9 @@ package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config._
 import configs.ConfigObject
-import io.smartdatalake.app.{BuildVersionInfo, FileDescriptor, UploadDefaults}
+import io.smartdatalake.app.BuildVersionInfo
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.{ExportWriter, FileDescriptor, UploadDefaults}
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil

@@ -1,24 +1,22 @@
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.app.{StateListener, UploadService}
+import io.smartdatalake.app.{BackendClient, StateListener}
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.LogUtil.getExceptionSummary
 import io.smartdatalake.workflow.action.ExecutionId
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.FileSystem
-import sttp.model.Method
 
 import scala.collection.mutable
 
 /**
  * Upload final state to given baseUrl. This is mainly used to upload state to the backend of the UI.
  */
-class StateUploader(uploader: UploadService, stagePath: Option[String], processUpdates: Boolean) extends StateListener with SmartDataLakeLogger {
+class StateUploader(backend: BackendClient, stagePath: Option[String], processUpdates: Boolean) extends StateListener with SmartDataLakeLogger {
 
   private[smartdatalake] var stageStateStore: Option[HadoopFileActionDAGRunStateStore] = None
   private val uploadedExecutionIds = mutable.Set[ExecutionId]()
-  private val operation = "state"
 
   logger.info(s"instantiated: stagePath=$stagePath processUpdates=$processUpdates")
 
@@ -36,7 +34,7 @@ class StateUploader(uploader: UploadService, stagePath: Option[String], processU
         try { // stop on first upload error
           stagedStates.foreach { file =>
             val body = HdfsUtil.readHadoopFile(file.path)
-            uploader.send(operation, Some(body))
+            backend.writeState(body)
             filesystem.delete(file.path, false)
           }
         } catch {
@@ -53,7 +51,7 @@ class StateUploader(uploader: UploadService, stagePath: Option[String], processU
       uploadedExecutionIds.add(context.executionId)
       logger.info(s"Uploading ${if (isFirst) "first" else "final"} state for executionId=${context.executionId}")
       try {
-        uploader.send(operation, Some(state.toJson))
+        backend.writeState(state.toJson)
       } catch {
         case ex: Exception =>
           stageStateStore match {
@@ -68,18 +66,11 @@ class StateUploader(uploader: UploadService, stagePath: Option[String], processU
     } else {
       // if intermediate notification, upload only changed action info to baseUrl
       if (processUpdates && changedActionId.isDefined) {
-        // additional query parameters needed to identify run/attempt
-        val runParams = Map(
-          "application" -> context.appConfig.applicationName.get,
-          "runId" -> context.executionId.runId.toString,
-          "attemptId" -> context.executionId.attemptId.toString,
-          "actionId" -> changedActionId.get.id
-        )
         // upload changed action info
         val body = ActionDAGRunState.toJson(state.actionsState(changedActionId.get))
         logger.debug(s"Uploading state update for ${changedActionId.get} executionId=${context.executionId}")
         try {
-          uploader.send(operation, Some(body), Method.PATCH, runParams)
+          backend.updateState(body, context.appConfig.applicationName.get, context.executionId, changedActionId.get)
         } catch {
           // just warn if update fails
           case ex: Exception => logger.warn(s"Failed uploading state update for $changedActionId. ${getExceptionSummary(ex)}")
