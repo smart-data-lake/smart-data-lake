@@ -18,8 +18,13 @@
  */
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.app.LocalJettyAgentSmartDataLakeBuilderConfig
+import io.smartdatalake.app.{GlobalConfig, LocalJettyAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
+import io.smartdatalake.config.ConfigParser.{getConnectionConfigMap, parseConfigObjectWithId}
+import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.Connection
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
@@ -30,13 +35,22 @@ import org.eclipse.jetty.websocket.servlet.{ServletUpgradeRequest, ServletUpgrad
 /**
  * Methods for starting and stopping the JettyAgentServer
  */
-object JettyAgentServer extends SmartDataLakeLogger {
+case class JettyAgentServer(sdlb: SmartDataLakeBuilder, config: LocalJettyAgentSmartDataLakeBuilderConfig) extends SmartDataLakeLogger {
 
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)
 
-  def start(config: LocalJettyAgentSmartDataLakeBuilderConfig, serverController: AgentServerController): Unit = {
-    val contextHandler = getServletContextHandler(config, serverController)
+  private implicit val dummyInstanceRegistry: InstanceRegistry = new InstanceRegistry()
+  private val localConfig = config.getHoconConfig(validateCompletness = false)(new Configuration())
+  private val localConnections = getConnectionConfigMap(localConfig)
+    .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+  private val sdlbGlobalConfig = GlobalConfig.from(localConfig)
+  implicit val hadoopConfiguration: Configuration = sdlbGlobalConfig.getHadoopConfiguration
+
+  private val agentController = AgentServerController(sdlb, localConnections)
+
+  def start(): Unit = {
+    val contextHandler = getServletContextHandler(config, agentController)
     PortUtils.startOnPort(startServer(contextHandler), "AgentServer", config.port, config.maxPortRetries, logger)
   }
 

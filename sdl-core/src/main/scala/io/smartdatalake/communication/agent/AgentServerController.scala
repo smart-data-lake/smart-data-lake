@@ -30,10 +30,10 @@ import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
-import org.apache.hadoop.conf.Configuration
 
 case class AgentServerController(
-                                  sdlb: SmartDataLakeBuilder
+                                  sdlb: SmartDataLakeBuilder,
+                                  localConnections: Map[ConnectionId, Connection]
                                 ) extends SmartDataLakeLogger {
 
   def handle(message: SDLMessage, sdlbConfig: CanBuildAgentSmartDataLakeBuilderConfig[_]): Option[SDLMessage] = {
@@ -44,15 +44,8 @@ case class AgentServerController(
             // reset instance registry to avoid side effects from previous runs
             sdlb.instanceRegistry.clear()
             implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-            implicit val hadoopConfig: Configuration = new Configuration() // use default configuration
 
             val receivedConfig = ConfigFactory.parseString(agentInstruction.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
-
-            val localConnections: Map[ConnectionId, Connection] = if (sdlbConfig.configuration.nonEmpty) {
-              val localConfig = sdlbConfig.getHoconConfig(validateCompletness = false)
-              getConnectionConfigMap(localConfig)
-                .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
-            } else Map()
 
             val connectionsToRegister: Map[ConnectionId, Connection] = if (sdlbConfig.useOnlyLocalConnectionConfig) {
               assert(sdlbConfig.configuration.nonEmpty, "No local configuration provided, set useOnlyLocalConnectionConfig=false or specify hocon configuration to use when starting the agent server.")
@@ -64,7 +57,11 @@ case class AgentServerController(
             }
             instanceRegistry.register(connectionsToRegister)
 
-            val dataObjects = getDataObjectConfigMap(receivedConfig)
+            val dataObjectConfigs = getDataObjectConfigMap(receivedConfig)
+            dataObjectConfigs.foreach { case (id, config) =>
+              require(config.hasPath("connectionId") || config.hasPath("connection-id"), s"$id is configured without connection. DataObjects without connectionId are not allowed for security reasons.")
+            }
+            val dataObjects = dataObjectConfigs
               .map { case (id, config) => (DataObjectId(id), parseConfigObjectWithId[DataObject](id, config)) }
             instanceRegistry.register(dataObjects)
 

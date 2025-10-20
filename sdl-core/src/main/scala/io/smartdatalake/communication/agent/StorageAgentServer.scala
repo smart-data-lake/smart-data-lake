@@ -19,41 +19,51 @@
 
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.app.{LocalStorageAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
+import io.smartdatalake.app.{GlobalConfig, LocalStorageAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
 import io.smartdatalake.communication.agent.StorageAgentServer.FileType.FileType
 import io.smartdatalake.communication.agent.StorageAgentServer.{FileType, getFilename}
 import io.smartdatalake.communication.message.{ActionLog, SDLMessage, SDLMessageType}
+import io.smartdatalake.config.ConfigParser.{getConnectionConfigMap, parseConfigObjectWithId}
+import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, WaitUtil}
+import io.smartdatalake.workflow.connection.Connection
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-class StorageAgentServer(sdlb: SmartDataLakeBuilder) extends SmartDataLakeLogger {
+class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAgentSmartDataLakeBuilderConfig) extends SmartDataLakeLogger {
 
   private val startTime = System.currentTimeMillis() / 1000
 
-  private implicit val hadoopConfiguration: Configuration = new Configuration()
+  private implicit val dummyInstanceRegistry: InstanceRegistry = new InstanceRegistry()
+  private val localConfig = agentConfig.getHoconConfig(validateCompletness = false)(new Configuration())
+  private val localConnections = getConnectionConfigMap(localConfig)
+    .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+  private val sdlbGlobalConfig = GlobalConfig.from(localConfig)
+  implicit val hadoopConfiguration: Configuration = sdlbGlobalConfig.getHadoopConfiguration
 
-  def pollForInstructions(agentConfig: LocalStorageAgentSmartDataLakeBuilderConfig): Boolean = {
+  def pollForInstructions(): Boolean = {
     val hadoopPath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(agentConfig.path))
     implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopPath)
     filesystem.mkdirs(hadoopPath)
 
-    logger.info(s"Polling for instructions in ${agentConfig.path}")
-    if (agentConfig.stopAfterSec.exists(_ + startTime < System.currentTimeMillis() / 1000)) {
-      logger.info(s"Agent is going to stop now, as it has been running for ${agentConfig.stopAfterSec.get} seconds")
-      return false
+    logger.info(s"Polling for instructions every ${agentConfig.pollIntervalSec} seconds in ${agentConfig.path}")
+    val secondsPolled = (System.currentTimeMillis() / 1000 - startTime).toInt
+    if (agentConfig.stopAfterSec.exists(secondsPolled > _)) {
+      logger.info(s"Agent is going to stop now, as it has been running for $secondsPolled seconds")
+      return false // dont poll again
     }
-    WaitUtil.sleepUntil(pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
+    WaitUtil.sleepUntil(timeoutSec = agentConfig.stopAfterSec.map(_ - secondsPolled), pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
       () => getInstructionFileIterator(hadoopPath).nonEmpty
     }
 
     // execute instructions
-    val agentController: AgentServerController = AgentServerController(sdlb)
+    val agentController = AgentServerController(sdlb, localConnections)
     getInstructionFileIterator(hadoopPath).foreach {
       instructionFile =>
         val instructionFilenamePattern = s"^(.+)-${FileType.Instruction}.json$$".r
@@ -87,7 +97,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder) extends SmartDataLakeLogger
           HdfsUtil.renamePath(instructionFile, instructionDoneFile)
         }
     }
-    true
+    true // do poll again
   }
 
   def getInstructionFileIterator(hadoopPath: Path)(implicit filesystem: FileSystem): Iterator[Path] = {

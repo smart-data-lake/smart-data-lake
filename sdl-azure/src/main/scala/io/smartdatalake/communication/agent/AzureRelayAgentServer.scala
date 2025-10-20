@@ -16,21 +16,33 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.communication.agent
 
 import com.microsoft.azure.relay.{HybridConnectionChannel, HybridConnectionListener, RelayConnectionStringBuilder, TokenProvider}
-import io.smartdatalake.app.LocalAzureRelayAgentSmartDataLakeBuilderConfig
+import io.smartdatalake.app.{LocalAzureRelayAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
 import io.smartdatalake.communication.message.SDLMessage
+import io.smartdatalake.config.ConfigParser.{getConnectionConfigMap, parseConfigObjectWithId}
+import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.Connection
+import org.apache.hadoop.conf.Configuration
 
 import java.net.URI
 import java.nio.ByteBuffer
 
-object AzureRelayAgentServer extends SmartDataLakeLogger {
+case class AzureRelayAgentServer(sdlb: SmartDataLakeBuilder, config: LocalAzureRelayAgentSmartDataLakeBuilderConfig) extends SmartDataLakeLogger {
 
-  def start(agentConfig: LocalAzureRelayAgentSmartDataLakeBuilderConfig, agentController: AgentServerController): Unit = {
-    val connectionParams = new RelayConnectionStringBuilder(agentConfig.azureRelayURL.get + System.getenv("SharedAccessKey"))
+  private implicit val dummyInstanceRegistry: InstanceRegistry = new InstanceRegistry()
+  private val localConfig = config.getHoconConfig(validateCompletness = false)(new Configuration())
+  private val localConnections = getConnectionConfigMap(localConfig)
+    .map { case (id, config) => (ConnectionId(id), parseConfigObjectWithId[Connection](id, config)) }
+
+  private val agentController = AgentServerController(sdlb, localConnections)
+
+
+  def start(): Unit = {
+    val connectionParams = new RelayConnectionStringBuilder(config.azureRelayURL.get + System.getenv("SharedAccessKey"))
 
     val tokenProvider = TokenProvider.createSharedAccessSignatureTokenProvider(connectionParams.getSharedAccessKeyName, connectionParams.getSharedAccessKey)
     val listener = new HybridConnectionListener(new URI(connectionParams.getEndpoint.toString + connectionParams.getEntityPath), tokenProvider)
@@ -51,7 +63,7 @@ object AzureRelayAgentServer extends SmartDataLakeLogger {
             val message = new String(bytesReceived.array, bytesReceived.arrayOffset, bytesReceived.remaining)
             logger.info("Received " + message)
             val sdlMessage = SDLMessage.fromJson(message)
-            val responseMessageOpt = agentController.handle(sdlMessage, agentConfig)
+            val responseMessageOpt = agentController.handle(sdlMessage, config)
             if (responseMessageOpt.isDefined) {
               sendSDLMessage(responseMessageOpt.get, connection)
               if(responseMessageOpt.get.agentResult.get.exception.isDefined){

@@ -39,8 +39,6 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
 
   protected implicit val session: SparkSession = TestUtil.session
 
-  import session.implicits._
-
   val feedName = "test"
   FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_agent_dummy_connection").toFile)
   FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_dummy_cloud_connection").toFile)
@@ -55,9 +53,9 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(), azureRelayURL = Some(azureRelayUrl))
   val remoteSDLB = DefaultSmartDataLakeBuilder
   //Make sure this string matches the config from the file application-azureRelayAgent.conf
-  val agentController = AgentServerController(remoteSDLB)
+  val server = AzureRelayAgentServer(remoteSDLB, agentConfig)
   val agentServerThread = Future {
-    AzureRelayAgentServer.start(agentConfig, agentController)
+    server.start()
   }
 
   val configFileResource = getClass.getResource("/configAgents/application-azureRelayAgent.conf")

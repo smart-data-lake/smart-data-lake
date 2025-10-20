@@ -61,22 +61,14 @@ object LocalStorageAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    val envConfig = LocalStorageAgentSmartDataLakeBuilderConfig(
-      master = sys.env.get("SDL_SPARK_MASTER_URL").orElse(Some("local[*]")),
-      deployMode = sys.env.get("SDL_SPARK_DEPLOY_MODE").orElse(Some("client")),
-      configuration = sys.env.get("SDL_CONFIGURATION").map(_.split(',').toSeq).getOrElse(Seq()),
-      parallelism = sys.env.get("SDL_PARALELLISM").map(_.toInt).getOrElse(1),
-      statePath = sys.env.get("SDL_STATE_PATH"),
-    )
-
-    OParser.parse(agentParser, args, envConfig) match {
+    OParser.parse(agentParser, args, LocalStorageAgentSmartDataLakeBuilderConfig()) match {
       case Some(config) =>
 
         // poll for instructions
-        val server = new StorageAgentServer(this)
+        val server = new StorageAgentServer(this, config)
         var doPoll = true
         while (doPoll) {
-          doPoll = server.pollForInstructions(config)
+          doPoll = server.pollForInstructions()
         }
 
       case None =>

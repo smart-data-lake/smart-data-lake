@@ -19,7 +19,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent.JettyAgentServerConfig.{DefaultPort, MaxPortRetries}
-import io.smartdatalake.communication.agent.{AgentServerController, JettyAgentServer, JettyAgentServerConfig}
+import io.smartdatalake.communication.agent.{JettyAgentServer, JettyAgentServerConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
@@ -59,8 +59,8 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
     OParser.parse(agentParser, args, LocalJettyAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
-        val agentController = AgentServerController(this)
-        JettyAgentServer.start(agentServerConfig, agentController)
+        val server = JettyAgentServer(this, agentServerConfig)
+        server.start()
       case None =>
         throwOParserError()
     }

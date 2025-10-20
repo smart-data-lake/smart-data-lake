@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
-import io.smartdatalake.communication.agent.{AgentClient, AgentServerController, JettyAgentServer, StorageAgentServer}
+import io.smartdatalake.communication.agent.{AgentClient, JettyAgentServer, StorageAgentServer}
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
@@ -42,8 +42,6 @@ import scala.util.{Failure, Success}
 class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   protected implicit val session: SparkSession = TestUtil.session
-
-  import session.implicits._
 
   val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
@@ -88,8 +86,8 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
 
     // setup remote SDLB agent
     val remoteSDLB = new SmartDataLakeBuilder {}
-    val agentController = AgentServerController(remoteSDLB)
-    JettyAgentServer.start(LocalJettyAgentSmartDataLakeBuilderConfig(configuration = Seq("cp:/configAgents/agent-remote-server.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)), agentController)
+    val server = JettyAgentServer(remoteSDLB, LocalJettyAgentSmartDataLakeBuilderConfig(configuration = Seq("cp:/configAgents/agent-remote-server.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)))
+    server.start()
 
     // run SDLB Main Instance
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test-(jetty|main)", configuration = Seq("cp:/configAgents/agent-main.conf"), configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString))
@@ -116,12 +114,12 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
 
     // setup remote SDLB agent, needs to run in separate thread
     val remoteSDLB = new SmartDataLakeBuilder {}
-    val server = new StorageAgentServer(remoteSDLB)
+    val server = new StorageAgentServer(remoteSDLB, LocalStorageAgentSmartDataLakeBuilderConfig(configuration = Seq("cp:/configAgents/agent-remote-server.conf"), path = tempDir.resolve("storage-agent1").toString, pollIntervalSec = 1, configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)))
     var doPoll = true
     import scala.concurrent.ExecutionContext.Implicits.global
     Future {
       while (doPoll) {
-        server.pollForInstructions(LocalStorageAgentSmartDataLakeBuilderConfig(configuration = Seq("cp:/configAgents/agent-remote-server.conf"), path = tempDir.resolve("storage-agent1").toString, pollIntervalSec = 1, configurationValueOverwrite = Map("env.tempDir" -> tempDir.toString)))
+        server.pollForInstructions()
       }
     }.onComplete {
       case Success(_) => logger.info(s"pollForInstructions done")
