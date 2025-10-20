@@ -52,12 +52,15 @@ case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec:
 
     logger.info(s"($id) Writing instruction $instructionId to $instructionFile")
     implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopPath)(context.hadoopConf)
-    HdfsUtil.writeHadoopFile(instructionFile, message.toJson)
-    WaitUtil.sleepUntil(timeoutSec = Some(startTimeoutSec), logInfo = Some(s"to start $instructionId ($id)")) {
-      () => filesystem.exists(logFile)
-    }
-    WaitUtil.sleepUntil(timeoutSec = Some(execTimeoutSec), logInfo = Some(s"to finish $instructionId ($id)")) {
-      () => filesystem.exists(resultFile)
+    // only one instruction at a time executed by an agent. Creating multiple instruction files at the same time might cause wait timeout exceptions.
+    synchronized {
+      HdfsUtil.writeHadoopFile(instructionFile, message.toJson)
+      WaitUtil.sleepUntil(timeoutSec = Some(startTimeoutSec), logInfo = Some(s"to start $instructionId ($id)")) {
+        () => filesystem.exists(logFile)
+      }
+      WaitUtil.sleepUntil(timeoutSec = Some(execTimeoutSec), logInfo = Some(s"to finish $instructionId ($id)")) {
+        () => filesystem.exists(resultFile)
+      }
     }
     val resultStr = HdfsUtil.readHadoopFile(resultFile)
     logger.info(s"($id) Received result for $instructionId")
