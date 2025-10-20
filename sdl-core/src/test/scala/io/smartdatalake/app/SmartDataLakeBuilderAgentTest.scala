@@ -81,7 +81,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
 
     // setup input DataObject and data
     val srcDO = CsvFileDataObject("src1", tempDir.resolve("agent_src/remote_file").toString)(sdlb.instanceRegistry)
-    val dfSrc1 = Seq("testData").toDF("testColumn")
+    val dfSrc1 = Seq(("testData", 1)).toDF("testColumn", "nb")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // setup remote SDLB agent
@@ -109,7 +109,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
 
     // setup input DataObject and data
     val srcDO = CsvFileDataObject("src1", tempDir.resolve("agent_src/remote_file").toString)(sdlb.instanceRegistry)
-    val dfSrc1 = Seq("testData").toDF("testColumn")
+    val dfSrc1 = Seq(("testData", 1)).toDF("testColumn", "nb")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // setup remote SDLB agent, needs to run in separate thread
