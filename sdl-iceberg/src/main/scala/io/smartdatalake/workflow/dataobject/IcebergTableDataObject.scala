@@ -353,6 +353,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
+    import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
 
     val genericDf = SparkDataFrame(df)
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
@@ -403,13 +404,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         }
       })
     } else SparkStageMetricsListener.execWithMetrics(this.id, {
-      if (partitions.isEmpty) {
-        dfWriter.saveAsTable(table.fullName)
-      } else {
-        dfWriter
-          .partitionBy(partitions: _*)
-          .saveAsTable(table.fullName)
-      }
+      dfWriter
+        .optionalPartitionBy(partitions.toSeq)
+        .saveAsTable(table.fullName)
     })
 
     // get iceberg snapshot summary / stats
