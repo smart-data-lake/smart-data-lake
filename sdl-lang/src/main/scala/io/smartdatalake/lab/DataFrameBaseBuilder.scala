@@ -75,7 +75,7 @@ abstract class DataFrameBaseBuilder[R] {
     val literalExpr = literal match {
       case x: String => x
       case Long | Int | Short | Byte => lit(literal)
-      case x: AnyRef => throw new IllegalArgumentException("Only AnyVal (Int, Long, ... ), String and Column supported as parameter of withFilterEquals method")
+      case x: AnyRef => throw new IllegalArgumentException(s"Only AnyVal (Int, Long, ... ), String and Column supported as parameter of withFilterEquals method. Got ${x.getClass.getName}")
       case x => lit(x) // if type is not AnyRef, it is AnyVal; but Scala can not match against AnyVal...
     }
     setFilters(filters + (colName -> (col(colName) === literalExpr)))

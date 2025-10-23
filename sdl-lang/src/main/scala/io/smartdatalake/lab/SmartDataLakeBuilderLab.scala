@@ -85,7 +85,7 @@ case class SmartDataLakeBuilderLab[D,A](
       val dfs = transformers.foldLeft(Map[String,DataFrame]()) {
         case (dfs, t) => sparkTransform(t, partitionValues, filters, options, dfs)
       }
-      val unapplyMsg = dfs.keys.map(key => s"""val df${DataFrameUtil.strToCamelCase(key)} = dfs("$key")""")
+      val unapplyMsg = dfs.keys.toSeq.sorted.map(key => s"""val df${DataFrameUtil.strToCamelCase(key)} = dfs("$key")""")
         .mkString(System.lineSeparator())
       println(s"""DataFrames built: ${dfs.keys.mkString(", ")} - unapply using:\n$unapplyMsg\n""")
       dfs
