@@ -39,6 +39,8 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
 
   protected implicit val session: SparkSession = TestUtil.session
 
+  import session.implicits._
+
   val feedName = "test"
   FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_agent_dummy_connection").toFile)
   FileUtils.deleteDirectory(Paths.get(System.getProperty("user.dir"), "target/relay_dummy_cloud_connection").toFile)
