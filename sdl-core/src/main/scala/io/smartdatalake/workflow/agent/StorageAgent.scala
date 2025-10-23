@@ -50,7 +50,7 @@ case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec:
     val resultFile = getFilename(hadoopPath, instructionId, FileType.Result)
     val logFile = getFilename(hadoopPath, instructionId, FileType.Log)
 
-    logger.info(s"($id) Writing instruction $instructionId to $instructionFile")
+    logger.info(s"($id) Writing instruction $instructionId to $instructionFile: ${message.toJson.take(100)}")
     implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopPath)(context.hadoopConf)
     // only one instruction at a time executed by an agent. Creating multiple instruction files at the same time might cause wait timeout exceptions.
     synchronized {
@@ -63,7 +63,7 @@ case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec:
       }
     }
     val resultStr = HdfsUtil.readHadoopFile(resultFile)
-    logger.info(s"($id) Received result for $instructionId")
+    logger.info(s"($id) Received result for $instructionId: ${resultStr.take(100)}")
     val response = SDLMessage.fromJson(resultStr)
     assert(response.agentResult.isDefined, s"($id) Agent response must be a message of type AgentResult, but received ${response} for instruction $instructionId")
     response.agentResult.get
