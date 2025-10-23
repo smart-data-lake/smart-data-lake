@@ -43,6 +43,8 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
 
   protected implicit val session: SparkSession = TestUtil.session
 
+  import session.implicits._
+
   val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
