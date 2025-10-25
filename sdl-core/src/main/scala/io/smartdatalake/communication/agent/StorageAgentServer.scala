@@ -61,6 +61,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
     WaitUtil.sleepUntil(timeoutSec = agentConfig.stopAfterSec.map(_ - secondsPolled), pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
       () => getInstructionFileIterator(hadoopPath).nonEmpty
     }
+    Thread.sleep(100L) // wait some time to ensure that the result file is completely written (unit tests might fail on github otherwise)
 
     // execute instructions
     val agentController = AgentServerController(sdlb, localConnections)
