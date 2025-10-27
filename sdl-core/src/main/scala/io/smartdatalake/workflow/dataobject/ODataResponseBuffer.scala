@@ -132,7 +132,7 @@ class ODataResponseMemoryBuffer(setup: Option[ODataResponseBufferSetup], context
   override def getDataFrame: DataFrame = {
     val session = context.sparkSession
     import session.implicits._
-    val dataFrame = responses.toDF("responseString")
+    val dataFrame = responses.toSeq.toDF("responseString")
     dataFrame
   }
 
