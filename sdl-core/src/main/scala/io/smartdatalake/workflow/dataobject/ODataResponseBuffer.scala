@@ -48,9 +48,8 @@ case class ODataResponseBufferSetup(
 
 /**
  * [[ODataResponseBuffer]] is the base class for all other response buffer implementations
- * @param setup: The setup object which contains the configuration for this response buffer
  */
-abstract class ODataResponseBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext) {
+abstract class ODataResponseBuffer(context: ActionPipelineContext) {
 
   /**
    * Contains the number of characters already stored in this response buffer
@@ -105,7 +104,7 @@ abstract class ODataResponseBuffer(setup: ODataResponseBufferSetup, context: Act
  * ResponseBuffer implementation which uses memory to store all responses.
  * @param setup: The setup object which contains the configuration for this response buffer
  */
-class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
+class ODataResponseMemoryBuffer(setup: Option[ODataResponseBufferSetup], context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(context) {
 
   /**
    * The buffered responses. Every response corresponds to one element in this array.
@@ -133,7 +132,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
   override def getDataFrame: DataFrame = {
     val session = context.sparkSession
     import session.implicits._
-    val dataFrame = responses.toSeq.toDF("responseString")
+    val dataFrame = responses.toDF("responseString")
     dataFrame
   }
 
@@ -158,13 +157,15 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
    */
   override def switchIfNecessary(): ODataResponseBuffer = {
     var result : ODataResponseBuffer = this
-    if (setup != null){
-      val dirPath = setup.tempFileDirectoryPath.getOrElse("")
-      val threshold = setup.memoryToFileSwitchThresholdNumOfChars.getOrElse(-1L)
+    if (setup.isDefined){
+      val dirPath = setup.get.tempFileDirectoryPath
+      val threshold = setup.get.memoryToFileSwitchThresholdNumOfChars
 
-      if (dirPath != "" && threshold > 0L && this.getStoredCharacterCount > threshold) {
+      if (dirPath.isDefined && !dirPath.get.isBlank
+        && threshold.isDefined && threshold.get > 0L
+        && this.getStoredCharacterCount > threshold.get) {
 
-        result = ioc.newODataResponseFileBuffer(setup.getActionName, setup, context)
+        result = ioc.newODataResponseFileBuffer(setup.get.getActionName, setup.get, context)
         result.addResponses(this.getResponseBuffer)
       }
     }
@@ -172,11 +173,7 @@ class ODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: Action
   }
 }
 
-
-
-
-
-class ODataResponseFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(setup, context) {
+class ODataResponseFileBuffer(tableName: String, setup:ODataResponseBufferSetup, context: ActionPipelineContext, ioc: ODataIOC) extends ODataResponseBuffer(context) {
 
   private var dirInitialized : Boolean = false
   private implicit val filesystem: FileSystem = ioc.newHadoopFsWithConf(ioc.newHadoopPath("//"), context)

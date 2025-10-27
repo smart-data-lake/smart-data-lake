@@ -42,7 +42,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL basic") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
@@ -55,7 +54,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val result = sut.getODataURL(List("ColumnA", "ColumnB"), actionPipelineContext)
@@ -65,7 +64,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL with state") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
@@ -78,7 +76,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("lastModified")
     )
 
@@ -90,7 +88,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL with state and source filter") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty: _*).when(action_mock).executionMode
@@ -103,7 +100,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("lastModified")
       , sourceFilters = Some("type eq TEST")
     )
@@ -116,7 +113,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL with maxrecordcount") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
@@ -129,7 +125,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , maxRecordCount = Some(9999)
     )
 
@@ -140,7 +136,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getSparkDataFrame in init phase") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
@@ -154,7 +149,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val result = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
@@ -176,7 +171,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("validateConfiguration - non-incremental mode") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
@@ -184,7 +179,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -196,7 +191,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("validateConfiguration - non-incremental mode with incrementalOutputExpr") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
@@ -204,7 +199,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("FOOBAR")
     )
 
@@ -217,7 +212,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("validateConfiguration - incremental mode with correct setup") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("IncColumn", StringType)))))
@@ -225,7 +220,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("IncColumn")
     )
 
@@ -238,7 +233,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("validateConfiguration - incremental mode with no incColumn") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("IncColumn", StringType)))))
@@ -246,7 +241,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = None
     )
 
@@ -261,7 +256,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("validateConfiguration - incremental mode with no incColumn in schema") {
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
@@ -269,7 +264,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("incColumn")
     )
 
@@ -317,8 +312,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     )
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
-    
+
     val sut = ODataDataObject(
         id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
@@ -326,7 +320,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -368,7 +362,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val ioc_spy = m.spy(new ODataIOC())
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -377,7 +370,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("modifiedOn")
     )
     sut.injectIOC(ioc_spy)
@@ -445,7 +438,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val ioc_spy = m.spy(new ODataIOC())
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -454,7 +446,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("modifiedOn")
     )
     sut.injectIOC(ioc_spy)
@@ -536,7 +528,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     val temp_dir_base = Files.createTempDirectory("odatatest_filebuffer").toFile
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
-    val temp_dir = new File(temp_dir_base, "test-dataobject_1717974000")
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -621,7 +612,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"),
       timeouts = Some(HttpTimeoutConfig(connectionTimeoutMs = 500, readTimeoutMs = 500)))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -630,7 +620,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -682,7 +672,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   test("Regression test - Missing incremental column in schema") {
 
     val mock_auto = m.mock(classOf[OAuthMode])
-    val mock_buffer_setup = m.mock(classOf[ODataResponseBufferSetup])
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -691,7 +680,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "annotations"
       , authorization = Some(mock_auto)
       , timeouts = None
-      , responseBufferSetup = Some(mock_buffer_setup)
+      , responseBufferSetup = None
       , incrementalOutputExpr = Some("modifiedon")
       , sourceFilters = Some("objecttypecode eq 'msdyn_transcript'")
     )
@@ -712,7 +701,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     )
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -721,7 +709,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authorization = Some(auth_setup)
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val action_mock = m.mock(classOf[CopyAction])

@@ -76,7 +76,7 @@ class ODataIOC {
    * @param context pipeline context
    * @return ODataResponseMemoryBuffer
    */
-  def newODataResponseMemoryBuffer(setup: ODataResponseBufferSetup, context: ActionPipelineContext) : ODataResponseMemoryBuffer = {
+  def newODataResponseMemoryBuffer(setup: Option[ODataResponseBufferSetup], context: ActionPipelineContext) : ODataResponseMemoryBuffer = {
     new ODataResponseMemoryBuffer(setup, context, this)
   }
 
@@ -141,15 +141,6 @@ class ODataIOC {
   }
 
   /**
-   * Calls the static method createDirectories of the java.nio.file.Files class
-   * @param path path to create
-   * @return
-   */
-  def fileCreateDirectories(path:java.nio.file.Path) : java.nio.file.Path = {
-    Files.createDirectories(path)
-  }
-
-  /**
    * Calls the static method now of the java.time.Instance class
    * @return now instant
    */
@@ -167,7 +158,6 @@ class ODataIOC {
     HdfsUtil.writeHadoopFile(path, content)(filesystem)
   }
 }
-
 
 /**
  * [[DataObject]] of type OData.
@@ -381,10 +371,10 @@ case class ODataDataObject(override val id: DataObjectId,
       //Generate the URL for the first API call
       var requestUrl = getODataURL(columnNames, context)
 
-      responseBufferSetup.get.setActionName(this.id.id)
+      responseBufferSetup.foreach{ rbs => rbs.setActionName(this.id.id) }
 
       //Initialize the MemoryBuffer
-      this.responseBuffer = ioc.newODataResponseMemoryBuffer(responseBufferSetup.get, context)
+      this.responseBuffer = ioc.newODataResponseMemoryBuffer(responseBufferSetup, context)
       var loopCount = 0
 
       //Commence the looping for each request

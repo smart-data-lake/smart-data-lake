@@ -35,10 +35,10 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite with BeforeAndAf
 
   def init_sut(ioc: ODataIOC = new ODataIOC(), threshold: Int = 9999, tableName: String = null): ODataResponseMemoryBuffer = {
     val context = this.contextExec
-    val setup = ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(threshold))
+    val setup = Some(ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(threshold)))
 
     if (tableName != null) {
-      setup.setActionName(tableName)
+      setup.get.setActionName(tableName)
     }
 
     new ODataResponseMemoryBuffer(setup, context, ioc)
@@ -116,26 +116,26 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite with BeforeAndAf
 
   test("ODataResponseMemoryBuffer - switchIfNecessary - new buffer") {
     val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(3))
-    setup.setActionName("TABLE")
+    val setup = Some(ODataResponseBufferSetup(Some("TEMPFILEPATH"), Some(3)))
+    setup.get.setActionName("TABLE")
 
     val ioc = init_ioc()
     val newBuffer = m.mock(classOf[ODataResponseFileBuffer])
-    m.when(ioc.newODataResponseFileBuffer("TABLE", setup, context)).thenReturn(newBuffer)
+    m.when(ioc.newODataResponseFileBuffer("TABLE", setup.get, context)).thenReturn(newBuffer)
     val sut = new ODataResponseMemoryBuffer(setup, context, ioc)
 
     sut.addResponse("TEST")
     val result = sut.switchIfNecessary()
 
     assert(result == newBuffer)
-    m.verify(ioc, m.times(1)).newODataResponseFileBuffer("TABLE", setup, context)
+    m.verify(ioc, m.times(1)).newODataResponseFileBuffer("TABLE", setup.get, context)
   }
 
 
   test("ODataResponseMemoryBuffer - switchIfNecessary - above threshold but no path") {
     val context = m.mock(classOf[ActionPipelineContext])
-    val setup = ODataResponseBufferSetup(None, Some(3))
-    setup.setActionName("TABLE")
+    val setup = Some(ODataResponseBufferSetup(None, Some(3)))
+    setup.get.setActionName("TABLE")
 
     val ioc = init_ioc()
     val sut = new ODataResponseMemoryBuffer(setup, context, ioc)
