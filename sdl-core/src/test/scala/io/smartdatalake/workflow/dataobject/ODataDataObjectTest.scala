@@ -41,7 +41,6 @@ import java.time.Instant
 class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
   test("getODataURL basic") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -53,7 +52,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
@@ -64,7 +63,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getODataURL with state") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -76,7 +74,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("lastModified")
@@ -89,7 +87,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getODataURL with state and source filter") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -101,7 +98,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("lastModified")
@@ -115,7 +112,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getODataURL with maxrecordcount") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -127,7 +123,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , maxRecordCount = Some(9999)
@@ -139,7 +135,6 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("getSparkDataFrame in init phase") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -152,7 +147,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
@@ -175,14 +170,13 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("validateConfiguration - non-incremental mode") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
@@ -195,14 +189,13 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("validateConfiguration - non-incremental mode with incrementalOutputExpr") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("FOOBAR")
@@ -216,14 +209,13 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("validateConfiguration - incremental mode with correct setup") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("IncColumn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("IncColumn")
@@ -237,14 +229,13 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("validateConfiguration - incremental mode with no incColumn") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("IncColumn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = None
@@ -260,14 +251,13 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   }
 
   test("validateConfiguration - incremental mode with no incColumn in schema") {
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("incColumn")
@@ -300,6 +290,47 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
   test("Simple Test without special options and only two records") {
 
+
+    val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2}]}"""
+    w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
+      .withHeader("Accept", w.equalTo("application/json"))
+      .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
+      .withQueryParam("$select", w.equalTo("ColumnA,ColumnB"))
+      .willReturn(w.aResponse().withBody(response1))
+    )
+
+    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
+    
+    val sut = ODataDataObject(
+        id = DataObjectId("test-dataobject")
+      , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
+      , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
+      , tableName = "testSource"
+      , authMode = None
+      , timeouts = None
+      , responseBufferSetup = Some(buffer_setup)
+    )
+
+    val action_mock = m.mock(classOf[CopyAction])
+    m.doReturn(Some(ProcessAllMode()),Seq.empty: _*).when(action_mock).executionMode
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(this.session).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+
+    val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
+    val resultData = resultDf.collect()
+
+    assert(resultData.length == 2)
+
+    val record1 = resultData(0)
+    assert(record1.getString(0) == "FOOBAR_1A")
+    assert(record1.getInt(1) == 1)
+
+    val record2 = resultData(1)
+    assert(record2.getString(0) == "FOOBAR_2A")
+    assert(record2.getInt(1) == 2)
+  }
+
+  test("Simple Test without authMode") {
+
     val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
     w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
@@ -318,13 +349,13 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
-    
+
     val sut = ODataDataObject(
-        id = DataObjectId("test-dataobject")
+      id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
@@ -348,18 +379,11 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   }
 
   test("With state") {
-    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
-
-    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
-      .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
-      .willReturn(w.aResponse().withBody(auth_response))
-    )
 
     val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:40.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:44.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$select", w.equalTo("ColumnA,ColumnB,modifiedOn"))
       .withQueryParam("$filter", w.equalTo("modifiedOn gt 2024-06-10T08:00:00.000Z"))
       .willReturn(w.aResponse().withBody(response1))
@@ -367,7 +391,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val ioc_spy = m.spy(new ODataIOC())
 
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -375,7 +398,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("modifiedOn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("modifiedOn")
@@ -407,18 +430,11 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   }
 
   test("With three pages with memory buffer") {
-    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
-
-    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
-      .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
-      .willReturn(w.aResponse().withBody(auth_response))
-    )
 
     val response1 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=2", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:45.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:46.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$select", w.equalTo("ColumnA,ColumnB,modifiedOn"))
       .withQueryParam("$filter", w.equalTo("modifiedOn gt 2024-06-10T10:03:44.000Z"))
       .willReturn(w.aResponse().withBody(response1))
@@ -428,7 +444,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$page", w.equalTo("2"))
       .willReturn(w.aResponse().withBody(response2))
     )
@@ -437,14 +452,12 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$page", w.equalTo("3"))
       .willReturn(w.aResponse().withBody(response3))
     )
 
     val ioc_spy = m.spy(new ODataIOC())
 
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
 
     val sut = ODataDataObject(
@@ -452,7 +465,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("modifiedOn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("modifiedOn")
@@ -494,18 +507,11 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   }
 
   test("With three pages with temp file buffer") {
-    val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
-
-    w.stubFor(w.post(w.urlEqualTo("/tenantid/oauth2/v2.0/token"))
-      .withRequestBody(w.equalTo("grant_type=client_credentials&client_id=FooBarID&client_secret=FooBarPWD&scope=Scope"))
-      .willReturn(w.aResponse().withBody(auth_response))
-    )
 
     val response1 = """{"@odata.context": "FOOBAR CONTEXT", "@odata.nextLink":"http://localhost:8080/dataapi/api/data/v9.2/testSource?$page=2", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:45.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:46.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$select", w.equalTo("ColumnA,ColumnB,modifiedOn"))
       .withQueryParam("$filter", w.equalTo("modifiedOn gt 2024-06-10T10:03:44.000Z"))
       .willReturn(w.aResponse().withBody(response1))
@@ -515,7 +521,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$page", w.equalTo("2"))
       .willReturn(w.aResponse().withBody(response2))
     )
@@ -524,7 +529,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo("Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$page", w.equalTo("3"))
       .willReturn(w.aResponse().withBody(response3))
     )
@@ -534,16 +538,14 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(now, Seq.empty: _*).when(ioc_spy).getInstantNow
 
     val temp_dir_base = Files.createTempDirectory("odatatest_filebuffer").toFile
-    val auth_setup = OAuthMode(StringOrSecret("http://localhost:8080/tenantid/oauth2/v2.0/token"), StringOrSecret("FooBarID"), StringOrSecret("FooBarPWD"), StringOrSecret("Scope"))
     val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some(temp_dir_base.getAbsolutePath), memoryToFileSwitchThresholdNumOfChars = Some(20))
-    val temp_dir = new File(temp_dir_base, "test-dataobject_1717974000")
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType), StructField("modifiedOn", StringType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
       , incrementalOutputExpr = Some("modifiedOn")
@@ -628,7 +630,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
@@ -667,7 +669,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
@@ -681,7 +683,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
   test("Regression test - Missing incremental column in schema") {
 
-    val mock_auto = m.mock(classOf[OAuthMode])
     val mock_buffer_setup = m.mock(classOf[ODataResponseBufferSetup])
 
     val sut = ODataDataObject(
@@ -689,7 +690,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("annotationid", StringType), StructField("_objectid_value", StringType), StructField("createdon", StringType), StructField("documentbody", StringType)))))
       , baseUrl = "NOT RELEVANT"
       , tableName = "annotations"
-      , authorization = Some(mock_auto)
+      , authMode = None
       , timeouts = None
       , responseBufferSetup = Some(mock_buffer_setup)
       , incrementalOutputExpr = Some("modifiedon")
@@ -719,7 +720,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
       , baseUrl = "http://localhost:8080/dataapi/api/data/v9.2/"
       , tableName = "testSource"
-      , authorization = Some(auth_setup)
+      , authMode = Some(auth_setup)
       , timeouts = None
       , responseBufferSetup = Some(buffer_setup)
     )
