@@ -274,8 +274,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   }
 
   test("Simple Test without special options and only two records") {
-
-
     val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
@@ -284,8 +282,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       .willReturn(w.aResponse().withBody(response1))
     )
 
-    val buffer_setup = ODataResponseBufferSetup(tempFileDirectoryPath = Some("C:\\temp\\"), memoryToFileSwitchThresholdNumOfChars = Some(1000))
-
     val sut = ODataDataObject(
         id = DataObjectId("test-dataobject")
       , schema = Some(SparkSchema(StructType(Seq(StructField("ColumnA", StringType), StructField("ColumnB", IntegerType)))))
@@ -293,7 +289,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
       , tableName = "testSource"
       , authMode = None
       , timeouts = None
-      , responseBufferSetup = Some(buffer_setup)
+      , responseBufferSetup = None
     )
 
     val action_mock = m.mock(classOf[CopyAction])
@@ -314,7 +310,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     assert(record2.getInt(1) == 2)
   }
 
-  test("Simple Test without authMode") {
+  test("Simple Test with state") {
 
     val auth_response = """{"token_type":"Bearer", "access_token":"ACCESS_TOKEN_FOO_BAR", "expires_in":4242}"""
 
@@ -362,7 +358,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     assert(record2.getInt(1) == 2)
   }
 
-  test("With state") {
+  test("Simple Test without authMode") {
 
     val response1 = """{"@odata.context": "FOOBAR CONTEXT", "value": [{"@odata.id":"ODATAID1", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_1A", "ColumnB":1, "modifiedOn":"2024-06-10T10:03:40.000Z"}, {"@odata.id":"ODATAID2", "@odata.etag":"ODATA_ETAG", "@odata.editLink":"ODATA_EDITLINK", "ColumnA":"FOOBAR_2A", "ColumnB":2, "modifiedOn":"2024-06-10T10:03:44.000Z"}]}"""
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
