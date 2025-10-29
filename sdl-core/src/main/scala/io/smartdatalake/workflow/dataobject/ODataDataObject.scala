@@ -169,8 +169,9 @@ class ODataIOC {
  * @param tableName : Name of the table which needs to be accessed
  * @param sourceFilters : Optional. OData filter string which will be applied to the access operation like "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
  * @param timeouts : Optional. Timeout settings of type [[HttpTimeoutConfig]]
- * @param authorization : Optional configuration of webservice authentication. Supported `AuthMode`s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.
+ * @param authMode : Optional configuration of webservice authentication. Supported `AuthMode`s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.
  * CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
+ * @param authorization : Deprecated, use #authMode instead
  * @param incrementalOutputExpr: Optional. Name of the column which will be used to read incrementally (like "modifiedon"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems.
  * @param nRetry: Optional. Number of retries after a failed attempt, default = 1
  * @param responseBufferSetup: Optional. Setup for response buffers of type [[ODataResponseBufferSetup]]
@@ -183,7 +184,8 @@ case class ODataDataObject(override val id: DataObjectId,
                            sourceFilters: Option[String] = None,
                            timeouts: Option[HttpTimeoutConfig] = None,
                            proxy: Option[HttpProxyConfig] = None,
-                           authorization: Option[HttpAuthMode] = None,
+                           authMode: Option[HttpAuthMode] = None,
+                           @Deprecated @deprecated("Use authMode instead", "2.8.1") authorization: Option[HttpAuthMode] = None,
                            followRedirects: Boolean = false,
                            incrementalOutputExpr: Option[String] = None,
                            nRetry: Int = 1,
@@ -222,7 +224,7 @@ case class ODataDataObject(override val id: DataObjectId,
                       , mimeType: String = "application/json"
                       , retries: Int = 0
                      ) : Array[Byte] = {
-    val webserviceClient = SttpWebserviceClient(url = url, additionalHeaders = headers, timeouts = timeouts, authMode = authorization, proxy = proxy, followRedirects = followRedirects, retries = retries, sttpBackendOption = None)
+    val webserviceClient = SttpWebserviceClient(url = url, additionalHeaders = headers, timeouts = timeouts, authMode = authMode.orElse(authorization), proxy = proxy, followRedirects = followRedirects, retries = retries, sttpBackendOption = None)
     val webserviceResult = method match {
       case WebserviceMethod.Get =>
         webserviceClient.get()

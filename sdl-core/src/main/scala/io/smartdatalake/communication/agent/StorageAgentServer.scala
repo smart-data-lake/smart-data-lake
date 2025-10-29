@@ -61,6 +61,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
     WaitUtil.sleepUntil(timeoutSec = agentConfig.stopAfterSec.map(_ - secondsPolled), pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
       () => getInstructionFileIterator(hadoopPath).nonEmpty
     }
+    Thread.sleep(100L) // wait some time to ensure that the result file is completely written (unit tests might fail on github otherwise)
 
     // execute instructions
     val agentController = AgentServerController(sdlb, localConnections)
@@ -76,6 +77,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
 
         try {
           val instructionStr = HdfsUtil.readHadoopFile(instructionFile)
+          logger.info(s"Instruction $instructionId: ${instructionStr.take(100)}")
           val message = SDLMessage.fromJson(instructionStr)
           assert(message.agentInstruction.isDefined, s"Message must contain an agent instruction")
 
@@ -84,8 +86,9 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
             .getOrElse(throw new IllegalStateException("No result message received from instruction processing"))
 
           // write result
+          val resultStr = resultMessage.toJson
           HdfsUtil.writeHadoopFile(resultFile, resultMessage.toJson)
-          logger.info(s"Finished processing instruction $instructionId, result written to $resultFile")
+          logger.info(s"Finished processing instruction $instructionId, result written to $resultFile: ${resultStr.take(100)}")
         } catch {
           case ex: Exception =>
             logger.error(s"Error processing instruction $instructionId: ${ex.getClass.getSimpleName}: ${ex.getMessage}", ex)
