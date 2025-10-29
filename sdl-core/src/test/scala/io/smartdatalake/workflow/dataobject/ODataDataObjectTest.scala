@@ -430,7 +430,6 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     w.stubFor(w.get(w.urlMatching("/dataapi/api/data/v9.2/testSource.*"))
       .withHeader("Accept", w.equalTo("application/json"))
       .withHeader("Content-Type", w.equalTo("application/json; charset=UTF-8"))
-      .withHeader("Authorization", w.equalTo(s"Bearer ACCESS_TOKEN_FOO_BAR"))
       .withQueryParam("$page", w.equalTo("3"))
       .willReturn(w.aResponse().withBody(response3))
     )
