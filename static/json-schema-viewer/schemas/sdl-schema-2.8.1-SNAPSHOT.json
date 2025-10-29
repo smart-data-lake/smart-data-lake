@@ -3497,7 +3497,7 @@
             "additionalProperties" : false,
             "description" : "Proxy configuration used to make HTTP-connection."
           },
-          "authorization" : {
+          "authMode" : {
             "oneOf" : [ {
               "type" : "object",
               "properties" : {
@@ -3772,6 +3772,283 @@
               "description" : "AWS User/Pwd Authentication.\n\nThis first calls AWS Cognito InitiateAuth endpoint from the selected region to authenticate the user.  \nThe tokens returned can then be refreshed with the corresponding token endpoint of the user pool."
             } ],
             "description" : ": Optional configuration of webservice authentication. Supported`AuthMode` s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.  \nCustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module."
+          },
+          "authorization" : {
+            "oneOf" : [ {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AuthHeaderMode"
+                },
+                "headerName" : {
+                  "type" : "string"
+                },
+                "secret" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "secretVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                }
+              },
+              "title" : "AuthHeaderMode",
+              "required" : [ "headerName", "type" ],
+              "additionalProperties" : false,
+              "description" : "Authenticate using a custom HTTP header."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "BasicAuthMode"
+                },
+                "user" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "password" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "userVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                },
+                "passwordVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                }
+              },
+              "title" : "BasicAuthMode",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Authenticate using basic user/pwd authentication.\n\nFor http connection this will create a basic authentication header."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "CustomHttpAuthMode"
+                },
+                "className" : {
+                  "type" : "string",
+                  "description" : "class name implementing trait`CustomHttpAuthModeLogic`"
+                },
+                "options" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                  },
+                  "description" : "Options to pass to the custom auth mode logic in prepare function.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "CustomHttpAuthMode",
+              "required" : [ "className", "options", "type" ],
+              "additionalProperties" : false,
+              "description" : "Connect with custom HTTP-header based authentication"
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "TokenAuthMode"
+                },
+                "tokenType" : {
+                  "type" : "string",
+                  "description" : "token type to use in HTTP Authorization header. Default is \"Bearer\"."
+                },
+                "token" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "tokenVariable" : {
+                  "type" : "string",
+                  "deprecated" : true
+                }
+              },
+              "title" : "TokenAuthMode",
+              "required" : [ "type" ],
+              "additionalProperties" : false,
+              "description" : "Authenticate using a predefined token.\n\nFor HTTP Connections the token is used as Authorization header."
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AzureADClientGrantAuthMode"
+                },
+                "authority" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "applicationId" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "clientSecret" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "scope" : {
+                  "type" : "string",
+                  "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                }
+              },
+              "title" : "AzureADClientGrantAuthMode",
+              "required" : [ "authority", "applicationId", "clientSecret", "scope", "type" ],
+              "additionalProperties" : false
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "OAuthMode"
+                },
+                "oauthUrl" : {
+                  "type" : "string",
+                  "description" : "URL to the OAuth2 authorization instance like \"https://login.microsoftonline.com/{tenant-guid}/oauth2/v2.0/token\" (supports secret providers)\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "clientId" : {
+                  "type" : "string",
+                  "description" : "Name of the user (supports secrets providers)\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "clientSecret" : {
+                  "type" : "string",
+                  "description" : "Password of the user (supports secret providers)\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "oauthScope" : {
+                  "type" : "string",
+                  "description" : "OAuth authorization scope (like https://xxx.crm4.dynamics.com/.default) (supports secret providers)\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "useIdToken" : {
+                  "type" : "boolean",
+                  "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                },
+                "proxy" : {
+                  "type" : "object",
+                  "properties" : {
+                    "host" : {
+                      "type" : "string",
+                      "description" : "proxy host"
+                    },
+                    "port" : {
+                      "type" : "integer",
+                      "description" : "proxy port"
+                    },
+                    "user" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                    },
+                    "password" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                    }
+                  },
+                  "title" : "HttpProxyConfig",
+                  "required" : [ "host", "port" ],
+                  "additionalProperties" : false,
+                  "description" : "Proxy configuration used to make HTTP-connection."
+                },
+                "timeouts" : {
+                  "type" : "object",
+                  "properties" : {
+                    "connectionTimeoutMs" : {
+                      "type" : "integer"
+                    },
+                    "readTimeoutMs" : {
+                      "type" : "integer"
+                    }
+                  },
+                  "title" : "HttpTimeoutConfig",
+                  "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+                  "additionalProperties" : false
+                },
+                "followRedirects" : {
+                  "type" : "boolean",
+                  "description" : "if redirects should be followed when creating HTTP-connection. Default is false because of security concerns."
+                },
+                "retries" : {
+                  "type" : "integer",
+                  "description" : "number of retries if http request fails. Default is 1 retry."
+                }
+              },
+              "title" : "OAuthMode",
+              "required" : [ "oauthUrl", "clientId", "clientSecret", "oauthScope", "type" ],
+              "additionalProperties" : false,
+              "description" : "`OAuthMode` contains the coordinates and credentials to gain access to the OData DataSource"
+            }, {
+              "type" : "object",
+              "properties" : {
+                "type" : {
+                  "const" : "AWSUserPwdAuthMode"
+                },
+                "region" : {
+                  "type" : "string",
+                  "description" : "AWS region"
+                },
+                "userPool" : {
+                  "type" : "string"
+                },
+                "clientId" : {
+                  "type" : "string",
+                  "description" : "client id of the AWS application\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "user" : {
+                  "type" : "string",
+                  "description" : "user to login\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "password" : {
+                  "type" : "string",
+                  "description" : "password to use for login.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                },
+                "useIdToken" : {
+                  "type" : "boolean",
+                  "description" : "If true, id_token is used for Http Authorization header, otherwise access_token. Default is false."
+                },
+                "timeouts" : {
+                  "type" : "object",
+                  "properties" : {
+                    "connectionTimeoutMs" : {
+                      "type" : "integer"
+                    },
+                    "readTimeoutMs" : {
+                      "type" : "integer"
+                    }
+                  },
+                  "title" : "HttpTimeoutConfig",
+                  "required" : [ "connectionTimeoutMs", "readTimeoutMs" ],
+                  "additionalProperties" : false
+                },
+                "proxy" : {
+                  "type" : "object",
+                  "properties" : {
+                    "host" : {
+                      "type" : "string",
+                      "description" : "proxy host"
+                    },
+                    "port" : {
+                      "type" : "integer",
+                      "description" : "proxy port"
+                    },
+                    "user" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                    },
+                    "password" : {
+                      "type" : "string",
+                      "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+                    }
+                  },
+                  "title" : "HttpProxyConfig",
+                  "required" : [ "host", "port" ],
+                  "additionalProperties" : false,
+                  "description" : "Proxy configuration used to make HTTP-connection."
+                }
+              },
+              "title" : "AWSUserPwdAuthMode",
+              "required" : [ "region", "userPool", "clientId", "user", "password", "type" ],
+              "additionalProperties" : false,
+              "description" : "AWS User/Pwd Authentication.\n\nThis first calls AWS Cognito InitiateAuth endpoint from the selected region to authenticate the user.  \nThe tokens returned can then be refreshed with the corresponding token endpoint of the user pool."
+            } ],
+            "description" : ": Deprecated, use #authMode instead",
+            "deprecated" : true
           },
           "followRedirects" : {
             "type" : "boolean"
