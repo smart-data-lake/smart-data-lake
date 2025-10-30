@@ -28,6 +28,7 @@ jobs:
       with:
         ref: ${{ github.base_ref }}
         fetch-depth: 0
+        token: ${{ secrets.PAT_ACTIONS }}
     - name: Git Config
       run: |
         git config --local user.email "action@github.com"
