@@ -694,7 +694,6 @@
                             <arg>-deprecation</arg>
                             <arg>-feature</arg>
                             <arg>-explaintypes</arg>
-                            <arg>-release:${maven.compiler.release}</arg>
                         </args>
                         <jvmArgs>
                             <jvmArg>-Xms64m</jvmArg>
