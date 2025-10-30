@@ -23,16 +23,14 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.{ConnectionPoolConfig, JdbcExecution, SmartDataLakeLogger}
-import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
-import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcCatalog}
-import io.smartdatalake.workflow.dataobject.HttpProxyConfig
+import io.smartdatalake.util.webservice.HttpProxyConfig
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode, OAuthMode}
+import io.smartdatalake.workflow.connection.jdbc.DefaultJdbcCatalog
 import net.snowflake.spark.snowflake.Utils
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
 import java.sql.{Connection => SqlConnection}
-import java.util
-import scala.jdk.CollectionConverters._
 
 /**
  * Connection information for Snowflake databases.
@@ -60,7 +58,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                override val metadata: Option[ConnectionMetadata] = None
                               ) extends Connection with JdbcExecution with SmartDataLakeLogger {
 
-  private val supportedAuths = Seq(classOf[BasicAuthMode])
+  private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[OAuthMode])
   private var _snowparkSession: Option[Session] = None
   require(supportedAuths.contains(authMode.getClass), s"($id) ${authMode.getClass.getSimpleName} not supported by ${this.getClass.getSimpleName}. Supported auth modes are ${supportedAuths.map(_.getSimpleName).mkString(", ")}.")
 
@@ -81,45 +79,55 @@ case class SnowflakeConnection(override val id: ConnectionId,
   }
 
   def getJdbcAuthOptions(schema: String): Map[String, String] = {
-    authMode match {
-      case m: BasicAuthMode =>
-        Map(
-          "sfURL" -> url,
-          "sfUser" -> m.userSecret.resolve(),
-          "sfPassword" -> m.passwordSecret.resolve(),
-          "sfDatabase" -> database,
-          "sfRole" -> role,
-          "sfSchema" -> schema,
-          "sfWarehouse" -> warehouse
-        ) ++ getProxyOptions
+    val connectionOptions = Map(
+      "sfURL" -> url,
+      "sfDatabase" -> database,
+      "sfRole" -> role,
+      "sfSchema" -> schema,
+      "sfWarehouse" -> warehouse
+    )
+    val authOptions = authMode match {
+      case m: BasicAuthMode => Map(
+        "sfUser" -> m.userSecret.resolve(),
+        "sfPassword" -> m.passwordSecret.resolve(),
+      )
+      case m: OAuthMode => Map(
+        "sfAuthenticator" -> "oauth",
+        "sfToken" -> m.getToken
+      )
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
     }
+    connectionOptions ++ authOptions ++ getProxyOptions
   }
 
-  def getSnowparkSession(schema: String): Session = {
+  def getSnowparkSession: Session = {
     _snowparkSession.synchronized {
       if (_snowparkSession.isEmpty) {
-        _snowparkSession = Some(createSnowparkSession(schema))
+        _snowparkSession = Some(createSnowparkSession)
       }
     }
     _snowparkSession.get
   }
 
-  private def createSnowparkSession(schema: String): Session = {
-    authMode match {
-      case m: BasicAuthMode =>
-        val builder = Session.builder.configs(Map(
-          "URL" -> url,
-          "USER" -> m.userSecret.resolve(),
-          "PASSWORD" -> m.passwordSecret.resolve(),
-          "ROLE" -> role,
-          "WAREHOUSE" -> warehouse,
-          "DB" -> database,
-          "SCHEMA" -> schema
-        ) ++ getProxyOptions)
-        builder.create
+  private def createSnowparkSession: Session = {
+    val commonOptions = Map(
+      "URL" -> url,
+      "ROLE" -> role,
+      "WAREHOUSE" -> warehouse,
+      "DB" -> database,
+    )
+    val authOptions = authMode match {
+      case m: BasicAuthMode => Map(
+        "USER" -> m.userSecret.resolve(),
+        "PASSWORD" -> m.passwordSecret.resolve(),
+      )
+      case m: OAuthMode => Map(
+        "AUTHENTICATOR" -> "oauth",
+        "TOKEN" -> m.getToken
+      )
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
     }
+    Session.builder.configs(commonOptions ++ authOptions ++ getProxyOptions).create
   }
 
   override def factory: FromConfigFactory[Connection] = SnowflakeConnection

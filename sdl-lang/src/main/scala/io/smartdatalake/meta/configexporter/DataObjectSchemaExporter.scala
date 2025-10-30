@@ -14,11 +14,10 @@ import org.json4s.{Formats, JObject, NoTypeHints}
 import scopt.OptionParser
 
 import java.time.LocalDateTime
-import scala.collection.compat._
 import scala.util.{Failure, Success, Try}
 
 case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
-                                          target: String = "file:./schema",
+                                          targets: Seq[String] = Seq("file:./schema"),
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
                                           updateStats: Boolean = true,
@@ -37,10 +36,10 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .action((value, c) => c.copy(configPaths = value.split(',')))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('p', "exportPath")
-      .action((value, c) => c.copy(target = "file:"+value))
+      .action((value, c) => c.copy(targets = Seq("file:" + value)))
       .text("Deprecated: Use target instead. Path to export schema and statistics to.")
     opt[String]('t', "target")
-      .action((value, c) => c.copy(target = value))
+      .action((value, c) => c.copy(targets = value.split(",").map(_.trim).toSeq))
       .text("Target URI to export configuration to. Can be 'file:./xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: file:./exportedConfig.json")
     opt[String]('i', "includeRegex")
       .action((value, c) => c.copy(includeRegex = value))
@@ -82,10 +81,10 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter"), master=Some(config.master)), phase = ExecutionPhase.Init, serializableHadoopConf = new SerializableHadoopConfiguration(hadoopConf), globalConfig = globalConfig)
     val dataObjects = registry.getDataObjects
       .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
-    logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.target}")
+    logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.targets.mkString(",")}")
 
     // create document writer depending on target uri scheme
-    val writer = ExportWriter.apply(config.target, config.configPaths)
+    val writers = config.targets.map(ExportWriter.apply(_, config.configPaths))
 
     // get and write Schemas
     val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>
@@ -108,12 +107,12 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       exportedSchema.foreach {
         case (schema, info, _) =>
           info.foreach(logger.warn)
-          writer.writeSchema(formatSchema(schema, info), dataObject.id, getCurrentVersion)
+          writers.foreach(_.writeSchema(formatSchema(schema, info), dataObject.id, getCurrentVersion))
       }
       // return true if no exception
       exportedSchema.forall(_._3)
-    }.maxOption
-    require(!atLeastOneSchemaSuccessful.contains(false), "Schema export failed for all DataObjects!")
+    }.reduceOption(_ || _).getOrElse(false)
+    require(atLeastOneSchemaSuccessful, "Schema export failed for all DataObjects!")
 
     // get and write Stats
     dataObjects.foreach { dataObject =>
@@ -121,7 +120,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
         logger.info(s"get statistics for ${dataObject.id}")
         val stats = dataObject.getStats(config.updateStats)
         val contentStr = Serialization.writePretty(stats)
-        writer.writeStats(contentStr, dataObject.id, getCurrentVersion)
+        writers.foreach(_.writeStats(contentStr, dataObject.id, getCurrentVersion))
       } catch {
         case ex: Exception =>
           logger.warn(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")

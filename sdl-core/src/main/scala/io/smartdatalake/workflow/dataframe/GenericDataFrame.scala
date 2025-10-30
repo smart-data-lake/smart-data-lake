@@ -23,9 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import io.smartdatalake.workflow.dataobject.SchemaValidation
 import org.json4s.JsonAST.{JBool, JObject}
 import org.json4s.{JArray, JNothing, JString, JValue}
 
@@ -64,6 +62,8 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def filter(expression: GenericColumn): GenericDataFrame
   def where(expression: GenericColumn): GenericDataFrame = filter(expression)
+
+  def limit(n: Int): GenericDataFrame
 
   def collect: Seq[GenericRow]
 

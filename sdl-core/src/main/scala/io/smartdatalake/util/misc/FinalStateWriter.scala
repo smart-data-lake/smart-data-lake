@@ -3,7 +3,7 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.app.StateListener
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 
 /**

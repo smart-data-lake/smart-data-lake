@@ -22,10 +22,10 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.lab.DataFrameBaseBuilder.DEFAULT_DATAOBJECT_ID
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, Transformer}
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomTransformMethodDef, CustomTransformMethodWrapper, NotFoundError, TransformDfsMethod, TransformInfo}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, NotFoundError, TransformDfsMethod, TransformInfo}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.prepareTolerantKey
 import io.smartdatalake.workflow.dataobject.CanCreateSparkDataFrame
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -50,7 +50,8 @@ case class SmartDataLakeBuilderLab[D,A](
                                        private val dataObjectCatalogFactory: (InstanceRegistry, ActionPipelineContext) => D,
                                        private val actionCatalogFactory: (InstanceRegistry, ActionPipelineContext) => A,
                                        private val userClassLoader: Option[ClassLoader] = None
-                                     ) {
+                                       ) {
+
   @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader, session.sparkContext.hadoopConfiguration)
   @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
   @transient val dataObjects: D = dataObjectCatalogFactory(registry, context)
@@ -84,7 +85,9 @@ case class SmartDataLakeBuilderLab[D,A](
       val dfs = transformers.foldLeft(Map[String,DataFrame]()) {
         case (dfs, t) => sparkTransform(t, partitionValues, filters, options, dfs)
       }
-      println(s"DataFrames built: ${dfs.keys.mkString(", ")}")
+      val unapplyMsg = dfs.keys.toSeq.sorted.map(key => s"""val df${DataFrameUtil.strToCamelCase(key)} = dfs("$key")""")
+        .mkString(System.lineSeparator())
+      println(s"""DataFrames built: ${dfs.keys.mkString(", ")} - unapply using:\n$unapplyMsg\n""")
       dfs
     }
 

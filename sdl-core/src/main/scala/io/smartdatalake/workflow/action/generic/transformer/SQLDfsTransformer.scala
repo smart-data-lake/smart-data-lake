@@ -24,12 +24,14 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
 import io.smartdatalake.workflow.action.{Action, ActionHelper}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 
 /**
  * Configuration of a custom GenericDataFrame transformation between many inputs and many outputs (n:m) as SQL code.
@@ -46,21 +48,36 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
- * @param code           Map of output names and corresponding SQL code for transformation.
+ * @param files          Map of output names to corresponding Files where SQL code for transformation is loaded from for transformation.
  *                       If this is the last transformation in the chain, the output name has to match an output DataObject id,
  *                       otherwise it can be any name which will then be available in the next transformation.
  *                       Use tokens `%{<key>}` to replace with runtimeOptions in SQL code.
  *                       Example: `select * from test where run = %{runId}`
  *                       The special token `%{inputViewName_<input_name>}` can be used to insert the name of temporary views.
- *                       The input name is either the id of an input DataObject, or the name of an output of the previous transformation
- *                       if this is not the first transformation of the chain.
+ *                       The input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.
+ *                       Make sure to set the name of the previous transformation in that case.
+ * @param code           Map of output names to corresponding SQL code for transformation.
+ *                       If this is the last transformation in the chain, the output name has to match an output DataObject id,
+ *                       otherwise it can be any name which will then be available in the next transformation.
+ *                       Use tokens `%{<key>}` to replace with runtimeOptions in SQL code.
+ *                       Example: `select * from test where run = %{runId}`.
+ *                       The special token `%{inputViewName_<input_name>}` can be used to insert the name of temporary views.
+ *                       The input name is either the id of an input DataObject, or the name of an output of the previous transformation if this is not the first transformation of the chain.
+ *                       Make sure to set the name of the previous transformation in that case.
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
-case class SQLDfsTransformer(override val name: String = "sqlTransform", override val description: Option[String] = None, code: Map[String,String], options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map())
+case class SQLDfsTransformer(override val name: String = "sqlTransform",
+                             override val description: Option[String] = None,
+                             files: Map[String, String] = Map(),
+                             code: Map[String, String] = Map(),
+                             options: Map[String, String] = Map(),
+                             runtimeOptions: Map[String, String] = Map())
   extends OptionsGenericDfsTransformer with SmartDataLakeLogger {
+  assert(files.nonEmpty || code.nonEmpty, s"Either `files` or `code` must be non empty for SQLDfsTransformer")
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
+    implicit val defaultHadoopConf: Configuration = new Configuration()
     val functions = DataFrameSubFeed.getFunctions(dfs.values.head.subFeedType)
     // register all inputs as temporary table
     val inputViewNameOptions: Map[String, String] = dfs.map {
@@ -72,8 +89,11 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
     // get an output DataObject from the Action to use to creating DataFrame from SQL. Note that this DataObject is only used to get connection information.
     val outputDataObjectId = context.instanceRegistry.get[Action](actionId).outputs.head.id
     // execute all queries and return them under corresponding output name
-    code.map {
-      case (outputName,sql) =>
+    zipMaps(code, files).map {
+      case (outputName, (code, file)) =>
+        assert(code.isEmpty || file.isEmpty, s"Only one of `files` or `code` must be defined per key of SQLDfsTransformer, but ${outputName} is defined in `files` and `code`.")
+        val sql = file.map(file => FileUtil.readFromPath(new Path(file)))
+          .orElse(code).get
         val df = try {
           var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
           // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
@@ -91,6 +111,13 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform", overrid
         (outputName, df)
     }
   }
+
+  private def zipMaps[A, B](map1: Map[String, A], map2: Map[String, B]): Map[String, (Option[A], Option[B])] = {
+    val zipped = for (key <- map1.keys ++ map2.keys)
+      yield (key, (map1.get(key), map2.get(key)))
+    zipped.toMap
+  }
+
   override def factory: FromConfigFactory[GenericDfsTransformer] = SQLDfsTransformer
 }
 

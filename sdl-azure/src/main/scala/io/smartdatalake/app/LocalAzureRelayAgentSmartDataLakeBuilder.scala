@@ -18,8 +18,7 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.communication.agent.{AgentServerController, AzureRelayAgentServer}
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.communication.agent.AzureRelayAgentServer
 import io.smartdatalake.util.hdfs.PartitionValues
 import scopt.OParser
 
@@ -40,8 +39,9 @@ case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: 
                                                           override val statePath: Option[String] = None,
                                                           override val test: Option[TestMode.Value] = None,
                                                           override val streaming: Boolean = false,
-                                                          azureRelayURL: Option[String] = None)
-  extends CanBuildSmartDataLakeBuilderConfig[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
+                                                          azureRelayURL: Option[String] = None,
+                                                          override val useOnlyLocalConnectionConfig: Boolean = true)
+  extends CanBuildAgentSmartDataLakeBuilderConfig[LocalAzureRelayAgentSmartDataLakeBuilderConfig]
 
 object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
@@ -54,6 +54,14 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .required()
         .action((arg, config) => config.copy(azureRelayURL = Some(arg)))
         .text(s"Url of the Azure Relay Hybrid Connection that this Server should connect to"),
+      opt[Boolean]('b', "useOnlyLocalConnectionConfig")
+        .action((arg, config) => config.copy(useOnlyLocalConnectionConfig = arg))
+        .text(
+          s"""
+             | Dont allow receiving connection configurations from the client, only use local ones.
+             | This is a security feature to avoid that the client can connect to arbitrary data sources.
+             | Default is true.
+          """.stripMargin)
     )
   }
 
@@ -67,8 +75,8 @@ object LocalAzureRelayAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
 
     OParser.parse(agentParser, args, LocalAzureRelayAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
-        val agentController: AgentServerController = AgentServerController(new InstanceRegistry, this)
-        AzureRelayAgentServer.start(agentServerConfig, agentController)
+        val server = AzureRelayAgentServer(this, agentServerConfig)
+        server.start()
       case None =>
         throwOParserError()
     }

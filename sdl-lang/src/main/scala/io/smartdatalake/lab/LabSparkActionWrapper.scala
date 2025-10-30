@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport, FromConfigFactory}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil
+import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}
@@ -57,6 +58,10 @@ case class LabSparkDfsActionWrapper[A <: CustomDataFrameAction](action: A, conte
   override private[smartdatalake] def createLabTransformer(customTransformer: CustomDfsTransformer): GenericDfsTransformerDef = {
     LabSparkDfsTransformer(customTransformer = customTransformer)
   }
+
+  override def recompileFromSrc(srcDir: String): Unit = {
+    action.getTransformers(context).collect { case t: CanRecompileFromSrc => t }.foreach(_.recompileFromSrc(srcDir))
+  }
 }
 
 case class LabSparkDfActionWrapper[A <: DataFrameOneToOneActionImpl](action: A, context: ActionPipelineContext) extends LabSparkActionWrapper[A, GenericDfTransformerDef, CustomDfTransformer](action, context) {
@@ -81,6 +86,10 @@ case class LabSparkDfActionWrapper[A <: DataFrameOneToOneActionImpl](action: A, 
   }
   override private[smartdatalake] def createLabTransformer(customTransformer: CustomDfTransformer): GenericDfTransformerDef = {
     LabSparkDfTransformer(customTransformer = customTransformer)
+  }
+
+  override def recompileFromSrc(srcDir: String): Unit = {
+    action.getTransformers(context).collect { case t: CanRecompileFromSrc => t }.foreach(_.recompileFromSrc(srcDir))
   }
 }
 
@@ -133,6 +142,8 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
       case None => throw NotSupportedException(action.id, "has no ExecutionMode defined")
     }
   }
+
+  def recompileFromSrc(srcDir: String): Unit
 
   /**
    * Use a Builder to configure and get DataFrames from this Action.
@@ -203,7 +214,9 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
      */
     def get: Map[String,DataFrame] = {
       val dfs = getDataFrames(partitionValues, filters, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers, additionalTransformerOptions)
-      println(s"DataFrames built: ${dfs.keys.mkString(", ")}")
+      val unapplyMsg = dfs.keys.map(key => s"""val df${DataFrameUtil.strToCamelCase(key)} = dfs("$key")""")
+        .mkString(System.lineSeparator())
+      println(s"""DataFrames built: ${dfs.keys.mkString(", ")} - unapply using:\n$unapplyMsg\n""")
       dfs
     }
 

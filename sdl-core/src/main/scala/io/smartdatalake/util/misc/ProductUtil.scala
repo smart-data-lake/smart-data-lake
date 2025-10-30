@@ -30,7 +30,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{currentMirror, universe}
 
-private[smartdatalake] object ProductUtil {
+object ProductUtil {
 
   /**
    * Gets the field value for a specified field of a case class instance by field name reflection.
@@ -83,7 +83,7 @@ private[smartdatalake] object ProductUtil {
    * Converts an arbitrary object to a one-line string, which is as easy as possible to read in logs.
    * Case classes and Maps are formatted as key=value list.
    */
-  private[smartdatalake] def formatObj(obj: Any, truncateListLimit: Int = 10): String = {
+  def formatObj(obj: Any, truncateListLimit: Int = 10): String = {
     import scala.jdk.CollectionConverters._
 
     // recursive function to add an object to the message

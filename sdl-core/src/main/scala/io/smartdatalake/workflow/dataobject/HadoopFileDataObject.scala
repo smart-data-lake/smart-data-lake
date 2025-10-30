@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
-import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -82,22 +81,22 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * Check if the input files exist.
    * Note that hadoopDir can be a specific file or a directory.
    */
-  def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
+  def checkFilesExisting(recursive: Boolean = false)(implicit context: ActionPipelineContext): Boolean = {
     val status = try {
       filesystem.getFileStatus(hadoopPath)
     } catch {
       case _: FileNotFoundException => return false
     }
-    status.isFile || (status.isDirectory && listDataFiles().nonEmpty)
+    status.isFile || (status.isDirectory && listDataFiles(recursive = recursive).nonEmpty)
   }
 
-  def listDataFiles(pv: PartitionValues = PartitionValues(Map()))(implicit context: ActionPipelineContext): Iterator[Path] = {
-    val pathPattern = if (partitions.nonEmpty) new GlobPattern(new Path(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)), fileName).toString)
-    else new GlobPattern(new Path(hadoopPath, fileName).toString)
-    RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, partitions.nonEmpty))
-      .filter(_.isFile)
+  def listDataFiles(pv: PartitionValues = PartitionValues(Map()), recursive: Boolean = false)(implicit context: ActionPipelineContext): Iterator[Path] = {
+    val partitionPattern = if (partitions.nonEmpty) Some(new GlobPattern(new Path(pv.getPartitionString(partitionLayout().get), fileName).toString)) else None
+    val fileNamePattern = new GlobPattern(fileName)
+    val filterFun = (status: FileStatus) => if (status.isDirectory) !status.getPath.toString.startsWith(".") else fileNamePattern.matches(status.getPath.getName)
+    HdfsUtil.listFiles(hadoopPath, recursive || partitions.nonEmpty, filterFun)(filesystem)
       .map(_.getPath)
-      .filter(p => pathPattern.matches(p.toString))
+      .filter(p => partitionPattern.forall(_.matches(relativizePath(p.toString)))) // filter files matching partition pattern if defined
   }
 
   def listPartitionPathsStatus(pv: PartitionValues = PartitionValues(Map()), partitionLayoutParam: String = partitionLayout().get)(implicit context: ActionPipelineContext): Seq[FileStatus] = {
@@ -311,7 +310,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   def deleteAllFiles(path: Path)(implicit context: ActionPipelineContext): Unit = {
     logger.info(s"($id) deleteAllFiles $path")
-    val dirEntries = RemoteIteratorWrapper(filesystem.listFiles(path, false))
+    val dirEntries = HdfsUtil.listFiles(path, recursive = false)(filesystem)
     dirEntries.foreach { s =>
       if (s.isDirectory) filesystem.delete(hadoopPath, /*recursive*/ true)
       else filesystem.delete(s.getPath, false)

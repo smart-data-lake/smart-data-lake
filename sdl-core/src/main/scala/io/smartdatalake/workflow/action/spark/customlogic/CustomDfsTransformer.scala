@@ -23,17 +23,16 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, MethodParameterInfo, ProductU
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, getConverterFor}
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, extractSeqVal, getConverterFor, stdTransformMethodSignature}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.{prepareTolerantKey, tolerantGet}
-import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaClassSparkDsNTo1Transformer, ScalaCodeSparkDfsTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import java.lang.reflect.InvocationTargetException
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.typeOf
-import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe.{TypeTag, typeOf}
 
 /**
  * Interface to define a custom Spark-DataFrame transformation (n:m)
@@ -74,18 +73,16 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with TransformInfo w
   // lookup custom transform method
   @transient override private[smartdatalake] lazy val customTransformMethod = {
     val transformMethods = CustomCodeUtil.getClassMethodsByName(getClass, "transform")
-      .filter(_.owner != typeOf[CustomDfsTransformer].typeSymbol) // remove default transform-method implementation of CustomDfsTransformer
-    require(transformMethods.size == 1, """
-                                                   | CustomDfsTransformer implementations need to implement exactly one method with name 'transform'.
-                                                   | Traditionally the signature of the transform method is 'transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]',
-                                                   | but since SDLB 2.6 you can also implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
-                                                   | Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
-                                                   | The transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.
-      """)
-    // if type signature is different from default method, this transformer has a custom transform method, otherwise return None.
-    import scala.reflect.runtime.universe._
-    val defaultTransformMethod = typeOf[CustomDfsTransformer].member(TermName("transform"))
-    transformMethods.find(_.typeSignature != defaultTransformMethod.typeSignature)
+    require(transformMethods.nonEmpty,
+      """
+        | CustomDfsTransformer implementations need to implement one method with name 'transform'.
+        | Traditionally the signature of the transform method is 'transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]',
+        | but since SDLB 2.6 you can also implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
+        | Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
+        | The transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.
+    """.stripMargin)
+    // if there is a method with different type signature then the standard method, this transformer has a custom transform method, otherwise return None.
+    transformMethods.filterNot(_.typeSignature =:= stdTransformMethodSignature).headOption // remove default transform-method implementation of CustomDfsTransformer
   }
 
   @transient private lazy val customTransformMethodWrapper = customTransformMethod.map(new CustomTransformMethodWrapper(_))
@@ -144,6 +141,15 @@ object CustomDfsTransformer {
       case e: Exception => throw new IllegalStateException(s"Could not convert value $v for parameter ${param.name} to ${param.tpe}: ${e.getClass.getSimpleName} - ${e.getMessage}")
     }
   }
+
+  def extractSeqVal(options: Map[String, String], param: MethodParameterInfo, converter: String => Any): Seq[Any] = {
+    val v = options.getOrElse(param.name, throw NotFoundError(s"No value found in options for parameter ${param.name}"))
+    try {
+      v.split(",").map(_.trim).filter(_.nonEmpty).map(converter)
+    } catch {
+      case e: Exception => throw new IllegalStateException(s"Could not convert value $v for parameter ${param.name} to ${param.tpe}: ${e.getClass.getSimpleName} - ${e.getMessage}")
+    }
+  }
   def getConverterFor(tpe: universe.Type): String => Any = {
     tpe match {
       case _ if tpe =:= typeOf[String] => (x: String) => x
@@ -156,6 +162,8 @@ object CustomDfsTransformer {
       case _ if tpe =:= typeOf[Float] => _.toFloat
     }
   }
+
+  val stdTransformMethodSignature: universe.Type = typeOf[CustomDfsTransformer].members.find(_.name.toString == "transform").head.typeSignature
 }
 
 /**
@@ -211,14 +219,14 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
         val paramName = dfParam.name
         val dfName = paramName.stripPrefix("df")
         val df = tolerantGet(dfs, dfName)
-          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dfName for parameter $paramName"))
+          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dfName for parameter $paramName. DataFrames available are ${dfs.keys.mkString(", ")}."))
         (dfParam, df)
       case dsParam if dsParam.tpe <:< typeOf[Dataset[_]] =>
         val paramName = dsParam.name
         val dsName = paramName.stripPrefix("ds")
         val dsType = dsParam.tpe.typeArgs.head
         val df = tolerantGet(dfs, dsName)
-          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName"))
+          .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName. DataFrames available are ${dfs.keys.mkString(", ")}."))
         val dfWithSelect = {
           val columnNames = ProductUtil.classAccessorNames(dsType)
           df.select(columnNames.map(col): _*)
@@ -226,6 +234,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
         val ds = ProductUtil.createDataset(dfWithSelect, dsType)
         (dsParam, ds)
       case sessionParam if sessionParam.tpe =:= typeOf[SparkSession] => (sessionParam, session)
+      case dfsParam if dfsParam.tpe =:= typeOf[Map[String, DataFrame]] => (dfsParam, dfs)
       case optionsParam if optionsParam.tpe =:= typeOf[Map[String, String]] => (optionsParam, options)
       case optionalParam if optionalParam.tpe <:< typeOf[Option[_]] =>
         val optionVal = try {
@@ -234,6 +243,13 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
           case _: NotFoundError => optionalParam.defaultValue.map(_.asInstanceOf[Option[Any]]).getOrElse(None)
         }
         (optionalParam, optionVal)
+      case seqParam if seqParam.tpe <:< typeOf[Seq[_]] =>
+        val seqVal = try {
+          extractSeqVal(options, seqParam, getConverterFor(seqParam.tpe.typeArgs.head))
+        } catch {
+          case ex: NotFoundError => seqParam.defaultValue.map(_.asInstanceOf[Seq[Any]]).getOrElse(throw ex)
+        }
+        (seqParam, seqVal)
       case defaultParam if defaultParam.defaultValue.isDefined =>
         val defaultVal = try {
           extractOptionVal(options, defaultParam, getConverterFor(defaultParam.tpe))

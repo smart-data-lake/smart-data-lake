@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -31,7 +32,6 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping, FileSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
@@ -146,7 +146,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
 
   test("PartitionDiffMode selectAdditionalInputExpression with udf") {
     val udfConfig = SparkUDFCreatorConfig(classOf[TestUdfAddLastnameEinstein].getName)
-    ExpressionEvaluator.registerUdf("testUdfAddLastNameEinstein", udfConfig.getUDF)
+    SparkExpressionUtil.registerSparkUdf("testUdfAddLastNameEinstein", udfConfig.getUDF)
     val executionMode = PartitionDiffMode(selectAdditionalInputExpression = Some("testUdfAddLastNameEinstein(selectedInputPartitionValues,inputPartitionValues)"))
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())

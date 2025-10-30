@@ -23,6 +23,17 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
 
+
+/**
+ * Interface to generalize authentication for token based authentication
+ */
+trait TokenAuth {
+  /**
+   * Return authentication token.
+   */
+  def getToken: String
+}
+
 /**
  * Authenticate using a predefined token.
  *
@@ -34,7 +45,7 @@ case class TokenAuthMode(
                           tokenType: String = "Bearer",
                           private val token: Option[StringOrSecret],
                           @Deprecated @deprecated("Use `token` instead", "2.5.0") private val tokenVariable: Option[String] = None
-                        ) extends HttpAuthMode with HttpHeaderAuth {
+                        ) extends HttpAuthMode with TokenAuth with HttpHeaderAuth {
   private val _token = token.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(tokenVariable.get))
 
   private[smartdatalake] val tokenSecret: StringOrSecret = _token
@@ -42,6 +53,8 @@ case class TokenAuthMode(
   override def getHeaders: Map[String, String] = {
     Map("Authorization" -> s"$tokenType ${tokenSecret.resolve()}")
   }
+
+  override def getToken: String = tokenSecret.resolve()
 
   override def factory: FromConfigFactory[HttpAuthMode] = TokenAuthMode
 }

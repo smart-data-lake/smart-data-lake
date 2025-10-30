@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.statusinfo.websocket
+package io.smartdatalake.debezium
 
-import io.smartdatalake.config.SdlConfigObject.ActionId
+import org.apache.kafka.connect.source.SourceRecord
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 
-case class ActionLog(actionId: Option[ActionId], level: String, timestamp: LocalDateTime, message: String)
+trait SdlbDebeziumChangeConsumerState {
+  def records: Seq[SourceRecord]
+  def isSnapshotting: Boolean
+  def lastRecordTimestamp: ZonedDateTime
+}

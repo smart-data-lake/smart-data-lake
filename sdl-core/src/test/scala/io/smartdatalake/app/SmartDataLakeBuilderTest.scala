@@ -83,7 +83,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
 
   test("Test command line config value overwrite") {
     val appConfig = sdlb.parse(Seq("-c", "cp:/application.conf", "-f", "test", "-o", "global.abc=def", "-o", "global.synchronousStreamingTriggerIntervalSec=5")).get
-    val hoconConfig = appConfig.getHoconConfig(session.sparkContext.hadoopConfiguration)
+    val hoconConfig = appConfig.getHoconConfig()(session.sparkContext.hadoopConfiguration)
     assert(hoconConfig.getString("global.abc") == "def")
     assert(hoconConfig.getInt("global.synchronousStreamingTriggerIntervalSec") == 5)
     assert(hoconConfig.getString("global.sparkUDFs.udfAddX.className") == "io.smartdatalake.app.TestUDFAddXCreator")
@@ -96,7 +96,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     val feedName = "test"
 
     // configure SDLPlugin for testing
-    Environment._sdlPlugin = Some(Some(new TestSDLPlugin))
+    Environment._sdlPlugins = Seq(new TestSDLPlugin)
 
     HdfsUtil.deleteFiles(new Path(statePath), false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
@@ -187,7 +187,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     assert(TestSDLPlugin.startupCalled)
     assert(TestSDLPlugin.configureCalled)
     assert(TestSDLPlugin.shutdownCalled)
-    Environment._sdlPlugin = None
+    Environment._sdlPlugins = Seq()
   }
 
   test("sdlb run with skipped action and recovery after action 2 failed the first time") {
@@ -555,7 +555,7 @@ class SmartDataLakeBuilderTest extends FunSuite with BeforeAndAfter {
     // use only first partition col (dt) for partition diff mode
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)

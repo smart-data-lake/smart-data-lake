@@ -30,7 +30,6 @@ import io.smartdatalake.util.secrets.{SecretProviderConfig, SecretsUtil, StringO
 import io.smartdatalake.workflow.action.spark.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.PrivateAccessor
 
@@ -105,8 +104,10 @@ extends SmartDataLakeLogger {
     SecretsUtil.registerProvider(id, providerConfig.provider)
   }
 
-  // configure SDLPlugin
-  Environment.sdlPlugin.foreach(_.configure(pluginOptions))
+  /**
+  pluginOptions are global for all plugins
+   */
+    Environment.sdlPlugins.foreach(_.configure(pluginOptions))
 
   /**
    * Get Hadoop configuration as Spark would see it.
@@ -185,11 +186,10 @@ extends SmartDataLakeLogger {
 
   private[smartdatalake] def registerUdf(session: SparkSession): Unit = {
     sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
-      val udf = config.getUDF
       // register in SDL spark session
-      session.udf.register(name, udf)
+      config.registerUdf(name, session)
       // register for use in expression evaluation
-      ExpressionEvaluator.registerUdf(name, udf)
+      config.registerUdf(name, Environment.expressionEvaluatorFactory)
     }
     pythonUDFs.getOrElse(Map()).foreach { case (name,config) =>
       // register in SDL spark session

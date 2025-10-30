@@ -19,28 +19,23 @@
 
 package io.smartdatalake.communication.agent
 
-import io.smartdatalake.app.{LocalJettyAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.LocalJettyAgentSmartDataLakeBuilderConfig
 import io.smartdatalake.communication.message.{SDLMessage, SDLMessageMetadata, SDLMessageType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.eclipse.jetty.websocket.api.{Session, StatusCode, WebSocketAdapter}
-import org.json4s.Formats
-import org.json4s.jackson.Serialization.{read, writePretty}
 
 
-class JettyAgentServerSocket(localJettyConfig: LocalJettyAgentSmartDataLakeBuilderConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
-  implicit val format: Formats = AgentClient.messageFormat
+class JettyAgentServerSocket(agentConfig: LocalJettyAgentSmartDataLakeBuilderConfig, agentController: AgentServerController) extends WebSocketAdapter with SmartDataLakeLogger {
 
   override def onWebSocketConnect(sess: Session): Unit = {
 
     super.onWebSocketConnect(sess)
     logger.info(s"Socket $this Connected")
-    val outputString = writePretty {
-      SDLMessage(
-        msgType = SDLMessageType.StartConnection,
-        messageMetadata = Some(SDLMessageMetadata(this.toString, sess.getRemoteAddress.toString))
-      )
-    }
-    sess.getRemote.sendString(outputString)
+    val message = SDLMessage(
+      msgType = SDLMessageType.StartConnection,
+      messageMetadata = Some(SDLMessageMetadata(this.toString, sess.getRemoteAddress.toString))
+    )
+    sess.getRemote.sendString(message.toJson)
     sess.getPolicy.setMaxTextMessageBufferSize(1000000)
   }
 
@@ -48,19 +43,14 @@ class JettyAgentServerSocket(localJettyConfig: LocalJettyAgentSmartDataLakeBuild
   override def onWebSocketText(message: String): Unit = {
     super.onWebSocketText(message)
     logger.info("Received " + message)
-    val sdlMessage = read[SDLMessage](message)
-    val sdlConfig = SmartDataLakeBuilderConfig(localJettyConfig.feedSel, applicationName = localJettyConfig.applicationName, configuration = localJettyConfig.configuration,
-      partitionValues = localJettyConfig.partitionValues,
-      parallelism = localJettyConfig.parallelism, statePath = localJettyConfig.statePath,
-      test = localJettyConfig.test, streaming = localJettyConfig.streaming)
-
-    val responseMessageOpt = agentController.handle(sdlMessage, sdlConfig)
+    val sdlMessage = SDLMessage.fromJson(message)
+    val responseMessageOpt = agentController.handle(sdlMessage, agentConfig)
     if(responseMessageOpt.isDefined) sendSDLMessage(responseMessageOpt.get)
     else closeConnection()
   }
 
   def sendSDLMessage(sdlMessage: SDLMessage): Unit = {
-    val outputString = writePretty(sdlMessage)
+    val outputString = sdlMessage.toJson
     logger.info("Sending" + outputString)
     getSession.getRemote.sendString(outputString)
   }

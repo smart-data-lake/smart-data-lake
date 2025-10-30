@@ -30,8 +30,6 @@ import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
 import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
-import org.apache.spark.sql.custom.ExpressionEvaluator
-import org.apache.spark.sql.functions.expr
 
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
@@ -82,6 +80,17 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * To be implemented by subclasses
    */
   def outputs: Seq[DataObject]
+
+  /**
+   * Hook to define main input in sub classes
+   */
+  def mainInputId: Option[DataObjectId] = None
+
+  /**
+   * Hook to define main output in sub classes
+   */
+  def mainOutputId: Option[DataObjectId] = None
+
 
   /**
    * Optional execution condition for this action.
@@ -190,16 +199,17 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     //noinspection MapGetOrElseBoolean
     val skipMsg = executionCondition.map { c =>
       // evaluate condition if existing
-      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds)
+      val data = SubFeedsExpressionData.fromSubFeeds(subFeeds, mainInputId.getOrElse(inputs.head.id))
       if (!c.evaluate(id, Some("executionCondition"), data)) {
         val descriptionText = c.description.map(d => s""""$d" """).getOrElse("")
         Some(s"""($id) execution skipped because of failed executionCondition ${descriptionText}expression="${c.expression}" $data""")
       } else None
     }.getOrElse {
-      // default behaviour: if no executionCondition is defined, Action is executed if no input subFeed is skipped.
-      val skippedSubFeeds = subFeeds.filter(_.isSkipped)
-      if (skippedSubFeeds.nonEmpty) {
-        Some(s"""($id) execution skipped because input subFeeds are skipped: ${subFeeds.map(_.dataObjectId).mkString(", ")}""")
+      // default behaviour: if no executionCondition is defined, Action is executed if main input subFeed is not skipped.
+      val inputId = mainInputId.getOrElse(inputs.head.id)
+      val inputSubFeed = subFeeds.find(_.dataObjectId == inputId).getOrElse(throw new IllegalStateException(s"SubFeed ${inputId.id} not found"))
+      if (inputSubFeed.isSkipped) {
+        Some(s"($id) execution skipped because mainInput subFeed ${inputId.id} is skipped")
       } else None
     }
     // check execution condition result
@@ -286,7 +296,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
   private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    val conditionEvaluator = new ExpressionEvaluator[Metric,Boolean](expr(condition))
+    val conditionEvaluator = Environment.expressionEvaluatorFactory.getEvaluator[Metric, Boolean](condition)
     val metrics = subFeeds.flatMap{ subFeed =>
       val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric
       metricsRaw.map{

@@ -23,4 +23,4 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 
 import java.time.LocalDateTime
 
-case class ActionLog(actionId: Option[ActionId], level: String, timestamp: LocalDateTime, message: String)
+case class ActionLog(actionId: Option[ActionId] = None, level: String, timestamp: LocalDateTime, message: String)

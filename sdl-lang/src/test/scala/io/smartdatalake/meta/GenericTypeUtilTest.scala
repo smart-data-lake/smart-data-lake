@@ -43,11 +43,60 @@ class GenericTypeUtilTest extends FunSuite {
   test("scala doc from case class attribute and from overridden method as fallback") {
     val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestObject])
     assert(testObjectTypeDef.name == "TestObject")
-    assert(testObjectTypeDef.description.contains("ScalaDoc on case class\n\nTest line break\n\nSEE: [[OverrideTest]] for details"))
+    assert(testObjectTypeDef.description.contains("ScalaDoc on case class\n\nTest line break\n\nSEE: `OverrideTest` for details"))
     assert(testObjectTypeDef.attributes.find(_.name == "id").get.description.contains("parameter test"))
     assert(testObjectTypeDef.attributes.find(_.name == "overrideTestFirstMethod").get.description.contains("override test first method"))
     assert(testObjectTypeDef.attributes.find(_.name == "overrideTestSecondMethod").get.description.contains("override test second method"))
   }
+
+  test("scala doc link tag parsing"){
+    val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestLinkTag])
+    assert(testObjectTypeDef.description.contains("This is an example of a raw URI https://www.example.com.  \nThis is an example of a [Pretty Link](https://www.example.com).  \nThis is a `DataObject` containing multiple `ActionObject`s."))
+  }
+
+  test("scala doc code indention correction"){
+    val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestCodeBlocks])
+    assert(testObjectTypeDef.description.exists(_.contains("```\nspaces {\n  assert = true\n}\n```")))
+    assert(testObjectTypeDef.description.exists(_.contains("```\nmixed {\n  assert = true\n  config = \"test/directory\"\n  config2 = \"test/directory\"\n}\n```")))
+    assert(testObjectTypeDef.description.exists(_.contains("```\ntabs {\n\tassert = true\n}\n```")))
+  }
+}
+
+/**
+ * This is an example of a raw URI [[https://www.example.com]].
+ * This is an example of a [[https://www.example.com Pretty Link]].
+ * This is a [[DataObject]] containing multiple [[ActionObject]]s.
+ */
+
+case class TestLinkTag() {
+
+}
+
+/**
+ * See the following Example:
+ * {{{
+ *   spaces {
+ *     assert = true
+ *   }
+ * }}}
+ *
+ * {{{
+ * 	 	mixed {
+ * 		   assert = true
+ *		    config = "test/directory"
+ *	  	  config2 = "test/directory"
+ * 		 }
+ * }}}
+ *
+ * {{{
+ *	tabs {
+ *		assert = true
+ *	}
+ * }}}
+ *
+ */
+
+case class TestCodeBlocks() {
 
 }
 
