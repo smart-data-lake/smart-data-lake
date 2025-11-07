@@ -145,6 +145,8 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
 
   def recompileFromSrc(srcDir: String): Unit
 
+  def id: String = action.id.id
+
   /**
    * Use a Builder to configure and get DataFrames from this Action.
    */
@@ -260,7 +262,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
   private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[T], replacedTransformers: Map[Int, T], additionalTransformerOptions: Map[Int, Map[String, String]]): Map[String, GenericDataFrame]
 
   /**
-   * To override by subclasses to create create a transformer from a custom scala transformer class.
+   * To override by subclasses to create a transformer from a custom scala transformer class.
    */
   private[smartdatalake] def createLabTransformer(customTransformer: S): T
 }

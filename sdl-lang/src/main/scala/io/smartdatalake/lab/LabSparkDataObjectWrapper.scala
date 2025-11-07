@@ -131,6 +131,8 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     }
   }
 
+  def id: String = dataObject.id.id
+
 }
 
 case class NotSupportedException(id: ConfigObjectId, msg: String) extends Exception(s"$id} $msg")
