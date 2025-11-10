@@ -233,8 +233,17 @@ private[smartdatalake] class DefinitionRegistry() {
     baseTypeEntries.put(tpe, jsonType)
   }
   def getJsonRefDefs(baseType: Type): Seq[JsonRefDef] = {
-    val baseTypeEntries = entries.getOrElse(Some(baseType), Map())
-    baseTypeEntries.keys.map( tpe => getJsonRefDef(Some(baseType), tpe)).toSeq.sortBy(_.`$ref`)
+    // Collect JsonRefDefs from all registered groups whose base type is a subtype of the
+    // requested baseType. This ensures that when requesting refs for a general type
+    // (e.g. AuthMode) we also include concrete implementations grouped under a more
+    // specific base (e.g. HttpAuthMode), avoiding missing options in places where the
+    // more general base type is used.
+    val refs = entries.iterator.flatMap {
+      case (Some(registeredBase), typeDefs) if (registeredBase <:< baseType) =>
+        typeDefs.keys.map(tpe => getJsonRefDef(Some(registeredBase), tpe))
+      case _ => Seq.empty[JsonRefDef]
+    }.toSeq
+    refs.sortBy(_.`$ref`)
   }
   def getJsonRefDef(baseType: Option[Type], tpe: Type): JsonRefDef = {
     JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}")
