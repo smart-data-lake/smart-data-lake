@@ -11,6 +11,7 @@ import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.reflections.Reflections
 import scaladoc.Tag
 
@@ -44,7 +45,8 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[AuthMode],
     typeOf[ValidationRule],
     typeOf[SaveModeOptions],
-    typeOf[CustomDfTransformerConfig]
+    typeOf[CustomDfTransformerConfig],
+    typeOf[Expectation]
   )
 
   def getReflections = ReflectionUtil.getReflections("io.smartdatalake")
