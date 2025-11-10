@@ -35,7 +35,6 @@ import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
 
-import scala.collection.compat._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -161,8 +160,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           if (refDefs.size > 1) JsonOneOfDef(refDefs, description, deprecated = isDeprecated)
           else refDefs.head
         }
-        case t if registry.typeExists(t) => registry.getJsonRefDef(t, isDeprecated)
-        case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass, isDeprecated)
+        case t if registry.typeExists(t) => Some(registry.getJsonRefDef(t, isDeprecated)).map(x => x.copy(description = description.orElse(x.description))).get
+        case t if t <:< typeOf[Product] => Some(fromCaseClass(t.typeSymbol.asClass, isDeprecated)).map(x => x.copy(description = description.orElse(x.description))).get
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
           val baseCls = getClass.getClassLoader.loadClass(t.typeSymbol.fullName)
           val subTypeClssSym = reflections.getSubTypesOf(baseCls).asScala

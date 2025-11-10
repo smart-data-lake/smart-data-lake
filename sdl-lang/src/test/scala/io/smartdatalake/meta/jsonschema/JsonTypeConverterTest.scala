@@ -193,6 +193,23 @@ class JsonTypeConverterTest extends FunSuite {
     val jsonEnum = jsonTypeDef.properties("testEnum").asInstanceOf[JsonStringDef]
     assert(jsonEnum.enum.get.toSet == Set("firstValue", "secondValue"))
    }
+
+  test("parameter scaladoc descriptions are preserved for referenced and inlined types (regression test for #1011, #1028)") {
+    // Test that UIBackendConfig.timeouts param description is preserved (case of referenced type with $ref)
+    // and CopyAction.executionCondition param description is preserved (case of inlined type)
+    val schema = JsonSchemaUtil.createSdlSchema("test-version")
+    val schemaJson = schema.toJson
+    
+    // Check uiBackend.timeouts has description from @param timeouts (issue #1011)
+    val uiBackendTimeoutsDesc = (schemaJson \ "properties" \ "global" \ "properties" \ "uiBackend" \ "properties" \ "timeouts" \ "description").asInstanceOf[org.json4s.JString].s
+    assert(uiBackendTimeoutsDesc.contains("configuration of HTTP timeouts"), 
+      s"uiBackend.timeouts description should contain 'configuration of HTTP timeouts' but was: $uiBackendTimeoutsDesc")
+    
+    // Check CopyAction.executionCondition has description from inherited @param executionCondition in Action trait (issue #1028)
+    val copyActionExecCondDesc = (schemaJson \ "definitions" \ "Action" \ "CopyAction" \ "properties" \ "executionCondition" \ "description").asInstanceOf[org.json4s.JString].s
+    assert(copyActionExecCondDesc.contains("Optional execution condition for this action"), 
+      s"CopyAction.executionCondition description should contain 'Optional execution condition for this action' but was: $copyActionExecCondDesc")
+  }
 }
 
 object TestEnum extends Enumeration {
