@@ -10,6 +10,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerCon
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
 import org.reflections.Reflections
 import scaladoc.Tag
@@ -32,6 +33,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[Connection],
     typeOf[DataObject],
     typeOf[Action],
+    typeOf[Agent],
     typeOf[Table],
     typeOf[DataObjectMetadata],
     typeOf[ActionMetadata],
