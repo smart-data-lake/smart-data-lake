@@ -11,6 +11,7 @@ import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.reflections.Reflections
@@ -34,6 +35,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[Connection],
     typeOf[DataObject],
     typeOf[Action],
+    typeOf[Agent],
     typeOf[Table],
     typeOf[DataObjectMetadata],
     typeOf[ActionMetadata],

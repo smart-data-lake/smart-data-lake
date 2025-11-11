@@ -90,10 +90,10 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       id = s"sdl-schema-$version.json#",
       properties = ListMap(
         globalKey -> globalJsonDef,
-        connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map Connection name : definition"))),
+        connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map of Connection name and definition"))),
         dataObjectsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[DataObject]), Some("Map of DataObject name and definition"))),
         actionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Action]), Some("Map of Action name and definition"))),
-        agentsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Agent]), Some("Map of Action name and definition"))),
+        agentsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Agent]), Some("Map of Agent name and definition"))),
       ),
       required = Seq(dataObjectsKey, actionsKey),
       additionalProperties = true,
