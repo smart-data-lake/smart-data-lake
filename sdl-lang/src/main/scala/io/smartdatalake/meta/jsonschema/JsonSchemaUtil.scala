@@ -34,6 +34,7 @@ import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
+import scala.collection.compat._
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
