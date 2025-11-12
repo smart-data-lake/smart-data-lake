@@ -579,139 +579,6 @@
         "description" : "Keep partitions while retention condition is fulfilled, delete other partitions.  \nExample: cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:\n```\nhousekeepingMode = {\n  type = PartitionRetentionMode\n  retentionCondition = \"datediff(now(), to_date(elements['dt'], 'yyyyMMdd')) <= 90\"\n}\n```\n"
       }
     },
-    "Agent" : {
-      "AzureRelayAgent" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "AzureRelayAgent"
-          },
-          "url" : {
-            "type" : "string",
-            "description" : "Connection URL on how the agent can be reached. See io.smartdatalake.app.SmartDataLakeBuilderAzureRelayAgentIT#azureRelayUrl for an example."
-          },
-          "connections" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "oneOf" : [ {
-                "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/HadoopFileConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/HiveTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/IcebergTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/JdbcTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/KafkaConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SFtpFileRefConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SnowflakeConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SplunkConnection"
-              } ]
-            },
-            "description" : "Optional Map of private connections that this agent has access to.\n\nIf an Agent has no own Hocon connection configuration in the remote location, connections can be defined here\nand they will override connections defined in the global connections section for execution on the Agent.  \nThis allows the Agent to use some connections that are only accessible in the Agent's environment.\n\nNote that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons."
-          }
-        },
-        "title" : "AzureRelayAgent",
-        "required" : [ "type", "url" ],
-        "additionalProperties" : false,
-        "description" : "`Agent` that communicates via a Azure Relay Service.  \nSee the class SmartDataLakeBuilderAzureRelayAgentIT for an example."
-      },
-      "JettyAgent" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "JettyAgent"
-          },
-          "url" : {
-            "type" : "string",
-            "description" : "Connection URL on how the agent can be reached, example: \"ws://localhost:4441/ws/\""
-          },
-          "connections" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "oneOf" : [ {
-                "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/HadoopFileConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/HiveTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/IcebergTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/JdbcTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/KafkaConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SFtpFileRefConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SnowflakeConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SplunkConnection"
-              } ]
-            },
-            "description" : "Optional Map of private connections that this agent has access to.\n\nIf an Agent has no own Hocon connection configuration in the remote location, connections can be defined here\nand they will override connections defined in the global connections section for execution on the Agent.  \nThis allows the Agent to use some connections that are only accessible in the Agent's environment.\n\nNote that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons."
-          }
-        },
-        "title" : "JettyAgent",
-        "required" : [ "type", "url" ],
-        "additionalProperties" : false,
-        "description" : "Simple, unsecured SDLB Remote `Agent` for development use that communicates via a plain Jetty Websocket.  \nSee the class SmartDataLakeBuilderAgentTest for an example."
-      },
-      "StorageAgent" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "StorageAgent"
-          },
-          "path" : {
-            "type" : "string",
-            "description" : "Hadoop path where the agent reads instructions from and writes result information to"
-          },
-          "startTimeoutSec" : {
-            "type" : "integer",
-            "description" : "maximum time to wait for the start of the processing by the agent in seconds (default: 300s)"
-          },
-          "execTimeoutSec" : {
-            "type" : "integer",
-            "description" : "maximum time to wait for the execution result in seconds (default: 300s)"
-          },
-          "connections" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "oneOf" : [ {
-                "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/HadoopFileConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/HiveTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/IcebergTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/JdbcTableConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/KafkaConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SFtpFileRefConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SnowflakeConnection"
-              }, {
-                "$ref" : "#/definitions/Connection/SplunkConnection"
-              } ]
-            },
-            "description" : "Optional Map of private connections that this agent has access to.\n\nIf an Agent has no own Hocon connection configuration in the remote location, connections can be defined here\nand they will override connections defined in the global connections section for execution on the Agent.  \nThis allows the Agent to use some connections that are only accessible in the Agent's environment.\n\nNote that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons."
-          }
-        },
-        "title" : "StorageAgent",
-        "required" : [ "type", "path" ],
-        "additionalProperties" : false,
-        "description" : "An SDLB Remote Agent that communicates through Hadoop storage (e.g. HDFS, S3, Azure Blob Storage, ...)"
-      }
-    },
     "DataObject" : {
       "AccessTableDataObject" : {
         "type" : "object",
@@ -7537,7 +7404,7 @@
         }, {
           "$ref" : "#/definitions/Connection/SplunkConnection"
         } ],
-        "description" : "Map of Connection name and definition"
+        "description" : "Map Connection name : definition"
       }
     },
     "dataObjects" : {
@@ -7625,14 +7492,7 @@
     "agents" : {
       "type" : "object",
       "additionalProperties" : {
-        "oneOf" : [ {
-          "$ref" : "#/definitions/Agent/AzureRelayAgent"
-        }, {
-          "$ref" : "#/definitions/Agent/JettyAgent"
-        }, {
-          "$ref" : "#/definitions/Agent/StorageAgent"
-        } ],
-        "description" : "Map of Agent name and definition"
+        "description" : "Map of Action name and definition"
       }
     }
   },
