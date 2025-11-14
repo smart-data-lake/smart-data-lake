@@ -4,6 +4,10 @@ on:
   push:
     branches: [documentation]
 
+  # allow for manual releases
+  workflow_dispatch:
+    branches: [documentation]
+      
 jobs:
   deploy:
     name: Deploy to GitHub Pages
