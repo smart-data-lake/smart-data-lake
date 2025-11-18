@@ -32,6 +32,14 @@
 
     <name>sdl-core</name>
 
+    <properties>
+        <!--
+          Only execute unit tests (suffix Test), but no integration tests (suffix IT) by default.
+          Integration tests might fail because rate limiting by external services.
+         -->
+        <test-suffix-regex>Test</test-suffix-regex>
+    </properties>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -487,6 +495,9 @@
             <plugin>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
+                <configuration>
+                    <suffixes>${test-suffix-regex}</suffixes>
+                </configuration>
             </plugin>
 
             <!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
