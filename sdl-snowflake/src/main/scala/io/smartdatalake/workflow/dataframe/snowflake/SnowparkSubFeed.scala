@@ -323,7 +323,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
 
   override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
     val decimalPattern = "decimal\\(([0-9]+),([0-9]+)\\)".r
-    val snowparkType = tpe.toLowerCase match {
+    val snowparkType = tpe.toLowerCase.replace(" ", "") match {
       case "string" => StringType
       case "boolean" => BooleanType
       case "byte" => ByteType
