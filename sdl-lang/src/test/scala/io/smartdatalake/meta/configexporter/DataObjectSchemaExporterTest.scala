@@ -41,8 +41,8 @@ import java.nio.file.{Files, Paths}
 class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
 
   val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
-  val target = "file:./target/schema"
-  val exportPath = Paths.get(target.stripPrefix("file:"))
+  val target = "localfile:./target/schema"
+  val exportPath = Paths.get(target.stripPrefix("localfile:"))
 
   before {
     FileUtils.deleteDirectory(exportPath.toFile)
@@ -80,7 +80,7 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
   test("export complex schema") {
     val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", targets = Seq(target))
     DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
-    val writer = FileExportWriter(Paths.get(exporterConfig.targets.head.stripPrefix("file:")))
+    val writer = FileExportWriter(Paths.get(exporterConfig.targets.head.stripPrefix("localfile:")))
     val actualOutput = writer.getLatestData("dataObjectParquet6", "schema")
     val expectedFieldsJson =
       """{

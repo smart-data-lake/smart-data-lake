@@ -16,7 +16,7 @@ import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
 case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
-                                          targets: Seq[String] = Seq("file:./schema"),
+                                          targets: Seq[String] = Seq("./schema"),
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
                                           updateStats: Boolean = true,
@@ -35,11 +35,11 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .action((value, c) => c.copy(configPaths = value.split(',')))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('p', "exportPath")
-      .action((value, c) => c.copy(targets = Seq("file:" + value)))
+      .action((value, c) => c.copy(targets = Seq(value)))
       .text("Deprecated: Use target instead. Path to export schema and statistics to.")
     opt[String]('t', "target")
       .action((value, c) => c.copy(targets = value.split(",").map(_.trim).toSeq))
-      .text("Target URI to export configuration to. Can be 'file:./xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: file:./exportedConfig.json")
+      .text("Target URI to export configuration to. Can be './xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: ./schema")
     opt[String]('i', "includeRegex")
       .action((value, c) => c.copy(includeRegex = value))
       .text("Regular expression used to include DataObjects in export, matching DataObject ids. Default: .*")

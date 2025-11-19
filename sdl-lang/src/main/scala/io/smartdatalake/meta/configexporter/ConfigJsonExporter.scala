@@ -23,7 +23,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
-case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, targets: Seq[String] = Seq("file:./exportedConfig.json"), enrichOrigin: Boolean = true, descriptionPath: Option[String] = None, uploadDescriptions: Boolean = false)
+case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, targets: Seq[String] = Seq("./exportedConfig.json"), enrichOrigin: Boolean = true, descriptionPath: Option[String] = None, uploadDescriptions: Boolean = false)
 
 object ConfigJsonExporter extends SmartDataLakeLogger {
 
@@ -36,11 +36,11 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .action((value, c) => c.copy(configPaths = value.split(',')))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('f', "filename")
-      .action((value, c) => c.copy(targets = Seq("file:" + value)))
+      .action((value, c) => c.copy(targets = Seq(value)))
       .text("Deprecated: Use target instead. File to export configuration to.")
     opt[String]('t', "target")
       .action((value, c) => c.copy(targets = value.split(",").map(_.trim).toSeq))
-      .text("Target URI to export configuration to. Can be 'file:./xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: file:./exportedConfig.json")
+      .text("Target URI to export configuration to. Can be './xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: ./exportedConfig.json")
     opt[Boolean]("enrichOrigin")
       .action((value, c) => c.copy(enrichOrigin = value))
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
