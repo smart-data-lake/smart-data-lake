@@ -63,7 +63,7 @@ object ExportWriter {
           .orElse(if (configPaths.nonEmpty) Some(BackendClient(configPaths)) else None)
           .getOrElse(throw new IllegalArgumentException(s"cannot initialize BackendClient as configPaths and global.uiBackend are missing"))
       case "http" | "https" => HttpExportWriter(uri)
-      case "file" => FileExportWriter(Paths.get(uri.stripPrefix("file:")))
+      case "localfile" => FileExportWriter(Paths.get(uri.stripPrefix("localfile:")))
       case _ => HadoopExportWriter(new HadoopPath(uri), hadoopConfig.getOrElse(new Configuration()))
     }
   }

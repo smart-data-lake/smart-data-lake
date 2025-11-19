@@ -48,9 +48,9 @@ class ConfigJsonExporterTest extends FunSuite {
   }
 
   test("test main file export") {
-    val fileName = "target/exportedConfig.json"
+    val fileName = "localfile:target/exportedConfig.json"
     ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile, "-f", fileName))
-    assert(new File(fileName).exists())
+    assert(new File(fileName.stripPrefix("localfile:")).exists())
   }
 
   test("test main with default filename") {
