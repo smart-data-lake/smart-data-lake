@@ -336,6 +336,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case "date" => DateType
       case "timestamp" => TimestampType
       case "binary" => BinaryType
+      case "variant" => StringType
     }
     SnowparkSimpleDataType(snowparkType)
   }
