@@ -130,9 +130,9 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
   }
 
   test("test main with includes and excludes, dont update if same") {
-    DataObjectSchemaExporter.main(Array("-c", configPath, "-t", target, "-i", "dataObjectCsv[0-9]", "-e", "dataObjectCsv5"))
-    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
-    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1","dataObjectCsv2","dataObjectCsv3","dataObjectCsv4"))
+    DataObjectSchemaExporter.main(Array("-c", configPath, "-t", target, "-i", "dataObjectCsv[0-9]|dataObjectHive14", "-e", "dataObjectCsv5", "--preferredSubFeedType", "SparkSubFeed"))
+    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1", "dataObjectCsv2", "dataObjectCsv3", "dataObjectCsv4", "dataObjectHive14"))
+    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1", "dataObjectCsv2", "dataObjectCsv3", "dataObjectCsv4", "dataObjectHive14"))
   }
 
   test("schema file is not updated if unchanged") {

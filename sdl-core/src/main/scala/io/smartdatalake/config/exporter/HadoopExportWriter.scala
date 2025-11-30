@@ -61,5 +61,9 @@ case class HadoopExportWriter(path: HadoopPath, hadoopConfig: Configuration = ne
     filesystem.mkdirs(path)
     logger.info(s"Writing $filename")
     HdfsUtil.writeHadoopFile(new HadoopPath(path, filename), document)
+    // delete unneeded crc File created by Hadoop local file system...
+    if (filesystem.getUri.getScheme == "file") {
+      HdfsUtil.deleteFiles(new HadoopPath(path, s".${filename}.crc"), doWarn = false)
+    }
   }
 }
