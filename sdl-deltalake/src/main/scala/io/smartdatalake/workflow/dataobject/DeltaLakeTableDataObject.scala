@@ -105,7 +105,7 @@ import scala.util.Try
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata meta data of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
- *                  attributes are required as the pipeline will try to add the descripion to the catalog.
+ *                  attributes are required as the pipeline will try to add the description to the catalog.
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
