@@ -191,7 +191,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     metadata.flatMap(_.description).foreach(_ => {
       require(table.db.isDefined && table.catalog.isDefined,
         "Since the attribute metadata.description is set, you must also define a " +
-          "table.db and and a table.catalog in order to add a the tableComment" +
+          "table.db and a table.catalog in order to add a the tableComment" +
           "to the catalog")
     })
     // initialize external table if needed
