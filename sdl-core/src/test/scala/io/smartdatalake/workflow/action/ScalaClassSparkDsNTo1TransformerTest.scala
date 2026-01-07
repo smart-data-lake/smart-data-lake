@@ -34,8 +34,8 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Dataset, SparkSession}
-import org.scalatest.Matchers.{a, thrownBy}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.File
 import java.nio.file.Files
@@ -102,7 +102,7 @@ class BadSignatureTransformDsNTo1Transformer extends CustomDsNto1Transformer {
   }
 }
 
-class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter {
+class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -111,7 +111,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
   private val tempDir = Files.createTempDirectory("testScalaClassSparkDs2To1TransformerTest")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  val sdlb = DefaultSmartDataLakeBuilder
+  private val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
@@ -178,7 +178,9 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
 
     val srcSubFeed1 = SparkSubFeed(None, "src1Ds", partitionValues = Seq())
     val srcSubFeed2 = SparkSubFeed(None, "src2Ds", partitionValues = Seq())
-    a[AssertionError] shouldBe thrownBy(testAction.exec(Seq(srcSubFeed1, srcSubFeed2)))
+    assertThrows[AssertionError] {
+      testAction.exec(Seq(srcSubFeed1, srcSubFeed2))
+    }
   }
 
   test("Transform method with bad signature defined (direct call to exec)") {
@@ -290,9 +292,9 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
 
     // setup DataObjects
     val partitionValues = Seq(PartitionValues(
-      Map(("year" -> "1992"),
-        ("month" -> "04"),
-        ("day" -> "25"))))
+      Map("year" -> "1992",
+        "month" -> "04",
+        "day" -> "25")))
     // fill src with first files
     val srcDO1 = SparkSubFeed(SparkDataFrame(
       Seq(("john", 5, "1992", "04", "25"))
@@ -307,9 +309,9 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectIdWithPartitionAutoSelect.conf"),
       partitionValues =
         Some(Seq(PartitionValues(
-          Map(("year" -> "1992"),
-            ("month" -> "04"),
-            ("day" -> "25")
+          Map("year" -> "1992",
+            "month" -> "04",
+            "day" -> "25"
           ))))
     )
     //Run SDLB
@@ -421,6 +423,8 @@ class ScalaClassSparkDsNTo1TransformerTest extends FunSuite with BeforeAndAfter 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9InputsWrongTransformer.conf"))
     //Run SDLB
 
-    a[TaskFailedException] shouldBe thrownBy(sdlb.run(sdlConfig))
+    assertThrows[TaskFailedException] {
+      sdlb.run(sdlConfig)
+    }
   }
 }

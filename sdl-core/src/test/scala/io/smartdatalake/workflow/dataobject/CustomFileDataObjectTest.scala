@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.testutils.custom.TestCustomFileCreator
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileCreatorConfig
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 
 import scala.io.Source.fromInputStream
 

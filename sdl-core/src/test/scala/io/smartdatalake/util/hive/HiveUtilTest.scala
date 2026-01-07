@@ -25,16 +25,18 @@ import io.smartdatalake.workflow.dataobject.Table
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SaveMode, SparkSession}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Path, Paths}
 
 /**
  * Unit tests for HiveUtil
  */
-class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class HiveUtilTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   implicit lazy val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   private val hiveTable = Table(Some("default"), "unittesttable")
@@ -64,14 +66,14 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
     (1, "A", "X"),
     (2, "B", "X"),
     (3, "C", "Y"),
-    (4, "C", "Y"))).toDF( "id", "data1", "part" )
+    (4, "C", "Y"))).toDF("id", "data1", "part")
   val testDataB: DataFrame = session.createDataset(Seq(
     (1, "A", "C", "Z"),
     (2, "B", "B", "Z"),
     (3, "C", "A", "Y"),
-    (4, "C", "A", "Y"))).toDF( "id", "data1", "data2", "part" )
+    (4, "C", "A", "Y"))).toDF("id", "data1", "data2", "part")
 
-  def checkPartitionsExpected( table: Table, expectedPartitions:Seq[Map[String,String]] ) : Boolean = {
+  def checkPartitionsExpected(table: Table, expectedPartitions: Seq[Map[String, String]]): Boolean = {
     val tablePartitions = HiveUtil.getTablePartitions(table)
     tablePartitions.toSet.equals(expectedPartitions.toSet)
   }
@@ -81,11 +83,11 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
 
     logger.info("Creating table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    intercept[AnalysisException]{
+    intercept[AnalysisException] {
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA))
 
     logger.info("Overwriting data in existing table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
@@ -101,11 +103,11 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA))
 
     logger.info("Overwriting data in existing table with modified schema")
     HiveUtil.writeDfToHive(testDataB, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(session.table(hiveTable.fullName).isEqual(testDataB ))
+    assert(session.table(hiveTable.fullName).isEqual(testDataB))
   }
 
   test("Create partitioned external table and overwrite data") {
@@ -113,13 +115,13 @@ class HiveUtilTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger
 
     logger.info("Creating table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(checkPartitionsExpected(hiveTable, Seq(Map( "part" -> "X"), Map("part" -> "Y"))))
-    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
+    assert(checkPartitionsExpected(hiveTable, Seq(Map("part" -> "X"), Map("part" -> "Y"))))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA))
 
     logger.info("Overwriting data in existing table with modified schema")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(checkPartitionsExpected(hiveTable, Seq(Map( "part" -> "X"), Map("part" -> "Y"))))
-    assert(session.table(hiveTable.fullName).isEqual(testDataA ))
+    assert(checkPartitionsExpected(hiveTable, Seq(Map("part" -> "X"), Map("part" -> "Y"))))
+    assert(session.table(hiveTable.fullName).isEqual(testDataA))
   }
 
 }

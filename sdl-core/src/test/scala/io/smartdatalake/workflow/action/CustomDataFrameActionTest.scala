@@ -36,11 +36,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSub
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Path => NioPath}
 
-class CustomDataFrameActionTest extends FunSuite with BeforeAndAfter {
+class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._

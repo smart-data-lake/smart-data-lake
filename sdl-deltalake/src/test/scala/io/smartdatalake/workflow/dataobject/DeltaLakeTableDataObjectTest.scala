@@ -34,12 +34,13 @@ import io.smartdatalake.workflow.dataobject.expectation.SQLExpectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{AnalysisException, SparkSession}
-import org.scalatest.Matchers.convertToAnyShouldWrapper
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class DeltaLakeTableDataObjectTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
+class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
   // set additional spark options for delta lake
   protected implicit val session : SparkSession = DeltaLakeTestUtils.session

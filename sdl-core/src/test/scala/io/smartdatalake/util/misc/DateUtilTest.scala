@@ -19,12 +19,13 @@
 
 package io.smartdatalake.util.misc
 
-import org.scalatest.{FunSpec, Matchers}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 
 import java.time.temporal.ChronoUnit
 import java.time.{LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 
-class DateUtilTest extends FunSpec with Matchers {
+class DateUtilTest extends AnyFunSpec with Matchers {
 
   private val currentTime = LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS)
   private val currentTimeAtUtc = currentTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneOffset.UTC)

@@ -28,7 +28,8 @@ import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Dataset, SparkSession}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
@@ -43,7 +44,7 @@ class TestDSTransformer extends CustomDsTransformer[InputDataSet, OutputDataSet]
   }
 }
 
-class ScalaClassSparkDsTransformerTest extends FunSuite with BeforeAndAfter {
+class ScalaClassSparkDsTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 

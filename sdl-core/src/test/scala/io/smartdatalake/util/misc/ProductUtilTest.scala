@@ -19,9 +19,9 @@
 
 package io.smartdatalake.util.misc
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ProductUtilTest extends FunSuite {
+class ProductUtilTest extends AnyFunSuite {
 
   test("get case class field value") {
     val p1 = XyzProduct("test", 1, true)

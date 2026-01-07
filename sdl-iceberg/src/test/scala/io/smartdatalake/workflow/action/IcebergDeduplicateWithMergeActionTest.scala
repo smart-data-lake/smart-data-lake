@@ -25,16 +25,18 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
+class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
-  protected implicit val session : SparkSession = IcebergTestUtils.session
+  protected implicit val session: SparkSession = IcebergTestUtils.session
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -51,8 +53,8 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname","firstname")))
-    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
+    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname", "firstname")))
+    val tgtDO = IcebergTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -121,8 +123,8 @@ class IcebergDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
     instanceRegistry.register(srcDO)
-    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname","firstname")))
-    val tgtDO = IcebergTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable)
+    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname", "firstname")))
+    val tgtDO = IcebergTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 

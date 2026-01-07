@@ -27,13 +27,15 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
+class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session : SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -54,19 +56,19 @@ class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "copy"
     val srcTable = Table(Some("default"), "copy_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"),  table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     instanceRegistry.register(jdbcConnection)
-    val tgtTable = Table(Some("public"), "copy_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
+    val tgtTable = Table(Some("public"), "copy_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
     tgtDO.dropTable
-    tgtDO.connection.dropTable(tgtTable.fullName+"_sdltmp")
+    tgtDO.connection.dropTable(tgtTable.fullName + "_sdltmp")
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
     val action1 = CopyAction("dda", srcDO.id, tgtDO.id, saveModeOptions = Some(SaveModeMergeOptions()))
-    val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))
@@ -82,7 +84,7 @@ class CopyWithMergeActionTest extends FunSuite with BeforeAndAfter {
     }
 
     // prepare & start 2nd load - schema evolution: column rating -> rating2!
-    val l2 = Seq(("doe","john",10),("pan","peter",5),("pan","peter2",5)).toDF("lastname", "firstname", "rating2")
+    val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5), ("pan", "peter2", 5)).toDF("lastname", "firstname", "rating2")
     srcDO.writeSparkDataFrame(l2, Seq())
     action1.init(Seq(srcSubFeed))
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(contextExec)

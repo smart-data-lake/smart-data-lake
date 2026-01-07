@@ -23,11 +23,11 @@ import com.snowflake.snowpark.{types => snowpark}
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkSchema, SnowparkSimpleDataType, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import org.apache.spark.sql.{types => spark}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.typeOf
 
-class SnowparkSchemaConverterTest extends FunSuite {
+class SnowparkSchemaConverterTest extends AnyFunSuite {
 
   test("converting simple schema from Spark to Snowflake") {
     val sparkSchema = SparkSchema(

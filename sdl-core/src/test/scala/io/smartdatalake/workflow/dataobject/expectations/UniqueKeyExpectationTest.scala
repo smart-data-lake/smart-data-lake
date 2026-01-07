@@ -29,11 +29,13 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.expectation.{ExpectationScope, ExpectationValidationException, UniqueKeyExpectation}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
-class UniqueKeyExpectationTest extends FunSuite with BeforeAndAfter {
+class UniqueKeyExpectationTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -48,14 +50,14 @@ class UniqueKeyExpectationTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
     val tgtDO = MockDataObject("tgt1", primaryKey = Some(Seq("lastname")), saveMode = SDLSaveMode.Append,
-      expectations = Seq(UniqueKeyExpectation("primaryKeyTest", approximate=false))
+      expectations = Seq(UniqueKeyExpectation("primaryKeyTest", approximate = false))
     ).register
 
     // prepare
-      val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
-      val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
-      srcDO.writeSparkDataFrame(l1, Seq())
-      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+    val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
+    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
 
     // start first load -> should succeed
     {
@@ -70,7 +72,7 @@ class UniqueKeyExpectationTest extends FunSuite with BeforeAndAfter {
     }
 
     // prepare source with duplicate record
-    val l2 = Seq(("jonson","rob",5),("jonson","bob",3)).toDF("lastname", "firstname", "rating")
+    val l2 = Seq(("jonson", "rob", 5), ("jonson", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())
 
     // start 3nd load -> should fail because of duplicate records processed in job
@@ -83,13 +85,13 @@ class UniqueKeyExpectationTest extends FunSuite with BeforeAndAfter {
   test("succeed and fail primary key validation with scope=All") {
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtDO = MockDataObject("tgt1", primaryKey=Some(Seq("lastname")), saveMode=SDLSaveMode.Append,
-      expectations = Seq(UniqueKeyExpectation("primaryKeyTest", approximate=false, scope=ExpectationScope.All))
+    val tgtDO = MockDataObject("tgt1", primaryKey = Some(Seq("lastname")), saveMode = SDLSaveMode.Append,
+      expectations = Seq(UniqueKeyExpectation("primaryKeyTest", approximate = false, scope = ExpectationScope.All))
     ).register
 
     // prepare
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
-    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
 

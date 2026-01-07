@@ -19,9 +19,9 @@
 
 package io.smartdatalake.util.misc
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class EnvironmentUtilTest extends FunSuite {
+class EnvironmentUtilTest extends AnyFunSuite {
 
   test("camelCaseToUpper") {
     assert(EnvironmentUtil.camelCaseToUpper("camelCaseToUpper") == "CAMEL_CASE_TO_UPPER")

@@ -26,12 +26,13 @@ import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.script.CmdScript
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 import java.time.Duration
 
 
-private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
+private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
 
   val dataObjectConfig: Config = ConfigFactory.parseString(
     """
@@ -235,9 +236,9 @@ private[smartdatalake] class ActionImplTests extends FlatSpec with Matchers {
         |}
         |""".stripMargin).withFallback(dataObjectConfig).resolve
 
-    val thrown = the [ConfigurationException] thrownBy ConfigParser.parse(config)
+    val thrown = the[ConfigurationException] thrownBy ConfigParser.parse(config)
 
-    thrown.getMessage should include ("123")
-    thrown.getMessage should include ("tdo1")
+    thrown.getMessage should include("123")
+    thrown.getMessage should include("tdo1")
   }
 }

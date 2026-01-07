@@ -127,8 +127,8 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.scalacheck</groupId>
-			<artifactId>scalacheck_${scala.minor.version}</artifactId>
+			<groupId>org.scalatestplus</groupId>
+			<artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
 			<scope>test</scope>
 		</dependency>
 <!--		 sdl-core test utils-->

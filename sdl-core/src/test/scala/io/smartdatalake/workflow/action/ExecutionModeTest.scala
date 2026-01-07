@@ -34,12 +34,13 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.udf
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
 
 import java.io.FileNotFoundException
 import java.nio.file.Files
 
-class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfterAll {
+class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -206,7 +207,7 @@ class ExecutionModeTest extends FunSuite with BeforeAndAfter with BeforeAndAfter
     val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.filter.nonEmpty)
   }
-    test("DataFrameIncrementalMode comparison column has different case than OutputDataObject Column") {
+  test("DataFrameIncrementalMode comparison column has different case than OutputDataObject Column") {
     val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())

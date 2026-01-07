@@ -19,9 +19,9 @@
 
 package io.smartdatalake.workflow.action
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ActionHelperTest extends FunSuite {
+class ActionHelperTest extends AnyFunSuite {
 
   test("replaceSpecialCharactersWithUnderscore") {
     assert(ActionHelper.replaceSpecialCharactersWithUnderscore("1-x.y+z!9") == "1_x_y_z_9")

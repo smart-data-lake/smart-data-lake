@@ -22,11 +22,11 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ExecutionPhase, GenericMetrics}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.time.LocalDateTime
 
-class RuntimeDataTest extends FunSuite {
+class RuntimeDataTest extends AnyFunSuite {
 
   test("store and get synchronous events") {
     val runtimeData = SynchronousRuntimeData(10)

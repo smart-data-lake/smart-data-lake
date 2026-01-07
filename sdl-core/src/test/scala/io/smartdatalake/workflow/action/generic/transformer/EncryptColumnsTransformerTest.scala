@@ -36,7 +36,7 @@ import org.apache.spark.sql
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -49,7 +49,7 @@ case class Test_Record(
                         lo: Long
                       )
 
-class EncryptColumnsTransformerTest extends FunSuite {
+class EncryptColumnsTransformerTest extends AnyFunSuite {
   implicit val session: SparkSession = TestUtil.session
   import session.implicits._
   private val tempDir = Files.createTempDirectory("test")

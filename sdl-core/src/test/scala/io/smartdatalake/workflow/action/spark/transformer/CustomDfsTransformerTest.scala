@@ -29,11 +29,11 @@ import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.typeOf
 
-class CustomDfsTransformerTest extends FunSuite {
+class CustomDfsTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._

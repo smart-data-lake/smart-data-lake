@@ -28,15 +28,17 @@ import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
+class DeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session : SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -63,7 +65,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     val srcDO = MockDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname")))
-    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -71,7 +73,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true)
-    val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
@@ -89,7 +91,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-    val l2 = Seq(("doe","john",10),("pan","peter",5)).toDF("lastname", "firstname", "rating")
+    val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())(context2)
     action1.init(Seq(srcSubFeed))(context2.copy(phase = ExecutionPhase.Init)).head
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
@@ -127,17 +129,17 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
-    val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
+    val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
     tgtDO.dropTable
-    tgtDO.connection.dropTable(tgtTable.fullName+"_sdltmp") // drop temp table if not properly cleaned up...
+    tgtDO.connection.dropTable(tgtTable.fullName + "_sdltmp") // drop temp table if not properly cleaned up...
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true, updateCapturedColumnOnlyWhenChanged = true)
-    val l1 = Seq(("doe","john",Some(5)),("pan","peter",Some(5)),("pan","peter2",None),("pan","peter3",None),("hans","muster",Some(5))).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("doe", "john", Some(5)), ("pan", "peter", Some(5)), ("pan", "peter2", None), ("pan", "peter3", None), ("hans", "muster", Some(5))).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
@@ -155,7 +157,7 @@ class DeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-    val l2 = Seq(("doe","john",Some(10)),("pan","peter",Some(5)),("pan","peter2",Some(3)),("pan","peter3",None)).toDF("lastname", "firstname", "rating")
+    val l2 = Seq(("doe", "john", Some(10)), ("pan", "peter", Some(5)), ("pan", "peter2", Some(3)), ("pan", "peter3", None)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())(context2)
     action1.init(Seq(srcSubFeed))(context2.copy(phase = ExecutionPhase.Init))
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)

@@ -20,9 +20,9 @@
 package io.smartdatalake.workflow.connection.jdbc
 
 import org.apache.spark.sql.types.{FloatType, IntegerType}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class MariaDbDialectTest extends FunSuite {
+class MariaDbDialectTest extends AnyFunSuite {
 
   test("can handle MariaDB url") {
     assert(MariaDbDialect.canHandle("jdbc:mariadb://localhost:3306"))

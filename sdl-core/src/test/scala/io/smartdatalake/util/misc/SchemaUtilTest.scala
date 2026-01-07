@@ -22,13 +22,13 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType}
-import org.scalatest.FunSuite
-import org.scalatest.Matchers.{a, be}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers.{a, be}
 import org.apache.spark.sql.types._
 
 import java.nio.file.Files
 
-class SchemaUtilTest extends FunSuite {
+class SchemaUtilTest extends AnyFunSuite {
 
   private val tempDir = Files.createTempDirectory("schema-util-test")
 

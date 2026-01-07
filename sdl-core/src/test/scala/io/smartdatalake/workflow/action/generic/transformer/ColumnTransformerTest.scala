@@ -18,30 +18,17 @@
  */
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.DefaultSmartDataLakeBuilder
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDsNto1Transformer
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.dataobject.CsvFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Dataset, SparkSession}
-import org.scalatest.Matchers.{a, thrownBy}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.spark.sql.SparkSession
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
-import java.io.File
-import java.nio.file.Files
-import scala.reflect.io.Directory
-
-class ColumnTransformerTest extends FunSuite with BeforeAndAfter {
+class ColumnTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -63,7 +50,7 @@ class ColumnTransformerTest extends FunSuite with BeforeAndAfter {
       additionalColumns = Map("run_id" -> "runId"),
       additionalDerivedColumns = Map(
         "col_1_plus_col2" -> """col_1 + col_2"""
-        ,"sum_col_1" -> """sum(col_1) over (partition by 'whatever')"""
+        , "sum_col_1" -> """sum(col_1) over (partition by 'whatever')"""
       ),
       renamedColumns = Map("col_1" -> "new_col_1"),
       droppedColumns = Seq("col_2")

@@ -24,11 +24,11 @@ import io.smartdatalake.testutils.TestUtil
 import org.apache.hadoop.conf.Configuration
 import org.json4s.jackson.JsonMethods
 import org.json4s.{StringInput, _}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.File
 
-class ConfigJsonExporterTest extends FunSuite {
+class ConfigJsonExporterTest extends AnyFunSuite {
   private val descriptionPath = getClass.getResource("/dagexporter/description").getPath
 
   test("export config") {
