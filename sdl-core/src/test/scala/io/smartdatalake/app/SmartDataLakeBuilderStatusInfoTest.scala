@@ -27,7 +27,8 @@ import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
 import org.eclipse.jetty.websocket.client.WebSocketClient
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -37,16 +38,16 @@ import scala.util.{Failure, Success}
 /**
  * This tests use configuration test/resources/configstatusinfo/application.conf
  */
-class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
+class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
-  val sdlb = DefaultSmartDataLakeBuilder
+  private val sdlb = DefaultSmartDataLakeBuilder
 
   before {
-    sdlb.instanceRegistry.clear
+    sdlb.instanceRegistry.clear()
   }
 
   // Note that this test produces a StackOverflowError in the Log with JDK11. The test succeeds nevertheless. Details see below.
@@ -67,12 +68,15 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     //Create Client Websocket that tries to establish connection with SDLB Job
     val receivedMessages: ListBuffer[String] = ListBuffer()
     // The socket that receives events
-    class UnitTestSocket() extends WebSocketAdapter with SmartDataLakeLogger {
+    class UnitTestSocket extends WebSocketAdapter with SmartDataLakeLogger {
       override def onWebSocketConnect(sess: Session): Unit = {}
+
       override def onWebSocketText(message: String): Unit = {
         receivedMessages += message
       }
+
       override def onWebSocketClose(statusCode: Int, reason: String): Unit = {}
+
       override def onWebSocketError(cause: Throwable): Unit = {}
     }
     val client = new WebSocketClient
@@ -111,6 +115,4 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     client.stop()
   }
 }
-
-
 

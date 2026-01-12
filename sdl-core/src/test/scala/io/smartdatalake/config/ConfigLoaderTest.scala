@@ -20,10 +20,10 @@ package io.smartdatalake.config
 
 import com.typesafe.config.ConfigException
 import org.apache.hadoop.conf.Configuration
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-
-class ConfigLoaderTest extends FlatSpec with Matchers {
+class ConfigLoaderTest extends AnyFlatSpec with Matchers {
 
   val defaultHadoopConf: Configuration = new Configuration()
 
@@ -59,7 +59,7 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
   }
 
   it must "fail parsing a non-existing location" in {
-    an [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("foo/bar"), defaultHadoopConf)
+    an[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("foo/bar"), defaultHadoopConf)
   }
 
   it must "fail if provided directory is empty" in {
@@ -67,21 +67,21 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
   }
 
   it must "fail if no configuration files are found for any location provided location in the Sequence" in {
-    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/error.conf"), defaultHadoopConf)
-    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/empty"), defaultHadoopConf)
+    a[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/error.conf"), defaultHadoopConf)
+    a[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/config.conf").toString, getClass.getResource("/config").toURI.toString + "/empty"), defaultHadoopConf)
   }
 
   it must "fail parsing a non-existing classpath entry" in {
-    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("cp:/foo/bar.conf"), defaultHadoopConf)
+    a[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("cp:/foo/bar.conf"), defaultHadoopConf)
   }
 
   it must "fail parsing a classpath entry with wrong extension" in {
-    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("cp:/foo/bar"), defaultHadoopConf)
+    a[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq("cp:/foo/bar"), defaultHadoopConf)
   }
 
   it must "not parse a file that is not a config file" in {
     val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory").toString), defaultHadoopConf)
-    a [ConfigException] should be thrownBy config.getString("noconfig")
+    a[ConfigException] should be thrownBy config.getString("noconfig")
   }
 
   it must "ignore hidden files" in {
@@ -93,11 +93,11 @@ class ConfigLoaderTest extends FlatSpec with Matchers {
     val config = ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/config/subdirectory").toString), defaultHadoopConf)
     config.getString("foo") shouldBe "foo"
     config.getString("config2") shouldBe "config2"
-    a [ConfigException] should be thrownBy config.getString("noconfig")
+    a[ConfigException] should be thrownBy config.getString("noconfig")
   }
 
   it should "fail on duplicate configuration object IDs" in {
-    a [ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithDuplicates").toString), defaultHadoopConf)
+    a[ConfigurationException] should be thrownBy ConfigLoader.loadConfigFromFilesystem(Seq(getClass.getResource("/configWithDuplicates").toString), defaultHadoopConf)
   }
 
   it must "should load configurations with templates" in {

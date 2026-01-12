@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
 import org.apache.spark
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.scalatest.Matchers.intercept
+import org.scalatest.matchers.should.Matchers.intercept
 
 
 /**

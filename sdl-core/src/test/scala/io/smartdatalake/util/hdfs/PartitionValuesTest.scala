@@ -19,9 +19,9 @@
 
 package io.smartdatalake.util.hdfs
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class PartitionValuesTest extends FunSuite {
+class PartitionValuesTest extends AnyFunSuite {
 
   test("sorting of partition values: 1 column") {
     val orderingDt = PartitionValues.getOrdering(Seq("dt"))

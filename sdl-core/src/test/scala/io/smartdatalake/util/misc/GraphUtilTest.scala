@@ -19,9 +19,9 @@
 
 package io.smartdatalake.util.misc
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class GraphUtilTest extends FunSuite {
+class GraphUtilTest extends AnyFunSuite {
 
   val graph1 = GraphUtil.Graph(Set(("A","B"),("A","C"),("B","D"),("C","D"),("D","E")))
   val allNodes = graph1.edges.flatMap(e => Set(e._1,e._2))

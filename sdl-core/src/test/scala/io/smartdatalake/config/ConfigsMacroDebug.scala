@@ -43,7 +43,7 @@ object ConfigsMacroDebug extends App with ConfigImplicits {
       | }
       |""".stripMargin).resolve
 
-  implicit val instanceRegistry = new InstanceRegistry
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   import configs.syntax.RichConfig
   config.extract[CustomDfDataObject].value
   //CustomDfDataObject.fromConfig(config)(new InstanceRegistry)

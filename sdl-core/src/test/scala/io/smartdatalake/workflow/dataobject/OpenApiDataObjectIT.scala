@@ -24,9 +24,9 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.explode
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class OpenApiDataObjectIT extends FunSuite {
+class OpenApiDataObjectIT extends AnyFunSuite {
   protected implicit lazy val session: SparkSession = TestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext

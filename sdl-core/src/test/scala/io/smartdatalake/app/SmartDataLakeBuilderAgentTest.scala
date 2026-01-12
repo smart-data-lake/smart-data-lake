@@ -33,19 +33,20 @@ import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
-  val sdlb = DefaultSmartDataLakeBuilder
+  private val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
   before {
@@ -125,7 +126,7 @@ class SmartDataLakeBuilderAgentTest extends FunSuite with BeforeAndAfter with Sm
       }
     }.onComplete {
       case Success(_) => logger.info(s"pollForInstructions done")
-      case Failure(ex) => throw (ex)
+      case Failure(ex) => throw ex
     }
 
     // run SDLB Main Instance

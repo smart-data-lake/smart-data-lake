@@ -28,14 +28,15 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSub
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.PrintWriter
 import java.nio.file.{Files, Path => NioPath}
 import scala.io.Source
 import scala.util.Using
 
-class CustomFileActionTest extends FunSuite with BeforeAndAfter {
+class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -74,7 +75,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test"->"true")))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test" -> "true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, 1)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
@@ -106,7 +107,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    val srcPartitionValues = Seq(PartitionValues(Map("p"->"test")))
+    val srcPartitionValues = Seq(PartitionValues(Map("p" -> "test")))
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve("p=test/" + resourceFile).toFile)
 
     // setup DataObjects
@@ -116,7 +117,7 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test"->"true")))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test" -> "true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, 1, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", srcPartitionValues) // InitSubFeed needed to test initExecutionMode!
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
@@ -135,13 +136,14 @@ class CustomFileActionTest extends FunSuite with BeforeAndAfter {
   }
 
 }
+
 object CustomFileActionTest {
   val delimiter = ","
 }
 
 class TestFileTransformer extends CustomFileTransformer {
-  override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
-    assert(options("test")=="true")
+  override def transform(options: Map[String, String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = {
+    assert(options("test") == "true")
     Using.resource(Source.fromInputStream(input)) { src =>
       Using.resource(new PrintWriter(output)) { os =>
         src.getLines().foreach { l =>

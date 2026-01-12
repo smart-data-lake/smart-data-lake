@@ -34,15 +34,16 @@ import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.json4s.jackson.{JsonMethods, Serialization}
 import org.json4s.{Formats, NoTypeHints, StringInput}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Paths}
 
-class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
+class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
 
-  val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
+  private val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
   val target = "localfile:./target/schema"
-  val exportPath = Paths.get(target.stripPrefix("localfile:"))
+  private val exportPath = Paths.get(target.stripPrefix("localfile:"))
 
   before {
     FileUtils.deleteDirectory(exportPath.toFile)
@@ -144,7 +145,7 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
     // first write
     val schema1 = SparkSchema(StructType(Seq(StructField("a", StringType))))
     writer.writeSchema(formatSchema(Some(schema1), None), DataObjectId("test"), getCurrentVersion)
-    assert(writer.readIndex(dataObjectId, "schema").length==1)
+    assert(writer.readIndex(dataObjectId, "schema").length == 1)
     Thread.sleep(1000) // timestamp in filename has seconds resolution, make sure we dont overwrite previous file.
     // second write -> no update
     writer.writeSchema(formatSchema(Some(schema1), None), DataObjectId("test"), getCurrentVersion)
@@ -175,8 +176,8 @@ class DataObjectSchemaExporterTest extends FunSuite with BeforeAndAfter {
     val writer = FileExportWriter(exportPath)
     val latestStats = writer.getLatestData(hiveDO.id, "stats")
       .map(Serialization.read[Map[String, Any]]).get
-    assert(latestStats.apply("columns").asInstanceOf[Map[String,Any]]
-      .apply("lastname").asInstanceOf[Map[String,Any]]
+    assert(latestStats.apply("columns").asInstanceOf[Map[String, Any]]
+      .apply("lastname").asInstanceOf[Map[String, Any]]
       .apply(ColumnStatsType.DistinctCount.toString) == 3)
   }
 }

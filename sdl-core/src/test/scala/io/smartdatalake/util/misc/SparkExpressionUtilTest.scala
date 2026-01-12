@@ -26,9 +26,9 @@ import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.action.executionMode.DefaultExecutionModeExpressionData
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, min, udf}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class SparkExpressionUtilTest extends FunSuite {
+class SparkExpressionUtilTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
 

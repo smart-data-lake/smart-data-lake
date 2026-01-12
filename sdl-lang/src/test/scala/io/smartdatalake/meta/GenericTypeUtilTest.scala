@@ -19,11 +19,11 @@
 
 package io.smartdatalake.meta
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.typeOf
 
-class GenericTypeUtilTest extends FunSuite {
+class GenericTypeUtilTest extends AnyFunSuite {
 
   test ("handle attributes - required, deprecated, override") {
     val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestObject])

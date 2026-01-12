@@ -24,9 +24,9 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataobject.FileRef
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class SubFeedTest extends FunSuite {
+class SubFeedTest extends AnyFunSuite {
 
   implicit val session: SparkSession = TestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry

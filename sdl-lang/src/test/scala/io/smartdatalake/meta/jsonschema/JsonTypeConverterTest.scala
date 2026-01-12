@@ -28,11 +28,11 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import org.reflections.Reflections
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-class JsonTypeConverterTest extends FunSuite {
+class JsonTypeConverterTest extends AnyFunSuite {
   private val registry = new DefinitionRegistry
   private val reflections = new Reflections
   private val jsonTypeConverter = new JsonSchemaUtil.JsonTypeConverter(reflections, registry)

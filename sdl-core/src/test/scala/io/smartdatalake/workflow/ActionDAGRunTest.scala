@@ -28,13 +28,13 @@ import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, LocalDateTime}
 
-class ActionDAGRunTest extends FunSuite {
+class ActionDAGRunTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._

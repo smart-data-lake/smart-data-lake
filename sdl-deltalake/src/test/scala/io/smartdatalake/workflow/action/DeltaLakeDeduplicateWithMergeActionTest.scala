@@ -27,16 +27,18 @@ import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
+class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
-  protected implicit val session : SparkSession = DeltaLakeTestUtils.session
+  protected implicit val session: SparkSession = DeltaLakeTestUtils.session
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -53,8 +55,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
+    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -117,8 +119,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
+    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 

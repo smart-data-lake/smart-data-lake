@@ -29,11 +29,11 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.ParquetFileDataObject
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class OfflineCopyActionTest extends FunSuite {
+class OfflineCopyActionTest extends AnyFunSuite {
 
   private val tempDir = Files.createTempDirectory("test")
 

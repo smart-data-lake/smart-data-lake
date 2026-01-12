@@ -20,9 +20,9 @@
 package io.smartdatalake.util.misc
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class HoconUtilTest extends FunSuite {
+class HoconUtilTest extends AnyFunSuite {
 
   val config = ConfigFactory.parseString(
     """

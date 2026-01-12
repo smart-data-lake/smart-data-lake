@@ -20,9 +20,9 @@
 package io.smartdatalake.util.spark
 
 import io.smartdatalake.util.spark.DataFrameUtil.{normalizeToAscii, removeNonStandardSQLNameChars, strCamelCase2LowerCaseWithUnderscores, strToLowerCamelCase}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class DataFrameUtilTest extends FunSuite {
+class DataFrameUtilTest extends AnyFunSuite {
 
   test("camelCase to lower_case_with_underscore") {
     assert(strCamelCase2LowerCaseWithUnderscores("abc0") == "abc0")

@@ -26,14 +26,14 @@ import org.apache.logging.log4j.core.{LogEvent, LoggerContext}
 import org.apache.logging.log4j.core.appender.AbstractAppender
 import org.apache.logging.log4j.core.config.LoggerConfig
 import org.hsqldb.Server
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.net.ConnectException
 import java.sql.{SQLException, SQLTransientConnectionException}
 import java.util.Properties
 import scala.collection.mutable
 
-class JdbcTableConnectionTest extends FunSuite with SmartDataLakeLogger {
+class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("autocommit is disabled by default") {
     // prepare

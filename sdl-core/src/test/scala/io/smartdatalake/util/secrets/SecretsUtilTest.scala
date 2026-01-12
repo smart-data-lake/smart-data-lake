@@ -20,9 +20,9 @@
 package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class SecretsUtilTest extends FunSuite {
+class SecretsUtilTest extends AnyFunSuite {
 
   test("register custom config provider and get secret") {
     val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map("option1" -> "1")))

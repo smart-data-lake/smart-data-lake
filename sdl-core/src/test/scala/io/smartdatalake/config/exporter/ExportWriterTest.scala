@@ -23,11 +23,11 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.ExportWriter.{formatSchema, parseSchema}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.types._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class ExportWriterTest extends FunSuite {
+class ExportWriterTest extends AnyFunSuite {
 
   private val tempDir = Files.createTempDirectory("exportwritertest")
   private val dataObjectId = DataObjectId("testDO")

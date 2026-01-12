@@ -20,19 +20,20 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.script.CmdScript
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, CsvFileDataObject, DataObject, DataObjectMetadata}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.commons.lang.NotImplementedException
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class CustomScriptActionTest extends FunSuite with BeforeAndAfter {
+class CustomScriptActionTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -51,6 +52,7 @@ class CustomScriptActionTest extends FunSuite with BeforeAndAfter {
 
     // notify test variable & function
     var testVar: Option[String] = None
+
     def notify(v: String): Unit = {
       testVar = Some(v)
     }
@@ -58,7 +60,7 @@ class CustomScriptActionTest extends FunSuite with BeforeAndAfter {
     // setup DataObjects
     val src1DO = CsvFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'))
     val src2DO = CsvFileDataObject("src2", tempDir.resolve("src2").toString.replace('\\', '/'))
-    val tgtDO = TestScriptNotificationDataObject("tgt", notify )
+    val tgtDO = TestScriptNotificationDataObject("tgt", notify)
     instanceRegistry.register(src1DO)
     instanceRegistry.register(src2DO)
     instanceRegistry.register(tgtDO)
