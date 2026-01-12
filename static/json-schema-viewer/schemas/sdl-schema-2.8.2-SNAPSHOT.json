@@ -1366,7 +1366,7 @@
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
-            "description" : "meta data"
+            "description" : "meta data of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog\nattributes are required as the pipeline will try to add the description to the catalog."
           }
         },
         "title" : "DeltaLakeTableDataObject",
