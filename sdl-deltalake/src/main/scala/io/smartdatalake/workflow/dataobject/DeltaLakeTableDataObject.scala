@@ -104,7 +104,8 @@ import scala.util.Try
  * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
- * @param metadata meta data
+ * @param metadata meta data of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
+ *                  attributes are required as the pipeline will try to add the description to the catalog.
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
@@ -187,6 +188,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
     require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
+    metadata.flatMap(_.description).foreach(_ => {
+      require(table.db.isDefined && table.catalog.isDefined,
+        "Since the attribute metadata.description is set, you must also define a " +
+          "table.db and a table.catalog in order to add a the tableComment" +
+          "to the catalog")
+    })
     // initialize external table if needed
     if (path.isDefined) { // if path is not defined, it is handled as managed table.
       if (!isTableExisting) {
@@ -301,7 +308,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     super.postWrite(partitionValues)
     if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
     metadata.flatMap(_.description).foreach {addTableComment}
-
   }
 
 
