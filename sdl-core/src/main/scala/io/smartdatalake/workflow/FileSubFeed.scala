@@ -86,8 +86,8 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): FileSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = result.fileRefs, fileRefMapping = None)
   }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): FileSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = None, fileRefMapping = None)
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): FileSubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, fileRefs = None, fileRefMapping = None)
   }
 }
 object FileSubFeed extends SubFeedConverter[FileSubFeed] {

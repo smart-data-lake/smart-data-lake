@@ -67,7 +67,7 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   }
 
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed
-  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SubFeed
 
   def withMetrics(metrics: MetricsMap): SubFeed = ProductUtil.dynamicCopy(this, "metrics", Some(metrics))
 

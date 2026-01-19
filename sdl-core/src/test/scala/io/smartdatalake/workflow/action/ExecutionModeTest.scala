@@ -102,7 +102,7 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
     assert(result.inputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe"))))
-    assert(result.outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe"))))
+    assert(result.outputPartitionValues.contains(Seq(PartitionValues(Map("lastname" -> "doe")))))
   }
 
   test("PartitionDiffMode negative applyCondition") {
@@ -152,7 +152,7 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(result.outputPartitionValues == Seq(PartitionValues(Map("lastname" -> "doe")))) // Einstein already exists in tgt2
+    assert(result.outputPartitionValues.contains(Seq(PartitionValues(Map("lastname" -> "doe"))))) // Einstein already exists in tgt2
     assert(result.inputPartitionValues.toSet == Set(PartitionValues(Map("lastname" -> "einstein")), PartitionValues(Map("lastname" -> "doe")))) // but Einstein is added as additional input partition
   }
 

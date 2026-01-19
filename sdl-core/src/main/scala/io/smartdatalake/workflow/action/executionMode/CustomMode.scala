@@ -36,6 +36,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
  *                            It can be used to ensure processing over multiple actions in case of errors.
  * @param options             Options specified in the configuration for this execution mode
  */
+@Deprecated @deprecated("Implement ExecutionMode directly and use as type in configuration", "2.8.1")
 case class CustomMode(className: String, override val alternativeOutputId: Option[DataObjectId] = None, options: Option[Map[String, String]] = None)
   extends ExecutionMode with ExecutionModeWithMainInputOutput {
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
