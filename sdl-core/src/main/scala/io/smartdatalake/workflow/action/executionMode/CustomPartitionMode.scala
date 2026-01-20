@@ -51,7 +51,7 @@ case class CustomPartitionMode(className: String, override val alternativeOutput
       case (input: CanHandlePartitions, output: CanHandlePartitions) =>
         val partitionValuesOpt = impl.apply(options.getOrElse(Map()), actionId, input, output, subFeed.partitionValues.map(_.getMapString), context)
           .map(_.map(pv => PartitionValues(pv)))
-        partitionValuesOpt.map(pvs => ExecutionModeResult(inputPartitionValues = pvs, outputPartitionValues = pvs))
+        partitionValuesOpt.map(pvs => ExecutionModeResult(inputPartitionValues = pvs, outputPartitionValues = Some(pvs)))
       case (_: CanHandlePartitions, _) =>
         throw ConfigurationException(s"$actionId has set executionMode = CustomPartitionMode but ${output.id} does not support partitions!")
       case (_, _) =>
