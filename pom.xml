@@ -866,9 +866,6 @@
                     <configuration>
                         <failOnWarning>false</failOnWarning>
                         <ignoreNonCompile>true</ignoreNonCompile>
-                        <ignoredUsedUndeclaredDependencies>
-                            <dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
-                        </ignoredUsedUndeclaredDependencies>
                     </configuration>
                     <executions>
                         <execution>
@@ -3053,6 +3050,11 @@
                 <artifactId>delta-spark_${scala.minor.version}</artifactId>
                 <version>${delta.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.scalatestplus</groupId>
+                <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+                <version>${scalatest.plus.version}</version>
+            </dependency>
 
             <!-- TEST dependencies -->
             <dependency>
@@ -3066,12 +3068,6 @@
                         <artifactId>scala-xml_${scala.minor.version}</artifactId>
                     </exclusion>
                 </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>org.scalatestplus</groupId>
-                <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
-                <version>${scalatest.plus.version}</version>
-                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.scalactic</groupId>
