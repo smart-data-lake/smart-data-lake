@@ -42,6 +42,7 @@ object Collection extends Types {
 
   val doomsTime: Timestamp = Timestamp.valueOf("9999-12-31 00:00:00")
 
+  /** * Some simple DataSets ** */
   private val schemaSimple: StructType = StructType(Array(
     StructField(name = "id", dataType = StringType, nullable = false),
     StructField(name = "n", dataType = IntegerType, nullable = false),
@@ -56,6 +57,55 @@ object Collection extends Types {
     StructField(name = "id", dataType = StringType, nullable = false),
     StructField(name = "x", dataType = IntegerType, nullable = true)))
   val dsNull: Dataset[(String, Int)] = spark.createDataFrame(ArrayBuffer(Row("A", None)).asJava, schemaNull).as[(String, Int)]
+
+
+  val dfTemporalPeriods: DataFrame = List(
+    (1, Some(0.0), Some(1.2), 3.14, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
+    (1, Some(0.7), Some(1.4), -0.17, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-06-30 23:59:59.999")),
+    (1, Some(1.2), Some(1.4), 42.0, Timestamp.valueOf("2020-07-01 00:00:00"), doomsTime),
+    (1, Some(1.4), Some(2.0), 0.0, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-09-30 23:59:59.999")),
+    (1, Some(1.4), Some(3.0), 13.17, Timestamp.valueOf("2020-10-01 00:00:00"), doomsTime),
+    (1, Some(3.0), Some(4.0), -2.72, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
+    (1, None, Some(5.0), 100.1, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-03-31 23:59:59.999")),
+    (1, Some(4.0), Some(5.0), 9.87, Timestamp.valueOf("2020-04-01 00:00:00"), doomsTime)
+  ).toDF("id", "x", "y", "wert", "valid_from", "valid_to")
+  val dfSnapshotsWithGaps: DataFrame = List(
+    (0, 20190101, Some(3.14), None),
+    (0, 20190102, Some(3.14), Some(-2.37)),
+    (0, 20190103, Some(2.72), Some(4.57)),
+    (0, 20190104, None, None),
+    (0, 20190106, Some(1.0), Some(3.0)),
+    (0, 20190201, Some(3.14), None),
+    (0, 20190207, Some(1.0), Some(2.5)),
+    (1, 20190101, Some(42.0), None),
+    (1, 20190102, None, None),
+    (1, 20190103, Some(-21.3), None),
+    (1, 20190104, None, None))
+    .toDF("id", "dt", "x", "y")
+
+  val dfIdXRows: List[(Int, Option[Double])] = List((-4, Some(NegativeInfinity)), (-3, Some(PositiveInfinity)),
+    (-2, Some(NaN)), (-1, None),
+    (0, Some(0.1)), (2, Some(0.9999)), (4, Some(1d)),
+    (1, Some(-0.1)), (3, Some(-0.9999)), (5, Some(-1d)),
+    (6, Some(1.0001)), (8, Some(3d)), (10, Some(42d)),
+    (7, Some(-1.0001)), (9, Some(-3d)), (11, Some(-42d)),
+    (100, Some(0d))
+  )
+  val dfIdX: DataFrame = dfIdXRows.toDF("id", "x")
+
+  // hierarchical data frame
+  val rowsHierarchy: List[(Byte, String, String)] = List(
+    (1, "a", "ab"), (2, "a", "ac"), (3, "ac", "aca"), (4, "b", "ba"),
+    (5, "c", "ca"), (6, "ca", "caa"), (7, "ca", "cab"), (8, "c", "cb"),
+    (9, "cb", "X"), (10, "c", "cc"), (11, "cc", "X"), (12, "X", "Y"), (13, "Y", "Z"))
+  val dfHierarchy: DataFrame = rowsHierarchy.toDF("id", "parent", "child")
+
+  // DataFrame with Nletten
+  val rowsNletten: List[(String, String)] = List(("1lette", "Unilette"),
+    ("2lette", "Doublette"), ("2lette", "Doublette"),
+    ("3lette", "Trilette"), ("3lette", "Trilette"), ("3lette", "Trilette"),
+    ("4lette", "Quatrilette"), ("4lette", "Quatrilette"), ("4lette", "Quatrilette"), ("4lette", "Quatrilette"))
+  val dfNletten: DataFrame = rowsNletten.toDF("id", "name")
 
 
   /** * DataFrame with Decimals ** */
@@ -160,42 +210,6 @@ object Collection extends Types {
     Row(sixRow, Row(List(oneRow, twoRow, threeRow), List(oneRow, fiveRow)))
   ).asJava
   val df_struct: DataFrame = spark.createDataFrame(rowStruct, schemaStruct)
-
-  val dfTemporalPeriods: DataFrame = List(
-    (1, Some(0.0), Some(1.2), 3.14, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
-    (1, Some(0.7), Some(1.4), -0.17, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-06-30 23:59:59.999")),
-    (1, Some(1.2), Some(1.4), 42.0, Timestamp.valueOf("2020-07-01 00:00:00"), doomsTime),
-    (1, Some(1.4), Some(2.0), 0.0, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-09-30 23:59:59.999")),
-    (1, Some(1.4), Some(3.0), 13.17, Timestamp.valueOf("2020-10-01 00:00:00"), doomsTime),
-    (1, Some(3.0), Some(4.0), -2.72, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
-    (1, None, Some(5.0), 100.1, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-03-31 23:59:59.999")),
-    (1, Some(4.0), Some(5.0), 9.87, Timestamp.valueOf("2020-04-01 00:00:00"), doomsTime)
-  ).toDF("id", "x", "y", "wert", "valid_from", "valid_to")
-
-  val dfSnapshotsWithGaps: DataFrame = List(
-    (0, 20190101, Some(3.14), None),
-    (0, 20190102, Some(3.14), Some(-2.37)),
-    (0, 20190103, Some(2.72), Some(4.57)),
-    (0, 20190104, None, None),
-    (0, 20190106, Some(1.0), Some(3.0)),
-    (0, 20190201, Some(3.14), None),
-    (0, 20190207, Some(1.0), Some(2.5)),
-    (1, 20190101, Some(42.0), None),
-    (1, 20190102, None, None),
-    (1, 20190103, Some(-21.3), None),
-    (1, 20190104, None, None))
-    .toDF("id", "dt", "x", "y")
-
-  val dfIdXRows: List[(Int, Option[Double])] = List((-4, Some(NegativeInfinity)), (-3, Some(PositiveInfinity)),
-    (-2, Some(NaN)), (-1, None),
-    (0, Some(0.1)), (2, Some(0.9999)), (4, Some(1d)),
-    (1, Some(-0.1)), (3, Some(-0.9999)), (5, Some(-1d)),
-    (6, Some(1.0001)), (8, Some(3d)), (10, Some(42d)),
-    (7, Some(-1.0001)), (9, Some(-3d)), (11, Some(-42d)),
-    (100, Some(0d))
-  )
-
-  val dfIdX: DataFrame = dfIdXRows.toDF("id", "x")
 
 
   /** Generated DataFrames */
