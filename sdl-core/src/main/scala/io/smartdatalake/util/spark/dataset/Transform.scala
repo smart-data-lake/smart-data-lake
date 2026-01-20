@@ -55,13 +55,12 @@ trait Transform extends Serializable {
      * @param keepOriginalCols   : whether to keep original cols (make sure that there is no ambiguity!)
      * @return DataFrame with renamed columns
      */
-    def transformCols(transformRenameFun: String => Seq[(Column, String)],
+    def transformCols(transformRenameFun: String => Iterable[(Column, String)],
                       colFilter: String => Boolean,
                       keepOriginalCols: Boolean): DataFrame = {
       val resultCols = ds.columns.flatMap { cn =>
         if (colFilter(cn)) {
-          val newCols: Seq[Column] = transformRenameFun(cn)
-            .map { case (c, cn) => c.as(cn) }
+          val newCols = transformRenameFun(cn).map { case (c, cn) => c.as(cn) }.toList
           if (keepOriginalCols) col(cn) +: newCols else newCols
 
         } else List(col(cn))
@@ -80,10 +79,10 @@ trait Transform extends Serializable {
      * @return DataFrame with renamed columns
      */
     def transformCols(renameFun: String => Iterable[String] = List(_),
-                      transformFun: String => Seq[Column] = cn => Seq(col(cn)),
+                      transformFun: String => Iterable[Column] = cn => Seq(col(cn)),
                       colFilter: String => Boolean = _ => true,
                       keepOriginalCols: Boolean = false): DataFrame = {
-      val transformRename: String => Seq[(Column, String)] = cn => transformFun(cn).zip(renameFun(cn))
+      val transformRename: String => Iterable[(Column, String)] = cn => transformFun(cn).zip(renameFun(cn))
       transformCols(transformRenameFun = transformRename,
         colFilter = colFilter, keepOriginalCols = keepOriginalCols)
     }
@@ -99,10 +98,10 @@ trait Transform extends Serializable {
      * @return DataFrame with renamed columns
      */
     def transformCols(renameFun: String => Iterable[String],
-                      transformFun: String => Seq[Column],
+                      transformFun: String => Iterable[Column],
                       datType: DataType,
                       keepOriginalCols: Boolean): DataFrame = {
-      val transformRename: String => Seq[(Column, String)] = cn => transformFun(cn).zip(renameFun(cn))
+      val transformRename: String => Iterable[(Column, String)] = cn => transformFun(cn).zip(renameFun(cn))
       transformCols(transformRenameFun = transformRename,
         colFilter = ds.schema(_).dataType == datType,
         keepOriginalCols = keepOriginalCols)
@@ -165,7 +164,7 @@ trait Transform extends Serializable {
 
       def isPrecisionSmallerThan(upperBound: Int)(p: Int) = p < upperBound || (!strict & p == upperBound)
 
-      val trfFun: String => Seq[Column] = cn => {
+      val trfFun: String => Iterable[Column] = cn => {
         val newType = if (typ.isEmpty) oldTypePrecisionScale(cn).map(_._1).getOrElse(0) match {
           case n if n <= 0 => oldType(cn)
           case n if isPrecisionSmallerThan(3)(n) => ByteType
@@ -213,7 +212,8 @@ trait Transform extends Serializable {
      * @return
      */
     // TODO: Move enumerateGroups to a different trait as it does not transform the dataset
-    def enumerateGroups(attr: String, keyCols: Seq[Column], orderCols: Seq[Column], condition: Column, groupNbName: String = "nb")
+    def enumerateGroups(attr: String, keyCols: Seq[Column], orderCols: Seq[Column],
+                        condition: Column, groupNbName: String = "nb")
                        (implicit ss: SparkSession): DataFrame = {
       import ss.implicits._
 
@@ -316,7 +316,7 @@ trait Transform extends Serializable {
       def getSubColAlias(cn: String): String = if (fullSubcolName)
         cn.replace(".", fullSubcolNameSep) else cn.replaceAll(".*\\.", "")
 
-      val transformRename: String => Seq[(Column, String)] = str =>
+      val transformRename: String => List[(Column, String)] = str =>
         unfoldStructCol(ds.schema, nested)(str)
           .map { x => (col(x), getSubColAlias(x)) }
       transformCols(transformRenameFun = transformRename,

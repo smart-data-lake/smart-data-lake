@@ -23,7 +23,7 @@ import io.smartdatalake.util.LogUtils.{debLogFun, debugLog}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.Logger
 
 import scala.util.{Failure, Success, Try}
 

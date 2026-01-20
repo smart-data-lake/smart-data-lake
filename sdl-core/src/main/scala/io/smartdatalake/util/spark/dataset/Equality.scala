@@ -213,7 +213,7 @@ trait Equality extends Transform {
     final def hasAlmostEqualRows(that: Dataset[T],
                                  precisionMap: Map[String, PrecisionDef],
                                  showDiff: Boolean,
-                                 pk: Seq[String]
+                                 pk: Iterable[String]
                                 )(implicit logger: Logger): Boolean = {
       LogUtils.debugLog(s"hasAlmostEqualRows: precisionMap.size = ${precisionMap.size} , showDiff = $showDiff , pk = (${pk.mkString(",")})")
       LogUtils.debugLog(s"hasAlmostEqualRows: precisionMap = ${precisionMap.mkString(",")}")
@@ -242,8 +242,8 @@ trait Equality extends Transform {
       else if (pk.isEmpty) (List.empty[Array[Column]], List(thiss.columns.map(col)))
       // if precisionMap contains elements and PK is given
       // then compare the precise columns using symmetric difference and the others using row difference
-      else (List((pk ++ preciseCols).distinct.map(col).toArray),
-        List((pk ++ impreciseCols).distinct.map(col).toArray))
+      else (List((pk ++ preciseCols).toArray.distinct.map(col)),
+        List((pk ++ impreciseCols).toArray.distinct.map(col)))
       LogUtils.debugLog(s"hasAlmostEqualRows: symDiffCols = ${symDiffCols.headOption.map(_.mkString(","))}")
       LogUtils.debugLog(s"hasAlmostEqualRows: rowDiffCols = ${rowDiffCols.headOption.map(_.mkString(","))}")
 
@@ -288,7 +288,7 @@ trait Equality extends Transform {
                           ignoreColumnOrder: Boolean, ignoreNullability: Boolean,
                           precisionMap: Map[String, PrecisionDef],
                           showDiff: Boolean,
-                          pk: Seq[String])(implicit logger: Logger): Boolean = {
+                          pk: Iterable[String])(implicit logger: Logger): Boolean = {
       schemataEqual(ds.schema, that.schema, ignoreColumnOrder, ignoreNullability, showDiff) &&
         ds.select(ds.columns.map(col): _*)
           .hasAlmostEqualRows(that.select(ds.columns.map(col): _*), precisionMap, showDiff, pk)
@@ -318,7 +318,7 @@ trait Equality extends Transform {
                           relThreshold: Option[Double] = Some(epsilonDouble),
                           strict: Boolean = true,
                           showDiff: Boolean = true,
-                          pk: Seq[String] = Nil)(implicit logger: Logger): Boolean = {
+                          pk: Iterable[String] = Nil)(implicit logger: Logger): Boolean = {
       val thisUnfolded = ds.explodeMaps.explodeArrays.unfoldStructs()
       val thatUnfolded = that.explodeMaps.explodeArrays.unfoldStructs()
       LogUtils.debugLog(s"almostEqual: thisUnfolded.schema = ${thisUnfolded.schema.catalogString}")
@@ -345,7 +345,7 @@ trait Equality extends Transform {
     final def equal(that: Dataset[T],
                     ignoreColumnOrder: Boolean = true, ignoreNullability: Boolean = true,
                     showDiff: Boolean = true,
-                    pk: Seq[String] = Nil)(implicit logger: Logger): Boolean = ds
+                    pk: Iterable[String] = Nil)(implicit logger: Logger): Boolean = ds
       .almostEqual(that = that,
         ignoreColumnOrder = ignoreColumnOrder, ignoreNullability = ignoreNullability,
         precisionMap = Map[String, PrecisionDef](), showDiff, pk)
