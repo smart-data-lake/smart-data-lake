@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.HadoopExportWriter
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
@@ -52,7 +52,7 @@ class OfflineCopyActionTest extends AnyFunSuite {
     // setup DataObjects
     val srcDO = ParquetFileDataObject("src1", tempDir.resolve("test1/src1").toString, filenameColumn = Some("_filename"))
     instanceRegistry.register(srcDO)
-    val tgtDO = MockDataObject("tgt1")
+    val tgtDO = MockSparkDataObject("tgt1")
     instanceRegistry.register(tgtDO)
 
     // prepare schema export

@@ -197,6 +197,16 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = throwNotImplementedError
 
   override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = throwNotImplementedError
+
+  def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = throwNotImplementedError
+
+  def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = throwNotImplementedError
+
+  def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = throwNotImplementedError
+
+  def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = throwNotImplementedError
+
+  def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 }
 
 

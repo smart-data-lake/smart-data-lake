@@ -97,6 +97,27 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 
   override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): GenericDataFrame = throw new NotImplementedError("Joining using a ScalaColumn[A] expression is not supported at the moment")
 
+  private def reorderColumns(newOrder: Seq[String]): ScalaDataFrame = {
+    require(newOrder.toSet == schema.columns.toSet, "Some of the provided columns either don't exist, or there are columns missing for reordering")
+    ScalaDataFrame(cols = newOrder.map(this.apply))
+  }
+
+  //override in order to avoid Spark col() expression
+  override def symmetricDifference(other: GenericDataFrame, diffColName: String): GenericDataFrame = {
+    other match {
+      case otherScala: ScalaDataFrame => {
+        require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
+        val otherReordered: ScalaDataFrame = otherScala.reorderColumns(newOrder = this.schema.columns)
+        val df1 = this.except(otherReordered)
+        val df2 = otherReordered.except(this)
+        val newCol: Seq[Boolean] = (0 until(df1.count.toInt)).map(_ => true).toSeq ++ (0 until(df1.count.toInt)).map(_ => false).toSeq
+        df1.unionByName(df2).withColumn(diffColName, ScalaColumn(diffColName, newCol))
+      }
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+
+    }
+  }
+
   def select(columnNames: List[String]): ScalaDataFrame = {
     checkColumnsExist(this, colNames = columnNames)
     ScalaDataFrame(cols.filter(c => columnNames.contains(c.definition.name)))
@@ -119,7 +140,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   override def unionByName(other: GenericDataFrame): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame => {
       checkColumnsExist(otherScala, columns)
-      val zipped = cols.sortBy(_.definition.name) zip otherScala.cols.filter(columns.contains).sortBy(_.definition.name)
+      val zipped = cols.sortBy(_.definition.name) zip otherScala.cols.filter(c => columns.contains(c.definition.name)).sortBy(_.definition.name)
       ScalaDataFrame(zipped.map(pair => pair._1 unsafeAppend pair._2))
     }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
@@ -127,9 +148,8 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 
   override def except(other: GenericDataFrame): GenericDataFrame = other match {
     case otherScala: ScalaDataFrame => {
-      require(dim == otherScala.dim, "The except operation can only be carried out with two dataframes of the same dimension")
-      val duplRows = rows.toSet intersect otherScala.rows.toSet
-      ScalaDataFrame.fromScalaRows(rows.filterNot(duplRows.contains))
+      require(schema == otherScala.schema, "The except operation can only be carried out with two dataframes with the same schema")
+      ScalaDataFrame.fromScalaRows(rows = (rows.toSet -- otherScala.rows.toSet).toSeq, schemaIn = Some(schema))
     }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
@@ -273,6 +293,7 @@ object ScalaDataFrame {
       .map(v => v._2.createColumn(v._1.toIndexedSeq)))
 
     colsTry match {
+      case Success(_) if rows.isEmpty => ScalaDataFrame.returnEmpty(schema)
       case Success(columns) => new ScalaDataFrame(columns)
       case Failure(e) if e.getMessage.startsWith("transpose requires all collections to have the same size") => //error with transpose operation
         throw new IllegalArgumentException("Could not create dataframe, rows must have the same size")
@@ -280,8 +301,8 @@ object ScalaDataFrame {
     }
   }
 
-  def returnEmpty(schema: ScalaSchema) = {
-    ScalaDataFrame(Seq(), Some(schema))
+  def returnEmpty(schema: ScalaSchema): ScalaDataFrame = {
+    schema.toEmptyScalaDataFrame
   }
 
   val implicits: ScalaDataFrameImplicits.type = ScalaDataFrameImplicits

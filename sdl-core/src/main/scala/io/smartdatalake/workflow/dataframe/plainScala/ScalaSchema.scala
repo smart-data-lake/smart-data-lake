@@ -73,5 +73,7 @@ case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInf
   override def treeString(level: Int): String = fields.map(f => f"${f.name} (${f.dataType})").mkString("  |  "); //only flat structure as of now
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
+
+  def toEmptyScalaDataFrame: ScalaDataFrame = ScalaDataFrame(fields.map(_.createColumn(data = IndexedSeq())))
 }
 

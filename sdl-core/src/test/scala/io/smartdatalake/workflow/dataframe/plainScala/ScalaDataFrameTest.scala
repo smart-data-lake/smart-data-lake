@@ -25,13 +25,22 @@ class ScalaDataFrameTest extends FunSuite {
 
   import ScalaDataFrame.implicits._
 
+  //implementation was overriden, thus test needed
+  // symmetric difference part of isEqual operator (part of further tests)
+  test("test symmetric difference") {
+    val df = ScalaDataFrame.apply(Seq(Seq(1,2,3,"a","b","c",true), Seq(4,5,6,"gf","dgd","gsg",false)))
+    val df2 = ScalaDataFrame(Seq(Seq(1,2,3,"a","b","c",false), Seq(4,5,6,"gf","dgd","gsg",true))) //last value switch
+    assert(df.symmetricDifference(df).isEmpty && !df.symmetricDifference(df2).isEmpty)
+  }
+
   test("create from Seq and rename columns") {
     val df = ScalaDataFrame.apply(Seq(Seq(1, "A"), Seq(2, "B")))
       .withColumnRenamed("col0", "a")
       .withColumnRenamed("col1", "b")
     val df1 = df
       .withColumn("c", df("a") * df("a"))
-    println(df1.showString())
+    val df2 = ScalaDataFrame.apply(Seq(Seq(1, "A", 1), Seq(2, "B", 4)), Seq("a", "b", "c"))
+    assert(df1.isEqual(df2))
   }
 
   test("create from Seq with column names") {
@@ -95,6 +104,50 @@ class ScalaDataFrameTest extends FunSuite {
       .withColumn("c", col("a") * lit(-1))
     assert(df1.collect.map(_.toSeq) == expected)
   }
+
+  test("select works correctly") {
+    val df = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    assert(df.select("col2").isEqual(ScalaDataFrame(Seq(Seq("a"), Seq("b")), Seq("col2"))))
+    assertThrows[IllegalArgumentException](df.select("col_non_existent"))
+  }
+
+  test("groupby is not implemented yet") {
+    val df = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    assertThrows[NotImplementedError](df.groupBy(df.cols))
+  }
+
+  test("unionByName works as expected") {
+    def combine(a:Any, b: Any) = {
+      (a,b) match {
+        case (x: String, y: String) => x + y
+        case (x: Int, y: Int) => x + y
+        case _ => throw new IllegalArgumentException
+      }
+    }
+    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val df2 = ScalaDataFrame(Seq(Seq("c", 3), Seq("d", 4)), Seq("col2", "col1"))
+    val df3 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col3", "col4"))
+    val df_union = df1.unionByName(df2)
+    assert(df_union.cols.map(_.data.reduce(combine)) == Seq(10, "abcd"))
+    assertThrows[IllegalArgumentException](df1.unionByName(df3))
+  }
+
+  test ("except works as planned") {
+    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(4, "c")), Seq("col1", "col2"))
+    val df2 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val df3 = ScalaDataFrame(Seq(Seq(3, "a"), Seq(4, "c")), Seq("col1", "col2"))
+    val df_err = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col_error", "col2"))
+    assert(df1.except(df2).isEqual(df3))
+    assertThrows[IllegalArgumentException](df1.except(df_err))
+  }
+
+  test ("distinct works as expected") {
+    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")))
+    assert(df1.distinct.dim == (3,2)) //3 rows 2 cols
+  }
+
+
+
 
   // TODO: check null values handling
 
