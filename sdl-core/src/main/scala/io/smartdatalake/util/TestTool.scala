@@ -1,3 +1,22 @@
+/*
+ * Smart Data Lake - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package io.smartdatalake.util
 
 import org.apache.spark.sql.Dataset
@@ -9,6 +28,7 @@ import java.io.FileNotFoundException
 import java.text.SimpleDateFormat
 
 trait TestTool extends Compare {
+
   ////////////////////////////////////////////
   ///// just some constants to test with /////
   ////////////////////////////////////////////
@@ -63,11 +83,6 @@ trait TestTool extends Compare {
   protected final val testPosInt: Gen[Int] = choose[Int](min = 1, max = 1024)
   protected final val testPosIntPair: Gen[(Int, Int)] = Gen.zip[Int, Int](g1 = testPosInt, g2 = testPosInt)
   protected final val testPosInts: Gen[List[Int]] = nonEmptyListOf(g = testPosInt)
-
-
-  ////////////////////////////////
-  ///// Testing with Structs /////
-  ////////////////////////////////
 
   def readResourceFile(filename: String): String = {
     val stream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
