@@ -1,7 +1,6 @@
 package io.smartdatalake.util
 
 import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.types.{DataType, StructField, StructType}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{choose, nonEmptyListOf}
 import org.slf4j.Logger
@@ -69,36 +68,6 @@ trait TestTool extends Compare {
   ////////////////////////////////
   ///// Testing with Structs /////
   ////////////////////////////////
-
-  /**
-   * creates Struct
-   *
-   * @param fields : fields as triple (name, data type, is nullable)
-   * @return StructType
-   */
-  protected final def createStruct(fields: Array[(String, DataType, Boolean)]): StructType = StructType(
-    fields.map(x => StructField(name = x._1, dataType = x._2: DataType, nullable = x._3))
-  )
-
-  /**
-   * creates Struct with nullable fields
-   *
-   * @param fields : nullable fields as pair (name, data type)
-   * @return StructType
-   */
-  protected final def createStruct(fields: Array[(String, DataType)]): StructType = createStruct(
-    fields.map { case (fldName, dTyp) => (fldName, dTyp, true) }
-  )
-
-  /**
-   * creates Struct with one field
-   *
-   * @param fieldName : name of field
-   * @param fieldType : data type of field
-   * @param nullable  : is field nullable ?
-   * @return StructType
-   */
-  protected final def createStruct(fieldName: String, fieldType: DataType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
 
   def readResourceFile(filename: String): String = {
     val stream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
