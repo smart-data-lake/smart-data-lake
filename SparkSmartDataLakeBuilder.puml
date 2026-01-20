@@ -1,0 +1,1571 @@
+@startuml
+class io.smartdatalake.app.BackendClient extends io.smartdatalake.config.exporter.ExportWriter, io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  + {method} deleteFile
+  - {method} download
+  - {field} formats
+  + {method} listFiles
+  - {method} parseFileDescriptors
+  + {method} readLatestSchema
+  + {method} updateState
+  - {method} upload
+  + {field} uploader
+  + {method} writeConfig
+  + {method} writeFile
+  + {method} writeSchema
+  + {method} writeState
+  + {method} writeStats
+}
+io.smartdatalake.app.BackendClient o-- io.smartdatalake.app.UploadService
+io.smartdatalake.app.BackendClient o-- io.smartdatalake.config.exporter.FileDescriptor
+io.smartdatalake.app.BackendClient o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.app.BackendClient o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.app.BackendClient o-- io.smartdatalake.workflow.action.SDLExecutionId
+io.smartdatalake.app.BackendClient o-- sttp.model.Method
+interface io.smartdatalake.app.CanBuildSmartDataLakeBuilderConfig<R> {
+  + {method} addConfiguration
+  + {method} addConfigurationValueOverwrite
+  + {method} addPartitionValues
+  + {abstract} {method} applicationName
+  + {field} appName
+  + {abstract} {method} configuration
+  + {abstract} {method} configurationValueOverwrite
+  + {abstract} {method} deployMode
+  + {abstract} {method} feedSel
+  + {method} getHoconConfig
+  + {method} getStdAppConfig
+  + {method} isDryRun
+  + {abstract} {method} master
+  + {abstract} {method} parallelism
+  + {abstract} {method} partitionValues
+  + {abstract} {method} statePath
+  + {abstract} {method} streaming
+  + {abstract} {method} test
+  + {method} validate
+  + {method} withApplicationName
+  + {method} withDeployMode
+  + {method} withFeedSel
+  + {method} withMaster
+  + {method} withParallelism
+  + {method} withStatePath
+  + {method} withStreaming
+  + {method} withTest
+}
+io.smartdatalake.app.CanBuildSmartDataLakeBuilderConfig o-- com.typesafe.config.Config
+io.smartdatalake.app.CanBuildSmartDataLakeBuilderConfig o-- io.smartdatalake.app.SmartDataLakeBuilderConfig
+io.smartdatalake.app.CanBuildSmartDataLakeBuilderConfig o-- io.smartdatalake.util.hdfs.PartitionValues
+class io.smartdatalake.app.GlobalConfig extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  ~ {field} _sparkSession
+  + {method} <init>
+  ~ {field} _sparkSession_=
+  - {method} additionalSparkOptions
+  + {field} allowAsRecursiveInput
+  + {field} allowOverwriteAllPartitionsWithoutPartitionValues
+  - {method} checkCaseSensitivityIsConsistent
+  - {method} createSparkSession
+  + {field} dataObjectsSchemaSource
+  + {field} enableHive
+  + {field} environment
+  + {method} getHadoopConfiguration
+  + {method} getSchemaFromSource
+  + {method} hasSparkSession
+  + {field} kryoClasses
+  + {field} memoryLogTimer
+  - {method} mergeSparkOptions
+  + {field} pluginOptions
+  + {field} pythonUDFs
+  ~ {method} registerUdf
+  + {field} secretProviders
+  ~ {method} setSparkOptions
+  + {field} shutdownHookLogger
+  + {field} sparkOptions
+  + {method} sparkSession
+  + {field} sparkUDFs
+  + {field} stateListeners
+  + {field} statusInfo
+  + {field} synchronousStreamingTriggerIntervalSec
+  + {field} uiBackend
+}
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.app.MemoryLogTimerConfig
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.app.StateListenerConfig
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.app.StatusInfoConfig
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.app.UIBackendConfig
+io.smartdatalake.app.GlobalConfig o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.util.secrets.SecretProviderConfig
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.util.secrets.StringOrSecret
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.workflow.action.spark.customlogic.PythonUDFCreatorConfig
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreatorConfig
+io.smartdatalake.app.GlobalConfig o-- io.smartdatalake.workflow.dataframe.GenericSchema
+class io.smartdatalake.app.MemoryLogTimerConfig {
+  + {method} <init>
+  ~ {method} getAsMap
+  + {field} intervalSec
+  + {field} logBuffers
+  + {field} logLinuxCGroupMem
+  + {field} logLinuxMem
+  ~ {method} startTimer
+}
+abstract class io.smartdatalake.app.SmartDataLakeBuilder extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  ~ {method} agentExec
+  + {field} appType
+  + {field} appVersion
+  ~ {method} exec
+  + {method} execActionDAG
+  + {field} instanceRegistry
+  + {method} loadConfigIntoInstanceRegistry
+  ~ {method} logProgramStart
+  ~ {method} logStats
+  ~ {method} parse
+  + {method} parseKeyValue
+  # {field} parser
+  # {method} parserGeneric
+  ~ {method} recoverRun
+  + {method} run
+  - {method} shutdown
+  ~ {method} startRun
+  + {method} startSimulation
+  + {method} startSimulationWithConfigFile
+  ~ {method} throwOParserError
+}
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.app.CanBuildSmartDataLakeBuilderConfig
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.app.GlobalConfig
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.app.SmartDataLakeBuilderConfig
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.app.StateListener
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.config.InstanceRegistry
+io.smartdatalake.app.SmartDataLakeBuilder o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.action.Action
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.action.RuntimeInfo
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.action.SDLExecutionId
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.ActionDAGRun
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.ActionDAGRunState
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.ActionDAGRunStateStore
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.DataFrameSubFeed
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.DataObjectState
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.StateId
+io.smartdatalake.app.SmartDataLakeBuilder o-- io.smartdatalake.workflow.SubFeed
+io.smartdatalake.app.SmartDataLakeBuilder o-- scopt.OParser
+class io.smartdatalake.app.SmartDataLakeBuilderConfig extends io.smartdatalake.app.CanBuildSmartDataLakeBuilderConfig {
+  + {method} <init>
+  + {field} applicationName
+  + {field} configuration
+  + {field} configurationValueOverwrite
+  + {field} deployMode
+  + {field} feedSel
+  + {field} master
+  + {field} parallelism
+  + {field} partitionValues
+  + {field} statePath
+  + {field} streaming
+  + {field} test
+}
+io.smartdatalake.app.SmartDataLakeBuilderConfig o-- io.smartdatalake.util.hdfs.PartitionValues
+class io.smartdatalake.app.SparkSmartDataLakeBuilder extends io.smartdatalake.app.SmartDataLakeBuilder {
+  + {static} {method} main
+  - {static} {field} sparkParser
+}
+io.smartdatalake.app.SparkSmartDataLakeBuilder o-- io.smartdatalake.app.SmartDataLakeBuilderConfig
+io.smartdatalake.app.SparkSmartDataLakeBuilder o-- scopt.OParser
+interface io.smartdatalake.app.StateListener {
+  + {method} init
+  + {abstract} {method} notifyState
+  + {method} prepare
+}
+io.smartdatalake.app.StateListener o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.app.StateListener o-- io.smartdatalake.workflow.ActionDAGRunState
+io.smartdatalake.app.StateListener o-- io.smartdatalake.workflow.ActionPipelineContext
+class io.smartdatalake.app.StateListenerConfig {
+  + {method} <init>
+  + {field} className
+  ~ {field} listener
+  + {field} options
+}
+io.smartdatalake.app.StateListenerConfig o-- io.smartdatalake.app.StateListener
+io.smartdatalake.app.StateListenerConfig o-- io.smartdatalake.util.secrets.StringOrSecret
+class io.smartdatalake.app.StatusInfoConfig {
+  + {method} <init>
+  + {field} maxPortRetries
+  + {field} port
+  + {field} stopOnEnd
+}
+class io.smartdatalake.app.UIBackendConfig extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  + {field} authMode
+  + {field} baseUrl
+  + {field} client
+  + {field} env
+  + {method} getStateListener
+  + {method} getUploadService
+  - {field} httpBackend
+  + {field} processUpdates
+  + {field} proxy
+  + {field} repo
+  + {field} stagePath
+  - {field} sttpBackendOptions
+  + {field} tenant
+  + {field} timeouts
+}
+io.smartdatalake.app.UIBackendConfig o-- io.smartdatalake.app.BackendClient
+io.smartdatalake.app.UIBackendConfig o-- io.smartdatalake.app.StateListener
+io.smartdatalake.app.UIBackendConfig o-- io.smartdatalake.app.UploadService
+io.smartdatalake.app.UIBackendConfig o-- io.smartdatalake.util.webservice.HttpProxyConfig
+io.smartdatalake.app.UIBackendConfig o-- io.smartdatalake.util.webservice.HttpTimeoutConfig
+io.smartdatalake.app.UIBackendConfig o-- io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+io.smartdatalake.app.UIBackendConfig o-- "sttp.client3.package$Identity"
+io.smartdatalake.app.UIBackendConfig o-- sttp.client3.SttpBackend
+io.smartdatalake.app.UIBackendConfig o-- sttp.client3.SttpBackendOptions
+interface io.smartdatalake.app.UploadService {
+  + {method} send
+  + {abstract} {method} sendBytes
+}
+io.smartdatalake.app.UploadService o-- sttp.client3.BasicRequestBody
+io.smartdatalake.app.UploadService o-- sttp.model.MediaType
+io.smartdatalake.app.UploadService o-- sttp.model.Method
+io.smartdatalake.app.UploadService o-- sttp.model.Part
+interface io.smartdatalake.config.ConfigHolder {
+  ~ {field} _config
+  ~ {field} _config_=
+}
+io.smartdatalake.config.ConfigHolder o-- com.typesafe.config.Config
+interface io.smartdatalake.config.ConfigImplicits {
+  + {field} actionExpectationReader
+  + {field} actionIdReader
+  + {field} authModeReader
+  + {field} conditionReader
+  + {field} connectionDefReader
+  + {field} connectionIdReader
+  + {field} customDfCreatorConfigReader
+  + {field} customDfsTransformerConfigReader
+  + {field} customDfTransformerConfigReader
+  + {field} customFileTransformerConfigReader
+  + {field} dataObjectIdReader
+  + {field} dfsTransformerReader
+  + {field} dfTransformerReader
+  + {field} executionModeReader
+  + {field} expectationReader
+  + {field} genericSchemaReader
+  + {field} housekeepingModeReader
+  + {field} httpAuthModeReader
+  + {method} mapDataObjectIdStringReader
+  + {field} outputModeReader
+  + {field} saveModeOptionsReader
+  + {field} scriptDefReader
+  + {method} sdlDefaultNaming
+  + {field} secretProviderConfigReader
+  + {field} sparkRepartitionDefReader
+  + {field} sparkUdfCreatorConfigReader
+  + {field} stringOrSecretReader
+}
+io.smartdatalake.config.ConfigImplicits o-- configs.ConfigKeyNaming
+io.smartdatalake.config.ConfigImplicits o-- configs.ConfigReader
+io.smartdatalake.config.ConfigImplicits o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.config.ConfigImplicits o-- "io.smartdatalake.config.SdlConfigObject$ConnectionId"
+io.smartdatalake.config.ConfigImplicits o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.definitions.Condition
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.definitions.SaveModeOptions
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.util.hdfs.SparkRepartitionDef
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.util.secrets.SecretProviderConfig
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.util.secrets.StringOrSecret
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.executionMode.ExecutionMode
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.script.ParsableScriptDef
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreatorConfig
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.connection.authMode.AuthMode
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.connection.Connection
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.dataframe.GenericSchema
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.dataobject.expectation.Expectation
+io.smartdatalake.config.ConfigImplicits o-- io.smartdatalake.workflow.dataobject.HousekeepingMode
+interface io.smartdatalake.config.exporter.ExportWriter {
+  + {method} deleteFile
+  + {method} listFiles
+  + {method} readLatestSchema
+  + {abstract} {method} writeConfig
+  + {method} writeFile
+  + {abstract} {method} writeSchema
+  + {abstract} {method} writeStats
+}
+io.smartdatalake.config.exporter.ExportWriter o-- io.smartdatalake.config.exporter.FileDescriptor
+io.smartdatalake.config.exporter.ExportWriter o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+class io.smartdatalake.config.exporter.FileDescriptor {
+  + {method} <init>
+  + {field} lastModified
+  + {field} mediaType
+  + {field} name
+  + {field} size
+}
+interface io.smartdatalake.config.FromConfigFactory<CO extends io.smartdatalake.config.ParsableFromConfig> extends io.smartdatalake.config.ConfigImplicits {
+  # {method} extract
+  + {abstract} {method} fromConfig
+}
+io.smartdatalake.config.FromConfigFactory o-- com.typesafe.config.Config
+io.smartdatalake.config.FromConfigFactory o-- configs.ConfigReader
+io.smartdatalake.config.FromConfigFactory o-- io.smartdatalake.config.ConfigHolder
+io.smartdatalake.config.FromConfigFactory o-- io.smartdatalake.config.InstanceRegistry
+io.smartdatalake.config.FromConfigFactory o-- io.smartdatalake.config.ParsableFromConfig
+class io.smartdatalake.config.InstanceRegistry {
+  - {field} _dataObjectIdsToValidateOnRead
+  + {method} <init>
+  - {field} _dataObjectIdsToValidateOnRead_=
+  + {method} clear
+  + {method} get
+  + {method} getActions
+  + {method} getConnections
+  + {method} getDataObjectIdsToValidateOnRead
+  + {method} getDataObjects
+  ~ {field} instances
+  + {method} register
+  + {method} register
+  + {method} register
+  + {method} remove
+  + {method} shouldValidateDataObjectOnRead
+}
+io.smartdatalake.config.InstanceRegistry o-- io.smartdatalake.config.SdlConfigObject
+io.smartdatalake.config.InstanceRegistry o-- "io.smartdatalake.config.SdlConfigObject$ConfigObjectId"
+io.smartdatalake.config.InstanceRegistry o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.config.InstanceRegistry o-- io.smartdatalake.workflow.action.Action
+io.smartdatalake.config.InstanceRegistry o-- io.smartdatalake.workflow.connection.Connection
+io.smartdatalake.config.InstanceRegistry o-- io.smartdatalake.workflow.dataobject.DataObject
+interface io.smartdatalake.config.ParsableFromConfig<CO extends io.smartdatalake.config.ParsableFromConfig> {
+  + {abstract} {method} factory
+}
+io.smartdatalake.config.ParsableFromConfig o-- io.smartdatalake.config.FromConfigFactory
+interface io.smartdatalake.config.SdlConfigObject extends io.smartdatalake.config.ConfigHolder {
+  + {abstract} {method} id
+}
+io.smartdatalake.config.SdlConfigObject o-- "io.smartdatalake.config.SdlConfigObject$ConfigObjectId"
+class "io.smartdatalake.config.SdlConfigObject$ActionId" extends "io.smartdatalake.config.SdlConfigObject$ConfigObjectId" {
+  + {method} <init>
+  + {field} id
+  + {method} toString
+}
+class "io.smartdatalake.config.SdlConfigObject$AgentId" extends "io.smartdatalake.config.SdlConfigObject$ConfigObjectId" {
+  + {method} <init>
+  + {field} id
+  + {method} toString
+}
+interface "io.smartdatalake.config.SdlConfigObject$ConfigObjectId" {
+  + {abstract} {method} id
+}
+class "io.smartdatalake.config.SdlConfigObject$ConnectionId" extends "io.smartdatalake.config.SdlConfigObject$ConfigObjectId" {
+  + {method} <init>
+  + {field} id
+  + {method} toString
+}
+class "io.smartdatalake.config.SdlConfigObject$DataObjectId" extends "io.smartdatalake.config.SdlConfigObject$ConfigObjectId" {
+  + {method} <init>
+  + {field} id
+  + {method} toString
+}
+class io.smartdatalake.definitions.Condition extends io.smartdatalake.definitions.ConditionBase {
+  + {method} <init>
+  + {field} description
+  + {field} expression
+}
+interface io.smartdatalake.definitions.ConditionBase {
+  + {abstract} {method} description
+  ~ {method} evaluate
+  + {abstract} {method} expression
+  ~ {method} syntaxCheck
+}
+io.smartdatalake.definitions.ConditionBase o-- "io.smartdatalake.config.SdlConfigObject$ConfigObjectId"
+interface io.smartdatalake.definitions.SaveModeOptions {
+  ~ {method} convertToTargetSchema
+  ~ {abstract} {method} saveMode
+}
+io.smartdatalake.definitions.SaveModeOptions o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+class io.smartdatalake.util.dag.DAG<N extends io.smartdatalake.util.dag.DAGNode> extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  - {method} <init>
+  + {method} buildTaskGraph
+  - {method} cancelledDAGResult
+  - {method} collectIncomingNodeResults
+  - {method} computeNodeOperationResult
+  + {field} endNodes
+  - {field} evidence$1
+  + {method} getNodes
+  + {method} getResultTask
+  + {field} incomingEdgesMap
+  - {method} incomingFailedResult
+  - {method} notify
+  + {method} render
+  + {field} sortedNodes
+  + {field} startNodes
+  + {method} trySeqToSeqTry
+}
+io.smartdatalake.util.dag.DAG o-- io.smartdatalake.util.dag.DAGEdge
+io.smartdatalake.util.dag.DAG o-- io.smartdatalake.util.dag.DAGEventListener
+io.smartdatalake.util.dag.DAG o-- io.smartdatalake.util.dag.DAGNode
+io.smartdatalake.util.dag.DAG o-- io.smartdatalake.util.dag.DAGResult
+io.smartdatalake.util.dag.DAG o-- monix.eval.Task
+io.smartdatalake.util.dag.DAG o-- monix.execution.Scheduler
+interface io.smartdatalake.util.dag.DAGEdge {
+  + {abstract} {method} nodeIdFrom
+  + {abstract} {method} nodeIdTo
+  + {abstract} {method} resultId
+}
+interface io.smartdatalake.util.dag.DAGEventListener<T extends io.smartdatalake.util.dag.DAGNode> {
+  + {abstract} {method} onNodeFailure
+  + {abstract} {method} onNodeSkipped
+  + {abstract} {method} onNodeStart
+  + {abstract} {method} onNodeSuccess
+}
+io.smartdatalake.util.dag.DAGEventListener o-- io.smartdatalake.util.dag.DAGNode
+io.smartdatalake.util.dag.DAGEventListener o-- io.smartdatalake.util.dag.DAGResult
+interface io.smartdatalake.util.dag.DAGNode {
+  + {abstract} {method} nodeId
+}
+interface io.smartdatalake.util.dag.DAGResult {
+  + {abstract} {method} resultId
+}
+class io.smartdatalake.util.hdfs.PartitionValues {
+  + {method} <init>
+  + {method} addKey
+  + {method} apply
+  + {field} elements
+  + {method} filterKeys
+  + {method} get
+  ~ {method} getFilterExpr
+  + {method} getMapString
+  ~ {method} getPartitionString
+  + {method} isComplete
+  + {method} isDefinedAt
+  + {method} isEmpty
+  + {method} isIncludedIn
+  + {method} isInitOf
+  + {method} keys
+  + {method} nonEmpty
+  + {method} toString
+}
+io.smartdatalake.util.hdfs.PartitionValues o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.util.hdfs.PartitionValues o-- io.smartdatalake.workflow.DataFrameSubFeedCompanion
+class io.smartdatalake.util.hdfs.SparkRepartitionDef extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  + {field} filename
+  + {field} keyCols
+  + {field} numberOfTasksPerPartition
+  + {method} prepareDataFrame
+  + {method} renameFiles
+  + {field} sortCols
+}
+io.smartdatalake.util.hdfs.SparkRepartitionDef o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.util.hdfs.SparkRepartitionDef o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.util.hdfs.SparkRepartitionDef o-- io.smartdatalake.workflow.dataobject.FileRef
+class io.smartdatalake.util.misc.SerializableHadoopConfiguration {
+  + {method} <init>
+  + {field} conf_=
+  + {field} conf
+  + {method} get
+  - {method} readObject
+  - {method} readObjectNoData
+  - {method} writeObject
+}
+interface io.smartdatalake.util.misc.SmartDataLakeLogger {
+  ~ {method} logAndThrowException
+  # {field} logger
+  ~ {method} logWithSeverity
+}
+interface io.smartdatalake.util.secrets.SecretProvider {
+  + {abstract} {method} getSecret
+}
+class io.smartdatalake.util.secrets.SecretProviderConfig {
+  + {method} <init>
+  + {field} className
+  + {field} options
+  ~ {field} provider
+}
+io.smartdatalake.util.secrets.SecretProviderConfig o-- io.smartdatalake.util.secrets.SecretProvider
+class io.smartdatalake.util.secrets.StringOrSecret {
+  - {field} _resolvedSecret
+  + {method} <init>
+  + {method} resolve
+  - {field} secret
+  + {method} toString
+}
+class io.smartdatalake.util.webservice.HttpProxyConfig extends io.smartdatalake.util.webservice.SttpConfigModifier {
+  + {method} <init>
+  + {field} host
+  + {field} password
+  + {field} port
+  + {method} sttpConfig
+  + {field} user
+}
+io.smartdatalake.util.webservice.HttpProxyConfig o-- io.smartdatalake.util.secrets.StringOrSecret
+io.smartdatalake.util.webservice.HttpProxyConfig o-- sttp.client3.SttpBackendOptions
+class io.smartdatalake.util.webservice.HttpTimeoutConfig extends io.smartdatalake.util.webservice.SttpConfigModifier {
+  + {method} <init>
+  + {method} connectionTimeout
+  + {field} connectionTimeoutMs
+  + {method} readTimeout
+  + {field} readTimeoutMs
+  + {method} sttpConfig
+}
+io.smartdatalake.util.webservice.HttpTimeoutConfig o-- sttp.client3.SttpBackendOptions
+interface io.smartdatalake.util.webservice.SttpConfigModifier {
+  + {abstract} {method} sttpConfig
+}
+io.smartdatalake.util.webservice.SttpConfigModifier o-- sttp.client3.SttpBackendOptions
+interface io.smartdatalake.workflow.action.Action extends io.smartdatalake.config.SdlConfigObject, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.util.dag.DAGNode, io.smartdatalake.util.misc.SmartDataLakeLogger, io.smartdatalake.workflow.AtlasExportable {
+  + {method} addAsyncMetrics
+  + {method} addRuntimeEvent
+  + {method} agentId
+  + {method} atlasName
+  - {method} checkExecutionCondition
+  - {method} evaluateMetricsFailCondition
+  + {abstract} {method} exec
+  + {abstract} {method} executionCondition
+  + {abstract} {method} executionMode
+  - {method} findSubFeedPartitionValues
+  - {method} getDataObject
+  + {method} getDataObjectsState
+  # {method} getInputDataObject
+  + {method} getLatestRuntimeEventState
+  # {method} getOutputDataObject
+  # {method} getRuntimeDataImpl
+  + {method} getRuntimeInfo
+  ~ {method} handleRecursiveInputsAsSubFeeds
+  + {abstract} {field} id
+  + {abstract} {method} init
+  + {abstract} {method} inputs
+  ~ {method} isAsynchronous
+  ~ {method} isAsynchronousProcessStarted
+  + {method} mainInputId
+  + {method} mainOutputId
+  + {abstract} {method} metadata
+  + {abstract} {method} metricsFailCondition
+  + {method} nodeId
+  + {abstract} {method} outputs
+  + {method} postExec
+  + {method} postExecFailed
+  + {method} preExec
+  + {method} preInit
+  + {method} prepare
+  + {method} recursiveInputs
+  ~ {method} reset
+  ~ {field} runtimeData
+  + {method} setSparkJobMetadata
+  + {method} toString
+  + {method} toString
+  + {method} toStringMedium
+  + {method} toStringShort
+  + {method} validateConfig
+}
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.config.InstanceRegistry
+io.smartdatalake.workflow.action.Action o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.action.Action o-- "io.smartdatalake.config.SdlConfigObject$AgentId"
+io.smartdatalake.workflow.action.Action o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.definitions.Condition
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.action.ActionMetadata
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.action.ExecutionId
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.action.executionMode.ExecutionMode
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.action.RuntimeData
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.action.RuntimeInfo
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.ActionMetrics
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.dataobject.DataObject
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.DataObjectState
+io.smartdatalake.workflow.action.Action o-- io.smartdatalake.workflow.SubFeed
+class io.smartdatalake.workflow.action.ActionMetadata {
+  + {method} <init>
+  + {field} description
+  + {field} feed
+  + {field} name
+  + {field} tags
+}
+class io.smartdatalake.workflow.action.ExecutionData<A extends io.smartdatalake.workflow.action.ExecutionId> {
+  + {method} <init>
+  + {method} addEvent
+  + {method} addMetrics
+  - {method} calcDuration
+  - {field} events
+  + {method} getEvents
+  + {method} getLatestEvent
+  ~ {method} getLatestMetrics
+  + {method} getRuntimeInfo
+  + {field} id
+  + {method} isAsynchronous
+  + {method} isFinal
+  - {field} metricsMap
+}
+io.smartdatalake.workflow.action.ExecutionData o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.action.ExecutionData o-- io.smartdatalake.workflow.action.ExecutionId
+io.smartdatalake.workflow.action.ExecutionData o-- io.smartdatalake.workflow.action.RuntimeEvent
+io.smartdatalake.workflow.action.ExecutionData o-- io.smartdatalake.workflow.action.RuntimeInfo
+io.smartdatalake.workflow.action.ExecutionData o-- io.smartdatalake.workflow.ActionMetrics
+io.smartdatalake.workflow.action.ExecutionData o-- io.smartdatalake.workflow.DataObjectState
+interface io.smartdatalake.workflow.action.ExecutionId
+interface io.smartdatalake.workflow.action.executionMode.ExecutionMode extends io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder, io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} apply
+  + {field} applyConditionsDef
+  + {method} evaluateApplyConditions
+  + {method} evaluateFailConditions
+  + {field} failConditionsDef
+  + {method} isAsynchronous
+  + {method} mainInputOutputNeeded
+  + {method} postExec
+  + {method} preInit
+  + {method} prepare
+}
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.definitions.Condition
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.workflow.dataobject.DataObject
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.workflow.DataObjectState
+io.smartdatalake.workflow.action.executionMode.ExecutionMode o-- io.smartdatalake.workflow.SubFeed
+class io.smartdatalake.workflow.action.executionMode.ExecutionModeResult {
+  + {method} <init>
+  + {field} fileRefs
+  + {field} filter
+  + {field} inputPartitionValues
+  + {field} options
+  + {field} outputPartitionValues
+}
+io.smartdatalake.workflow.action.executionMode.ExecutionModeResult o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.executionMode.ExecutionModeResult o-- io.smartdatalake.workflow.dataobject.FileRef
+interface io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer extends io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder
+interface io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef extends io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer {
+  ~ {method} applyTransformation
+  + {abstract} {method} description
+  ~ {method} getSubFeedSupportedType
+  + {abstract} {method} name
+  + {method} prepare
+  + {abstract} {method} transform
+}
+io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+interface io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer extends io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder
+interface io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef extends io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer {
+  ~ {method} applyTransformation
+  + {method} description
+  ~ {method} getSubFeedSupportedType
+  + {abstract} {method} name
+  + {method} prepare
+  + {abstract} {method} transform
+}
+io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef o-- io.smartdatalake.workflow.DataFrameSubFeed
+interface io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer extends io.smartdatalake.workflow.action.generic.transformer.Transformer {
+  ~ {method} applyTransformation
+  + {method} transformPartitionValues
+}
+io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer o-- io.smartdatalake.workflow.ActionPipelineContext
+interface io.smartdatalake.workflow.action.generic.transformer.Transformer
+interface io.smartdatalake.workflow.action.RuntimeData {
+  # {field} currentExecution_=
+  # {field} lastExecution_=
+  + {abstract} {method} addEvent
+  + {method} addMetric
+  + {method} clear
+  # {field} currentExecution
+  + {method} currentExecutionId
+  # {method} doHousekeeping
+  # {field} executions
+  + {method} getEvents
+  + {method} getLatestEventState
+  + {method} getMetrics
+  + {method} getRuntimeInfo
+  # {field} lastExecution
+  + {method} lastExecutionId
+  + {abstract} {method} numberOfExecutionToKeep
+}
+io.smartdatalake.workflow.action.RuntimeData o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.action.RuntimeData o-- io.smartdatalake.workflow.action.ExecutionData
+io.smartdatalake.workflow.action.RuntimeData o-- io.smartdatalake.workflow.action.ExecutionId
+io.smartdatalake.workflow.action.RuntimeData o-- io.smartdatalake.workflow.action.RuntimeEvent
+io.smartdatalake.workflow.action.RuntimeData o-- io.smartdatalake.workflow.action.RuntimeInfo
+io.smartdatalake.workflow.action.RuntimeData o-- io.smartdatalake.workflow.ActionMetrics
+io.smartdatalake.workflow.action.RuntimeData o-- io.smartdatalake.workflow.DataObjectState
+class io.smartdatalake.workflow.action.RuntimeEvent {
+  + {method} <init>
+  + {field} msg
+  + {field} phase
+  + {field} results
+  + {field} state
+  + {field} tstmp
+}
+io.smartdatalake.workflow.action.RuntimeEvent o-- io.smartdatalake.workflow.SubFeed
+class io.smartdatalake.workflow.action.RuntimeInfo {
+  + {method} <init>
+  + {field} dataObjectsState
+  + {field} duration
+  + {field} endTstmp
+  + {field} endTstmpInit
+  + {field} endTstmpPrepare
+  + {field} executionId
+  + {method} hasCompleted
+  + {field} inputIds
+  + {field} msg
+  + {field} outputIds
+  + {field} results
+  + {field} startTstmp
+  + {field} startTstmpInit
+  + {field} startTstmpPrepare
+  + {field} state
+  + {method} toString
+}
+io.smartdatalake.workflow.action.RuntimeInfo o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.action.RuntimeInfo o-- io.smartdatalake.workflow.action.ExecutionId
+io.smartdatalake.workflow.action.RuntimeInfo o-- io.smartdatalake.workflow.DataObjectState
+io.smartdatalake.workflow.action.RuntimeInfo o-- io.smartdatalake.workflow.SubFeed
+interface io.smartdatalake.workflow.action.script.ParsableScriptDef extends io.smartdatalake.workflow.action.script.ScriptDef, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder
+interface io.smartdatalake.workflow.action.script.ScriptDef {
+  + {abstract} {method} description
+  + {abstract} {method} execStdOutStream
+  + {abstract} {method} execStdOutString
+  + {abstract} {method} name
+}
+io.smartdatalake.workflow.action.script.ScriptDef o-- "io.smartdatalake.config.SdlConfigObject$ConfigObjectId"
+io.smartdatalake.workflow.action.script.ScriptDef o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.action.script.ScriptDef o-- io.smartdatalake.workflow.ActionPipelineContext
+class io.smartdatalake.workflow.action.SDLExecutionId extends io.smartdatalake.workflow.action.ExecutionId {
+  + {method} <init>
+  + {field} attemptId
+  + {method} compare
+  ~ {method} incrementAttemptId
+  ~ {method} incrementRunId
+  + {field} runId
+  + {method} toString
+}
+io.smartdatalake.workflow.action.SDLExecutionId o-- io.smartdatalake.workflow.action.ExecutionId
+interface io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreator {
+  + {abstract} {method} exec
+  + {method} schema
+}
+class io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig {
+  + {method} <init>
+  + {field} className
+  + {method} exec
+  + {field} fnEmptySchema
+  + {field} impl
+  + {field} options
+  + {field} scalaCode
+  + {field} scalaFile
+  + {method} schema
+  + {method} toString
+}
+io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig o-- io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreator
+io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig o-- io.smartdatalake.workflow.ActionPipelineContext
+class io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig {
+  + {method} <init>
+  + {field} className
+  + {field} impl
+  + {field} options
+  + {field} runtimeOptions
+  + {field} scalaCode
+  + {field} scalaFile
+  + {field} sqlCode
+  + {method} toString
+}
+io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig o-- io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef
+class io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig {
+  + {method} <init>
+  + {field} className
+  + {field} impl
+  + {field} options
+  + {field} pythonCode
+  + {field} pythonFile
+  + {field} runtimeOptions
+  + {field} scalaCode
+  + {field} scalaFile
+  + {field} sqlCode
+  + {method} toString
+}
+io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig o-- io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef
+interface io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformer {
+  + {abstract} {method} transform
+}
+class io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig {
+  + {method} <init>
+  + {field} className
+  + {field} impl
+  + {field} options
+  + {field} scalaCode
+  + {field} scalaFile
+  + {method} transform
+}
+io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig o-- io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformer
+class io.smartdatalake.workflow.action.spark.customlogic.PythonUDFCreatorConfig {
+  + {method} <init>
+  - {field} functionCode
+  + {field} options
+  + {field} pythonCode
+  + {field} pythonFile
+  ~ {method} registerUDF
+}
+interface io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreator {
+  + {abstract} {method} get
+}
+class io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreatorConfig extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  + {field} className
+  ~ {field} creator
+  ~ {method} getUDF
+  + {field} options
+  + {method} registerUdf
+  + {method} registerUdf
+}
+io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreatorConfig o-- ch.zzeekk.spark.expressions.ExpressionEvaluatorFactory
+io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreatorConfig o-- io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreator
+class io.smartdatalake.workflow.ActionDAGRun extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  - {field} previousThreadName_=
+  + {field} actionsSkipped
+  - {field} appVersionInfo
+  - {method} createScheduler
+  + {field} dag
+  + {method} exec
+  + {field} executionId
+  - {method} getActionThreadName
+  - {method} getInitialSubFeed
+  - {method} getRecursiveSubFeeds
+  + {method} getRuntimeInfos
+  + {method} getStatistics
+  + {method} init
+  + {field} initialDataObjectsState
+  + {field} initialSubFeeds
+  + {field} parallelism
+  + {field} partitionValues
+  + {method} prepare
+  - {field} previousThreadName
+  + {method} reset
+  - {method} run
+  + {method} saveState
+  - {field} sdlbVersionInfo
+  - {method} setThreadName
+  + {field} stateListeners
+  + {field} stateStore
+  - {method} unionDuplicateSubFeeds
+}
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.app.StateListener
+io.smartdatalake.workflow.ActionDAGRun o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.ActionDAGRun o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.util.dag.DAG
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.util.dag.DAGNode
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.util.dag.DAGResult
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.action.Action
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.action.RuntimeInfo
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.action.SDLExecutionId
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.ActionDAGRunState
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.ActionDAGRunStateStore
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.DataObjectState
+io.smartdatalake.workflow.ActionDAGRun o-- io.smartdatalake.workflow.SubFeed
+io.smartdatalake.workflow.ActionDAGRun o-- monix.execution.schedulers.SchedulerService
+class "io.smartdatalake.workflow.ActionDAGRun#ActionEventListener" extends io.smartdatalake.util.dag.DAGEventListener, io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  - {field} context
+  + {method} onNodeFailure
+  + {method} onNodeSkipped
+  + {method} onNodeStart
+  + {method} onNodeSuccess
+  - {field} phase
+}
+"io.smartdatalake.workflow.ActionDAGRun#ActionEventListener" o-- io.smartdatalake.util.dag.DAGResult
+"io.smartdatalake.workflow.ActionDAGRun#ActionEventListener" o-- io.smartdatalake.workflow.action.Action
+"io.smartdatalake.workflow.ActionDAGRun#ActionEventListener" o-- io.smartdatalake.workflow.ActionPipelineContext
+class io.smartdatalake.workflow.ActionDAGRunState {
+  + {method} <init>
+  + {field} actionsState
+  + {field} appConfig
+  + {field} appVersionInfo
+  + {field} attemptId
+  + {field} attemptStartTime
+  + {method} finalState
+  + {method} getDataObjectsState
+  + {method} isFailed
+  + {field} isFinal
+  + {method} isSkipped
+  + {method} isSucceeded
+  + {field} runId
+  + {field} runStartTime
+  + {field} runStateFormatVersion
+  + {field} sdlbVersionInfo
+  + {method} toJson
+}
+io.smartdatalake.workflow.ActionDAGRunState o-- io.smartdatalake.app.SmartDataLakeBuilderConfig
+io.smartdatalake.workflow.ActionDAGRunState o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.ActionDAGRunState o-- io.smartdatalake.workflow.action.RuntimeInfo
+io.smartdatalake.workflow.ActionDAGRunState o-- io.smartdatalake.workflow.DataObjectState
+interface io.smartdatalake.workflow.ActionDAGRunStateStore<A extends io.smartdatalake.workflow.StateId> extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {abstract} {method} getLatestRunId
+  + {abstract} {method} getLatestStateId
+  + {abstract} {method} recoverRunState
+  + {abstract} {method} saveState
+}
+io.smartdatalake.workflow.ActionDAGRunStateStore o-- io.smartdatalake.workflow.ActionDAGRunState
+io.smartdatalake.workflow.ActionDAGRunStateStore o-- io.smartdatalake.workflow.StateId
+interface io.smartdatalake.workflow.ActionMetrics {
+  + {method} getAsText
+  + {abstract} {method} getId
+  + {abstract} {method} getMainInfos
+  + {abstract} {method} getOrder
+}
+class io.smartdatalake.workflow.ActionPipelineContext extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} <init>
+  + {field} actionsSelected
+  + {field} actionsSkipped
+  + {field} appConfig
+  + {field} application
+  + {field} attemptStartTime
+  + {field} currentAction
+  + {field} dataFrameReuseStatistics
+  + {field} executionId
+  + {field} feed
+  ~ {method} forgetDataFrameReuse
+  ~ {method} getReferenceTimestampOrNow
+  + {field} globalConfig
+  + {method} hadoopConf
+  + {method} hasSparkSession
+  ~ {method} incrementAttemptId
+  ~ {method} incrementRunId
+  + {field} instanceRegistry
+  + {method} isExecPhase
+  + {field} phase
+  + {field} referenceTimestamp
+  ~ {method} rememberDataFrameReuse
+  + {field} runStartTime
+  + {field} serializableHadoopConf
+  + {field} simulation
+  + {method} sparkSession
+}
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.app.GlobalConfig
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.app.SmartDataLakeBuilderConfig
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.config.InstanceRegistry
+io.smartdatalake.workflow.ActionPipelineContext o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.ActionPipelineContext o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.util.misc.SerializableHadoopConfiguration
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.workflow.action.Action
+io.smartdatalake.workflow.ActionPipelineContext o-- io.smartdatalake.workflow.action.SDLExecutionId
+interface io.smartdatalake.workflow.AtlasExportable {
+  + {abstract} {method} atlasName
+  + {method} atlasQualifiedName
+}
+interface io.smartdatalake.workflow.connection.authMode.AuthMode extends io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder {
+  ~ {method} close
+  ~ {method} prepare
+}
+interface io.smartdatalake.workflow.connection.authMode.HttpAuthMode extends io.smartdatalake.workflow.connection.authMode.AuthMode, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.workflow.connection.authMode.HttpHeaderAuth
+interface io.smartdatalake.workflow.connection.authMode.HttpHeaderAuth {
+  + {abstract} {method} getHeaders
+}
+interface io.smartdatalake.workflow.connection.Connection extends io.smartdatalake.config.SdlConfigObject, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.workflow.AtlasExportable {
+  + {method} atlasName
+  + {abstract} {field} id
+  + {abstract} {method} metadata
+  + {method} toStringShort
+}
+io.smartdatalake.workflow.connection.Connection o-- "io.smartdatalake.config.SdlConfigObject$ConnectionId"
+io.smartdatalake.workflow.connection.Connection o-- io.smartdatalake.workflow.connection.ConnectionMetadata
+class io.smartdatalake.workflow.connection.ConnectionMetadata {
+  + {method} <init>
+  + {field} description
+  + {field} layer
+  + {field} name
+  + {field} subjectArea
+  + {field} tags
+}
+interface io.smartdatalake.workflow.dataframe.DataFrameFunctions {
+  + {abstract} {method} approxCountDistinct
+  + {abstract} {method} array
+  + {abstract} {method} array_construct_compact
+  + {abstract} {method} arrayType
+  + {abstract} {method} coalesce
+  + {abstract} {method} col
+  + {abstract} {method} concat
+  + {abstract} {method} count
+  + {abstract} {method} countDistinct
+  + {abstract} {method} explode
+  + {abstract} {method} expr
+  + {abstract} {method} field
+  + {abstract} {method} from_json
+  + {abstract} {method} hash
+  + {abstract} {method} lit
+  + {abstract} {method} mapType
+  + {abstract} {method} max
+  + {abstract} {method} min
+  + {abstract} {method} not
+  + {abstract} {method} raise_error
+  + {abstract} {method} regexp_extract
+  + {method} requestSubFeedType
+  + {abstract} {method} row_number
+  + {abstract} {method} rowFromSeq
+  + {abstract} {method} schemaEvolutionUdf
+  + {abstract} {method} size
+  + {abstract} {method} sql
+  + {abstract} {method} stringType
+  + {abstract} {method} struct
+  + {abstract} {method} structType
+  + {abstract} {method} structType
+  # {abstract} {method} subFeedType
+  + {abstract} {method} transform
+  + {abstract} {method} transform_keys
+  + {abstract} {method} transform_values
+  + {abstract} {method} when
+  + {abstract} {method} window
+}
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericArrayDataType
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericDataType
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericField
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericMapDataType
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericRow
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericStructDataType
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericUnaryUdf
+io.smartdatalake.workflow.dataframe.DataFrameFunctions o-- io.smartdatalake.workflow.dataframe.GenericWhen
+interface io.smartdatalake.workflow.dataframe.DataFrameObservation extends io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {abstract} {method} waitFor
+  + {method} waitForElseNoData
+}
+io.smartdatalake.workflow.dataframe.DataFrameObservation o-- io.smartdatalake.workflow.ActionPipelineContext
+interface io.smartdatalake.workflow.dataframe.GenericArrayDataType {
+  + {abstract} {method} containsNull
+  + {abstract} {method} elementDataType
+  + {method} toJson
+  + {abstract} {method} withOtherElementType
+}
+io.smartdatalake.workflow.dataframe.GenericArrayDataType o-- io.smartdatalake.workflow.dataframe.GenericDataType
+interface io.smartdatalake.workflow.dataframe.GenericColumn extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} *
+  + {abstract} {method} +
+  + {abstract} {method} -
+  + {abstract} {method} /
+  + {abstract} {method} <
+  + {abstract} {method} =!=
+  + {abstract} {method} ===
+  + {abstract} {method} >
+  + {abstract} {method} and
+  + {abstract} {method} apply
+  + {abstract} {method} as
+  + {abstract} {method} cast
+  + {abstract} {method} desc
+  + {abstract} {method} exprSql
+  + {abstract} {method} getName
+  + {abstract} {method} isin
+  + {abstract} {method} isNotNull
+  + {abstract} {method} isNull
+  + {abstract} {method} or
+}
+io.smartdatalake.workflow.dataframe.GenericColumn o-- io.smartdatalake.workflow.dataframe.GenericDataType
+interface io.smartdatalake.workflow.dataframe.GenericDataFrame extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} agg
+  + {abstract} {method} apply
+  + {abstract} {method} as
+  + {abstract} {method} cache
+  + {abstract} {method} collect
+  + {method} colNamesLowercase
+  + {method} columns
+  + {abstract} {method} count
+  + {abstract} {method} createOrReplaceTempView
+  + {abstract} {method} distinct
+  + {abstract} {method} drop
+  + {abstract} {method} drop
+  + {abstract} {method} dropDuplicates
+  + {abstract} {method} except
+  + {abstract} {method} explainString
+  + {abstract} {method} filter
+  - {field} functions
+  + {abstract} {method} getDataFrameSubFeed
+  + {method} getNonuniqueRows
+  + {method} getNonuniqueStats
+  + {method} getNulls
+  + {method} getPKviolators
+  + {abstract} {method} groupBy
+  + {abstract} {method} isEmpty
+  + {method} isEqual
+  + {method} isSchemaEqualIgnoreNullabilty
+  + {abstract} {method} join
+  + {abstract} {method} join
+  + {abstract} {method} limit
+  + {method} movePartitionColsLast
+  + {abstract} {method} observe
+  + {abstract} {method} schema
+  + {abstract} {method} select
+  + {method} select
+  + {abstract} {method} setupObservation
+  + {abstract} {method} showString
+  + {method} standardizeColNames
+  + {method} symmetricDifference
+  + {abstract} {method} uncache
+  + {abstract} {method} unionByName
+  + {method} where
+  + {abstract} {method} withColumn
+  + {abstract} {method} withColumnRenamed
+}
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.dataframe.DataFrameFunctions
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.dataframe.DataFrameObservation
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.dataframe.GenericGroupedDataFrame
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.dataframe.GenericRow
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.dataframe.GenericSchema
+io.smartdatalake.workflow.dataframe.GenericDataFrame o-- io.smartdatalake.workflow.DataFrameSubFeed
+interface io.smartdatalake.workflow.dataframe.GenericDataType extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} isSameType
+  + {method} isSimpleType
+  + {abstract} {method} isSortable
+  + {abstract} {method} makeNullable
+  + {abstract} {method} removeMetadata
+  + {abstract} {method} sql
+  # {method} standardizeTypeName
+  + {abstract} {method} toJson
+  + {abstract} {method} toLowerCase
+  + {abstract} {method} typeName
+}
+interface io.smartdatalake.workflow.dataframe.GenericField extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} comment
+  + {abstract} {method} dataType
+  + {abstract} {method} makeNullable
+  + {abstract} {method} name
+  + {abstract} {method} nullable
+  + {abstract} {method} removeMetadata
+  + {method} toJson
+  + {abstract} {method} toLowerCase
+}
+io.smartdatalake.workflow.dataframe.GenericField o-- io.smartdatalake.workflow.dataframe.GenericDataType
+interface io.smartdatalake.workflow.dataframe.GenericGroupedDataFrame extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} agg
+}
+io.smartdatalake.workflow.dataframe.GenericGroupedDataFrame o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataframe.GenericGroupedDataFrame o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+interface io.smartdatalake.workflow.dataframe.GenericMapDataType {
+  + {abstract} {method} keyDataType
+  + {method} toJson
+  + {abstract} {method} valueContainsNull
+  + {abstract} {method} valueDataType
+  + {abstract} {method} withOtherKeyType
+  + {abstract} {method} withOtherValueType
+}
+io.smartdatalake.workflow.dataframe.GenericMapDataType o-- io.smartdatalake.workflow.dataframe.GenericDataType
+interface io.smartdatalake.workflow.dataframe.GenericRow extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} get
+  + {abstract} {method} getAs
+  + {abstract} {method} getStruct
+  + {method} size
+  + {abstract} {method} toSeq
+}
+interface io.smartdatalake.workflow.dataframe.GenericSchema extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} add
+  + {abstract} {method} add
+  + {method} apply
+  + {method} columnExists
+  + {abstract} {method} columns
+  + {method} convert
+  + {abstract} {method} diffSchema
+  + {method} equalsSchema
+  + {abstract} {method} fields
+  + {abstract} {method} filter
+  + {method} filterColumns
+  + {abstract} {method} getDataType
+  + {abstract} {method} getEmptyDataFrame
+  + {abstract} {method} makeNullable
+  + {abstract} {method} remove
+  + {abstract} {method} removeMetadata
+  + {abstract} {method} sql
+  + {method} toJson
+  + {abstract} {method} toLowerCase
+  + {abstract} {method} treeString
+}
+io.smartdatalake.workflow.dataframe.GenericSchema o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataframe.GenericSchema o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataframe.GenericSchema o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.dataframe.GenericSchema o-- io.smartdatalake.workflow.dataframe.GenericDataType
+io.smartdatalake.workflow.dataframe.GenericSchema o-- io.smartdatalake.workflow.dataframe.GenericField
+interface io.smartdatalake.workflow.dataframe.GenericSimpleDataType {
+  + {abstract} {method} getDecimalSpec
+  + {abstract} {method} isNumeric
+}
+interface io.smartdatalake.workflow.dataframe.GenericStructDataType {
+  + {abstract} {method} fieldIndex
+  + {method} fieldNames
+  + {abstract} {method} fields
+  + {method} getDataType
+  + {method} size
+  + {method} toJson
+  + {abstract} {method} withOtherFields
+}
+io.smartdatalake.workflow.dataframe.GenericStructDataType o-- io.smartdatalake.workflow.dataframe.GenericDataType
+io.smartdatalake.workflow.dataframe.GenericStructDataType o-- io.smartdatalake.workflow.dataframe.GenericField
+interface io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} subFeedType
+}
+interface io.smartdatalake.workflow.dataframe.GenericUnaryUdf extends io.smartdatalake.workflow.dataframe.GenericTypedObject {
+  + {abstract} {method} convert
+}
+io.smartdatalake.workflow.dataframe.GenericUnaryUdf o-- io.smartdatalake.workflow.dataframe.GenericColumn
+interface io.smartdatalake.workflow.dataframe.GenericWhen {
+  + {abstract} {method} otherwise
+  + {abstract} {method} when
+}
+io.smartdatalake.workflow.dataframe.GenericWhen o-- io.smartdatalake.workflow.dataframe.GenericColumn
+class io.smartdatalake.workflow.dataframe.spark.SparkColumn extends io.smartdatalake.workflow.dataframe.GenericColumn {
+  + {method} *
+  + {method} +
+  + {method} -
+  + {method} /
+  + {method} <
+  + {method} <init>
+  + {method} =!=
+  + {method} ===
+  + {method} >
+  + {method} and
+  + {method} apply
+  + {method} as
+  + {method} cast
+  + {method} desc
+  + {method} exprSql
+  + {method} getName
+  + {field} inner
+  + {method} isin
+  + {method} isNotNull
+  + {method} isNull
+  + {method} or
+  + {method} subFeedType
+}
+io.smartdatalake.workflow.dataframe.spark.SparkColumn o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataframe.spark.SparkColumn o-- io.smartdatalake.workflow.dataframe.GenericDataType
+class io.smartdatalake.workflow.dataframe.spark.SparkDataFrame extends io.smartdatalake.workflow.dataframe.GenericDataFrame {
+  + {method} <init>
+  + {method} agg
+  + {method} apply
+  + {method} as
+  + {method} cache
+  + {method} collect
+  + {method} count
+  + {method} createOrReplaceTempView
+  + {method} distinct
+  + {method} drop
+  + {method} drop
+  + {method} dropDuplicates
+  + {method} except
+  + {method} explainString
+  + {method} filter
+  + {method} getDataFrameSubFeed
+  + {method} groupBy
+  + {field} inner
+  + {method} isEmpty
+  + {method} join
+  + {method} join
+  + {method} limit
+  + {method} observe
+  + {method} schema
+  + {method} select
+  + {method} setupObservation
+  + {method} showString
+  + {method} subFeedType
+  + {method} uncache
+  + {method} unionByName
+  + {method} withColumn
+  + {method} withColumnRenamed
+}
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.DataFrameObservation
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.GenericRow
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.spark.SparkGroupedDataFrame
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.spark.SparkSchema
+io.smartdatalake.workflow.dataframe.spark.SparkDataFrame o-- io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+interface io.smartdatalake.workflow.dataframe.spark.SparkDataType extends io.smartdatalake.workflow.dataframe.GenericDataType {
+  + {abstract} {method} inner
+  + {method} isSameType
+  + {method} isSortable
+  + {abstract} {method} makeNullable
+  + {abstract} {method} removeMetadata
+  + {method} sql
+  + {method} subFeedType
+  + {abstract} {method} toLowerCase
+  + {method} typeName
+}
+io.smartdatalake.workflow.dataframe.spark.SparkDataType o-- io.smartdatalake.workflow.dataframe.GenericDataType
+class io.smartdatalake.workflow.dataframe.spark.SparkField extends io.smartdatalake.workflow.dataframe.GenericField {
+  + {method} <init>
+  + {method} comment
+  + {method} dataType
+  + {field} inner
+  + {method} makeNullable
+  + {method} name
+  + {method} nullable
+  + {method} removeMetadata
+  + {method} subFeedType
+  + {method} toLowerCase
+}
+io.smartdatalake.workflow.dataframe.spark.SparkField o-- io.smartdatalake.workflow.dataframe.spark.SparkDataType
+class io.smartdatalake.workflow.dataframe.spark.SparkGroupedDataFrame extends io.smartdatalake.workflow.dataframe.GenericGroupedDataFrame {
+  + {method} <init>
+  + {method} agg
+  + {field} inner
+  + {method} subFeedType
+}
+io.smartdatalake.workflow.dataframe.spark.SparkGroupedDataFrame o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataframe.spark.SparkGroupedDataFrame o-- io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+class io.smartdatalake.workflow.dataframe.spark.SparkSchema extends io.smartdatalake.workflow.dataframe.GenericSchema {
+  + {method} <init>
+  + {method} add
+  + {method} add
+  + {method} columns
+  + {method} diffSchema
+  + {method} fields
+  + {method} filter
+  + {method} getDataType
+  + {method} getEmptyDataFrame
+  + {field} inner
+  + {method} makeNullable
+  + {method} remove
+  + {method} removeMetadata
+  + {method} sql
+  + {method} subFeedType
+  + {method} toLowerCase
+  + {method} treeString
+}
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.dataframe.GenericDataType
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.dataframe.GenericField
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.dataframe.GenericSchema
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.dataframe.spark.SparkDataType
+io.smartdatalake.workflow.dataframe.spark.SparkSchema o-- io.smartdatalake.workflow.dataframe.spark.SparkField
+class io.smartdatalake.workflow.dataframe.spark.SparkSubFeed extends io.smartdatalake.workflow.DataFrameSubFeed {
+  + {method} <init>
+  + {method} applyExecutionModeResultForInput
+  + {method} applyExecutionModeResultForOutput
+  ~ {method} convertToDummy
+  + {field} dataFrame
+  + {field} dataObjectId
+  + {field} filter
+  + {method} hasReusableDataFrame
+  + {field} isDAGStart
+  + {field} isDummy
+  + {field} isSkipped
+  + {method} isStreaming
+  + {field} metrics
+  + {field} observation
+  + {field} partitionValues
+  + {method} persist
+  + {method} toOutput
+  + {field} tpe
+  + {method} union
+  + {method} unpersist
+  + {method} withDataFrame
+}
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.dataframe.DataFrameObservation
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.dataframe.spark.SparkSchema
+io.smartdatalake.workflow.dataframe.spark.SparkSubFeed o-- io.smartdatalake.workflow.SubFeed
+interface io.smartdatalake.workflow.DataFrameSubFeed extends io.smartdatalake.workflow.SubFeed {
+  + {method} applyFilter
+  + {method} asDummy
+  + {method} breakLineage
+  + {method} clearFilter
+  + {method} clearPartitionValues
+  + {field} companion
+  ~ {method} convertToDummy
+  + {abstract} {method} dataFrame
+  + {abstract} {method} filter
+  + {abstract} {method} hasReusableDataFrame
+  + {abstract} {method} isDummy
+  + {abstract} {method} isStreaming
+  + {method} movePartitionColumnsLast
+  + {abstract} {method} observation
+  + {abstract} {method} persist
+  + {method} schema
+  + {abstract} {method} tpe
+  + {method} transform
+  + {abstract} {method} unpersist
+  + {method} updatePartitionValues
+  + {abstract} {method} withDataFrame
+  + {method} withFilter
+  + {method} withObservation
+  + {method} withPartitionValues
+}
+io.smartdatalake.workflow.DataFrameSubFeed o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.DataFrameSubFeed o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.DataFrameSubFeed o-- io.smartdatalake.workflow.dataframe.DataFrameObservation
+io.smartdatalake.workflow.DataFrameSubFeed o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.DataFrameSubFeed o-- io.smartdatalake.workflow.dataframe.GenericSchema
+io.smartdatalake.workflow.DataFrameSubFeed o-- io.smartdatalake.workflow.DataFrameSubFeedCompanion
+interface io.smartdatalake.workflow.DataFrameSubFeedCompanion extends io.smartdatalake.workflow.SubFeedConverter, io.smartdatalake.workflow.dataframe.DataFrameFunctions {
+  + {abstract} {method} createArrayDataType
+  + {abstract} {method} createField
+  + {abstract} {method} createMapDataType
+  + {abstract} {method} createSchema
+  + {abstract} {method} createSimpleDataType
+  + {abstract} {method} createStructDataType
+  + {method} getDataObjectReadSchema
+  + {abstract} {method} getEmptyDataFrame
+  + {method} getEmptyStreamingDataFrame
+  + {abstract} {method} getSubFeed
+  # {abstract} {method} subFeedType
+}
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericArrayDataType
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericDataType
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericField
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericMapDataType
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericSchema
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericSimpleDataType
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataframe.GenericStructDataType
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.DataFrameSubFeed
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataobject.CanCreateDataFrame
+io.smartdatalake.workflow.DataFrameSubFeedCompanion o-- io.smartdatalake.workflow.dataobject.DataObject
+interface io.smartdatalake.workflow.dataobject.CanCreateDataFrame {
+  # {method} addFieldIfNotExisting
+  + {method} createReadSchema
+  + {abstract} {method} getDataFrame
+  ~ {abstract} {method} getSubFeed
+  ~ {abstract} {method} getSubFeedSupportedTypes
+}
+io.smartdatalake.workflow.dataobject.CanCreateDataFrame o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.dataobject.CanCreateDataFrame o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataobject.CanCreateDataFrame o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.dataobject.CanCreateDataFrame o-- io.smartdatalake.workflow.dataframe.GenericDataType
+io.smartdatalake.workflow.dataobject.CanCreateDataFrame o-- io.smartdatalake.workflow.dataframe.GenericSchema
+io.smartdatalake.workflow.dataobject.CanCreateDataFrame o-- io.smartdatalake.workflow.DataFrameSubFeed
+interface io.smartdatalake.workflow.dataobject.DataObject extends io.smartdatalake.config.SdlConfigObject, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.util.misc.SmartDataLakeLogger, io.smartdatalake.workflow.AtlasExportable {
+  + {method} atlasName
+  # {method} getConnection
+  # {method} getConnectionReg
+  + {method} getStats
+  + {method} housekeepingMode
+  + {abstract} {field} id
+  + {abstract} {method} metadata
+  ~ {method} postRead
+  ~ {method} postWrite
+  ~ {method} prepare
+  ~ {method} preRead
+  ~ {method} preWrite
+  + {method} toStringShort
+}
+io.smartdatalake.workflow.dataobject.DataObject o-- io.smartdatalake.config.InstanceRegistry
+io.smartdatalake.workflow.dataobject.DataObject o-- "io.smartdatalake.config.SdlConfigObject$ConnectionId"
+io.smartdatalake.workflow.dataobject.DataObject o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataobject.DataObject o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.dataobject.DataObject o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataobject.DataObject o-- io.smartdatalake.workflow.connection.Connection
+io.smartdatalake.workflow.dataobject.DataObject o-- io.smartdatalake.workflow.dataobject.DataObjectMetadata
+io.smartdatalake.workflow.dataobject.DataObject o-- io.smartdatalake.workflow.dataobject.HousekeepingMode
+class io.smartdatalake.workflow.dataobject.DataObjectMetadata {
+  + {method} <init>
+  + {field} description
+  + {field} layer
+  + {field} name
+  + {field} subjectArea
+  + {field} tags
+}
+interface io.smartdatalake.workflow.dataobject.expectation.ActionExpectation extends io.smartdatalake.workflow.dataobject.expectation.BaseExpectation, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder, io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} getInputAggExpressionColumns
+}
+io.smartdatalake.workflow.dataobject.expectation.ActionExpectation o-- "io.smartdatalake.config.SdlConfigObject$ActionId"
+io.smartdatalake.workflow.dataobject.expectation.ActionExpectation o-- io.smartdatalake.workflow.dataframe.DataFrameFunctions
+io.smartdatalake.workflow.dataobject.expectation.ActionExpectation o-- io.smartdatalake.workflow.dataframe.GenericColumn
+interface io.smartdatalake.workflow.dataobject.expectation.BaseExpectation {
+  + {method} calculateAsJobDataFrameObservation
+  + {abstract} {method} description
+  + {abstract} {method} failedSeverity
+  + {abstract} {method} getAggExpressionColumns
+  + {method} getCustomMetrics
+  # {method} getMetric
+  + {abstract} {method} getValidationErrorColumn
+  + {abstract} {method} name
+  + {method} scope
+}
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- io.smartdatalake.workflow.dataframe.DataFrameFunctions
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- io.smartdatalake.workflow.dataframe.GenericColumn
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- io.smartdatalake.workflow.dataframe.GenericDataFrame
+io.smartdatalake.workflow.dataobject.expectation.BaseExpectation o-- io.smartdatalake.workflow.dataframe.spark.SparkColumn
+interface io.smartdatalake.workflow.dataobject.expectation.Expectation extends io.smartdatalake.workflow.dataobject.expectation.BaseExpectation, io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder, io.smartdatalake.util.misc.SmartDataLakeLogger
+class io.smartdatalake.workflow.dataobject.FileRef {
+  + {method} <init>
+  + {field} fileName
+  + {field} fullPath
+  + {field} partitionValues
+  + {method} toStringShort
+}
+io.smartdatalake.workflow.dataobject.FileRef o-- io.smartdatalake.util.hdfs.PartitionValues
+interface io.smartdatalake.workflow.dataobject.HousekeepingMode extends io.smartdatalake.config.ParsableFromConfig, io.smartdatalake.config.ConfigHolder {
+  + {abstract} {method} postWrite
+  + {abstract} {method} prepare
+}
+io.smartdatalake.workflow.dataobject.HousekeepingMode o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.dataobject.HousekeepingMode o-- io.smartdatalake.workflow.dataobject.DataObject
+class io.smartdatalake.workflow.DataObjectState {
+  + {method} <init>
+  + {field} dataObjectId
+  + {method} getEntry
+  + {field} state
+  + {method} toStringTuple
+}
+io.smartdatalake.workflow.DataObjectState o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+interface io.smartdatalake.workflow.StateId {
+  + {abstract} {method} attemptId
+  + {abstract} {method} runId
+}
+interface io.smartdatalake.workflow.SubFeed extends io.smartdatalake.util.dag.DAGResult, io.smartdatalake.util.misc.SmartDataLakeLogger {
+  + {method} appendMetrics
+  + {abstract} {method} applyExecutionModeResultForInput
+  + {abstract} {method} applyExecutionModeResultForOutput
+  + {abstract} {method} breakLineage
+  + {method} clearDAGStart
+  + {abstract} {method} clearPartitionValues
+  + {method} clearSkipped
+  + {abstract} {method} dataObjectId
+  + {abstract} {method} isDAGStart
+  + {abstract} {method} isSkipped
+  + {abstract} {method} metrics
+  + {abstract} {method} partitionValues
+  + {method} resultId
+  + {method} setSkipped
+  + {abstract} {method} toOutput
+  + {abstract} {method} union
+  + {method} unionPartitionValues
+  + {abstract} {method} updatePartitionValues
+  + {method} withMetrics
+}
+io.smartdatalake.workflow.SubFeed o-- "io.smartdatalake.config.SdlConfigObject$DataObjectId"
+io.smartdatalake.workflow.SubFeed o-- io.smartdatalake.util.hdfs.PartitionValues
+io.smartdatalake.workflow.SubFeed o-- io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+io.smartdatalake.workflow.SubFeed o-- io.smartdatalake.workflow.ActionPipelineContext
+interface io.smartdatalake.workflow.SubFeedConverter<S extends io.smartdatalake.workflow.SubFeed> {
+  + {abstract} {method} fromSubFeed
+  + {method} get
+}
+io.smartdatalake.workflow.SubFeedConverter o-- io.smartdatalake.workflow.ActionPipelineContext
+io.smartdatalake.workflow.SubFeedConverter o-- io.smartdatalake.workflow.SubFeed
+@enduml

@@ -364,6 +364,7 @@
                     <plugin>
                         <groupId>net.alchim31.maven</groupId>
                         <artifactId>scala-maven-plugin</artifactId>
+                        <version>${scala-maven-plugin.version}</version>
                         <executions>
                             <execution>
                                 <id>scala-doc</id>
@@ -422,6 +423,7 @@
         <maven.compiler.release>11</maven.compiler.release>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
+        <scala-maven-plugin.version>4.9.8</scala-maven-plugin.version>
         <scala.deps.scope>compile</scala.deps.scope>
         <spark.deps.scope>compile</spark.deps.scope>
         <hadoop.deps.scope>compile</hadoop.deps.scope>
@@ -680,7 +682,7 @@
                 <plugin>
                     <groupId>net.alchim31.maven</groupId>
                     <artifactId>scala-maven-plugin</artifactId>
-                    <version>4.9.6</version>
+                    <version>${scala-maven-plugin.version}</version>
                     <executions>
                         <execution>
                             <goals>
@@ -695,10 +697,13 @@
                         <failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
                         <recompileMode>incremental</recompileMode>
                         <args>
-                            <arg>-unchecked</arg>
+                            <arg>-P:semanticdb:sourceroot:${project.basedir}</arg>
+                            <arg>-P:semanticdb:targetroot:${project.build.directory}/classes</arg>
+                            <arg>-Yrangepos</arg>
                             <arg>-deprecation</arg>
-                            <arg>-feature</arg>
                             <arg>-explaintypes</arg>
+                            <arg>-feature</arg>
+                            <arg>-unchecked</arg>
                         </args>
                         <jvmArgs>
                             <jvmArg>-Xms64m</jvmArg>
@@ -711,6 +716,11 @@
                                 <groupId>com.github.takezoe</groupId>
                                 <artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
                                 <version>${scaladoc.reader.version}</version>
+                            </compilerPlugin>
+                            <compilerPlugin>
+                                <groupId>org.scalameta</groupId>
+                                <artifactId>semanticdb-scalac_2.13.18</artifactId>
+                                <version>4.14.5</version>
                             </compilerPlugin>
                         </compilerPlugins>
                     </configuration>
