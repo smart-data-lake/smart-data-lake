@@ -98,18 +98,19 @@ trait Quality extends Transform {
     /** * treating gaps in axis (time or space) ** */
 
     /**
-     * Füllt Datenlücken mit dem nächsten oder letzten vorherigen Wert auf.
-     * Ist der Parameter takeNextValueFirst=true, dann wird zuerst nach einem nächsten Wert geschaut.
+     * Fills data gaps with either the next or the previous value.
+     * If the parameter `takeNextValueFirst` is `true`, it will first look for the next value.
      *
-     * ACHTUNG: Alle Spalten des Ergebnisses sind nullable, auch wenn sie es vorher nicht waren:(
+     * WARNING: All columns in the result are nullable, even if they weren't before :(
      *
-     * @param keyColNames        : Spalten, die zusammen mit orderCol ein Primärschlüsselkandidat sind
-     * @param dataColNames       : Namen der Spalten deren Lücken zu füllen sind
-     * @param orderColName       : Name der Ordnungsspalte, z.B. gueltig_ab
-     * @param takeNextValueFirst : gibt an, ob zuerst der nächste und dann der vorherige Wert genommen wird
-     * @return data frame ohne NULL in Spalte dataColName
+     * @param keyColNames        : Columns which, together with `orderCol`, form a primary key candidate
+     * @param dataColNames       : Names of columns whose gaps are to be filled
+     * @param orderColName       : Name of the ordering column, e.g., "valid_from"
+     * @param takeNextValueFirst : Indicates whether to take the next value first
+     * @return A data frame without NULLs in the `dataColNames` columns
      */
-    final def fillGaps(keyColNames: Iterable[String], dataColNames: Iterable[String], orderColName: String, takeNextValueFirst: Boolean = true): DataFrame = {
+    final def fillGaps(keyColNames: Iterable[String], dataColNames: Iterable[String],
+                       orderColName: String, takeNextValueFirst: Boolean = true): DataFrame = {
       val dsColumns = ds.columns
       val fenestra_next = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.currentRow, Window.unboundedFollowing)
       val fenestra_prev = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.unboundedPreceding, Window.currentRow)
@@ -125,15 +126,25 @@ trait Quality extends Transform {
       ds.select(dsColumns.map(newColumn): _*)
     }
 
-    /**
+     /**
      * adds a column which indicates whether the next interval [fromColName , toColName[ is adjacent
      *
-     * @param keyColNames      : Spaltennamen des Schlüssels
-     * @param fromColName      : Spaltennamen der Intervallanfänge, die auf Lücken untersucht werden
-     * @param toColName        : Spaltennamen der Intervallenden, die auf Lücken untersucht werden
-     * @param orderColNames    : Sortierung
-     * @param gapIndicatorName : Name der Ergebnisspalte
-     * @return union of the frames
+     * @param keyColNames      : Column names of the key
+     * @param fromColName      : Column names of interval starts to be checked for gaps
+     * @param toColName        : Column names of interval ends to be checked for gaps
+     * @param orderColNames    : Sorting columns
+     * @param gapIndicatorName : Name of the result column indicating gaps
+     *
+     * Notes:
+     * - The `keyColNames` are used as part of the primary key.
+     * - `fromColName` and `toColName` are examined for gaps in the data.
+     * - `orderColNames` determines the order of data points (e.g., `valid_from` and `valid_to`).
+     * - `gapIndicatorName` holds a value indicating whether a gap was detected in `fromColName` or `toColName`.
+     *
+     * Usage:
+     * - This method fills gaps in data intervals defined by `fromColName` and `toColName`.
+     * - The `orderColNames` (e.g., `valid_from` and `valid_to`) are critical for correctly ordering data points.
+     * - The `gapIndicatorName` can be used to identify areas where data is missing.
      */
     final def getGaps(keyColNames: Iterable[String],
                       fromColName: String, toColName: String,
