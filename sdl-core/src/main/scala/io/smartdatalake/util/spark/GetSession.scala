@@ -36,10 +36,8 @@ object GetSession {
         "spark.dynamicAllocation.executorIdleTimeout", "spark.dynamicAllocation.maxExecutors",
         "spark.dynamicAllocation.minExecutors", "spark.executor.cores", "spark.executor.memory",
         "spark.executor.memoryOverhead", "spark.sql.maxPlanStringLength")
-      val runtimeConfigSettings = List("spark.sql.hive.filesourcePartitionFileCacheSize",
-        "spark.sql.hive.version", "spark.sql.mapKeyDedupPolicy",
-        "spark.sql.optimizer.maxIterations", "spark.shuffle.file.buffer",
-        "spark.sql.maxPlanStringLength", "spark.sql.shuffle.partitions",
+      val runtimeConfigSettings = List("spark.shuffle.file.buffer", "spark.sql.mapKeyDedupPolicy",
+        "spark.sql.maxPlanStringLength", "spark.sql.optimizer.maxIterations", "spark.sql.shuffle.partitions",
         "spark.sql.warehouse.dir")
 
       import session.implicits._
@@ -52,14 +50,15 @@ object GetSession {
 
       def getRuntimeConfigSetting(propName: String): Option[String] = session.conf.getOption(propName)
 
-      logger.info(s"logger.isDebugEnabled ? ${logger.isDebugEnabled()}")
-      logger.info(s"OS            : $os")
-      logger.info(s"Java  Version : $javaVersion")
-      logger.info(s"Java  Command : ${System.getProperty("sun.java.command")}")
-      logger.info(s"Java TimeZone : ${java.util.TimeZone.getDefault.getDisplayName()}")
-      logger.info(s"Scala Version : $scalaVersion")
-      logger.info(s"Spark Version : ${sparkContext.version}")
-      logger.info(s"Spark AppId   : ${sparkContext.getConf.getAppId}")
+      logger.info(
+        s"""logger.isDebugEnabled ? ${logger.isDebugEnabled()}
+           |   OS            : $os
+           |   Java  Version : $javaVersion
+           |   Java  Command : ${System.getProperty("sun.java.command")}
+           |   Java TimeZone : ${java.util.TimeZone.getDefault.getDisplayName()}
+           |   Scala Version : $scalaVersion
+           |   Spark Version : ${sparkContext.version}
+           |   Spark AppId   : ${sparkContext.getConf.getAppId}""".stripMargin)
 
       logger.info("Spark Conf Settings :")
       sparkConfSettings
