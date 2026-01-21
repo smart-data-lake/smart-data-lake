@@ -112,6 +112,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   }
 
   // Members declared in io.smartdatalake.workflow.SubFeedConverter
+  //TODO: ActionPipelineContext still has Spark dependencies (!)
   def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     subFeed match {
       case scalaSubFeed: ScalaSubFeed => scalaSubFeed.clearFilter().asInstanceOf[ScalaSubFeed] // make sure there is no filter, as filter can not be passed between actions.

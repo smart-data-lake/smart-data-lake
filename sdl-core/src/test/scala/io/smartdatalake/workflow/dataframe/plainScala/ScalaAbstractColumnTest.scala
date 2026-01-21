@@ -19,9 +19,9 @@
 
 package io.smartdatalake.workflow.dataframe.plainScala
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ScalaAbstractColumnTest extends FunSuite {
+class ScalaAbstractColumnTest extends AnyFunSuite {
 
   import ScalaDataFrame.implicits._
 
