@@ -139,13 +139,13 @@ trait Transform extends Serializable {
     /**
      * Converts the data type of a column to a specified type.
      *
-     * @param typ          : The desired data type to convert to
-     * @param colName      : The name of the column whose type is to be converted
-     * @return A data frame with the column type updated
-     *
      * Notes:
      * - This function takes a column name and a target data type and updates the column's type accordingly.
      * - The returned data frame reflects the updated column types.
+     *
+     * @param typ     : The desired data type to convert to
+     * @param colName : The name of the column whose type is to be converted
+     * @return A data frame with the column type updated
      *
      */
     def castColumnTo(typ: DataType)(colName: String): DataFrame = {

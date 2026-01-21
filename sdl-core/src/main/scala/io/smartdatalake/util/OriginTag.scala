@@ -21,5 +21,5 @@ package io.smartdatalake.util
 
 object OriginTag extends Enumeration {
   type OriginTag = Value
-  val LeftAndRight, Left, Right = Value
+  val LeftAndRight, FromLeft, FromRight = Value
 }
