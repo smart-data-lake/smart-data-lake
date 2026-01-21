@@ -231,9 +231,7 @@ trait Transform extends Serializable {
     /**
      * @return DataFrame with columns of ArrayType or MapType exploded
      */
-    // Do not follow IntelliJ's recommendation to add tailrec annotation, otherwise:
-    // could not optimize @tailrec annotated method explodeArrays:
-    // it contains a recursive call not in tail position
+    //noinspection NoTailRecursionAnnotation
     def explodeArrays: DataFrame = {
       // Since one array column can be exploded at time
       // we use recursion here instead of sending all columsn to the transformer
@@ -249,9 +247,7 @@ trait Transform extends Serializable {
     /**
      * @return DataFrame with columns of ArrayType or MapType exploded
      */
-    // Do not follow IntelliJ's recommendation to add tailrec annotation, otherwise:
-    // could not optimize @tailrec annotated method explodeArrays:
-    // it contains a recursive call not in tail position
+    //noinspection NoTailRecursionAnnotation
     def explodeMaps: DataFrame = {
       val firstMapCol: Option[String] = ds.columns.find(ds.schema(_).dataType.isInstanceOf[MapType])
       firstMapCol match {
