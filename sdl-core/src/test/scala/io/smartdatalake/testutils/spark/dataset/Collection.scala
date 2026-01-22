@@ -17,9 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util.spark.dataset
+package io.smartdatalake.testutils.spark.dataset
 
 import io.smartdatalake.app.AppUtil
+import io.smartdatalake.util.spark.dataset.Types
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.scalacheck.Gen

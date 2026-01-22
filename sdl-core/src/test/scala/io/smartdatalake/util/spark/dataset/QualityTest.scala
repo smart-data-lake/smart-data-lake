@@ -20,7 +20,7 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
-import io.smartdatalake.util.spark.dataset.Collection._
+import io.smartdatalake.testutils.spark.dataset.Collection._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.{ArrayType, IntegerType}

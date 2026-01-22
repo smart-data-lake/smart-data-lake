@@ -1,5 +1,6 @@
 package io.smartdatalake.util
 
+import io.smartdatalake.testutils.TestTool
 import io.smartdatalake.util.Constants.{epsilonDouble, halfDouble}
 import io.smartdatalake.util.OriginTag.{FromLeft, FromRight, LeftAndRight, OriginTag}
 import org.scalatest.flatspec.AnyFlatSpec

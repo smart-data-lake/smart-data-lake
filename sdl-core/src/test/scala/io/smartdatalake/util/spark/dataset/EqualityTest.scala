@@ -19,9 +19,10 @@
 
 package io.smartdatalake.util.spark.dataset
 
+import io.smartdatalake.testutils.TestTool
 import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
-import io.smartdatalake.util.spark.dataset.Collection._
-import io.smartdatalake.util.{PrecisionDef, TestTool}
+import io.smartdatalake.testutils.spark.dataset.Collection._
+import io.smartdatalake.util.PrecisionDef
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
