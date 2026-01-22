@@ -19,6 +19,10 @@
 
 package io.smartdatalake.util
 
+/**
+ * OriginTag is used by Compare.originMap to tag the origin of an element in the union of two sets
+ * please see the comment there for further details
+ */
 object OriginTag extends Enumeration {
   type OriginTag = Value
   val LeftAndRight, FromLeft, FromRight = Value
