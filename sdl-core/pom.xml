@@ -270,16 +270,15 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
             <version>${fasterxml.jackson.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+        </dependency>
 
         <!-- TEST dependencies -->
         <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.minor.version}</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.scalatestplus</groupId>
-            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
