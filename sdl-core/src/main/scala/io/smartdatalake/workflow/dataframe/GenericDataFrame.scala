@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.util.spark.DataFrameUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.json4s.JsonAST.{JBool, JObject}

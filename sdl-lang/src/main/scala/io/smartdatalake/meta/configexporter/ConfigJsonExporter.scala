@@ -11,7 +11,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
 import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.DataFrameUtil.strToLowerCamelCase
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import org.apache.commons.lang.NotImplementedException
@@ -120,8 +120,8 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         writers.zipWithIndex.foreach { case (writer, i) =>
 
           // write export config
-          val version = if (!config.targets(i).contains("version=")) Some(getAppVersion()) else None
-          writer.writeConfig(configAsJson, version)
+          val version = if (!config.targets(i).contains("version=")) Some(getAppVersion) else None
+          writer.writeConfig(document = configAsJson, version = version)
 
           // write descriptions
           if (config.uploadDescriptions) uploadDescriptions(config, writer, version)
@@ -129,11 +129,11 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
 
 
       case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+        logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 
-  def getAppVersion(): String = {
+  def getAppVersion: String = {
     BuildVersionInfo.appVersionInfo.map(_.version).getOrElse(UploadDefaults.versionDefault)
   }
 
@@ -193,7 +193,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   private def enrichCustomClassScalaDoc(config: Config): Config = {
     // we are looking for className and type attributes
     def searchCondition(key: String, value: ConfigValue) = {
-      val lccKey = DataFrameUtil.strToLowerCamelCase(key)
+      val lccKey = strToLowerCamelCase(key)
       // condition
       value.valueType == ConfigValueType.STRING &&
       (lccKey == "className" || lccKey == "type") &&

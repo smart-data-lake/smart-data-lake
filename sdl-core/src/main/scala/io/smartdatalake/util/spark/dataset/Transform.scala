@@ -30,18 +30,6 @@ import scala.jdk.CollectionConverters._
 
 trait Transform extends Serializable {
 
-  /**
-   * Create empty DataFrame with defined Schema
-   */
-  def getEmptyDataFrame(scheme: StructType)(implicit ss: SparkSession): DataFrame = ss
-    .createDataFrame(List[Row]().asJava, scheme)
-
-  def getDecimalPrecisionScale(t: DataType): Option[(Int, Int)] = t match {
-    case DecimalType() => Some((t.asInstanceOf[DecimalType].precision,
-      t.asInstanceOf[DecimalType].scale))
-    case _ => None
-  }
-
   implicit class DsTransform[T](ds: Dataset[T]) {
 
     /** * transformCols: generic workers used by many other methods ** */

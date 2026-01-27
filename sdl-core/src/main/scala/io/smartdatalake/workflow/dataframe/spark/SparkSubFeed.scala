@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataframe.spark
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
-import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
+import io.smartdatalake.util.spark.{dataset, DummyStreamProvider}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
@@ -173,7 +173,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
     val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkSchema]
-    SparkDataFrame(DataFrameUtil.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
   }
   override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = {
     schema match {

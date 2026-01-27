@@ -24,7 +24,8 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -219,7 +220,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
-    import DataFrameUtil._
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     dfRaw
@@ -473,7 +473,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
     // search how many partitions / chrono units back of data we have
     var cntEmptyConsecutive = 0
-    val detectedPartitions = Stream.from(0).map {
+    val detectedPartitions = LazyList.from(0).map {
       unitsBack =>
         val startTimeIncl = datePartitionCol.get.previous(lastCompletedPartitionStartTime, unitsBack)
         val endTimeExcl = datePartitionCol.get.next(startTimeIncl)
@@ -486,7 +486,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       case (startTimeIncl, isEmpty, minStartTime) =>
         cntEmptyConsecutive = if (isEmpty) cntEmptyConsecutive + 1
         else 0
-        (cntEmptyConsecutive <= maxEmptyConsecutive)
+        cntEmptyConsecutive <= maxEmptyConsecutive
     }.toVector
     logger.debug(s"($id) detected completed date partitions $detectedPartitions for topic $topicName")
 
@@ -507,7 +507,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
           .add("timestamp", TimestampType)
           .add("timestampType", IntegerType)
         // apply selected columns and return schema
-        SparkSchema(convertToReadDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw)).schema)
+        SparkSchema(convertToReadDataFrame(getEmptyDataFrame(readSchemaRaw)).schema)
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${writeSchema.subFeedType.typeSymbol.name} in method createReadSchema")
     }
   }

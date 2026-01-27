@@ -32,6 +32,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Provides utility functions for [[DataFrame]]s.
  */
+@deprecated(since = "2.8.2")
 object DataFrameUtil {
 
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger {
@@ -394,11 +395,6 @@ object DataFrameUtil {
   def removeNonStandardSQLNameChars(x: String): String = {
     x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")
   }
-
-  def getEmptyDataFrame(schema: StructType)(implicit session: SparkSession): DataFrame = {
-    session.createDataFrame(Seq.empty[Row].asJava, schema)
-  }
-
   /**
    * Create column Metadata with comment
    */

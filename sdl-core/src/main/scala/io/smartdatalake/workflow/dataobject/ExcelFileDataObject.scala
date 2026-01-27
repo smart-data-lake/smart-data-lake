@@ -26,6 +26,7 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.AclDef
 import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import org.apache.spark.sql.DataFrame
