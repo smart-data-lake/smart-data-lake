@@ -19,11 +19,11 @@
 
 package io.smartdatalake.util.spark.dataset
 
-import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import io.smartdatalake.testutils.spark.dataset.Collection._
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.{ArrayType, IntegerType}
+import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.slf4j.{Logger, LoggerFactory}
@@ -65,6 +65,20 @@ class QualityTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
+  "setColumnComments" should "preserve type of Dataset" in {
+    val ds: Dataset[TestCaseClass] = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF().as[TestCaseClass]
+    val dsCommented: Dataset[TestCaseClass] = ds
+      .setColumnComments(Map("id" -> "desc_id", "x" -> "desc_x", "y" -> "desc_y"))
+    ds.schema.map(_.dataType) shouldBe dsCommented.schema.map(_.dataType)
+  }
+
+  "setColumnComments" should "modify column metadata" in {
+    val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
+    val dfCommented = df.setColumnComments(Map("id" -> "desc_id", "x" -> "desc_x", "y" -> "desc_y"))
+    val actual = dfCommented.getColumnComments.select("comment").as[String].collect().toSet
+    val expected = Set("desc_id", "desc_x", "desc_y")
+    actual shouldBe expected
+  }
 
   /** * tests treating gaps in axis (time or space) ** */
 

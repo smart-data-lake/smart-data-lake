@@ -20,8 +20,8 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestTool
-import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import io.smartdatalake.testutils.spark.dataset.Collection._
+import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}

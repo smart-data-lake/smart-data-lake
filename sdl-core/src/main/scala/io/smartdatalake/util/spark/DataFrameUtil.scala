@@ -289,41 +289,9 @@ object DataFrameUtil {
     }
 
     /**
-     * Add a column include a comment
-     */
-    def withColumn(colName: String, expr: Column, comment: String): DataFrame = {
-      df.withColumn(colName, withComment(colName, expr, comment))
-    }
-
-    /**
      * Execute df.show and return it as String instead of printing it directly
      */
     def showString(): String = DatasetHelper.showString(df)
-  }
-
-  /**
-   * Create column Metadata with comment
-   */
-  def comment(commentString: String): Metadata = {
-    new MetadataBuilder().putString("comment", commentString).build()
-  }
-
-  /**
-   * Reference column and add comment to column
-   */
-  def withComment(colName: String, commentText: String): Column = {
-    col(colName).as(
-      colName.split("\\.").last, metadata = comment(commentText)
-    )
-  }
-
-  /**
-   * Add comment to column
-   */
-  def withComment(colName: String, column: Column, commentText: String): Column = {
-    column.as(
-      colName.split("\\.").last, metadata = comment(commentText)
-    )
   }
 
   /**

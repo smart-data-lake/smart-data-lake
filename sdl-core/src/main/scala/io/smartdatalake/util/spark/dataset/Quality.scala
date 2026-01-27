@@ -20,14 +20,35 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.util.LogUtils.{debLogFun, debugLog}
+import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField, StructType}
 import org.slf4j.Logger
 
 import scala.util.{Failure, Success, Try}
 
 trait Quality extends Transform {
+
+
+  final def comment(commentString: String): Metadata = new MetadataBuilder()
+    .putString("comment", commentString).build()
+
+  final def withComment(colName: String, column: Column, commentText: String): Column = column
+    .as(alias = colName, metadata = comment(commentText))
+
+  final def withComment(colName: String, commentText: String): Column = withComment(colName, col(colName), commentText)
+
+  final def withComment(column: Column, commentText: String): Column = {
+    val colName = column.expr match {
+      case c: NamedExpression => c.name
+      case _ => throw new IllegalArgumentException(s"Cannot extract name from Column $column," +
+        s" as it is not a NamedExpression." +
+        s" use withComment(colName: String, column: Column, commentText: String) instead.")
+    }
+    withComment(colName, commentText)
+  }
 
   /**
    *
@@ -52,6 +73,31 @@ trait Quality extends Transform {
   final def getStatsCol(cn: String): List[Column] = getStatsCol(col(cn), cn)
 
   implicit class DsQuality[T](ds: Dataset[T]) {
+    val cols: Array[String] = ds.columns
+    val scheme: StructType = ds.schema
+    implicit val enkoder: Encoder[T] = ds.encoder
+
+    def getColumnComments(implicit implSs: SparkSession): Dataset[(String, String, String)] = {
+      import implSs.implicits._
+      cols.map { cn => (cn, scheme(cn).dataType.catalogString, scheme(cn).getComment().getOrElse("")) }
+        .toList.toDF("column", "datatype", "comment").as[(String, String, String)]
+    }
+
+    def setColumnComments(commentMap: Map[String, String])(implicit logger: Logger): Dataset[T] = {
+      def commentField(fld: StructField): StructField = commentMap.get(fld.name).map(comment => fld.withComment(comment)).getOrElse(fld)
+
+      val superfluousComments = commentMap.keys.toSeq.diff(cols)
+      if (superfluousComments.nonEmpty) logger.warn(s"Superfluous comment detected for columns ${superfluousComments.mkString(", ")}")
+      val commentedCols = scheme.map(f => col(f.name).as(f.name, commentField(f).metadata))
+      ds.select(commentedCols: _*).as[T]
+    }
+
+    /**
+     * Add a column include a comment
+     */
+    def withColumn(colName: String, expr: Column, comment: String): DataFrame = {
+      ds.withColumn(colName, withComment(colName, expr, comment))
+    }
 
     /**
      * Converts maps to arrays and then counts distinct rows.
@@ -126,7 +172,7 @@ trait Quality extends Transform {
       ds.select(dsColumns.map(newColumn): _*)
     }
 
-     /**
+    /**
      * adds a column which indicates whether the next interval [fromColName , toColName[ is adjacent
      *
      * @param keyColNames      : Column names of the key
@@ -135,16 +181,16 @@ trait Quality extends Transform {
      * @param orderColNames    : Sorting columns
      * @param gapIndicatorName : Name of the result column indicating gaps
      *
-     * Notes:
-     * - The `keyColNames` are used as part of the primary key.
-     * - `fromColName` and `toColName` are examined for gaps in the data.
-     * - `orderColNames` determines the order of data points (e.g., `valid_from` and `valid_to`).
-     * - `gapIndicatorName` holds a value indicating whether a gap was detected in `fromColName` or `toColName`.
+     *                         Notes:
+     *                         - The `keyColNames` are used as part of the primary key.
+     *                         - `fromColName` and `toColName` are examined for gaps in the data.
+     *                         - `orderColNames` determines the order of data points (e.g., `valid_from` and `valid_to`).
+     *                         - `gapIndicatorName` holds a value indicating whether a gap was detected in `fromColName` or `toColName`.
      *
-     * Usage:
-     * - This method fills gaps in data intervals defined by `fromColName` and `toColName`.
-     * - The `orderColNames` (e.g., `valid_from` and `valid_to`) are critical for correctly ordering data points.
-     * - The `gapIndicatorName` can be used to identify areas where data is missing.
+     *                         Usage:
+     *                         - This method fills gaps in data intervals defined by `fromColName` and `toColName`.
+     *                         - The `orderColNames` (e.g., `valid_from` and `valid_to`) are critical for correctly ordering data points.
+     *                         - The `gapIndicatorName` can be used to identify areas where data is missing.
      */
     final def getGaps(keyColNames: Iterable[String],
                       fromColName: String, toColName: String,
