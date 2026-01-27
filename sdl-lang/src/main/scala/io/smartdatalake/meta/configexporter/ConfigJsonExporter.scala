@@ -11,7 +11,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
 import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.DataFrameUtil.strToLowerCamelCase
+import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import org.apache.commons.lang.NotImplementedException

@@ -248,6 +248,8 @@ trait Transform extends Serializable {
       }
     }
 
+    ///// Renaming Columns /////
+
     /**
      * renames columns given by the renaming function
      * but transforms Dataset to DataFrame
@@ -264,6 +266,9 @@ trait Transform extends Serializable {
       val rename: String => Iterable[String] = cn => Seq(renameFun(cn))
       transformCols(renameFun = rename, colFilter = colFilter, keepOriginalCols = keepOriginalCols)
     }
+
+
+    ///// Unfolding Structs /////
 
     /**
      * loest Struct-Column in die Elementfelder auf
@@ -313,7 +318,7 @@ trait Transform extends Serializable {
     }
 
 
-    /** * unpivotCast, transpose et al ** */
+    ///// unpivotCast, transpose et al /////
 
     /**
      * Transforms (reshapes) a wide dataframe to a long DataFrame by transforming columns into rows
@@ -444,5 +449,6 @@ trait Transform extends Serializable {
       if (!isExec) getEmptyDataFrame(ds.schema)(ds.sparkSession)
       else ds.toDF
     }
+
   }
 }

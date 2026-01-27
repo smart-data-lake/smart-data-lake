@@ -22,7 +22,7 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.lab.DataFrameBaseBuilder.DEFAULT_DATAOBJECT_ID
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil.strToCamelCase
+import io.smartdatalake.util.misc.StringUtil.strToCamelCase
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, NotFoundError, TransformDfsMethod, TransformInfo}

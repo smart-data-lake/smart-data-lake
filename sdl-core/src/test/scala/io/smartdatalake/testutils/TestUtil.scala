@@ -25,8 +25,9 @@ import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.StringUtil.replaceNonSqlWithUnderscores
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.spark.DataFrameUtil.{DfSDL, replaceNonSqlWithUnderscores}
+import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
@@ -453,5 +454,3 @@ object TestUtil extends SmartDataLakeLogger {
     dataObject
   }
 }
-
-

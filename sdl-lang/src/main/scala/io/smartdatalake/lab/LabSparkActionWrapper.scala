@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport, FromConfigFactory}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil
-import io.smartdatalake.util.spark.DataFrameUtil.strToCamelCase
+import io.smartdatalake.util.misc.StringUtil.strToCamelCase
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}

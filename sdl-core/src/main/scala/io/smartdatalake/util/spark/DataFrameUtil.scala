@@ -25,8 +25,6 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 
-import java.text.Normalizer
-
 /**
  * Provides utility functions for [[DataFrame]]s.
  */
@@ -302,66 +300,7 @@ object DataFrameUtil {
      */
     def showString(): String = DatasetHelper.showString(df)
   }
-  /**
-   * Transforms a name in CamelCase to lowercase with underscores, i.e. TestString -> test_string
-   *
-   * @param x [[String]] to transform
-   * @return transformed [[String]]
-   */
-  def strCamelCase2LowerCaseWithUnderscores(x: String): String = {
-    val normalized = "([A-Z]+[^A-Z_]*)|[^A-Z_]+".r.findAllMatchIn(x).map(_.group(0).toLowerCase.filter(_ != '_'))
-      .filter(_.nonEmpty).mkString("_")
-    // preserve leading underscores
-    x.takeWhile(_ == '_') + normalized
-  }
 
-  /**
-   * Transforms name with dashs and underscores to CamelCase.
-   */
-  def strToCamelCase(x: String): String = {
-    val parts = x.split("[_\\- ]")
-    parts.map(_.capitalize).mkString
-  }
-
-  /**
-   * Transforms name with dashs and underscores to LowerCamelCase.
-   */
-  def strToLowerCamelCase(x: String): String = {
-    val camelCase = strToCamelCase(x)
-    // lowercase first letter
-    camelCase.head.toLower +: camelCase.tail
-  }
-
-  /**
-   * Transform a string with UTF8 chars (e.g. diacritics, umlauts) to ASCII chars (best effort)
-   */
-  def normalizeToAscii(x: String): String = {
-    // replace umlauts
-    val normalizedUmlauts = x
-      .replace("Ä", "Ae")
-      .replace("Ö", "Oe")
-      .replace("Ü", "Ue")
-      .replace("ä", "ae")
-      .replace("ö", "oe")
-      .replace("ü", "ue")
-    // decompose diacritics (e.g. accents) into separate UTF characters
-    val normalizedUtf = Normalizer.normalize(normalizedUmlauts, Normalizer.Form.NFD)
-    // remove all non-ascii characters
-    normalizedUtf.replaceAll("[^\\p{ASCII}]","")
-  }
-
-  /**
-   * Remove all hyphen and blanks from a string with underscores
-   */
-  def replaceNonSqlWithUnderscores(x: String): String = {
-    x.replaceAll("[^a-zA-Z0-9_]+", "_")
-  }
-  /**
-   * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
-   */
-  def removeNonStandardSQLNameChars(x: String): String = {
-    x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")
-  }
   /**
    * Create column Metadata with comment
    */

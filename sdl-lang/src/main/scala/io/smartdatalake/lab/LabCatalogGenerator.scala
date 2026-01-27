@@ -21,7 +21,7 @@ package io.smartdatalake.lab
 
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.DataFrameUtil.strToLowerCamelCase
+import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
 import io.smartdatalake.workflow.action.{Action, CustomDataFrameAction, DataFrameOneToOneActionImpl}
 import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, DataObject}
 import org.apache.commons.io.FileUtils

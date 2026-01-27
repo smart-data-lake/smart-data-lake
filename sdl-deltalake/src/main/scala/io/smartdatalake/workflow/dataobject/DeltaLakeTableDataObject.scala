@@ -397,7 +397,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
     val deltaMetrics = dfHistory.select("operationMetrics").head().getMap[String,String](0)
       // normalize names lowercase with underscore
-      .map{case (k,v) => (DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
+      .map{case (k,v) => (StringUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
       // standardize naming
       .map{
         case ("num_output_rows", v) => "rows_inserted" -> v
