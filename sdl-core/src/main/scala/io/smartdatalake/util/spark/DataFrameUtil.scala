@@ -24,10 +24,8 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.storage.StorageLevel
 
 import java.text.Normalizer
-import scala.jdk.CollectionConverters._
 
 /**
  * Provides utility functions for [[DataFrame]]s.
@@ -304,37 +302,6 @@ object DataFrameUtil {
      */
     def showString(): String = DatasetHelper.showString(df)
   }
-
-  /**
-   * Persists a [[DataFrame]] with [[StorageLevel.MEMORY_AND_DISK_SER]].
-   *
-   * @param dataFrame [[DataFrame]] to persist
-   * @return persisted [[DataFrame]]
-   */
-  def defaultPersistDf(dataFrame: DataFrame): DataFrame = {
-    dataFrame.persist(StorageLevel.MEMORY_AND_DISK_SER)
-  }
-
-  /**
-   * Persists a  [[DataFrame]] with given storage level [[StorageLevel.MEMORY_AND_DISK_SER]] if persisting is allowed.
-   *
-   * @param df           [[DataFrame]] to persist
-   * @param doPersist    Allowed to persist?
-   * @param storageLevel [[StorageLevel]] to use
-   * @return persisted [[DataFrame]]
-   */
-  def persistDfIfPossible(df: DataFrame, doPersist: Boolean,
-                          storageLevel: Option[StorageLevel] = None): DataFrame = {
-    if (doPersist) {
-      if (storageLevel.isDefined) {
-        df.persist(storageLevel.get)
-      } else {
-        DataFrameUtil.defaultPersistDf(df)
-      }
-    }
-    else df
-  }
-
   /**
    * Transforms a name in CamelCase to lowercase with underscores, i.e. TestString -> test_string
    *
