@@ -181,10 +181,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
       .load()
+    if (!context.isExecPhase) df = df.limit(1)
     incrementalOutputState.foreach { case (lastExpr, lastHighWatermark)  =>
       assert(incrementalOutputExpr.isDefined, s"($id) incrementalOutputExpr must be set to use DataObjectStateIncrementalMode")
       if (lastExpr != incrementalOutputExpr.get) logger.warn(s"($id) incrementalOutputState has different column as incrementalOutputExpr ($lastExpr != ${incrementalOutputExpr.get}")
-      val resolvedExpr = ExpressionEvaluator.resolveExpression(expr(incrementalOutputExpr.get), df.schema, caseSensitive = false)
+      val resolvedExpr = SparkExpressionUtil.resolveExpression(incrementalOutputExpr.get, df.schema)
       // check if expression is fully resolved
       if (!resolvedExpr.resolved) {
         val attrs = ExpressionEvaluator.findUnresolvedAttributes(resolvedExpr).map(_.name)

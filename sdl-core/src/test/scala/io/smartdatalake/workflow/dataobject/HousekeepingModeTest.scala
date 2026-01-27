@@ -29,13 +29,15 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
+class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -44,7 +46,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  val df1 = Seq(("doe","john",5,"20201101"),("einstein","albert",2,"20201201"))
+  private val df1 = Seq(("doe", "john", 5, "20201101"), ("einstein", "albert", 2, "20201201"))
     .toDF("lastname", "firstname", "rating", "dt")
 
   before {
@@ -52,8 +54,8 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("PartitionRetentionMode") {
-    val srcDO = CsvFileDataObject("srcDO", tempPath+s"/src0", partitions=Seq("dt"))
-    val tgtDO = CsvFileDataObject("tgtDO", tempPath+s"/tgt1", partitions=Seq("dt")
+    val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
+    val tgtDO = CsvFileDataObject("tgtDO", tempPath + s"/tgt1", partitions = Seq("dt")
       , housekeepingMode = Some(PartitionRetentionMode("elements.dt >= 20201201"))
     )
     instanceRegistry.register(srcDO)
@@ -63,7 +65,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "srcDO", Seq())
     val tgtSubFeed = SparkSubFeed(None, "tgtDO", Seq())
     action1.prepare
-    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101","20201201"))
+    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101", "20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
     // check partition dt=20201101 is deleted
@@ -71,8 +73,8 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("PartitionArchiveCompactionMode with SparkFileDataObject") {
-    val srcDO = CsvFileDataObject("srcDO", tempPath+s"/src0", partitions=Seq("dt"))
-    val tgtDO = CsvFileDataObject("tgtDO", tempPath+s"/tgt1", partitions=Seq("dt")
+    val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
+    val tgtDO = CsvFileDataObject("tgtDO", tempPath + s"/tgt1", partitions = Seq("dt")
       , housekeepingMode = Some(PartitionArchiveCompactionMode(
         archivePartitionExpression = Some("map('dt','20201101')"), // always archive to 20201101
         compactPartitionExpression = Some("true") // compact all partitions...
@@ -85,7 +87,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "srcDO", Seq())
     val tgtSubFeed = SparkSubFeed(None, "tgtDO", Seq())
     action1.prepare
-    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101","20201201"))
+    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101", "20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
     // check partition dt=20201201 is archived and dt=20201101 is compacted
@@ -99,8 +101,8 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("PartitionArchiveCompactionMode with HiveTableDataObject") {
-    val srcDO = CsvFileDataObject("srcDO", tempPath+s"/src0", partitions=Seq("dt"))
-    val tgtDO = HiveTableDataObject("tgtDO", Some(tempPath+s"/tgt1"), partitions=Seq("dt"), table = Table(Some("default"), "tgtDO")
+    val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
+    val tgtDO = HiveTableDataObject("tgtDO", Some(tempPath + s"/tgt1"), partitions = Seq("dt"), table = Table(Some("default"), "tgtDO")
       , housekeepingMode = Some(PartitionArchiveCompactionMode(
         archivePartitionExpression = Some("map('dt','20201101')"), // always archive to 20201101
         compactPartitionExpression = Some("true") // compact all partitions...
@@ -114,7 +116,7 @@ class HousekeepingModeTest extends FunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "srcDO", Seq())
     val tgtSubFeed = SparkSubFeed(None, "tgtDO", Seq())
     action1.prepare
-    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101","20201201"))
+    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101", "20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
     // check partition dt=20201201 is archived and dt=20201101 is compacted

@@ -27,16 +27,18 @@ import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAfter {
+class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
-  protected implicit val session : SparkSession = DeltaLakeTestUtils.session
+  protected implicit val session: SparkSession = DeltaLakeTestUtils.session
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -53,8 +55,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
+    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -71,7 +73,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -89,7 +91,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
       // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
       val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -106,7 +108,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     {
       val expected = Seq(("doe", "john", 10, Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", 5, None, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, None, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context3)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
@@ -117,8 +119,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
 
     // setup DataObjects
     val srcDO = MockDataObject("src1").register
-    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = DeltaLakeTableDataObject( "tgt1", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
+    val tgtTable = Table(Some(deltaDb), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -135,7 +137,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     {
       val expected = Seq(("doe", "john", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -153,7 +155,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
       // note that we expect pan/peter/5, pan/peter2/3 and pan/peter3/null with old refTimestamp because all attributes stay the same
       val expected = Seq(("doe", "john", Some(10), Timestamp.valueOf(refTimestamp2)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -170,7 +172,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     {
       val expected = Seq(("doe", "john", Some(10), Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", Some(5), None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), None, Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), None, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()
+      val actual = tgtDO.getSparkDataFrame()(context3)
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
@@ -191,7 +193,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true,
-      transformers = Seq(SQLDfTransformer(code = "select lastname, firstname, rating as rating2 from %{inputViewName}"))
+      transformers = Seq(SQLDfTransformer(code = Some("select lastname, firstname, rating as rating2 from %{inputViewName}")))
     )
     val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
@@ -203,7 +205,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame().cache()
+      val actual = tgtDO.getSparkDataFrame()(context1).cache()
       actual.show
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
@@ -214,7 +216,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l2, Seq())(context1)
+    srcDO.writeSparkDataFrame(l2, Seq())(context2)
     action1.init(Seq(srcSubFeed))(context2.copy(phase = ExecutionPhase.Init))
     action1.exec(Seq(srcSubFeed))(context2)
 
@@ -222,7 +224,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends FunSuite with BeforeAndAft
       // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
       val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame().cache()
+      val actual = tgtDO.getSparkDataFrame()(context2).cache()
       actual.show
       val resultat = expected.isEqual(actual)
       if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)

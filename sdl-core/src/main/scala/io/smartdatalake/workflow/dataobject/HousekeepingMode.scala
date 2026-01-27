@@ -30,8 +30,8 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import java.sql.Timestamp
 
 trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigHolder{
-  private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
-  private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
+  def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
+  def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
 }
 
 /**
@@ -47,11 +47,11 @@ trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigH
  *                           working with the attributes of [[PartitionExpressionData]] returning a boolean with value true if the partition should be kept.
  */
 case class PartitionRetentionMode(retentionCondition: String, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
-  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
+  override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
     SparkExpressionUtil.syntaxCheck[PartitionExpressionData,Boolean](dataObject.id, Some("houskeepingMode.retentionCondition"), retentionCondition)
   }
-  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
+  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     dataObject match {
       case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.isEmpty =>
         throw ConfigurationException(s"(${dataObject.id}) PartitionRetentionMode not supported for DataObject without partition columns defined")
@@ -100,12 +100,12 @@ object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
  *                                   It is therefore ok to return true for all partitions which should be compacted, regardless if they have been compacted already.
  */
 case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[String] = None, compactPartitionExpression: Option[String] = None, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
-  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
+  override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
     archivePartitionExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionExpressionData, Map[String,String]](dataObject.id, Some("housekeepingMode.archivePartitionExpression"), expression))
     compactPartitionExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression))
   }
-  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
+  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     dataObject match {
       case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.isEmpty =>
         throw ConfigurationException(s"(${dataObject.id}) PartitionArchiveCompactionMode not supported for DataObject without partition columns defined")
@@ -149,7 +149,7 @@ object PartitionArchiveCompactionMode extends FromConfigFactory[HousekeepingMode
 }
 
 case class PartitionExpressionData(feed: String, application: String, runId: Int, runStartTime: Timestamp, dataObjectId: String, elements: Map[String,String])
-private[smartdatalake] object PartitionExpressionData {
+object PartitionExpressionData {
   def from(context: ActionPipelineContext, dataObjectId: DataObjectId, partitionValues: PartitionValues): PartitionExpressionData = {
     PartitionExpressionData(context.feed, context.application, context.executionId.runId, Timestamp.valueOf(context.runStartTime), dataObjectId.id, partitionValues.getMapString)
   }

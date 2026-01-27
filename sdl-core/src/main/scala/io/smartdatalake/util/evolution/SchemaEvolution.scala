@@ -202,7 +202,7 @@ object SchemaEvolution extends SmartDataLakeLogger {
 
       // log information
       val infoList = tgtColumns.flatMap(_.infoMsg).map("-> " + _).mkString("\n")
-      val infoTxt = s"$infoList\nold schema:\n${oldDf.schema.treeString().stripTrailing()}\nnew schema:\n${newDf.schema.treeString().stripTrailing()}".indent(2)
+      val infoTxt = indent(s"$infoList\nold schema:\n${oldDf.schema.treeString().stripTrailing()}\nnew schema:\n${newDf.schema.treeString().stripTrailing()}", 2)
       logger.info(s"schema evolution needed. mapping is:\n$infoTxt"
       )
 
@@ -213,6 +213,11 @@ object SchemaEvolution extends SmartDataLakeLogger {
       // return
       (oldExtendedDf, newExtendedDf)
     }
+  }
+
+  def indent(s: String, spaces: Int): String = {
+    val pad = " " * spaces
+    s.linesIterator.map("  " + _).mkString(System.lineSeparator())
   }
 
   def isStringListEqual(a: Seq[String], b: Seq[String], caseSensitiveComparison: Boolean): Boolean = {

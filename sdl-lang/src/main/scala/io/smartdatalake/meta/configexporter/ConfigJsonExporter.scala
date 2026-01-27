@@ -2,8 +2,9 @@ package io.smartdatalake.meta.configexporter
 
 import com.typesafe.config._
 import configs.ConfigObject
-import io.smartdatalake.app.{BuildVersionInfo, FileDescriptor, UploadDefaults}
+import io.smartdatalake.app.BuildVersionInfo
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.{ExportWriter, FileDescriptor, UploadDefaults}
 import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
@@ -22,7 +23,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
-case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, target: String = "file:./exportedConfig.json", enrichOrigin: Boolean = true, descriptionPath: Option[String] = None, uploadDescriptions: Boolean = false)
+case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, targets: Seq[String] = Seq("./exportedConfig.json"), enrichOrigin: Boolean = true, descriptionPath: Option[String] = None, uploadDescriptions: Boolean = false)
 
 object ConfigJsonExporter extends SmartDataLakeLogger {
 
@@ -35,11 +36,11 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .action((value, c) => c.copy(configPaths = value.split(',')))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('f', "filename")
-      .action((value, c) => c.copy(target = "file:"+value))
+      .action((value, c) => c.copy(targets = Seq(value)))
       .text("Deprecated: Use target instead. File to export configuration to.")
     opt[String]('t', "target")
-      .action((value, c) => c.copy(target = value))
-      .text("Target URI to export configuration to. Can be 'file:./xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: file:./exportedConfig.json")
+      .action((value, c) => c.copy(targets = value.split(",").map(_.trim).toSeq))
+      .text("Target URI to export configuration to. Can be './xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: ./exportedConfig.json")
     opt[Boolean]("enrichOrigin")
       .action((value, c) => c.copy(enrichOrigin = value))
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
@@ -114,18 +115,26 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
         val configAsJson = exportConfigJson(config)
 
         // create document writer depending on target uri scheme
-        val writer = ExportWriter.apply(config.target, config.configPaths)
+        val writers = config.targets.map(ExportWriter.apply(_, config.configPaths))
 
-        // write export config
-        val version = if (!config.target.contains("version=")) BuildVersionInfo.appVersionInfo.map(_.version).orElse(Some(UploadDefaults.versionDefault)) else None
-        writer.writeConfig(configAsJson, version)
+        writers.zipWithIndex.foreach { case (writer, i) =>
 
-        // write descriptions
-        if (config.uploadDescriptions) uploadDescriptions(config, writer, version)
+          // write export config
+          val version = if (!config.targets(i).contains("version=")) Some(getAppVersion()) else None
+          writer.writeConfig(configAsJson, version)
+
+          // write descriptions
+          if (config.uploadDescriptions) uploadDescriptions(config, writer, version)
+        }
+
 
       case None =>
         logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
+  }
+
+  def getAppVersion(): String = {
+    BuildVersionInfo.appVersionInfo.map(_.version).getOrElse(UploadDefaults.versionDefault)
   }
 
   def exportConfigJson(config: ConfigJsonExporterConfig)(implicit hadoopConf: Configuration): String = {

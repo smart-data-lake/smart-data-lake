@@ -18,28 +18,28 @@
  */
 package io.smartdatalake.workflow.action
 
-import java.nio.file.{Files, Path => NioPath}
-import java.time.LocalDateTime
-import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
-class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
+import java.nio.file.{Files, Path => NioPath}
+
+class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -62,9 +62,9 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Hive"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None, primaryKey = Some(Seq("line")))
-    val targetDO = HiveTableDataObject(id="target", Some(tempPath+s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
+    val targetDO = HiveTableDataObject(id = "target", Some(tempPath + s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
     targetDO.dropTable
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
@@ -77,7 +77,7 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(expected)
+    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(expected)
     assert(resultat)
   }
 
@@ -86,9 +86,9 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val feed = "customDf2Hive_dfManyTypes"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfManyTypes].getName)))
+    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfManyTypes].getName)))
     val targetTable = Table(db = Some("default"), name = "custom_dfManyTypes_copy")
-    val targetDO = HiveTableDataObject(id="target", Some(tempPath+s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
+    val targetDO = HiveTableDataObject(id = "target", Some(tempPath + s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
     targetDO.dropTable
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
@@ -107,7 +107,7 @@ class CustomDfToHiveTableTest extends FunSuite with BeforeAndAfter {
       .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
       .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
     val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable_Decimal2IntegralFloat",Seq())(actual)(expected)
+    if (!resultat) printFailedTestResult("Df2HiveTable_Decimal2IntegralFloat", Seq())(actual)(expected)
     assert(resultat)
   }
 

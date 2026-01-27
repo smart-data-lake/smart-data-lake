@@ -19,9 +19,9 @@
 package io.smartdatalake.util.hdfs
 
 import io.smartdatalake.definitions.Environment
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class PartitionLayoutTest extends FunSuite {
+class PartitionLayoutTest extends AnyFunSuite {
 
   test("extracting tokens from partition layout") {
     val delimiter = PartitionLayout.delimiter

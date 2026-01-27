@@ -19,9 +19,9 @@
 
 package io.smartdatalake.meta.dagexporter
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class DagExporterTest extends FunSuite {
+class DagExporterTest extends AnyFunSuite {
 
   test("testMain") {
     val expectedOutput =

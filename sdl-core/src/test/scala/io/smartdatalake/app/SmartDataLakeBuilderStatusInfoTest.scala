@@ -21,33 +21,33 @@ package io.smartdatalake.app
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.webservice.ScalaJWebserviceClient
+import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
 import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
 import org.eclipse.jetty.websocket.client.WebSocketClient
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.Future
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success}
 
 /**
  * This tests use configuration test/resources/configstatusinfo/application.conf
  */
-class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
+class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
-  val sdlb = DefaultSmartDataLakeBuilder
+  private val sdlb = DefaultSmartDataLakeBuilder
 
   before {
-    sdlb.instanceRegistry.clear
+    sdlb.instanceRegistry.clear()
   }
 
   // Note that this test produces a StackOverflowError in the Log with JDK11. The test succeeds nevertheless. Details see below.
@@ -68,7 +68,7 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     //Create Client Websocket that tries to establish connection with SDLB Job
     val receivedMessages: ListBuffer[String] = ListBuffer()
     // The socket that receives events
-    class UnitTestSocket() extends WebSocketAdapter with SmartDataLakeLogger {
+    class UnitTestSocket extends WebSocketAdapter with SmartDataLakeLogger {
       override def onWebSocketConnect(sess: Session): Unit = {}
 
       override def onWebSocketText(message: String): Unit = {
@@ -80,15 +80,13 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
       override def onWebSocketError(cause: Throwable): Unit = {}
     }
     val client = new WebSocketClient
-    val uri = URI.create("ws://localhost:4440/ws/")
     client.start()
-    val socket = new UnitTestSocket
-    val fut: Future[Session] = client.connect(socket, uri)
-    fut.get
+    val session = client.connect(new UnitTestSocket, URI.create("ws://localhost:4440/ws/")).get
+
 
     //Verify Rest API context endpoint is reachable and returns correct results
     val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
-    val webserviceClientContext = ScalaJWebserviceClient(webserviceDOContext)
+    val webserviceClientContext = SttpWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
       case Failure(exception) =>
         throw exception
@@ -101,9 +99,9 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     //Known Issue: if you run this test with Java 11.0.4, you may see a Stackoverflow error.
     //The problem arises after the second call to the webservice (no matter what the call is)
     // If you encounter it, either: Comment out one of the Calls to the webservice, or use a different JDK version to run the test.
-    val webserviceDOContext2 = WebserviceFileDataObject("dummy2", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
-    val webserviceClientContext2 = ScalaJWebserviceClient(webserviceDOContext2)
-    webserviceClientContext2.get() match {
+    val webserviceDOState = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
+    val webserviceClientState = SttpWebserviceClient(webserviceDOState)
+    webserviceClientState.get() match {
       case Failure(exception) =>
         throw exception
       case Success(value) =>
@@ -112,8 +110,9 @@ class SmartDataLakeBuilderStatusInfoTest extends FunSuite with BeforeAndAfter {
     }
     //Verify a client websocket can connect
     assert(receivedMessages.head.contains("Hello from io.smartdatalake.communication.statusinfo.websocket.StatusInfoSocket"))
+
+    session.close()
+    client.stop()
   }
 }
-
-
 

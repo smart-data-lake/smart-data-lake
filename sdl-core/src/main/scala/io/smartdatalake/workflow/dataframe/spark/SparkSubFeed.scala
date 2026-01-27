@@ -105,8 +105,8 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
       .asInstanceOf[SparkSubFeed]
   }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SparkSubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]))
 }
@@ -263,6 +263,13 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = {
+    (column, dataType) match {
+      case (sparkColumn: SparkColumn, sparkDataType: SparkDataType) => SparkColumn(functions.from_json(sparkColumn.inner, sparkDataType.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
   override def hash(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.hash(sparkColumn.inner))
@@ -356,6 +363,27 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  override def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = {
+    var field = StructField(name, dataType.asInstanceOf[SparkDataType].inner, nullable)
+    comment.foreach(c => field = field.withComment(c))
+    SparkField(field)
+  }
+
+  override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
+    SparkSimpleDataType(DataType.fromJson(s""""$tpe""""))
+  }
+
+  override def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = {
+    SparkStructDataType(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
+  }
+
+  override def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = {
+    SparkArrayDataType(ArrayType(valueTpe.asInstanceOf[SparkDataType].inner))
+  }
+
+  override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
+    SparkMapDataType(MapType(keyTpe.asInstanceOf[SparkDataType].inner, valueTpe.asInstanceOf[SparkDataType].inner))
+  }
 }
 
 trait SparkWhen extends GenericWhen {

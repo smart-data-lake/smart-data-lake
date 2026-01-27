@@ -20,8 +20,8 @@
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil
@@ -68,8 +68,8 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                              , applyPartitionValuesTransform: Boolean = false
                              , selectAdditionalInputExpression: Option[String] = None
                             ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  override val applyConditionsDef = applyCondition.toSeq.map(Condition(_))
-  override val failConditionsDef = failCondition.toSeq.map(Condition(_)) ++ failConditions
+  override val applyConditionsDef: Seq[Condition] = applyCondition.toSeq.map(Condition(_))
+  override val failConditionsDef: Seq[Condition] = failCondition.toSeq.map(Condition(_)) ++ failConditions
 
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 
@@ -86,8 +86,8 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
   }
 
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
-                                            , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
-                                           (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+                     , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
+                    (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     val doApply = evaluateApplyConditions(actionId, subFeed)
       .getOrElse(subFeed.partitionValues.isEmpty) // default is to apply PartitionDiffMode if no partition values are given
     if (doApply) {
@@ -159,7 +159,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               //return
               val inputPartitionLog = if (selectedInputPartitionValues != selectedOutputPartitionValues) s" by using input partitions ${selectedInputPartitionValues.mkString(", ")}" else ""
               logger.info(s"($actionId) PartitionDiffMode selected output partition values ${selectedOutputPartitionValues.mkString(", ")} to process$inputPartitionLog.")
-              Some(ExecutionModeResult(inputPartitionValues = selectedInputPartitionValues, outputPartitionValues = selectedOutputPartitionValues))
+              Some(ExecutionModeResult(inputPartitionValues = selectedInputPartitionValues, outputPartitionValues = Some(selectedOutputPartitionValues)))
             } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${output.id} has no partition columns defined!")
           } else throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${input.id} has no partition columns defined!")
         case (_: CanHandlePartitions, _) => throw ConfigurationException(s"$actionId has set executionMode = PartitionDiffMode but ${output.id} does not support partitions!")
@@ -167,6 +167,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
       }
     } else None
   }
+
   override def factory: FromConfigFactory[ExecutionMode] = PartitionDiffMode
 }
 
@@ -177,18 +178,19 @@ object PartitionDiffMode extends FromConfigFactory[ExecutionMode] {
 }
 
 /**
- * @param givenPartitionValues partition values received by main input or command line
- * @param inputPartitionValues all partition values existing in main input DataObject
- * @param outputPartitionValues all partition values existing in main output DataObject
- * @param selectedInputPartitionValues input partition values selected by PartitionDiffMode
+ * @param givenPartitionValues          partition values received by main input or command line
+ * @param inputPartitionValues          all partition values existing in main input DataObject
+ * @param outputPartitionValues         all partition values existing in main output DataObject
+ * @param selectedInputPartitionValues  input partition values selected by PartitionDiffMode
  * @param selectedOutputPartitionValues output partition values selected by PartitionDiffMode
  */
 case class PartitionDiffModeExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
                                            , runStartTime: Timestamp, attemptStartTime: Timestamp
-                                           , givenPartitionValues: Seq[Map[String,String]], inputPartitionValues: Seq[Map[String,String]], outputPartitionValues: Seq[Map[String,String]]
-                                           , selectedInputPartitionValues: Seq[Map[String,String]], selectedOutputPartitionValues: Seq[Map[String,String]]) {
+                                           , givenPartitionValues: Seq[Map[String, String]], inputPartitionValues: Seq[Map[String, String]], outputPartitionValues: Seq[Map[String, String]]
+                                           , selectedInputPartitionValues: Seq[Map[String, String]], selectedOutputPartitionValues: Seq[Map[String, String]]) {
   override def toString: String = ProductUtil.formatObj(this)
 }
+
 object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
     PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)

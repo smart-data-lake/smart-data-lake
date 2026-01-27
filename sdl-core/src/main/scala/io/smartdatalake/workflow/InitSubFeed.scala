@@ -23,14 +23,14 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import sun.reflect.generics.reflectiveObjects.NotImplementedException
+import org.apache.commons.lang3.NotImplementedException
 
 /**
  * An InitSubFeed is used to initialize first Nodes of a [[DAG]].
  *
- * @param dataObjectId id of the DataObject this SubFeed corresponds to
+ * @param dataObjectId    id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
- * @param isSkipped true if this subfeed is the result of a skipped action
+ * @param isSkipped       true if this subfeed is the result of a skipped action
  */
 case class InitSubFeed(override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
@@ -39,13 +39,16 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
                       )
   extends SubFeed {
   override def isDAGStart: Boolean = true
+
   override def breakLineage(implicit context: ActionPipelineContext): InitSubFeed = this
+
   override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): InitSubFeed = {
     if (breakLineageOnChange && partitionValues.nonEmpty) {
       logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearPartitionValues")
       this.copy(partitionValues = Seq()).breakLineage
     } else this.copy(partitionValues = Seq())
   }
+
   override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): InitSubFeed = {
     val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
     if (breakLineageOnChange && partitionValues != updatedPartitionValues) {
@@ -53,14 +56,18 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
       this.copy(partitionValues = updatedPartitionValues).breakLineage
     } else this.copy(partitionValues = updatedPartitionValues)
   }
+
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
+
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped)
   }
+
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
   }
-  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false)
   }
 }

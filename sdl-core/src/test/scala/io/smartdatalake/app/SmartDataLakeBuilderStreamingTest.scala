@@ -33,18 +33,20 @@ import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQueryException, StreamingQueryListener}
 import org.apache.spark.sql.types.StructType
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogger with BeforeAndAfter {
+class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLogger with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
@@ -54,7 +56,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
   val checkpointPath = "target/streamingCheckpointTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
-  val sdlb = DefaultSmartDataLakeBuilder
+  private val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
   before {
@@ -74,55 +76,56 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val appName = "sdlb-normal"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    HdfsUtil.deleteFiles(new Path(statePath), doWarn = false)
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "ap_input")
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), partitions = Seq("dt","type"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), partitions = Seq("dt", "type"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
+    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject( "tgt1", Some(tempPath+s"/${tgt1Table.fullName}"), partitions = Seq("dt","type"), table = tgt1Table, numInitialHdfsPartitions = 1)
+    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
 
     // fill src table with first partition
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // start streaming dag run
     // use only first partition col (dt) for partition diff mode
-    val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1)
 
     // create state listener to control execution
     val stateListener = new StateListener with SmartDataLakeLogger {
       private var dfWritten = false
-      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
+
+      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
         // check results after runId=1
-        if (state.isFinal && state.runId==1) {
+        if (state.isFinal && state.runId == 1) {
           // check results
           assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101"))
           assert(tgt1DO.getSparkDataFrame(Seq()).select($"lastname").as[String].collect().toSeq == Seq("doe"))
         }
         // add additional source partition in runId=2 for runId=3
-        if (state.isFinal && state.runId==2 && !dfWritten) {
+        if (state.isFinal && state.runId == 2 && !dfWritten) {
           dfWritten = true
           // add some more data
           logger.info("adding more data")
-          val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
+          val dfSrc2 = Seq(("20180102", "company", "olmo", "-", 10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
           srcDO.writeSparkDataFrame(dfSrc2, Seq())
         }
         // stop after runId=3
-        if (state.isFinal && state.runId>=3) {
+        if (state.isFinal && state.runId >= 3) {
           Environment.stopStreamingGracefully = true
         }
       }
@@ -136,8 +139,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment._additionalStateListeners = Seq()
 
     // check data after streaming is terminated
-    assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101","20180102"))
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101", "20180102"))
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
 
     // check state after streaming is terminated
     {
@@ -147,7 +150,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       assert(runState.runId >= 3)
       assert(runState.attemptId == 1)
       val resultActionsState = runState.actionsState.mapValues(_.state).toMap
-      val expectedActionsState = Map((action1.id , RuntimeEventState.SKIPPED))
+      val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues.isEmpty)
     }
@@ -162,39 +165,42 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partitions columns dt and type
-    val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
-                                 , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
+    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
+      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
 
     // fill src with first files
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare streaming action
-    val action1 = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1)
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
-      private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
+      private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
+
       override def onQueryIdle(event: StreamingQueryListener.QueryIdleEvent): Unit = {
         // Behaviour changed with Spark 3.5: no more progress if no data, but onQueryIdle is fired
         // stop streaming query
         logger.info("stopping streaming query after idle")
         session.streams.active.find(_.runId == event.runId).get.stop()
       }
+
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
+
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -215,6 +221,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
+
       override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
@@ -227,8 +234,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
 
     // check data after streaming is terminated
-    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Seq("20180101","20190101").toSet)
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Seq("20180101", "20190101").toSet)
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
 
     val action1InfoSdl1 = action1.getRuntimeInfo(Some(SDLExecutionId(1))).get
     assert(action1InfoSdl1.state == RuntimeEventState.SUCCEEDED) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
@@ -250,7 +257,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
       // only one SDL run executed (streaming action is asynchronous)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId,s.state)).toMap
+      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId, s.state)).toMap
       val expectedActionsState = Map((action1.id, (SDLExecutionId(1), RuntimeEventState.SUCCEEDED))) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
       assert(resultActionsState == expectedActionsState)
       assert(getFirstMetrics(runState.actionsState(action1.id))("records_written") == 1)
@@ -266,40 +273,42 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
-    val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
+    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
-    val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
+    val tgt2DO = CsvFileDataObject("tgt2", tempPath + "/tgt2", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
-    val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+    val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
-    val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+    val actionB = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
     instanceRegistry.register(Seq(actionA, actionB))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
-      private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
+      private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
+
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
+
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -312,7 +321,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
                 srcDO.writeSparkDataFrame(dfSrc2, Seq())
-              case x if x>0 && event.progress.numInputRows > 0 =>
+              case x if x > 0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
@@ -320,6 +329,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
+
       override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
@@ -332,8 +342,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
 
     // check data after streaming is terminated
-    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
-    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
   }
 
   test("sdlb streaming recovery, synchronous action failing before asynchronously streaming action") {
@@ -345,54 +355,56 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
-    val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
+    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
-    val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
+    val tgt2DO = CsvFileDataObject("tgt2", tempPath + "/tgt2", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
-    val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+    val actionAFail = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[RuntimeFailTransformer].getName)))
-    val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+    val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
-    val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+    val actionB = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
-      private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
+      private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
+
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
+
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
           case actionRegex(actionId) =>
             event.progress.batchId match {
-              case 0 if !dfWritten=>
+              case 0 if !dfWritten =>
                 dfWritten = true
                 // add some more data
                 logger.info("adding more data")
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
                 srcDO.writeSparkDataFrame(dfSrc2, Seq())
-              case x if x>0 && event.progress.numInputRows > 0 =>
+              case x if x > 0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
@@ -400,6 +412,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
+
       override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
@@ -423,8 +436,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
 
     // check data after streaming is terminated
-    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
-    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
   }
 
   test("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
@@ -433,42 +446,44 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     val appName = "sdlb-streaming4"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
+    HdfsUtil.deleteFiles(new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
-    val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
+    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
-    val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
+    val tgt2DO = CsvFileDataObject("tgt2", tempPath + "/tgt2", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
-    val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+    val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
-    val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+    val actionB = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
-      private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
+      private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
+
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
+
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -484,6 +499,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
+
       override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
@@ -506,35 +522,35 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
-    val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
+    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
-    val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
+    val tgt2DO = CsvFileDataObject("tgt2", tempPath + "/tgt2", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare streaming action
-    val actionAFail = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+    val actionAFail = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , transformers = Seq(ScalaClassSparkDfTransformer(className = classOf[RuntimeFailTransformer].getName)))
-    val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+    val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare partition diff action
-    val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+    val actionB = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // start run failing actionA
     instanceRegistry.register(Seq(actionAFail, actionB))
@@ -547,19 +563,20 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     // create state listener for controlling execution
     val stateListener: StateListener with SmartDataLakeLogger = new StateListener with SmartDataLakeLogger {
       var dfSrc2Written = false
-      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
+
+      override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
         assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
         logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
         // add additional source partition for runId=2
-        if (state.isFinal && state.runId==2 && !dfSrc2Written) {
+        if (state.isFinal && state.runId == 2 && !dfSrc2Written) {
           dfSrc2Written = true
           logger.info("adding more data")
-          val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
+          val dfSrc2 = Seq(("20180102", "company", "olmo", "-", 10)) // second partition 20190101
             .toDF("dt", "type", "lastname", "firstname", "rating")
           srcDO.writeSparkDataFrame(dfSrc2, Seq())
         }
         // stop after runId=3
-        if (state.isFinal && state.runId>=3) {
+        if (state.isFinal && state.runId >= 3) {
           Environment.stopStreamingGracefully = true
         }
       }
@@ -579,8 +596,8 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment._additionalStateListeners = Seq()
 
     // check data after streaming is terminated
-    assert(tgt2DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20180102"))
-    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6,11)) // +1 because of udfAddX
+    assert(tgt2DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102"))
+    assert(tgt2DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
   }
 
   test("sdlb streaming restart, synchronous action skipped before asynchronously streaming action") {
@@ -591,40 +608,42 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     HdfsUtil.deleteFiles(new Path(statePath), false)
-    HdfsUtil.deleteFiles(new Path(checkpointPath), false)
-    implicit val actionPipelineContext : ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    HdfsUtil.deleteFiles(new Path(checkpointPath), doWarn = false)
+    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
-    val srcDO = CsvFileDataObject( "src1", tempPath+"/src1", partitions = Seq("dt","type")
+    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject( "tgt1", tempPath+"/tgt1", partitions = Seq("dt","type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
     // second table has partitions columns dt and type (same as source)
-    val tgt2DO = CsvFileDataObject( "tgt2", tempPath+"/tgt2", partitions = Seq("dt","type")
+    val tgt2DO = CsvFileDataObject("tgt2", tempPath + "/tgt2", partitions = Seq("dt", "type")
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt2DO)
 
     // fill src with first files
-    val dfSrc1 = Seq(("20180101", "person", "doe","john",5)) // first partition 20180101
+    val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, Seq())
 
     // prepare partition diff action
-    val actionA = CopyAction( "a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, rating from src1")))
+    val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     // prepare streaming action
-    val actionB = CopyAction( "b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1")))
+    val actionB = CopyAction("b", tgt1DO.id, tgt2DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from tgt1"))))
 
     // streaming event listener will add data and stop streaming after 3 micro-batches
     val testStreamingQueryListener: StreamingQueryListener = new StreamingQueryListener {
       var dfSrc2Written = false
-      private val actionRegex = (s"Action~(${SdlConfigObject.idRegexStr})").r.unanchored
+      private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
+
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
+
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
@@ -637,7 +656,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
                 val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
                   .toDF("dt", "type", "lastname", "firstname", "rating")
                 srcDO.writeSparkDataFrame(dfSrc2, Seq())
-              case x if x>0 && event.progress.numInputRows > 0 =>
+              case x if x > 0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
                 logger.info("stopping streaming gracefully")
                 Environment.stopStreamingGracefully = true
@@ -645,6 +664,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
             }
         }
       }
+
       override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
     }
     session.streams.addListener(testStreamingQueryListener)
@@ -658,7 +678,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     Environment.stopStreamingGracefully = false
 
     // check data after streaming is terminated
-    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101","20190101"))
+    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
 
     // restart run
     val currentRunId = actionA.runtimeData.currentExecutionId.get.asInstanceOf[SDLExecutionId].runId
@@ -666,7 +686,7 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
     actionA.reset
     actionB.reset
     // this listener adds more data after first skipped run
-    Environment._additionalStateListeners = Seq(new PartitionStreamingTestStateListener2(currentRunId+1))
+    Environment._additionalStateListeners = Seq(new PartitionStreamingTestStateListener2(currentRunId + 1))
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
@@ -681,25 +701,28 @@ class SmartDataLakeBuilderStreamingTest extends FunSuite with SmartDataLakeLogge
 
 /**
  * Add more data after given runId
+ *
  * @param nextRunId
  */
 class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateListener with SmartDataLakeLogger {
   var srcDO: CsvFileDataObject = _
   private var dfWritten = false
+
   override def init(context: ActionPipelineContext): Unit = {
     srcDO = Environment.instanceRegistry.get[CsvFileDataObject](DataObjectId("src1"))
   }
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
-    implicit val _context = context
-    implicit val _sparkSession = context.sparkSession
+
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
+    implicit val _context: ActionPipelineContext = context
+    implicit val _sparkSession: SparkSession = context.sparkSession
     import _sparkSession.implicits._
     assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
     logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")
     // add additional source partition after runIdToAddData
-    if (state.isFinal && state.runId==runIdToAddData && !dfWritten) {
+    if (state.isFinal && state.runId == runIdToAddData && !dfWritten) {
       dfWritten = true
       logger.info("adding more data")
-      val dfSrc2 = Seq(("20180102", "company", "olmo","-",10)) // second partition 20190101
+      val dfSrc2 = Seq(("20180102", "company", "olmo", "-", 10)) // second partition 20190101
         .toDF("dt", "type", "lastname", "firstname", "rating")
       srcDO.writeSparkDataFrame(dfSrc2, Seq())
     }

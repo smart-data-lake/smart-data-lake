@@ -19,9 +19,9 @@
 
 package io.smartdatalake.workflow.action.script
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class CmdScriptTest extends FunSuite {
+class CmdScriptTest extends AnyFunSuite {
 
   test("split cmd with quotes") {
     val actual = CmdScript.splitCmdParameters("""my test "is splitted" correctly 'or not' """)

@@ -142,10 +142,20 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
   def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = throw new NotImplementedError(s"getEmptyStreamingDataFrame is not implemented for ${subFeedType.typeSymbol.name}")
   def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed
   def createSchema(fields: Seq[GenericField]): GenericSchema
+
+  def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField
+
+  def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType
+
+  def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType
+
+  def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType
+
+  def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType
 }
 
 object DataFrameSubFeed {
-  private[smartdatalake] def getCompanion(tpe: Type): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](tpe)
+  def getCompanion(tpe: Type): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](tpe)
   private[smartdatalake] def getCompanion(fullTpeName: String): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](fullTpeName)
 
   /**

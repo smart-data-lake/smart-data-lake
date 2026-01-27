@@ -31,9 +31,8 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.executionMode.KafkaStateIncrementalMode
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.StructType
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
-
-import java.nio.file.Files
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
 
 /**
  * Note about EmbeddedKafka compatibility:
@@ -42,8 +41,9 @@ import java.nio.file.Files
  * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
-class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with SmartDataLakeLogger {
+class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with SmartDataLakeLogger {
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -65,7 +65,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     val feed = "actionpipeline"
     val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
     instanceRegistry.register(kafkaConnection)
-    val srcDO = MockDataObject( "src1").register
+    val srcDO = MockDataObject("src1").register
     createCustomTopic("topic1", Map(), 1, 1)
     val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"))
     instanceRegistry.register(tgt1DO)
@@ -87,7 +87,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
 
     // check result
     val dfR1 = tgt2DO.getSparkDataFrame(Seq())
-    assert(dfR1.columns.toSet == Set("value","timestamp"))
+    assert(dfR1.columns.toSet == Set("value", "timestamp"))
     val r1 = dfR1
       .select($"value")
       .as[String].collect().toSeq
@@ -117,7 +117,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     instanceRegistry.register(tgt2DO)
 
     // prepare DAG
-    val df1 = Seq(("r1",TestPerson("doe", "john", 5))).toDF("key", "value")
+    val df1 = Seq(("r1", TestPerson("doe", "john", 5))).toDF("key", "value")
     srcDO.writeSparkDataFrame(df1, Seq())
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(KafkaStateIncrementalMode()))
@@ -206,7 +206,7 @@ class ActionDAGKafkaTest extends FunSuite with BeforeAndAfterAll with BeforeAndA
     // second dag run
     {
       val delaySecs = 1
-      Thread.sleep(delaySecs*1000 + 1000) // make sure to wait some time
+      Thread.sleep(delaySecs * 1000 + 1000) // make sure to wait some time
       val action1Delay1s = action1Delay10s.copy(
         executionMode = Some(KafkaStateIncrementalMode(delayedMaxTimestampExpr = Some(s"timestamp_seconds(unix_seconds(now()) - $delaySecs)"))))
       val dag: ActionDAGRun = ActionDAGRun(Seq(action1Delay1s))

@@ -26,7 +26,8 @@ import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.time.Duration
 
@@ -34,9 +35,10 @@ import java.time.Duration
  * Unit tests for historization
  *
  */
-class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   private implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)

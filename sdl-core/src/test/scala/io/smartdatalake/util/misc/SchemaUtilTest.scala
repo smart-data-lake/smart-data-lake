@@ -20,15 +20,15 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType}
-import org.scalatest.FunSuite
-import org.scalatest.Matchers.{a, be}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers.{a, be}
 import org.apache.spark.sql.types._
-
 
 import java.nio.file.Files
 
-class SchemaUtilTest extends FunSuite {
+class SchemaUtilTest extends AnyFunSuite {
 
   private val tempDir = Files.createTempDirectory("schema-util-test")
 
@@ -202,6 +202,105 @@ class SchemaUtilTest extends FunSuite {
       "person.name" -> "Full name"
     )
     assert(missingColumnsAndComments == expected)
+  }
+
+  test("Simple schema diff test with primitive types") {
+    val schemaL = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("created_at", TimestampType, nullable = false),
+      StructField("is_active", BooleanType, nullable = false),
+      StructField("name", StringType, nullable = false).withComment("ExtraField"),
+      StructField("address", StringType, nullable = false).withComment("ExtraField")
+    ))
+    val schemaR = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("created_at", TimestampType, nullable = false),
+      StructField("is_active", BooleanType, nullable = false),
+    ))
+    val diff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaR).fields)
+    val emptyDiff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaR).fields, SparkSchema(schemaL).fields)
+    assert(diff.forall(_.comment.get == "ExtraField") && diff.size == 2 && emptyDiff.isEmpty)
+  }
+
+  test("Schema diff: Nullability is checked") {
+    val schemaL = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("created_at", TimestampType, nullable = true).withComment("ExtraField"),
+      StructField("is_active", BooleanType, nullable = true).withComment("ExtraField"),
+      StructField("name", StringType, nullable = false).withComment("ExtraField"),
+      StructField("address", StringType, nullable = false).withComment("ExtraField")
+    ))
+    val schemaR = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("created_at", TimestampType, nullable = false),
+      StructField("is_active", BooleanType, nullable = false),
+    ))
+    val diff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaR).fields)
+    assert(diff.forall(_.comment.get == "ExtraField") && diff.size == 4)
+  }
+
+  test("Schema diff: Test case sensitivity") {
+    val schemaL = StructType(Seq(
+      StructField("ID", IntegerType, nullable = false).withComment("ExtraField"),
+      StructField("CREATED_AT", TimestampType, nullable = false).withComment("ExtraField"),
+      StructField("is_active", BooleanType, nullable = false),
+      StructField("name", StringType, nullable = false).withComment("ExtraField"),
+      StructField("address", StringType, nullable = false).withComment("ExtraField")
+    ))
+    val schemaR = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("created_at", TimestampType, nullable = false),
+      StructField("is_active", BooleanType, nullable = false),
+    ))
+    val diff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaR).fields, caseSensitive = true)
+    assert(diff.forall(_.comment.get == "ExtraField") && diff.size == 4)
+  }
+
+  test("Schema diff: Nested Structs") {
+    val subschemaL = StructType(Seq(
+      StructField("name", StringType),
+      StructField("age", IntegerType).withComment("ExtraFieldNested")))
+    val schemaL = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("person",subschemaL).withComment("ExtraField"),
+      StructField("created_at", TimestampType),
+      StructField("is_active", BooleanType).withComment("ExtraField")
+    ))
+
+    val subschemaR = StructType(Seq(
+      StructField("name", StringType)))
+    val schemaR = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("person", subschemaR),
+      StructField("created_at", TimestampType)
+    ))
+
+    val diff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaR).fields)
+    val emptyDiff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaL).fields)
+    assert(diff.forall(_.comment.get == "ExtraField") && diff.size == 2 && emptyDiff.isEmpty)
+  }
+
+  test("Schema diff: Structs nested in Arrays should show the same behaviour as nested structs (without arrays)") {
+    val subschemaL = StructType(Seq(
+      StructField("name", StringType),
+      StructField("age", IntegerType).withComment("ExtraFieldNested")))
+    val schemaL = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("person", ArrayType(subschemaL)).withComment("ExtraField"),
+      StructField("created_at", TimestampType),
+      StructField("is_active", BooleanType).withComment("ExtraField")))
+
+    val subschemaR = StructType(Seq(
+      StructField("name", StringType)))
+    val schemaR = StructType(Seq(
+      StructField("id", IntegerType),
+      StructField("person", ArrayType(subschemaR)),
+      StructField("created_at", TimestampType)
+    ))
+
+    val diff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaR).fields)
+    val emptyDiff = SchemaUtil.deepPartialMatchDiffFields(SparkSchema(schemaL).fields, SparkSchema(schemaL).fields)
+    assert(diff.forall(_.comment.get == "ExtraField") && diff.size == 2 && emptyDiff.isEmpty)
   }
 
 }

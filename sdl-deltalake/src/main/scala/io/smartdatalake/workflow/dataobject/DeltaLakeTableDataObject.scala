@@ -25,11 +25,10 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.SparkStageMetricsListener
-import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.util.misc.{AclDef, AclUtil, PerformanceUtils, ProductUtil, SchemaUtil}
+import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
 import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -45,8 +44,9 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
-import java.sql.SQLException
 
+import java.sql.{SQLException, Timestamp}
+import java.time.{Duration, LocalDateTime}
 import scala.util.Try
 
 /**
@@ -88,12 +88,15 @@ import scala.util.Try
  * @param postWriteSql SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
  *                   explicitly defined, the ones present in the configured "table" object are used.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
- * @param saveMode [[SDLSaveMode]] to use when writing files, default is "overwrite". Overwrite, Append and Merge are supported for now.
+ * @param saveMode     [[SDLSaveMode]] to use when writing files, default is "Overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param updateColumnComments If set to false, the column comments (read from the provided schema) will only be updated for newly created columns.
  *                             If set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in
  *                             a lower performance since a column comparison is needed. Defaults to "false".
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
+ * @param minVacuumInterval Optional String to determine the minimum time interval between two vacuum operations. If the parameter is set,
+ *                          SDLB will look at the last vacuum-execution time in the table and compare it to the current time. If the parameter is not set or if a vacuum has never happened, it will vacuum the table.
+ *                          The interval must be provided as a String in ISO 8601 Duration format (e.g. "P4DT12H" for "four days and twelve hours")
  * @param acl override connection permissions for files created tables hadoop directory with this connection
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
@@ -101,7 +104,8 @@ import scala.util.Try
  * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
- * @param metadata meta data
+ * @param metadata meta data of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
+ *                  attributes are required as the pipeline will try to add the description to the catalog.
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
@@ -119,6 +123,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val allowSchemaEvolution: Boolean = false,
                                     updateColumnComments: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
+                                    minVacuumInterval: Option[String] = None,
                                     acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
@@ -130,7 +135,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
    */
-  private val connection = connectionId.map(c => getConnection[DeltaLakeTableConnection](c))
+  val connection: Option[DeltaLakeTableConnection] = connectionId.map(c => getConnection[DeltaLakeTableConnection](c))
 
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
@@ -183,6 +188,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
     require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
+    metadata.flatMap(_.description).foreach(_ => {
+      require(table.db.isDefined && table.catalog.isDefined,
+        "Since the attribute metadata.description is set, you must also define a " +
+          "table.db and a table.catalog in order to add a the tableComment" +
+          "to the catalog")
+    })
     // initialize external table if needed
     if (path.isDefined) { // if path is not defined, it is handled as managed table.
       if (!isTableExisting) {
@@ -297,7 +308,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     super.postWrite(partitionValues)
     if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
     metadata.flatMap(_.description).foreach {addTableComment}
-
   }
 
 
@@ -472,12 +482,26 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   def vacuum(implicit context: ActionPipelineContext): Unit = {
-    retentionPeriod.foreach { period =>
-      val (_, d) = PerformanceUtils.measureDuration {
-        DeltaTable.forPath(context.sparkSession, hadoopPath.toString).vacuum(period)
-      }
-      logger.info(s"($id) vacuum took $d")
+
+    val session = context.sparkSession
+
+    def intervalHasPassed(lastExecution: Timestamp): Boolean = {
+      val timePassed = Duration.between(lastExecution.toLocalDateTime, LocalDateTime.now)
+      timePassed.compareTo(Duration.parse(minVacuumInterval.get)) > 0 //the time passed is greater than the set minInterval
     }
+
+    lazy val lastVacuum = deltaTable(session).history.filter(col("operation").contains("VACUUM END")).select(max("timestamp")).collect
+
+    //execute vacuum if either no interval is set, there has never been a vacuum operation, or the set interval has passed
+    if (minVacuumInterval.isEmpty || lastVacuum.isEmpty || intervalHasPassed(lastVacuum(0).getTimestamp(0))) {
+      retentionPeriod.foreach { period =>
+        val (_, d) = PerformanceUtils.measureDuration {
+          DeltaTable.forPath(session, hadoopPath.toString).vacuum(period)
+        }
+        logger.info(s"($id) vacuum took $d")
+      }
+    }
+
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
@@ -503,7 +527,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   protected def checkFilesExisting(implicit context: ActionPipelineContext): Boolean = {
     val hasFiles = filesystem.exists(hadoopPath.getParent) &&
-      RemoteIteratorWrapper(filesystem.listFiles(hadoopPath, true)).exists(_.getPath.getName.endsWith(filetype))
+      HdfsUtil.listFiles(hadoopPath, recursive = true, filterFun = s => s.isDirectory || s.getPath.getName.endsWith(filetype))(filesystem).nonEmpty
     if (!hasFiles) {
       logger.warn(s"($id) No files found at $hadoopPath. Can not import any data.")
       require(!failIfFilesMissing, s"($id) failIfFilesMissing is enabled and no files to process have been found in $hadoopPath.")

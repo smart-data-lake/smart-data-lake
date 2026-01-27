@@ -25,7 +25,7 @@ import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitSubFeed, SubFeed}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.TimestampType
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
 
 import java.sql.Timestamp
 import java.time.LocalDateTime
@@ -39,23 +39,23 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Removes all columns from a [[DataFrame]] except those specified in whitelist.
    *
-   * @param df [[DataFrame]] to be filtered
+   * @param df              [[DataFrame]] to be filtered
    * @param columnWhitelist columns to keep
    * @return [[DataFrame]] with all columns removed except those specified in whitelist
    */
   def filterWhitelist(columnWhitelist: Seq[String])(df: DataFrame): DataFrame = {
-    df.select(df.columns.filter(colName => columnWhitelist.contains(colName.toLowerCase)).map(col) :_*)
+    df.select(df.columns.filter(colName => columnWhitelist.contains(colName.toLowerCase)).map(col): _*)
   }
 
   /**
    * Remove all columns in blacklist from a [[DataFrame]].
    *
-   * @param df [[DataFrame]] to be filtered
+   * @param df              [[DataFrame]] to be filtered
    * @param columnBlacklist columns to remove
    * @return [[DataFrame]] with all columns in blacklist removed
    */
   def filterBlacklist(columnBlacklist: Seq[String])(df: DataFrame): DataFrame = {
-    df.select(df.columns.filter(colName => !columnBlacklist.contains(colName.toLowerCase)).map(col) :_*)
+    df.select(df.columns.filter(colName => !columnBlacklist.contains(colName.toLowerCase)).map(col): _*)
   }
 
   /**
@@ -72,8 +72,8 @@ object ActionHelper extends SmartDataLakeLogger {
    * Check plausibility of latest timestamp of a [[DataFrame]] vs. a given timestamp.
    * Throws exception if not successful.
    *
-   * @param timestamp to compare with
-   * @param df [[DataFrame]] to compare with
+   * @param timestamp    to compare with
+   * @param df           [[DataFrame]] to compare with
    * @param tstmpColName the timestamp column of the dataframe
    */
   def checkDataFrameNotNewerThan(timestamp: Timestamp, df: GenericDataFrame, tstmpColName: String): Unit = {
@@ -113,11 +113,12 @@ object ActionHelper extends SmartDataLakeLogger {
     else None
   }
 
-  def getOptionalDataFrame(input: CanCreateDataFrame, partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext) : Option[GenericDataFrame] = try {
+  def getOptionalDataFrame(input: CanCreateDataFrame, partitionValues: Seq[PartitionValues], subFeedType: Type)
+                          (implicit context: ActionPipelineContext): Option[GenericDataFrame] = try {
     Some(input.getDataFrame(partitionValues, subFeedType))
   } catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
-    case e: AnalysisException if e.getMessage.contains("[TABLE_OR_VIEW_NOT_FOUND]") => None
+    case e: AnalysisException if e.getMessage().contains("[TABLE_OR_VIEW_NOT_FOUND]") || e.getMessage().contains("[UNABLE_TO_INFER_SCHEMA]") => None
     case _: NoDataToProcessWarning => None
   }
 
@@ -125,7 +126,7 @@ object ActionHelper extends SmartDataLakeLogger {
    * Replace all special characters in a String with underscore
    * Used to get valid temp view names
    */
-  def replaceSpecialCharactersWithUnderscore(str: String) : String = {
+  def replaceSpecialCharactersWithUnderscore(str: String): String = {
     val invalidCharacters = "[^a-zA-Z0-9_]".r
     invalidCharacters.replaceAllIn(str, "_")
   }
@@ -133,14 +134,15 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * Create a valid temporary view name for SQL transformation.
    * Apart from replacing special characters, a postfix is added to make the name unique in case the input name is also an existing table.
+   *
    * @param inputName name of the input the temporary view should be created for
    */
-  def createTemporaryViewName(inputName: String) : String = {
+  def createTemporaryViewName(inputName: String): String = {
     replaceSpecialCharactersWithUnderscore(inputName) + TEMP_VIEW_POSTFIX
   }
 
   def replaceLegacyViewName(sql: String, inputViewName: String): String = {
-    sql.replaceAll("\\s"+inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX)+"(\\s|\\.|$)", s" $inputViewName" + "$1")
+    sql.replaceAll("\\s" + inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX) + "(\\s|\\.|$)", s" $inputViewName" + "$1")
   }
 
   def createSkippedSubFeed(output: DataObject): SubFeed = {

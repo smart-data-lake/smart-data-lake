@@ -24,12 +24,12 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, S
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataType}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class NestedColumnUtilTest extends FunSuite {
+class NestedColumnUtilTest extends AnyFunSuite {
 
   implicit val spark = session
   import spark.implicits._

@@ -19,7 +19,17 @@
 
 package io.smartdatalake.workflow.connection.authMode
 
+import com.typesafe.config.Config
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, parseUrl}
+import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig, OAuth2Response, OAuth2Service}
+import org.json4s.jackson.JsonMethods.parse
+import org.json4s.jackson.Serialization
+import org.json4s.{Formats, NoTypeHints}
+import sttp.client3.basicRequest
+import sttp.model.{Header, MediaType}
 
 /**
  * [[OAuthMode]] contains the coordinates and credentials to gain access to the OData DataSource
@@ -28,10 +38,68 @@ import io.smartdatalake.util.secrets.StringOrSecret
  * @param clientId Name of the user (supports secrets providers)
  * @param clientSecret Password of the user (supports secret providers)
  * @param oauthScope OAuth authorization scope (like https://xxx.crm4.dynamics.com/.default) (supports secret providers)
+ * @param useIdToken If true, id_token is used for Http Authorization header, otherwise access_token. Default is false.
+ * @param proxy      optional Proxy configuration used to make HTTP-connection.
+ * @param timeouts   optional configuration of HTTP timeouts
+ * @param followRedirects if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param retries number of retries if http request fails. Default is 1 retry.
  */
 case class OAuthMode (
                        oauthUrl: StringOrSecret,
                        clientId: StringOrSecret,
                        clientSecret: StringOrSecret,
-                       oauthScope: StringOrSecret
-                     )
+                       oauthScope: StringOrSecret,
+                       useIdToken: Boolean = false,
+                       proxy: Option[HttpProxyConfig] = None,
+                       timeouts: Option[HttpTimeoutConfig] = None,
+                       followRedirects: Boolean = false,
+                       retries: Int = 1
+                     ) extends HttpAuthMode with TokenAuth with SmartDataLakeLogger {
+  implicit val formats: Formats = Serialization.formats(NoTypeHints)
+
+  private lazy val oAuth2Service = OAuth2Service(oauthUrl.resolve(), Some(clientId.resolve()), clientCredentialsInit, proxy, timeouts, followRedirects, retries)
+  private val oauthUri = parseUrl(oauthUrl.resolve())
+
+  override def prepare(): Unit = {
+    // initialize oAuth2Service
+    oAuth2Service
+  }
+
+  private def clientCredentialsInit(): OAuth2Response = {
+    logger.info(s"Authenticating using client_credentials flow")
+
+    val payload: Map[String, String] = Map(
+      "grant_type" -> "client_credentials",
+      "client_id" -> clientId.resolve(),
+      "client_secret" -> clientSecret.resolve(),
+      "scope" -> oauthScope.resolve()
+    )
+
+    val request = basicRequest
+      .optionalReadTimeout(timeouts)
+      .post(oauthUri)
+      .header("Content-Type", "application/x-www-form-urlencoded")
+      .header(Header.accept(MediaType.ApplicationJson))
+      .followRedirects(followRedirects)
+      .body(payload) // Map is automatically serialized as "application/x-www-form-urlencoded" by sttp
+
+    parse(oAuth2Service.sendRequest(request, "OAuth initiate")).extract[OAuth2Response]
+  }
+
+  override def getHeaders: Map[String, String] = {
+    Map(oAuth2Service.getToken.getAuthHeader(useIdToken))
+  }
+
+  override def getToken: String = {
+    oAuth2Service.getToken.token(useIdToken)
+  }
+
+  override def factory: FromConfigFactory[HttpAuthMode] = OAuthMode
+}
+
+
+object OAuthMode extends FromConfigFactory[HttpAuthMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): OAuthMode = {
+    extract[OAuthMode](config)
+  }
+}

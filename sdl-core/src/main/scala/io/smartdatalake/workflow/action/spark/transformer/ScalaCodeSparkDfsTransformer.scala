@@ -23,13 +23,14 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.{CustomCodeUtil, FileUtil}
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -46,11 +47,13 @@ import org.apache.spark.sql.DataFrame
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class ScalaCodeSparkDfsTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, code: Option[String] = None, file: Option[String] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer {
+  assert(file.isEmpty || code.isEmpty, s"Only one of `file` or `code` must be defined for ScalaCodeSparkDfsTransformer")
+
   private lazy val fnTransform = {
     implicit val defaultHadoopConf: Configuration = new Configuration()
-    file.map(file => CustomCodeUtil.compileCode[fnTransformType](HdfsUtil.readHadoopFile(file)))
+    file.map(file => CustomCodeUtil.compileCode[fnTransformType](FileUtil.readFromPath(new Path(file))))
       .orElse(code.map(code => CustomCodeUtil.compileCode[fnTransformType](code)))
-      .getOrElse(throw ConfigurationException(s"Either file or code must be defined for ScalaCodeSparkDfsTransformer"))
+      .getOrElse(throw ConfigurationException(s"Either `file` or `code` must be defined for ScalaCodeSparkDfsTransformer"))
   }
   if (!Environment.compileScalaCodeLazy) fnTransform
   override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {

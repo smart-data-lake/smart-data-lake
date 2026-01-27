@@ -25,9 +25,9 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{DataValidationTransformer, RowLevelValidationRule}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class DataValidationTransformerTest extends FunSuite {
+class DataValidationTransformerTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._

@@ -26,14 +26,14 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.SchemaViolationException
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, SQLDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.dataframe.snowflake.SnowparkSubFeed
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
 import org.apache.spark
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.scalatest.Matchers.intercept
+import org.scalatest.matchers.should.Matchers.intercept
 
 
 /**
@@ -58,7 +58,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
   val testDOSchemaMin = testDO.copy(
     schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")))
   )
-  val testDOWithReadTransformer = testDO.copy(readTransformer = Some(SQLDfTransformer(code = s"select cast(id as bigint) id, s1, s2, dt from %{inputViewName}")))
+  val testDOWithReadTransformer = testDO.copy(readTransformer = Some(SQLDfTransformer(code = Some(s"select cast(id as bigint) id, s1, s2, dt from %{inputViewName}"))))
 
   // cleanup
   testDO.dropTable

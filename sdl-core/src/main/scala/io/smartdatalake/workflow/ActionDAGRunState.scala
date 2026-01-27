@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.config.ConfigParser
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{DateUtil, ReflectionUtil, SmartDataLakeLogger}
@@ -116,7 +117,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     {case obj: PartitionValues => JObject(obj.elements.map(e => JField(e._1, decompose(e._2))).toList)}
   ))
 
-  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake.workflow")
+  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
   implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +

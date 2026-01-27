@@ -236,6 +236,10 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
  * A structure to collect runtime event information
  */
 case class RuntimeEvent(tstmp: LocalDateTime, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String], results: Seq[SubFeed])
+
+/**
+ * Enumeration of possible runtime event states
+ */
 private[smartdatalake] object RuntimeEventState extends Enumeration {
   type RuntimeEventState = Value
   val PREPARING, PREPARED, INITIALIZING, INITIALIZED, RUNNING, SUCCEEDED, FAILED, CANCELLED, SKIPPED, PENDING, STREAMING = Value

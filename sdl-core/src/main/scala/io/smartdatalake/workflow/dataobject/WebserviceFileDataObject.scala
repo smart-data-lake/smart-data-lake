@@ -25,17 +25,13 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.SttpUtil.guessMimeType
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import sttp.client3.SttpBackendOptions
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -45,27 +41,6 @@ import scala.util.{Failure, Success, Try}
  */
 case class WebservicePartitionDefinition(name: String, values: Seq[String])
 
-/**
- * Proxy configuration used to make HTTP-connection.
- * @param host proxy host
- * @param port proxy port
- */
-case class HttpProxyConfig(host: String, port: Int, user: Option[StringOrSecret] = None, password: Option[StringOrSecret] = None) extends SttpConfigModifier {
-  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
-    if (user.nonEmpty && password.nonEmpty) options.httpProxy(host, port, user.get.resolve(), password.get.resolve())
-    else options.httpProxy(host, port)
-  }
-}
-
-case class HttpTimeoutConfig(connectionTimeoutMs: Int, readTimeoutMs: Int) extends SttpConfigModifier {
-  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions = {
-    options.connectionTimeout(FiniteDuration(connectionTimeoutMs, TimeUnit.MILLISECONDS))
-  }
-}
-
-trait SttpConfigModifier {
-  def sttpConfig(options: SttpBackendOptions): SttpBackendOptions
-}
 
 /**
  * [[DataObject]] to call webservice and return response as InputStream, or upload data as OutputStream to webservice.
@@ -88,6 +63,7 @@ trait SttpConfigModifier {
  *                    Default method is POST.
  * @param proxy optional Proxy configuration used to make HTTP-connection.
  * @param followRedirects if redirects should be followed when creating HTTP-connection. Default is false because of security concerns.
+ * @param retries         number of retries if http request fails. Default is 0 retries.
  * @param partitionDefs Optional list of partitions and possible partition values.
  *                      Partitions and their values are mapped as query parameter in webservice requests.
  *                      Multiple values are translated into multiple requests. Each request handles one combination of partition values.
@@ -104,6 +80,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
                                     writeMethod: WebserviceMethod = WebserviceMethod.Post,
                                     proxy: Option[HttpProxyConfig] = None,
                                     followRedirects: Boolean = false,
+                                    retries: Int = 0,
                                     partitionDefs: Seq[WebservicePartitionDefinition] = Seq(),
                                     override val partitionLayout: Option[String] = None,
                                     pagingLinkRegex: Option[String] = None,
@@ -135,7 +112,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @return Response as Array[Byte]
    */
   def getResponse(url: String): Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, Some(url))
+    val webserviceClient = SttpWebserviceClient(this, Some(url))
 
     webserviceClient.get() match {
       case Success(c) => c
@@ -153,7 +130,7 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
    * @return Response as Array[Byte]
    */
   def postResponse(body: Array[Byte], query: Option[String] = None): Array[Byte] = {
-    val webserviceClient = ScalaJWebserviceClient(this, query.map(url + _))
+    val webserviceClient = SttpWebserviceClient(this, query.map(url + _))
 
     // Try to extract Mime Type
     // JSON is detected as text/plain, try to parse it as JSON to more precisely define it as

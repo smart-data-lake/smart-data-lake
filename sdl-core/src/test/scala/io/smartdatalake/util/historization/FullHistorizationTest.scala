@@ -29,7 +29,8 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSimpleDat
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.time.Duration
 
@@ -37,9 +38,10 @@ import java.time.Duration
  * Unit tests for historization
  *
  */
-class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
   private implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
@@ -62,14 +64,14 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     //ID 123 has new value and so old record is closed with newcol1=null
-    val dfResultExistingRowNonNull = toHistorizedDf(baseColumnsOldHist.filter(_._1==123), HistorizationPhase.UpdatedOld)
+    val dfResultExistingRowNonNull = toHistorizedDf(baseColumnsOldHist.filter(_._1 == 123), HistorizationPhase.UpdatedOld)
       .withColumn("new_col1", lit(null).cast(SparkSimpleDataType(StringType)))
 
     //ID 123 has new value and so new record is created with newcol1="Test"
-    val dfResultNewRowNonNull = toHistorizedDf(baseColumnsNewFeed.filter(_._1==123), HistorizationPhase.UpdatedNew, colNames :+ "new_col1")
+    val dfResultNewRowNonNull = toHistorizedDf(baseColumnsNewFeed.filter(_._1 == 123), HistorizationPhase.UpdatedNew, colNames :+ "new_col1")
 
     //ID 124 has null new value and so old record is left unchanged but with additional column
-    val dfResultExistingRowNull = toHistorizedDf(baseColumnsOldHist.filter(_._1==124), HistorizationPhase.Existing)
+    val dfResultExistingRowNull = toHistorizedDf(baseColumnsOldHist.filter(_._1 == 124), HistorizationPhase.Existing)
       .withColumn("new_col1", lit(null).cast(SparkSimpleDataType(StringType)))
 
     val dfExpected = dfResultExistingRowNonNull
@@ -296,18 +298,20 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     def rowsEqual(r1: Row, r2: Row): Boolean = {
       r1.hashCode() == r2.hashCode()
     }
-    assert(rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, null, "value"))))
-    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, "value", null)))) // switched field content
-    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, null, "value", "test")))) // additional field
-    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, null, "value", null)))) // additional null field
+
+    assert(rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, null, "value"))))
+    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, "value", null)))) // switched field content
+    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, null, "value", "test")))) // additional field
+    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, null, "value", null)))) // additional null field
 
     def internalRowsEqual(r1: InternalRow, r2: InternalRow): Boolean = {
       r1.hashCode() == r2.hashCode()
     }
-    assert(internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value")))
-    assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, "value", null))) // switched field content
-    assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value", "test"))) // additional field
-    assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value", null))) // additional null field
+
+    assert(internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, null, "value")))
+    assert(!internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, "value", null))) // switched field content
+    assert(!internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, null, "value", "test"))) // additional field
+    assert(!internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, null, "value", null))) // additional null field
   }
 
   test("When timeAxisUnit=0, history with half-open intervals should be created") {

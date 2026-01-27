@@ -20,14 +20,13 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, StateUploader}
-import io.smartdatalake.util.webservice.SttpUtil.getContent
+import io.smartdatalake.util.webservice.SttpUtil.{createDefaultBackendOptions, getContent}
+import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig}
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import io.smartdatalake.workflow.dataobject.{HttpProxyConfig, HttpTimeoutConfig}
-import sttp.client3.{BasicRequestBody, HttpClientSyncBackend, Identity, SttpBackend, SttpBackendOptions, basicRequest}
+import sttp.client3.{BasicRequestBody, HttpClientSyncBackend, Identity, SttpBackend, basicRequest}
 import sttp.model.Uri.PathSegment
 import sttp.model._
 
-import java.sql.Timestamp
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 
@@ -70,6 +69,7 @@ import scala.concurrent.duration.FiniteDuration
  * @param processUpdates optional; if false, only initial & final state is uploaded, otherwise all state updates are uploaded as partial updates.
  *                       Default is processUpdates=true.
  * @param timeouts       configuration of HTTP timeouts. Default is connectionTimeout=500ms, readTimeout=5s.
+ * @param proxy          optional configuration of HTTP proxy to access UI backend.
  */
 case class UIBackendConfig(
                             baseUrl: String,
@@ -83,20 +83,21 @@ case class UIBackendConfig(
                             proxy: Option[HttpProxyConfig] = None
                           ) extends SmartDataLakeLogger {
 
-  private val sttpBackendOptions = Seq(proxy, Some(timeouts)).flatten.foldLeft(SttpBackendOptions.Default) {
-    case (options, config) => config.sttpConfig(options)
-  }
+  private val sttpBackendOptions = createDefaultBackendOptions(proxy, Some(timeouts))
+
   @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend(sttpBackendOptions)
-  private val params = Map("tenant" -> tenant, "repo" -> repo, "env" -> env)
+
+  lazy val client: BackendClient = BackendClient(getUploadService)
 
   def getStateListener: StateListener = {
     authMode.map(_.getHeaders)
     logger.info(s"UI Backend upload initialized. baseUrl=$baseUrl tenant=$tenant repo=$repo env=$env authMode=${authMode.map(_.getClass.getSimpleName)}")
-    new StateUploader(getUploadService, stagePath, processUpdates)
+    new StateUploader(client, stagePath, processUpdates)
   }
 
   def getUploadService: UploadService = {
     new UploadService() {
+      private val params = Map("tenant" -> tenant, "repo" -> repo, "env" -> env)
       override def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
         assert(body.isEmpty || multipartBody.isEmpty, "Only body or multipartBody can be set.")
         logger.debug(s"operation=$operation method=$method params=$params additionalParams=$additionalParams mediaType=$mediaType bodyLength=${body.map(_.length).getOrElse(0)}")
@@ -115,16 +116,10 @@ case class UIBackendConfig(
   }
 }
 
-trait UploadService extends SmartDataLakeLogger {
+trait UploadService {
   def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String]
 
   def send(operation: String, body: Option[String] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
     sendBytes(operation, body = body.map(_.getBytes("UTF-8")), method = method, additionalParams = additionalParams, mediaType = mediaType)
   }
-}
-
-case class FileDescriptor(name: String, mediaType: String, size: Long, lastModified: Timestamp)
-
-private[smartdatalake] object UploadDefaults {
-  val versionDefault = "latest"
 }

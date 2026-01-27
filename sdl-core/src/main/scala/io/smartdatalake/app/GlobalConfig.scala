@@ -24,13 +24,14 @@ import configs.ConfigReader
 import configs.syntax._
 import io.smartdatalake.config.ConfigImplicits
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.ExportWriter
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{LogUtil, MemoryUtils, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.{SecretProviderConfig, SecretsUtil, StringOrSecret}
 import io.smartdatalake.workflow.action.spark.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.dataframe.GenericSchema
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.PrivateAccessor
 
@@ -64,13 +65,20 @@ import org.apache.spark.util.PrivateAccessor
  *                              1) that recursive input DataObjects must also be listed in output DataObjects of the same action
  *                              2) the DataObject must implement TransactionalSparkTableDataObject interface
  *                              Listing a DataObject in allowAsRecursiveInput can be used for well thought exceptions, but should be avoided in general.
- *                              Note that if 1) is true, also 2) must be fullfilled for Spark to work properly (because Spark can't read/write the same storage location in the same job),
+ *                              Note that if 1) is true, also 2) must be fulfilled for Spark to work properly (because Spark can't read/write the same storage location in the same job),
  *                              but there might be cases with recursions with different Actions involved, that dont need to fullfill 2).
  * @param environment    Override environment settings defined in Environment object by setting the corresponding key to the desired value (key in camelcase notation with the first letter in lowercase)
  * @param pluginOptions  Options for SDLPlugin initialization.
  *                       Note that SDLPlugin.startup is executed before SDLB parses the config, and pluginOptions are only available later when calling SDLPlugin.configure method.
  *                       An SDLPlugin is set through Environment.plugin, normally this is configured through the java system property "sdl.pluginClassName".
  * @param uiBackend      Configuration of the UI backend to upload state updates of the Job runs.
+ * @param dataObjectsSchemaSource Optional source URI for DataObjects schemas for development.*
+ * This is used for development on local environment without access to data.
+ * Schemas can be exported on dev/prod environment using the DataObjectSchemaExporter application,
+ * and used on local environment to define DataObject schemas for executing dry-run's.
+ * Source must be a path like `file:./schema` or `uiBackend`.
+ * uiBackend will use global.uiBackend configuration to query UI backend for schemas.
+ * Default: `file:./schema`.
  */
 case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , sparkOptions: Option[Map[String, StringOrSecret]] = None
@@ -88,6 +96,7 @@ case class GlobalConfig(kryoClasses: Option[Seq[String]] = None
                         , environment: Map[String, String] = Map()
                         , pluginOptions: Map[String, StringOrSecret] = Map()
                         , uiBackend: Option[UIBackendConfig] = None
+                        , dataObjectsSchemaSource: Option[String] = None
                        )
 extends SmartDataLakeLogger {
 
@@ -105,8 +114,10 @@ extends SmartDataLakeLogger {
     SecretsUtil.registerProvider(id, providerConfig.provider)
   }
 
-  // configure SDLPlugin
-  Environment.sdlPlugin.foreach(_.configure(pluginOptions))
+  /**
+  pluginOptions are global for all plugins
+   */
+    Environment.sdlPlugins.foreach(_.configure(pluginOptions))
 
   /**
    * Get Hadoop configuration as Spark would see it.
@@ -185,11 +196,10 @@ extends SmartDataLakeLogger {
 
   private[smartdatalake] def registerUdf(session: SparkSession): Unit = {
     sparkUDFs.getOrElse(Map()).foreach { case (name,config) =>
-      val udf = config.getUDF
       // register in SDL spark session
-      session.udf.register(name, udf)
+      config.registerUdf(name, session)
       // register for use in expression evaluation
-      ExpressionEvaluator.registerUdf(name, udf)
+      config.registerUdf(name, Environment.expressionEvaluatorFactory)
     }
     pythonUDFs.getOrElse(Map()).foreach { case (name,config) =>
       // register in SDL spark session
@@ -208,7 +218,26 @@ extends SmartDataLakeLogger {
         m.updated(k, mergedV)
     }
   }
+
+  def getSchemaFromSource(dataObjectId: DataObjectId)(implicit hadoopConf: Configuration): Option[GenericSchema] = {
+    if (dataObjectsSchemaSource.isDefined) {
+      // get schema
+      val connector = ExportWriter.apply(dataObjectsSchemaSource.get, backendClient = uiBackend.map(_.client), hadoopConfig = Some(hadoopConf))
+      connector.readLatestSchema(dataObjectId) match {
+        case Some(content) => try {
+          // parse
+          Some(ExportWriter.parseSchema(content)._1)
+        } catch {
+          case ex: Exception => throw new IllegalStateException(s"Could not parse schema for DataObject '${dataObjectId.id}': ${ex.getMessage}", ex)
+        }
+        case None =>
+          logger.info(s"No schema found for DataObject '${dataObjectId.id}' in source '${dataObjectsSchemaSource.get}'")
+          None
+      }
+    } else None
+  }
 }
+
 object GlobalConfig extends ConfigImplicits {
   private[smartdatalake] def from(config: Config): GlobalConfig = {
     implicit val customStateListenerConfig: ConfigReader[StateListenerConfig] = ConfigReader.derive[StateListenerConfig]

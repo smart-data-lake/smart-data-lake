@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- this artifact contains debezium-connector-mariadb with shaded debezium-ddl-parser antlr4-runtime, as there are version conflicts for antlr4 with spark -->
+    <artifactId>debezium-connector-mariadb-shaded</artifactId>
+    <groupId>io.smartdatalake</groupId>
+    <version>3.1.0.Final</version><!-- this is the debezium version to use -->
+    <packaging>jar</packaging>
+    <name>debezium-connector-mariadb-shaded</name>
+
+    <licenses>
+        <license>
+            <name>GNU General Public License (GPL) version 3</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+        </license>
+    </licenses>
+
+    <description>Shaded jar file for mariadb because of dependency conflicts with Apache Spark.</description>
+    <url>http://www.smartdatalake.io</url>
+    <inceptionYear>2019</inceptionYear>
+    <organization>
+        <name>ELCA Informatique SA</name>
+        <url>https://www.elca.ch</url>
+    </organization>
+
+    <developers>
+        <developer>
+            <name>Smart Data Lake</name>
+            <email>smartdatalake@elca.ch</email>
+            <organization>ELCA Informatik AG</organization>
+            <organizationUrl>http://www.elca.ch</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/smart-data-lake/smart-data-lake.git</connection>
+        <developerConnection>scm:git:ssh://github.com/smart-data-lake/smart-data-lake.git</developerConnection>
+        <url>http://github.com/smart-data-lake/smart-data-lake/tree/master</url>
+    </scm>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.release>8</maven.compiler.release>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>release-sonatype</id>
+            <distributionManagement>
+                <repository>
+                    <id>central</id>
+                    <name>Maven Central Repository</name>
+                    <url>https://repo1.maven.org/maven2</url>
+                </repository>
+            </distributionManagement>
+            <build>
+                <plugins>
+                    <!-- create javadoc -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.3</version>
+                        <executions>
+                            <execution>
+                                <id>attach-docs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- sign artifacts with gpg -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Prevent `gpg` from using pinentry programs -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- deploy to sonatype central -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.8.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-runtime</artifactId>
+                <!-- this is the version needed by debezium 3.1.0.Final -->
+                <version>4.10.1</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-connector-mariadb</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Transitive dependencies as they are not selected for shading.
+             They must be made explicit again here for a proper dependency-reduced-pom. -->
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>mysql-binlog-connector-java</artifactId>
+            <version>0.40.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <version>3.5.0</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+
+        <sourceDirectory>src/main/java</sourceDirectory>
+
+        <plugins>
+            <!-- Creates a JAR file with the source files of the project. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>shade-jar-with-antlr-relocated</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <artifactSet>
+                                <includes>
+                                    <include>io.debezium:debezium-connector-mariadb</include>
+                                    <include>io.debezium:debezium-connector-binlog</include>
+                                    <include>io.debezium:debezium-ddl-parser</include>
+                                    <include>org.antlr:antlr4-runtime</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <!-- relocate antlr4 to avoid version conflicts -->
+                                    <pattern>org.antlr</pattern>
+                                    <shadedPattern>shaded.org.antlr</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+
+                </executions>
+
+            </plugin>
+        </plugins>
+    </build>
+
+
+</project>

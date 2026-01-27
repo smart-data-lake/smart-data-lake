@@ -21,9 +21,9 @@ package io.smartdatalake.workflow.action.spark.transformer
 
 import com.fasterxml.jackson.core.JsonParseException
 import io.smartdatalake.workflow.action.spark.transformer.ScalaNotebookSparkDfTransformer.{compileCode, parseNotebook, prepareFunction}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ScalaNotebookSparkDfTransformerTest extends FunSuite {
+class ScalaNotebookSparkDfTransformerTest extends AnyFunSuite {
 
   val testNotebookContent = """
     {

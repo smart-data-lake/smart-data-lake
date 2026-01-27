@@ -25,9 +25,9 @@ import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class DebugTransformerTest extends FunSuite {
+class DebugTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._

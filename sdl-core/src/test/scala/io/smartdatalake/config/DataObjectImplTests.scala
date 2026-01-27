@@ -30,9 +30,10 @@ import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DataObjectImplTests extends FlatSpec with Matchers {
+class DataObjectImplTests extends AnyFlatSpec with Matchers {
 
   "AvroFileDataObject" should "be parsable" in {
 
@@ -130,7 +131,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val dos = registry.instances.values
-    dos should contain allOf (
+    dos should contain allOf(
       CsvFileDataObject(
         id = "123",
         path = "/path/to/foo",
@@ -202,7 +203,7 @@ class DataObjectImplTests extends FlatSpec with Matchers {
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val registry2: InstanceRegistry = new InstanceRegistry()
-    val jdbcCon = JdbcTableConnection( "jdbc1", url = "jdbc://example.test", driver = "com.example.Driver" )
+    val jdbcCon = JdbcTableConnection("jdbc1", url = "jdbc://example.test", driver = "com.example.Driver")
     registry2.register(jdbcCon)
     registry.instances(DataObjectId("123")) shouldBe JdbcTableDataObject(
       id = "123",
@@ -294,18 +295,18 @@ class DataObjectImplTests extends FlatSpec with Matchers {
 
     val config = ConfigFactory.parseString(
       """
-         |dataObjects = {
-         | 123 = {
-         |   type = CustomDfDataObject
-         |   creator {
-         |     class-name = io.smartdatalake.testutils.custom.TestCustomDfCreator
-         |     options = {
-         |       test = foo
-         |     }
-         |   }
-         | }
-         |}
-         |""".stripMargin).resolve
+        |dataObjects = {
+        | 123 = {
+        |   type = CustomDfDataObject
+        |   creator {
+        |     class-name = io.smartdatalake.testutils.custom.TestCustomDfCreator
+        |     options = {
+        |       test = foo
+        |     }
+        |   }
+        | }
+        |}
+        |""".stripMargin).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe CustomDfDataObject(
@@ -317,18 +318,18 @@ class DataObjectImplTests extends FlatSpec with Matchers {
   "WebserviceFileDataObject" should "be parsable" in {
     val config = ConfigFactory.parseString(
       """
-         |dataObjects = {
-         | 123 = {
-         |  type = WebserviceFileDataObject
-         |  url = "http://test"
-         |  auth-mode = {
-         |    type = BasicAuthMode
-         |    user = "###CLEAR#test###"
-         |    password = "###CLEAR#test###"
-         |  }
-         | }
-         |}
-         |""".stripMargin).resolve
+        |dataObjects = {
+        | 123 = {
+        |  type = WebserviceFileDataObject
+        |  url = "http://test"
+        |  auth-mode = {
+        |    type = BasicAuthMode
+        |    user = "###CLEAR#test###"
+        |    password = "###CLEAR#test###"
+        |  }
+        | }
+        |}
+        |""".stripMargin).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe WebserviceFileDataObject(
@@ -377,29 +378,29 @@ class DataObjectImplTests extends FlatSpec with Matchers {
   "DataObject" should "throw nice error when wrong Connection type" in {
 
     val config = ConfigFactory.parseString(
-    """
-      |connections = {
-      | con1 = {
-      |  type = HiveTableConnection
-      |   pathPrefix = "file://c:/temp"
-      |   db = default
-      | }
-      |}
-      |dataObjects = {
-      | 123 = {
-      |  type = CsvFileDataObject
-      |  path = foo
-      |  connectionId = con1
-      |  csv-options {
-      |   header = true
-      |  }
-      | }
-      |}
-      |""".stripMargin).resolve
+      """
+        |connections = {
+        | con1 = {
+        |  type = HiveTableConnection
+        |   pathPrefix = "file://c:/temp"
+        |   db = default
+        | }
+        |}
+        |dataObjects = {
+        | 123 = {
+        |  type = CsvFileDataObject
+        |  path = foo
+        |  connectionId = con1
+        |  csv-options {
+        |   header = true
+        |  }
+        | }
+        |}
+        |""".stripMargin).resolve
 
-    val thrown = the [ConfigurationException] thrownBy ConfigParser.parse(config)
+    val thrown = the[ConfigurationException] thrownBy ConfigParser.parse(config)
 
-    thrown.getMessage should include ("123")
-    thrown.getMessage should include ("con1")
+    thrown.getMessage should include("123")
+    thrown.getMessage should include("con1")
   }
 }

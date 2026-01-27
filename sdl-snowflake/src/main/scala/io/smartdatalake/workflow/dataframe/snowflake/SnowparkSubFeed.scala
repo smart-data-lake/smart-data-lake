@@ -93,8 +93,8 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
     this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
       .asInstanceOf[SnowparkSubFeed]
   }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]))
   override def isStreaming: Option[Boolean] = Some(false) // no spark streaming with Snowpark
@@ -250,6 +250,10 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     }
   }
 
+  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = {
+    throw new NotImplementedError("from_json is not implemented in Snowpark")
+  }
+
   override def hash(column: GenericColumn): GenericColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.hash(snowparkColumn.inner))
@@ -309,6 +313,44 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
 
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = {
     throw new NotImplementedError("schema evolution Udf can not be implemented in Snowpark")
+  }
+
+  override def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = {
+    // no comments on StructField in Snowpark
+    val field = StructField(name, dataType.asInstanceOf[SnowparkDataType].inner, nullable)
+    SnowparkField(field)
+  }
+
+  override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
+    val decimalPattern = "decimal\\(([0-9]+),([0-9]+)\\)".r
+    val snowparkType = tpe.toLowerCase.replace(" ", "") match {
+      case "string" => StringType
+      case "boolean" => BooleanType
+      case "byte" => ByteType
+      case "short" => ShortType
+      case "integer" => IntegerType
+      case "long" => LongType
+      case "float" => FloatType
+      case "double" => DoubleType
+      case decimalPattern(precision, scale) => DecimalType(precision.toInt, scale.toInt)
+      case "date" => DateType
+      case "timestamp" => TimestampType
+      case "binary" => BinaryType
+      case "variant" => StringType
+    }
+    SnowparkSimpleDataType(snowparkType)
+  }
+
+  override def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = {
+    SnowparkStructDataType(StructType(fields.map(_.asInstanceOf[SnowparkField].inner)))
+  }
+
+  override def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = {
+    SnowparkArrayDataType(ArrayType(valueTpe.asInstanceOf[SnowparkDataType].inner))
+  }
+
+  override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
+    SnowparkMapDataType(MapType(keyTpe.asInstanceOf[SnowparkDataType].inner, valueTpe.asInstanceOf[SnowparkDataType].inner))
   }
 }
 

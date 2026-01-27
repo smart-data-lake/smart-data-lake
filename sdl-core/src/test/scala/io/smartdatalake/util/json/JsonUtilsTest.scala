@@ -20,9 +20,9 @@
 package io.smartdatalake.util.json
 
 import org.json4s.jackson.JsonMethods
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class JsonUtilsTest extends FunSuite {
+class JsonUtilsTest extends AnyFunSuite {
 
   test("extract value") {
     val str = """{ "link": [ {"href": "abc", "rel": "last"}, {"href": "def", "rel": "next"}]}"""

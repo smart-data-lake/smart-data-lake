@@ -23,9 +23,9 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata, CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObjectMetadata}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class AppUtilTest extends FunSuite {
+class AppUtilTest extends AnyFunSuite {
 
   test("mask secrets when logging spark conf") {
     val logTxt = AppUtil.createMaskedSecretsKVLog("secret.key", "+yQs4uO+taUi27+baM5D1/ishD8wDBuxj6+so0uk")
@@ -44,10 +44,10 @@ class AppUtilTest extends FunSuite {
   private val do4 = CsvFileDataObject("do4", "/dummy", metadata = Some(DataObjectMetadata(name = Some("dataObject4"), layer = Some("L1"))))
   private val do5 = CsvFileDataObject("do5", "/dummy", metadata = Some(DataObjectMetadata(name = Some("dataObject5"), layer = Some("L2"))))
   private val do6 = CsvFileDataObject("do6", "/dummy", metadata = Some(DataObjectMetadata(name = Some("dataObject6"), layer = Some("L3"))))
-  instanceRegistry.register(Seq(do1,do2,do3,do4,do5,do6))
+  instanceRegistry.register(Seq(do1, do2, do3, do4, do5, do6))
   private val actionA = CopyAction("a", "do1", "do2", metadata = Some(ActionMetadata(name = Some("actionA"), feed = Some("test1"))))
   private val actionB = CopyAction("b", "do1", "do3", metadata = Some(ActionMetadata(name = Some("actionB"), feed = Some("test2"))))
-  private val actionC = CustomDataFrameAction("c", Seq("do2","do3","do4"), Seq("do5"), transformer = Some(CustomDfsTransformerConfig(sqlCode = Some(Map(do5.id.id -> "select * from do2"))))
+  private val actionC = CustomDataFrameAction("c", Seq("do2", "do3", "do4"), Seq("do5"), transformer = Some(CustomDfsTransformerConfig(sqlCode = Some(Map(do5.id.id -> "select * from do2"))))
     , metadata = Some(ActionMetadata(name = Some("actionC"), feed = Some("test1")))
   )
   private val actionD = CopyAction("d", "do5", "do6", metadata = Some(ActionMetadata(name = Some("actionD"), feed = Some("test1"))))

@@ -21,11 +21,11 @@ package io.smartdatalake.util.hdfs
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileAlreadyExistsException, FileSystem, Path}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class HdfsUtilTest extends FunSuite {
+class HdfsUtilTest extends AnyFunSuite {
 
   test("touch file") {
     val file = new Path("target/touch.me")

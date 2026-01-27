@@ -28,11 +28,12 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class IcebergCustomDataFrameTest extends FunSuite with BeforeAndAfter {
+class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -44,8 +45,8 @@ class IcebergCustomDataFrameTest extends FunSuite with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-  val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-  val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
+  private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
+  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
   Environment._globalConfig = GlobalConfig()
 
   before {

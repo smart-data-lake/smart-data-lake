@@ -20,7 +20,7 @@
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice.OpenApiUtil.simplifyContentType
 import io.smartdatalake.util.webservice.SttpUtil.sendRequest
 import org.apache.hadoop.conf.Configuration
@@ -44,7 +44,7 @@ object OpenApiUtil extends SmartDataLakeLogger {
   private val definitionsPath = "components"
   private val specCache = mutable.Map[String, OpenApiSpec]()
   val defaultApiDocsPath = "v3/api-docs"
-  val defaultResponseContentType = "application/json"
+  val defaultResponseContentType: String = MediaType.ApplicationJson.toString
   @transient private lazy val httpBackend: SttpBackend[Identity, Any] = HttpClientSyncBackend()
 
   /**
@@ -76,7 +76,7 @@ object OpenApiUtil extends SmartDataLakeLogger {
         .followRedirects(true)
       sendRequest(request, s"get OpenApi specification")
     } else {
-      SchemaUtil.readFromPath(new Path(url))
+      FileUtil.readFromPath(new Path(url))
     }
     logger.debug(s"got response $schema")
     val jsonSpec = parse(schema)

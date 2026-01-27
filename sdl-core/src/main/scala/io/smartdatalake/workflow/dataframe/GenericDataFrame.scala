@@ -23,11 +23,10 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
 import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import io.smartdatalake.workflow.dataobject.SchemaValidation
 import org.json4s.JsonAST.{JBool, JObject}
-import org.json4s.{JArray, JNothing, JString, JValue}
+import org.json4s.jackson.Serialization
+import org.json4s.{Formats, JArray, JNothing, JString, JValue, NoTypeHints}
 
 import scala.reflect.runtime.universe.Type
 
@@ -64,6 +63,8 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def filter(expression: GenericColumn): GenericDataFrame
   def where(expression: GenericColumn): GenericDataFrame = filter(expression)
+
+  def limit(n: Int): GenericDataFrame
 
   def collect: Seq[GenericRow]
 
@@ -293,6 +294,52 @@ trait GenericSchema extends GenericTypedObject {
   def toJson: JArray = JArray(fields.map(_.toJson).toList)
 
   def treeString(level: Int = Int.MaxValue): String
+
+  def apply(colName: String) = fields.find(_.name == colName)
+    .getOrElse(throw new IllegalArgumentException("field $colName not found"))
+}
+
+object GenericSchema {
+
+  /**
+   * Parsing schema export created by DataObjectSchemaExporter
+   */
+  def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
+    implicit val formats: Formats = Serialization.formats(NoTypeHints)
+    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+
+    def createDataType(json: JValue): GenericDataType = json match {
+      // simple type
+      case JString(str) => companion.createSimpleDataType(str)
+      // struct
+      case j: JObject if (j \ "dataType") == JString("struct") =>
+        val fields = (j \ "fields") match {
+          case jFields: JArray => jFields.arr.map { case jsonField: JObject => parseField(jsonField) }
+        }
+        companion.createStructDataType(fields)
+      // array
+      case j: JObject if (j \ "dataType") == JString("array") =>
+        val valueType = createDataType(j \ "elementType")
+        companion.createArrayDataType(valueType)
+      // map
+      case j: JObject if (j \ "dataType") == JString("map") =>
+        val keyType = createDataType(j \ "keyType")
+        val valueType = createDataType(j \ "valueType")
+        companion.createMapDataType(keyType, valueType)
+    }
+
+    def parseField(json: JObject): GenericField = {
+      companion.createField(
+        (json \ "name").extract[String],
+        createDataType(json \ "dataType"),
+        (json \ "nullable").extract[Boolean],
+        (json \ "comment").toOption.map(_.extract[String])
+      )
+    }
+
+    val fields = json.arr.map { case jsonField: JObject => parseField(jsonField) }
+    companion.createSchema(fields)
+  }
 }
 
 /**

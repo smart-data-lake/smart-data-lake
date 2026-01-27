@@ -22,14 +22,14 @@ package io.smartdatalake.workflow.action.generic.transformer
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class SQLDfTransformerTest extends FunSuite {
+class SQLDfTransformerTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
@@ -54,17 +54,17 @@ class SQLDfTransformerTest extends FunSuite {
   val emptyDf = Seq((1,"a")).toDF("num","str")
 
   test("options and view name token are replaced") {
-    val customTransformer = SQLDfTransformer(code = s"select num, %{option1} from %{inputViewName_src1}")
+    val customTransformer = SQLDfTransformer(code = Some(s"select num, %{option1} from %{inputViewName_src1}"))
     customTransformer.transformWithOptions(action1.id, Seq(), SparkDataFrame(emptyDf), srcDO1.id, Map("option1" -> "str"))
   }
 
   test("view name token without input name is replaced") {
-    val customTransformer = SQLDfTransformer(code = s"select num, %{option1} from %{inputViewName}")
+    val customTransformer = SQLDfTransformer(code = Some(s"select num, %{option1} from %{inputViewName}"))
     customTransformer.transformWithOptions(action1.id, Seq(), SparkDataFrame(emptyDf), srcDO1.id, Map("option1" -> "str"))
   }
 
   test("legacy view name without postfix is still supported") {
-    val customTransformer = SQLDfTransformer(code = s"select src1.num, %{option1} from src1")
+    val customTransformer = SQLDfTransformer(code = Some(s"select src1.num, %{option1} from src1"))
     customTransformer.transformWithOptions(action1.id, Seq(), SparkDataFrame(emptyDf), srcDO1.id, Map("option1" -> "str"))
   }
 

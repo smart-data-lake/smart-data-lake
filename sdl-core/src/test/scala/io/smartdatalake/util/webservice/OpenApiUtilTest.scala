@@ -24,9 +24,9 @@ import io.smartdatalake.testutils.TestUtil
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.json4s.jackson.JsonMethods.parse
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class OpenApiUtilTest extends FunSuite {
+class OpenApiUtilTest extends AnyFunSuite {
 
   implicit val hadoopConf: Configuration = new Configuration()
 

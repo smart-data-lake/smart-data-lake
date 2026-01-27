@@ -28,11 +28,11 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import org.reflections.Reflections
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-class JsonTypeConverterTest extends FunSuite {
+class JsonTypeConverterTest extends AnyFunSuite {
   private val registry = new DefinitionRegistry
   private val reflections = new Reflections
   private val jsonTypeConverter = new JsonSchemaUtil.JsonTypeConverter(reflections, registry)
@@ -155,7 +155,7 @@ class JsonTypeConverterTest extends FunSuite {
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
     assert(jsonTypeDef.properties("secret").isInstanceOf[JsonStringDef])
-    assert(jsonTypeDef.properties("secret").asInstanceOf[JsonStringDef].description.get.contains("```###<PROVIDERID>#<SECRETNAME>###```"))
+    assert(jsonTypeDef.properties("secret").asInstanceOf[JsonStringDef].description.get.contains("```\n###<PROVIDERID>#<SECRETNAME>###\n```"))
   }
 
   case class TestClassWithSecretsInOptions(options: Map[String, StringOrSecret])
@@ -165,7 +165,7 @@ class JsonTypeConverterTest extends FunSuite {
     val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
 
     assert(jsonTypeDef.properties("options").isInstanceOf[JsonMapDef])
-    assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.get.contains("```###<PROVIDERID>#<SECRETNAME>###```"))
+    assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.get.contains("```\n###<PROVIDERID>#<SECRETNAME>###\n```"))
   }
 
   case class TestClassWithoutSecretsInOptions(options: Map[String, String])
@@ -193,6 +193,23 @@ class JsonTypeConverterTest extends FunSuite {
     val jsonEnum = jsonTypeDef.properties("testEnum").asInstanceOf[JsonStringDef]
     assert(jsonEnum.enum.get.toSet == Set("firstValue", "secondValue"))
    }
+
+  test("parameter scaladoc descriptions are preserved for referenced and inlined types (regression test for #1011, #1028)") {
+    // Test that UIBackendConfig.timeouts param description is preserved (case of referenced type with $ref)
+    // and CopyAction.executionCondition param description is preserved (case of inlined type)
+    val schema = JsonSchemaUtil.createSdlSchema("test-version")
+    val schemaJson = schema.toJson
+    
+    // Check uiBackend.timeouts has description from @param timeouts (issue #1011)
+    val uiBackendTimeoutsDesc = (schemaJson \ "properties" \ "global" \ "properties" \ "uiBackend" \ "properties" \ "timeouts" \ "description").asInstanceOf[org.json4s.JString].s
+    assert(uiBackendTimeoutsDesc.contains("configuration of HTTP timeouts"), 
+      s"uiBackend.timeouts description should contain 'configuration of HTTP timeouts' but was: $uiBackendTimeoutsDesc")
+    
+    // Check CopyAction.executionCondition has description from inherited @param executionCondition in Action trait (issue #1028)
+    val copyActionExecCondDesc = (schemaJson \ "definitions" \ "Action" \ "CopyAction" \ "properties" \ "executionCondition" \ "description").asInstanceOf[org.json4s.JString].s
+    assert(copyActionExecCondDesc.contains("Optional execution condition for this action"), 
+      s"CopyAction.executionCondition description should contain 'Optional execution condition for this action' but was: $copyActionExecCondDesc")
+  }
 }
 
 object TestEnum extends Enumeration {

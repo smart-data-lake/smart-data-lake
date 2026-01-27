@@ -36,11 +36,12 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  *
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
- * @param rankingExpression Ranking expression to choose the record to keep if there are duplicates.
+ * @param rankingExpression Optional ranking expression to choose the record to keep if there are duplicates.
+ *                          If not defined this might be not deterministic. Spark will use df.dropDuplicates(cols) function.
  * @param primaryKeyColumns Optional list of primary key columns.
  *                          If left empty the primary key of the Actions output DataObject is used.
  */
-case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: String, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]]) extends GenericDfTransformer {
+case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: Option[String] = None, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]]) extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
 
@@ -55,9 +56,13 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
       }
     }.getOrElse(throw ConfigurationException("There are no primary key columns defined ether by parameter nor by detection with actionId."))
 
-    df.withColumn("_rank", window(() => row_number, primaryKey.map(col), expr(rankingExpression).desc))
-      .where(col("_rank") === lit(1))
-      .drop("_rank")
+    if (rankingExpression.isDefined) {
+      df.withColumn("_rank", window(() => row_number, primaryKey.map(col), expr(rankingExpression.get).desc))
+        .where(col("_rank") === lit(1))
+        .drop("_rank")
+    } else {
+      df.dropDuplicates(primaryKey)
+    }
   }
 
   override def factory: FromConfigFactory[GenericDfTransformer] = DeduplicateTransformer

@@ -23,7 +23,7 @@ import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfCreat
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
-import org.scalatest.Matchers
+import org.scalatest.matchers.should.Matchers
 
 class CustomDfDataObjectTest extends DataObjectTestSuite with Matchers {
 

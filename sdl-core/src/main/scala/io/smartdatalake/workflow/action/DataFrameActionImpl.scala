@@ -47,7 +47,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] {
 
   override def inputs: Seq[DataObject with CanCreateDataFrame]
+
   override def outputs: Seq[DataObject with CanWriteDataFrame]
+
   override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
 
   /**
@@ -90,6 +92,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    * Expectations defined at Action level are executed together with the expectations of the main output DataObject.
    */
   def expectations: Seq[ActionExpectation] = Seq()
+
   assert(!expectations.exists(_.scope == ExpectationScope.JobPartition), s"($id) Calculating input metrics for expectations with scope JobPartition not supported")
 
   /**
@@ -105,6 +108,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     def explodeGenericType(subFeedTypes: Seq[Type]): Seq[Type] = {
       subFeedTypes.flatMap(tpe => if (tpe =:= typeOf[DataFrameSubFeed]) DataFrameSubFeed.getKnownSubFeedTypes else Seq(tpe))
     }
+
     val allInputTypes = inputs.map(_.getSubFeedSupportedTypes).map(explodeGenericType)
     val commonInputTypes = allInputTypes.toSet.reduce(_ intersect _)
     val commonOutputTypes = outputs.map(_.writeSubFeedSupportedTypes).map(explodeGenericType).toSet.reduce(_ intersect _)
@@ -125,6 +129,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   private[smartdatalake] implicit lazy val subFeedHelper: DataFrameSubFeedCompanion = {
     ScalaUtil.companionOf[DataFrameSubFeedCompanion](subFeedType)
   }
+
   private[smartdatalake] override def subFeedConverter(): SubFeedConverter[DataFrameSubFeed] = subFeedHelper
 
   override def getRuntimeDataImpl: RuntimeData = {
@@ -136,6 +141,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   // remember streaming query
   // TODO: this is still spark specific!
   private var sparkStreamingQuery: Option[StreamingQuery] = None
+
   private[smartdatalake] def notifySparkStreamingQueryTerminated(implicit context: ActionPipelineContext): Unit = {
     sparkStreamingQuery = None
   }
@@ -149,20 +155,25 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * Enriches SparkSubFeed with DataFrame if not existing
    *
-   * @param input input data object.
-   * @param subFeed input SubFeed.
-   * @param phase current execution phase
+   * @param input       input data object.
+   * @param subFeed     input SubFeed.
+   * @param phase       current execution phase
    * @param isRecursive true if this input is a recursive input
    */
-  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame, subFeed: DataFrameSubFeed, phase: ExecutionPhase, isRecursive: Boolean = false)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  def enrichSubFeedDataFrame(input: DataObject with CanCreateDataFrame,
+                             subFeed: DataFrameSubFeed,
+                             phase: ExecutionPhase,
+                             isRecursive: Boolean = false)
+                            (implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    logger.debug(s"($id) enrichSubFeedDataFrame: subFeed = $subFeed, isRecursive = $isRecursive")
     assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
-    assert(phase!=ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
+    assert(phase != ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
       case Some(m: SparkStreamingMode) if !context.simulation =>
         // this must be a SparkSubFeed
         val sparkSubFeed = subFeed.asInstanceOf[SparkSubFeed]
         implicit val sparkSession: SparkSession = context.sparkSession
-        if (subFeed.dataFrame.isEmpty || phase==ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
+        if (subFeed.dataFrame.isEmpty || phase == ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
           logger.info(s"getting streaming DataFrame for ${input.id}")
@@ -178,7 +189,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
           context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
         // process subfeed
-        if (phase==ExecutionPhase.Exec || context.simulation) {
+        if (phase == ExecutionPhase.Exec || context.simulation) {
           // check if dataFrame must be created
           if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
             // validate partition values existing for input
@@ -194,7 +205,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             // recreate DataFrame from DataObject if not skipped
             if (!subFeed.isSkipped && (!isRecursive || isDataExisting)) {
               try {
-                logger.info(s"($id) getting DataFrame for ${input.id}" + (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else ""))
+                logger.info(s"($id) enrichSubFeedDataFrame: getting DataFrame for ${input.id}" +
+                  (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else "") +
+                  subFeed.filter.map(f => s" filtered by $f").getOrElse(""))
                 input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
                   .withFilter(subFeed.partitionValues, subFeed.filter)
               } catch {
@@ -224,12 +237,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     }
   }
 
-  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+  def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame)
+                          (implicit context: ActionPipelineContext): GenericDataFrame = {
     val schema = dataObject match {
       case input: SparkFileDataObject if input.getSchema.isDefined => input.getSchema
       case input: UserDefinedSchema if input.schema.isDefined => input.schema
       case input: SchemaValidation if input.schemaMin.isDefined => input.schemaMin
+      case _ if context.globalConfig.dataObjectsSchemaSource.isDefined && !context.isExecPhase =>
+        context.globalConfig.getSchemaFromSource(dataObject.id)(context.hadoopConf)
       case _ => None
     }
     val readSchema = schema.map(dataObject.createReadSchema)
@@ -238,7 +253,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       .getOrElse(dataObject.getDataFrame(Seq(), subFeedType).filter(subFeedHelper.lit(false)))
   }
 
-  override protected def preprocessInputSubFeedCustomized(subFeed: DataFrameSubFeed, ignoreFilters: Boolean, isRecursive: Boolean)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override protected def preprocessInputSubFeedCustomized(subFeed: DataFrameSubFeed,
+                                                          ignoreFilters: Boolean,
+                                                          isRecursive: Boolean)
+                                                         (implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    logger.debug(s"($id) preprocessInputSubFeedCustomized: subFeed = $subFeed, ignoreFilters = $ignoreFilters, , isRecursive = $isRecursive")
     val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
     val input = inputMap(subFeed.dataObjectId)
     // persist if requested
@@ -247,7 +266,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val writeSchema = preparedSubFeed.schema
     val readSchema = writeSchema.map(schema => input.createReadSchema(schema))
     val schemaChanges = writeSchema != readSchema
-    require(!context.simulation || !schemaChanges, s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
+    require(!context.simulation || !schemaChanges,
+      s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) {
       if (subFeed.isStreaming.getOrElse(false)) {
         subFeed.withDataFrame(readSchema.map(subFeedHelper.getEmptyStreamingDataFrame)).asDummy()
@@ -260,7 +280,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
     if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // enrich with fresh DataFrame if needed
-    preparedSubFeed = enrichSubFeedDataFrame(input, preparedSubFeed, context.phase, isRecursive)
+    preparedSubFeed = enrichSubFeedDataFrame(input = input, subFeed = preparedSubFeed,
+      phase = context.phase, isRecursive = isRecursive)
     // add observations on input DataFrame
     if (Environment.enableInputDataObjectCount) {
       input match {
@@ -303,18 +324,19 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         // setup output observation
         val (dfExpectations, outputObservations) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns, forceGenericObservation = forceGenericObservation)
         // setup extracting Spark observations metrics on input DataFrames and custom observation metrics together with output observation
-        outputObservations.collect{case x: SparkObservation => x}.foreach { outputSparkObservation =>
-          inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
-          val inputSparkObservationNames = inputSubFeeds.flatMap(_.observation).collect{ case x: SparkObservation => x}.map(_.getName)
+        outputObservations.collect { case x: SparkObservation => x }.foreach { outputSparkObservation =>
+          inputSubFeeds.flatMap(_.observation).collect { case x: SparkObservation => x }.map(_.getName)
+          val inputSparkObservationNames = inputSubFeeds
+            .flatMap(_.observation).collect { case x: SparkObservation => x }.map(_.getName)
           outputSparkObservation.setOtherObservationNames(inputSparkObservationNames)
-          outputSparkObservation.setOtherObservationsPrefix(id.id+"#")
+          outputSparkObservation.setOtherObservationsPrefix(id.id + "#")
         }
         // Combine non-Spark observations on input DataFrames with output observation into one combined observation, which is then assigned to corresponding property of the SubFeed.
         // Combining input observations with output observation is needed because a SubFeed can only carry one observation.
         val inputObservationsToCombine = inputSubFeeds.flatMap { subFeed =>
           subFeed.observation match {
             case Some(_: SparkObservation) => None // ignore as this is handled by output observation above
-            case Some(otherObservation) => Some(PrefixedObservation(otherObservation, subFeed.dataObjectId.id+"#")) // add input DataObjectId prefix to metrics
+            case Some(otherObservation) => Some(PrefixedObservation(otherObservation, subFeed.dataObjectId.id + "#")) // add input DataObjectId prefix to metrics
             case None => None
           }
         }
@@ -350,17 +372,21 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         // Note that scope All metrics are only calculated if this is the main output.
         val actionExpectationsInputMetrics = if (isMainOutput) calculateInputAggMetricsWithScopeAll(subFeed) else Map()
         // if this is mainOutput, enrich main input metrics
-        val enrichmentFunc: Map[String,_] => Map[String,_] = if (isMainOutput) enrichMainInputMetrics else identity
+        val enrichmentFunc: Map[String, _] => Map[String, _] = if (isMainOutput) enrichMainInputMetrics else identity
         // evaluate and validate expectations
-        var (metrics, exceptions) = evDataObject.validateExpectations(subFeedType, subFeed.dataFrame, evDataObject.getDataFrame(Seq(), subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ actionExpectationsInputMetrics, if (isMainOutput) expectations else Seq(), enrichmentFunc, loggerContext = "output")
+        var (metrics, exceptions) = evDataObject
+          .validateExpectations(subFeedType, subFeed.dataFrame, evDataObject.getDataFrame(Seq(), subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ actionExpectationsInputMetrics, if (isMainOutput) expectations else Seq(), enrichmentFunc, loggerContext = "output")
         // evaluate and validate expectations of input DataObjects to be validated on read
-        val inputExpectationsToEvaluateOnRead = inputs.filter(i => context.instanceRegistry.shouldValidateDataObjectOnRead(i.id))
-          .collect{case x: DataObject with ExpectationValidation => x}
+        val inputExpectationsToEvaluateOnRead = inputs
+          .filter(i => context.instanceRegistry.shouldValidateDataObjectOnRead(i.id))
+          .collect { case x: DataObject with ExpectationValidation => x }
         inputExpectationsToEvaluateOnRead.foreach { dataObject =>
-          val metricsSuffix = "#"+dataObject.id.id
-          val inputMetrics = metrics.filter(_._1.endsWith(metricsSuffix)).map{case (k,v) => (k.stripSuffix(metricsSuffix), v)}
+          val metricsSuffix = "#" + dataObject.id.id
+          val inputMetrics = metrics
+            .filter(_._1.endsWith(metricsSuffix)).map { case (k, v) => (k.stripSuffix(metricsSuffix), v) }
           if (inputMetrics.nonEmpty) {
-            val (updatedInputMetrics, inputExceptions) = dataObject.validateExpectations(subFeedType, None, dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity, scopeJobAndInputMetrics = inputMetrics, loggerContext = s"input ${dataObject.id}")
+            val (updatedInputMetrics, inputExceptions) = dataObject
+              .validateExpectations(subFeedType, None, dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity, scopeJobAndInputMetrics = inputMetrics, loggerContext = s"input ${dataObject.id}")
             metrics = metrics ++ updatedInputMetrics.map { case (k, v) => (k + metricsSuffix, v) }
             exceptions = exceptions ++ inputExceptions
           }
@@ -377,7 +403,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val count = outputSubFeed.metrics.flatMap(_.get("count"))
     if (recordsWritten.contains(0) && count.nonEmpty) outputSubFeed = outputSubFeed.withMetrics(outputSubFeed.metrics.get - "records_written" - "bytes_written").asInstanceOf[DataFrameSubFeed]
     // add no_data metric
-    if (count.contains(0) || (count.isEmpty && recordsWritten.contains(0))) outputSubFeed = outputSubFeed.appendMetrics(Map[String,Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
+    if (count.contains(0) || (count.isEmpty && recordsWritten.contains(0))) outputSubFeed = outputSubFeed.appendMetrics(Map[String, Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
     // return
     outputSubFeed
   }
@@ -386,7 +412,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // prepare input aggregation metrics columns from actions expectations
     val exprNameRegex = "([^#]+)#([^#]+)".r.anchored
     val actionExpectationsInputAggColumns = expectations.filter(_.scope == ExpectationScope.All).flatMap(_.getInputAggExpressionColumns(id))
-      .map( expr => expr.getName match {
+      .map(expr => expr.getName match {
         case Some(exprNameRegex(name, dataObjectId)) => (DataObjectId(dataObjectId), expr.as(name))
         case Some(name) => (prioritizedMainInputCandidates.head.id, expr)
         case None => throw new IllegalStateException(s"($id) name of aggregate expression unknown: $expr")
@@ -399,15 +425,17 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame => evDataObject
         case _ => throw new IllegalStateException(s"($id) Cannot calculate input metric on $dataObjectId not supporting ExpectationValidation")
       }
-      dataObject.calculateMetrics(dataObject.getDataFrame(Seq(),subFeed.tpe), aggExpressions, ExpectationScope.All)
-        .map{ case (k,v) => (k+"#"+dataObjectId.id, v)}
+      dataObject.calculateMetrics(dataObject.getDataFrame(Seq(), subFeed.tpe), aggExpressions, ExpectationScope.All)
+        .map { case (k, v) => (k + "#" + dataObjectId.id, v) }
     }
   }
 
   def enrichMainInputMetrics(metrics: Map[String, _]): Map[String, _] = {
     val mainInputIdSuffix = s"#${prioritizedMainInputCandidates.head.id.id}"
     // copy all metrics with name `<metric>#<dataObjectId>` as `<metric>#mainInput`
-    metrics ++ metrics.filterKeys(_.endsWith(mainInputIdSuffix)).map{case (k,v) => (k.stripSuffix(mainInputIdSuffix)+"#mainInput" -> v)}
+    metrics ++
+      metrics.filterKeys(_.endsWith(mainInputIdSuffix))
+        .map { case (k, v) => k.stripSuffix(mainInputIdSuffix) + "#mainInput" -> v }
   }
 
   /**
@@ -481,18 +509,20 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         preparedSubFeed.withMetrics(metrics).asInstanceOf[DataFrameSubFeed]
     }
   }
+
   private def getStreamingQueryName(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext) = {
-    s"${context.appConfig.appName} $id writing ${dataObjectId}"
+    s"${context.appConfig.appName} $id writing $dataObjectId"
   }
 
   /**
    * Apply many-to-many transformers to SubFeeds.
    * Keep outputs of previous transformers as input for next transformer, but in the end only return outputs of last transformer.
+   *
    * @return outputDataFrameMap and outputPartitionValues of last transformer
    */
   private[smartdatalake] def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
-    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap,inputPartitionValues)){
+    val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap, inputPartitionValues)) {
       case ((inputDfsMap, inputPartitionValues), transformer) =>
         val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions, outputs.map(_.id))
         (inputDfsMap ++ outputDfsMap, outputPartitionValues)
@@ -504,8 +534,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * apply transformer to partition values
    */
-  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)){
+  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])
+                                 (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
+    transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)) {
       case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, executionModeResultOptions)
     }
   }
@@ -513,11 +544,12 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * The transformed DataFrame is validated to have the output's partition columns included, partition columns are moved to the end and SubFeeds partition values updated.
    *
-   * @param output output DataObject
+   * @param output  output DataObject
    * @param subFeed SubFeed with transformed DataFrame
    * @return validated and updated SubFeed
    */
-   def validateAndUpdateSubFeedCustomized(output: DataObject, subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  def validateAndUpdateSubFeedCustomized(output: DataObject, subFeed: DataFrameSubFeed)
+                                        (implicit context: ActionPipelineContext): DataFrameSubFeed = {
     output match {
       case partitionedDO: CanHandlePartitions =>
         // validate output partition columns exist in DataFrame
@@ -533,8 +565,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * Validate that DataFrame contains a given list of columns, throwing an exception otherwise.
    *
-   * @param df DataFrame to validate
-   * @param columns Columns that must exist in DataFrame
+   * @param df        DataFrame to validate
+   * @param columns   Columns that must exist in DataFrame
    * @param debugName name to mention in exception
    */
   def validateDataFrameContainsCols(df: GenericDataFrame, columns: Seq[String], debugName: String): Unit = {
@@ -557,6 +589,6 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
           logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId}$partitionValuesLog")
           subFeed.unpersist
         }
-    }
+      }
   }
 }

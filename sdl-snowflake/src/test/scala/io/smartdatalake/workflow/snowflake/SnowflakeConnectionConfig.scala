@@ -36,6 +36,9 @@ object SnowflakeConnectionConfig {
     database = sys.env("SNOWFLAKE_DATABASE"),
     role = sys.env("SNOWFLAKE_ROLE"),
     authMode = BasicAuthMode(Some(StringOrSecret(sys.env("SNOWFLAKE_USER"))), Some(StringOrSecret(sys.env("SNOWFLAKE_PASSWORD")))),
+    //authMode = OAuthMode(oauthUrl=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_URL")),
+    //  clientId=StringOrSecret(sys.env("SNOWFLAKE_CLIENTID")), clientSecret=StringOrSecret(sys.env("SNOWFLAKE_SECRET")),
+    //  oauthScope=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_SCOPE")))
     //proxy = Some(HttpProxyConfig(host = "<host>", port = <port>))
   )
 }
