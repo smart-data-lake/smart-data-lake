@@ -125,6 +125,38 @@ trait Transform extends Serializable {
     }
 
     /**
+     * Converts the data type of columns to a specified type.
+     *
+     * Notes:
+     * - This function takes a column name and a target data type and updates the column's type accordingly.
+     * - The returned data frame reflects the updated column types.
+     *
+     * @param typ      : The desired data type to convert to
+     * @param colNames : List of column names whose type is to be converted
+     * @return A data frame with the column type updated
+     *
+     */
+    def castColumnsOfTypeTo(typ: DataType)(currentType: DataType): DataFrame = transformCols(
+      transformFun = cn => List(col(cn).cast(typ)),
+      colFilter = ds.schema.apply(_).dataType == currentType)
+
+    /**
+     * Converts the data type of columns to a specified type.
+     *
+     * Notes:
+     * - This function takes a column name and a target data type and updates the column's type accordingly.
+     * - The returned data frame reflects the updated column types.
+     *
+     * @param typ      : The desired data type to convert to
+     * @param colNames : List of column names whose type is to be converted
+     * @return A data frame with the column type updated
+     *
+     */
+    def castColumnsTo(typ: DataType)(colNames: Seq[String]): DataFrame = {
+      transformCols(transformFun = cn => List(col(cn).cast(typ)), colFilter = colNames.contains)
+    }
+
+    /**
      * Converts the data type of a column to a specified type.
      *
      * Notes:
@@ -136,9 +168,7 @@ trait Transform extends Serializable {
      * @return A data frame with the column type updated
      *
      */
-    def castColumnTo(typ: DataType)(colName: String): DataFrame = {
-      transformCols(transformFun = cn => List(col(cn).cast(typ)), colFilter = _ == colName)
-    }
+    def castColumnTo(typ: DataType)(colNames: String): DataFrame = castColumnsTo(typ)(List(colNames))
 
     /**
      *

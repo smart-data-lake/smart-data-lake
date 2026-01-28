@@ -81,7 +81,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
                               override val housekeepingMode: Option[HousekeepingMode] = None,
                               override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject {
+  extends SparkFileDataObject with io.smartdatalake.util.spark.dataset.Transform {
 
   override val format = "com.databricks.spark.csv"
 
@@ -111,7 +111,7 @@ case class CsvFileDataObject( override val id: DataObjectId,
     // standardize date column types
     dateColumnType match {
       case DateColumnType.String =>
-        dfSuper.castDfColumnTyp(DateType, StringType)
+        dfSuper.castColumnsOfTypeTo(DateType)(StringType)
       case DateColumnType.Date => dfSuper.castAllDate2Timestamp
     }
   }

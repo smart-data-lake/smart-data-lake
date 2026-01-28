@@ -80,6 +80,17 @@ class TransformTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
+  "castColumnsOfTypeTo" should "cast the type of double columns to float" in {
+    val actual = dsSimple1.castColumnsOfTypeTo(FloatType)(DoubleType)
+    val schemaExpected: StructType = StructType(Array(
+      StructField(name = "id", dataType = StringType, nullable = false),
+      StructField(name = "n", dataType = IntegerType, nullable = false),
+      StructField(name = "x", dataType = FloatType, nullable = false),
+      StructField(name = "y", dataType = FloatType, nullable = false)))
+    val expected = spark.createDataFrame(ArrayBuffer(Row("A", 1, 0f, 10f)).asJava, schemaExpected)
+    actual.equal(expected) should be(true)
+  }
+
   "castDecimalsToIntegralType" should "cast unscaled decimals to an IntegralType" in {
     val actual = dfIntDecimal.castDecimalsToIntegralType()
     val rowsExpected = ArrayBuffer(
