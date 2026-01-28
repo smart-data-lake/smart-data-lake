@@ -30,7 +30,7 @@
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "sdlb-schema-viewer": "2.0.0"
+    "@smart-data-lake/sdlb-schema-viewer": "2.0.1"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.8.1",

@@ -7,7 +7,7 @@ on:
   # allow for manual releases
   workflow_dispatch:
     branches: [documentation]
-      
+
 jobs:
   deploy:
     name: Deploy to GitHub Pages
@@ -21,6 +21,8 @@ jobs:
         run: |
           yarn install --frozen-lockfile
           yarn build
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Popular action to deploy to GitHub Pages:
       # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
