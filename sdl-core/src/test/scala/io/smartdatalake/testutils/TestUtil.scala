@@ -24,8 +24,8 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.misc.StringUtil.replaceNonSqlWithUnderscores
+import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.SDLSparkExtension
@@ -49,9 +49,8 @@ import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.io.File
-import java.math.BigDecimal
 import java.nio.file.Files
-import java.sql.{Date, Timestamp}
+import java.sql.Timestamp
 import java.time.{Instant, LocalDateTime}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -109,9 +108,9 @@ object TestUtil extends SmartDataLakeLogger {
   }
 
   // write DataFrame to table
-  def prepareHiveTable( table: Table, path: String, df: DataFrame, partitionCols: Seq[String] = Seq() ): Unit = {
+  def prepareHiveTable(table: Table, path: String, df: DataFrame, partitionCols: Seq[String] = Seq()): Unit = {
     if (partitionCols.isEmpty) df.write.mode(SaveMode.Overwrite).option("path", path).saveAsTable(s"${table.fullName}")
-    else df.write.mode(SaveMode.Overwrite).option("path", path).partitionBy(partitionCols:_*).saveAsTable(s"${table.fullName}")
+    else df.write.mode(SaveMode.Overwrite).option("path", path).partitionBy(partitionCols: _*).saveAsTable(s"${table.fullName}")
   }
 
   // returns HiveTableDataObject which is created and provided data frame written to
@@ -120,22 +119,22 @@ object TestUtil extends SmartDataLakeLogger {
                       tableName: String, dirPath: String,
                       df: DataFrame, partitionCols: Seq[String] = Seq(), primaryKeyColumns: Option[Seq[String]] = None
                      )(implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): HiveTableDataObject = {
-    val table = Table(db=db,name=tableName,primaryKey=primaryKeyColumns)
-    val path = dirPath+s"$tableName"
-    val hTabDo = HiveTableDataObject(id=s"${tableName}DO",path=Some(path),schemaMin=schemaMin.map(SparkSchema.apply),table=table)
+    val table = Table(db = db, name = tableName, primaryKey = primaryKeyColumns)
+    val path = dirPath + s"$tableName"
+    val hTabDo = HiveTableDataObject(id = s"${tableName}DO", path = Some(path), schemaMin = schemaMin.map(SparkSchema.apply), table = table)
     hTabDo.dropTable
     instanceRegistry.register(hTabDo)
-    prepareHiveTable(table,path,df,partitionCols)
+    prepareHiveTable(table, path, df, partitionCols)
     hTabDo
   }
 
-  def copyResourceToFile( resource: String, tgtFile: File): Unit = {
+  def copyResourceToFile(resource: String, tgtFile: File): Unit = {
     val inputStream = this.getClass.getClassLoader.getResourceAsStream(resource)
-    assert(inputStream!=null, s"resource file $resource not found")
+    assert(inputStream != null, s"resource file $resource not found")
     FileUtils.copyInputStreamToFile(inputStream, tgtFile)
   }
 
-  def setupSSHServer( port: Int, usr: String, pwd: String): SshServer = {
+  def setupSSHServer(port: Int, usr: String, pwd: String): SshServer = {
     val sshd = SshServer.setUpDefaultServer()
     sshd.setFileSystemFactory(new NativeFileSystemFactory())
     sshd.setPort(port)
@@ -154,8 +153,8 @@ object TestUtil extends SmartDataLakeLogger {
    * Setup simple webserver with given ports
    * Different stubs are generated automatically to answer different URLs with predefined return codes
    *
-   * @param host bind address, usually localhost / 127.0.0.1
-   * @param port port for http calls
+   * @param host      bind address, usually localhost / 127.0.0.1
+   * @param port      port for http calls
    * @param httpsPort port for https calls
    * @return instance of [[WireMockServer]]
    */
@@ -217,7 +216,7 @@ object TestUtil extends SmartDataLakeLogger {
     def printDf(df: DataFrame): Unit = {
       logger.error(df.schema.simpleString)
       df.printSchema()
-      df.orderBy(df.columns.head, df.columns.tail:_*).show(false)
+      df.orderBy(df.columns.head, df.columns.tail: _*).show(false)
     }
 
     logger.error(s"!!!! Test $testName Failed !!!")
@@ -243,7 +242,7 @@ object TestUtil extends SmartDataLakeLogger {
       logger.error(s"   comment  = $comment")
     }
 
-    def checkKey(x: (String,K)): Boolean = x match {
+    def checkKey(x: (String, K)): Boolean = x match {
       case (comment, argument) =>
         val actual = experiendum(argument)
         val expected = argExpMapComm(x)
@@ -254,14 +253,16 @@ object TestUtil extends SmartDataLakeLogger {
         result
       case _ => throw new Exception(s"Something went wrong: checkKey called with parameter x=$x")
     }
+
     val results: Set[Boolean] = argExpMapComm.keySet.map(checkKey)
     assert(results.forall(p => p))
   }
 
   def testArgumentExpectedMap[K, V](experiendum: K => V, argExpMap: Map[K, V]): Unit = {
-    def addEmptyComment(x : (K, V)): ((String, K), V) = x match {
+    def addEmptyComment(x: (K, V)): ((String, K), V) = x match {
       case (k, v) => (("", k), v)
     }
+
     val argExpMapWithReason: Map[(String, K), V] = argExpMap.map(addEmptyComment)
     testArgumentExpectedMapWithComment(experiendum, argExpMapWithReason)
   }
@@ -277,10 +278,11 @@ object TestUtil extends SmartDataLakeLogger {
       (4, Seq(("d", "D", Seq("d", "D")))),
       (5, Seq(("e", "E", Seq("e", "E"))))
     )
-    rowsComplex.toDF("id","value")
+    rowsComplex.toDF("id", "value")
   }
 
   def dfEmptyNilSchema: DataFrame = session.createDataFrame(Seq.empty[Row].asJava, StructType(Nil))
+
   def dfEmptyWithSchema: DataFrame = {
     import session.implicits._
     Seq.empty[String].toDF()
@@ -295,6 +297,7 @@ object TestUtil extends SmartDataLakeLogger {
   val notNullableArrayField: StructField = StructField("arrwithoutnull", ArrayType(StructType(nullableStringField :: notNullableStringField :: Nil), containsNull = false))
   val nullableMapField: StructField = StructField("mapwithnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = true))
   val notNullableMapField: StructField = StructField("mapwithoutnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = false))
+
   def dfEmptyWithStructuredSchema: DataFrame = {
     session.createDataFrame(session.sparkContext.makeRDD(Seq.empty[Row]),
       StructType(
@@ -329,43 +332,6 @@ object TestUtil extends SmartDataLakeLogger {
     val rowsHierarchy: Seq[(String, String)] = Seq(("a","ab"), ("a","ac"), ("ac","aca"), ("b","ba"),
       ("c","ca"), ("ca","caa"), ("ca","cab"), ("c","cb"), ("cb","X"), ("c","cc"), ("cc","X"), ("X","Y"), ("Y","Z"))
     rowsHierarchy.toDF("parent", "child")
-  }
-
-  def makeRowManyTypes(r: (Boolean,Int,Int,Int,Int,String,String,String,String,String,String,Double,Double,String,String,String) ): Row = {
-    Row(r._1,r._2.byteValue(),r._3.shortValue(),r._4,r._5.longValue(), // BooleanType - LongType
-      Decimal(new BigDecimal(r._6),2,0),
-      Decimal(new BigDecimal(r._7),4,0),
-      Decimal(new BigDecimal(r._8),10,0),
-      Decimal(new BigDecimal(r._9),11,0),
-      Decimal(new BigDecimal(r._10),4,3),
-      Decimal(new BigDecimal(r._11),38,1),
-      r._12.floatValue(),r._13,Date.valueOf(r._14),Timestamp.valueOf(r._15),r._16) // FloatType - StringType
-  }
-  val rowsManyTypes: List[(Boolean,Int,Int,Int,Int,String,String,String,String,String,String,Double,Double,String,String,String)] = List(
-    (false,0,0,0,0,"0","0","0","0","0.0","0.0",0.0,0.0,"1970-01-01","1970-01-01 02:34:56.789","zero"),
-    (true,127,32767,Int.MaxValue,Int.MaxValue,"99","9999","9999999999","99999999999","1.234","1234567890123456789012345678901234567.8",
-      Float.MaxValue,Double.MaxValue,"2020-02-29","2020-02-29 12:34:56.789","maximal")
-  )
-  def dfManyTypes: DataFrame = {
-    val schemaManyTypes: StructType = StructType(
-      StructField("_boolean", BooleanType, nullable = true) ::
-        StructField("_byte", ByteType, nullable = true) ::
-        StructField("_short", ShortType, nullable = true) ::
-        StructField("_integer", IntegerType, nullable = true) ::
-        StructField("_long", LongType, nullable = true) ::
-        StructField("_decimal_2_0" , DecimalType(2, 0), nullable = true) ::
-        StructField("_decimal_4_0" , DecimalType(4, 0), nullable = true) ::
-        StructField("_decimal_10_0", DecimalType(10, 0), nullable = true) ::
-        StructField("_decimal_11_0", DecimalType(11, 0), nullable = true) ::
-        StructField("_decimal_4_3", DecimalType(4, 3), nullable = true) ::
-        StructField("_decimal_38_1", DecimalType(38, 1), nullable = true) ::
-        StructField("_float", FloatType, nullable = true) ::
-        StructField("_double", DoubleType, nullable = true) ::
-        StructField("_date", DateType, nullable = true) ::
-        StructField("_timestamp", TimestampType, nullable = true) ::
-        StructField("_string", StringType, nullable = true) ::
-        Nil)
-    session.createDataFrame(rows=rowsManyTypes.map(makeRowManyTypes).asJava, schema=schemaManyTypes): DataFrame
   }
 
   def dfNonUnique: DataFrame = {
