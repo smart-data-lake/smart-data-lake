@@ -21,6 +21,7 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestTool
 import io.smartdatalake.testutils.spark.dataset.Collection._
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
@@ -35,7 +36,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
 class TransformTest extends AnyFlatSpec with Matchers
-  with TestTool with Equality with Types {
+  with TestTool with TestToolDataset with Equality with Types {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = createSparkSession()
 
@@ -80,6 +81,18 @@ class TransformTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
+  "castAll2String" should "cast all columns to StringType" in {
+    val actual = dfManyTypes.castAll2String
+    val expected = actual.columns.foldLeft(actual)({ (df, s) => df.withColumn(s, col(s).cast(StringType)) })
+    actual.equal(expected) should be(true)
+  }
+
+  "castAllDate2Timestamp" should "cast all DateType columns to TimestampType" in {
+    val actual = dfManyTypes.castAllDate2Timestamp
+    val expected = actual.withColumn("_date", $"_date".cast(TimestampType))
+    actual.equal(expected) should be(true)
+  }
+
   "castColumnsOfTypeTo" should "cast the type of double columns to float" in {
     val actual = dsSimple1.castColumnsOfTypeTo(FloatType)(DoubleType)
     val schemaExpected: StructType = StructType(Array(
@@ -106,6 +119,18 @@ class TransformTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
+  "castDecimalsToIntegralType" should "cast dataFrame with many types properly" in {
+    val actual = dfManyTypes.castAllDecimal2IntegralFloat
+    val expected = actual
+      .withColumn("_decimal_2_0", $"_decimal_2_0".cast(ByteType))
+      .withColumn("_decimal_4_0", $"_decimal_4_0".cast(ShortType))
+      .withColumn("_decimal_10_0", $"_decimal_10_0".cast(IntegerType))
+      .withColumn("_decimal_11_0", $"_decimal_11_0".cast(LongType))
+      .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
+      .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
+    actual.equal(expected) should be(true)
+  }
+
   "castDecimalsToIntegralType with parameter strict=false" should "cast BigDecimal( Long.MaxValue + 1) to Long.MinValue" in {
     val actual = dfIntDecimal.castDecimalsToIntegralType(strict = false)
     val rowsExpected = ArrayBuffer(
@@ -122,7 +147,7 @@ class TransformTest extends AnyFlatSpec with Matchers
   }
 
   "castDecimalsToIntegralType" should "cast unscaled decimals to DecimalType(38, 0)" in {
-    val actual = dfIntDecimal.castDecimalsToIntegralType(typ = Some(DecimalType(38, 0)))
+    val actual = dfIntDecimal.castDecimalsToIntegralType(typOpt = Some(DecimalType(38, 0)))
     val schema_expected = createStruct(Array[(String, DataType)](("id", IntegerType),
       ("deci_byte", DecimalType(38, 0)), ("deci_short", DecimalType(38, 0)), ("deci_int", DecimalType(38, 0)),
       ("deci_long", DecimalType(38, 0)), ("deci_tolong", DecimalType(38, 0)), ("deci", DecimalType(8, 4)))

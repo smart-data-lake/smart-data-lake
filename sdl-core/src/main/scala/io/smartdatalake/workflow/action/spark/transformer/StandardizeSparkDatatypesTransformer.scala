@@ -35,7 +35,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  */
-case class StandardizeSparkDatatypesTransformer(override val name: String = "standardizeSparkDatatypes", override val description: Option[String] = None) extends SparkDfTransformer {
+case class StandardizeSparkDatatypesTransformer(override val name: String = "standardizeSparkDatatypes",
+                                                override val description: Option[String] = None)
+  extends SparkDfTransformer with io.smartdatalake.util.spark.dataset.Transform {
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     df.castAllDecimal2IntegralFloat
   }

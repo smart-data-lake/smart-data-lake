@@ -174,38 +174,6 @@ class DataFrameUtilTest extends AnyFunSuite with Matchers with SmartDataLakeLogg
     assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplex.select(dfComplex.columns.reverseIterator.map(col).toSeq: _*)))
   }
 
-  // other tests
-
-  test("castAllDate2Timestamp") {
-    val actual = dfManyTypes.castAllDate2Timestamp
-    val expected = actual.withColumn("_date", $"_date".cast(TimestampType))
-    val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("castAllDate2Timestamp", Seq(dfManyTypes))(actual)(expected)
-    assert(resultat)
-  }
-
-  test("castAll2String") {
-    val actual = dfManyTypes.castAll2String
-    val expected = actual.columns.foldLeft(actual)({ (df, s) => df.withColumn(s, col(s).cast(StringType)) })
-    val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("castAll2String", Seq(dfManyTypes))(actual)(expected)
-    assert(resultat)
-  }
-
-  test("castAllDecimal2IntegralFloat") {
-    val actual = dfManyTypes.castAllDecimal2IntegralFloat
-    val expected = actual
-      .withColumn("_decimal_2_0", $"_decimal_2_0".cast(ByteType))
-      .withColumn("_decimal_4_0", $"_decimal_4_0".cast(ShortType))
-      .withColumn("_decimal_10_0", $"_decimal_10_0".cast(IntegerType))
-      .withColumn("_decimal_11_0", $"_decimal_11_0".cast(LongType))
-      .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
-      .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
-    val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("castAllDecimal2IntegralFloat", Seq(dfManyTypes))(actual)(expected)
-    assert(resultat)
-  }
-
   test("containsNull_df_complex") {
     val actual = dfComplex.containsNull()
     if (actual) {

@@ -64,7 +64,7 @@ case class JsonFileDataObject( override val id: DataObjectId,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                              )(implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject {
+  extends SparkFileDataObject with io.smartdatalake.util.spark.dataset.Transform {
 
   override val format = "json"
 
