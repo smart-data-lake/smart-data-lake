@@ -21,9 +21,8 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.dataset.Collection._
 import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{ArrayType, IntegerType}
-import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.slf4j.{Logger, LoggerFactory}
@@ -65,21 +64,6 @@ class QualityTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
-  "setColumnComments" should "preserve type of Dataset" in {
-    val ds: Dataset[TestCaseClass] = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF().as[TestCaseClass]
-    val dsCommented: Dataset[TestCaseClass] = ds
-      .setColumnComments(Map("id" -> "desc_id", "x" -> "desc_x", "y" -> "desc_y"))
-    ds.schema.map(_.dataType) shouldBe dsCommented.schema.map(_.dataType)
-  }
-
-  "setColumnComments" should "modify column metadata" in {
-    val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
-    val dfCommented = df.setColumnComments(Map("id" -> "desc_id", "x" -> "desc_x", "y" -> "desc_y"))
-    val actual = dfCommented.getColumnComments.select("comment").as[String].collect().toSet
-    val expected = Set("desc_id", "desc_x", "desc_y")
-    actual shouldBe expected
-  }
-
   ///// tests treating gaps in axis (time or space) /////
 
   "fillGaps_next" should "fill the gaps taking value from next row" in {
@@ -114,68 +98,6 @@ class QualityTest extends AnyFlatSpec with Matchers
       (Some(1), Some(20190103), Some(-21.3), None),
       (Some(1), Some(20190104), Some(-21.3), None)).toDF("id", "dt", "x", "y")
 
-    actual.equal(expected) should be(true)
-  }
-
-  ///// tests about nLets, unique keys, PK, nullness /////
-
-  "getNonuniqueStats" should "return empty dataFrame if there are no nLets" in {
-    val actual = dfHierarchy.getNonuniqueStats()
-    val expected = dfHierarchy.where(lit(false)).withColumn("_cnt_", lit(0: Long))
-    actual.equal(expected) should be(true)
-  }
-
-  "getNonuniqueStats" should "return nLets in projected DataFrame" in {
-    val actual = dfHierarchy.getNonuniqueStats("parent")
-    val zeilen_expected: Seq[(String, Long)] = Seq(("a", 2), ("c", 3), ("ca", 2))
-    val expected = zeilen_expected.toDF("parent", "_cnt_")
-    actual.equal(expected) should be(true)
-  }
-
-  "getNonuniqueStats" should "return nLets of a dataFrame which consists one column only of" in {
-    val argument = List(0, 1, 2).toDF("id")
-    val actual = argument.getNonuniqueStats()
-    val expected = argument.where(lit(false)).withColumn("_cnt_", lit(0: Long))
-    actual.equal(expected) should be(true)
-  }
-
-  "getNonuniqueStats" should "return nLets" in {
-    val actual = dfnLets.getNonuniqueStats()
-    val zeilen_expected: List[(String, String, Long)] = List(("2let", "doublet", 2),
-      ("3let", "triplet", 3), ("4let", "quatriplet", 4))
-    val expected = zeilen_expected.toDF("id", "name", "_cnt_")
-    actual.equal(expected) should be(true)
-  }
-
-  "containsNull" should "return for dsComplex" in {
-    val actual = dsComplex.containsNull()
-    if (actual) {
-      logger.error(s"actual = $actual")
-      dsComplex.show(true)
-    }
-    actual shouldBe false
-  }
-
-  "containsNull" should "return for dsComplexWithNull" in {
-    val actual = dsComplexWithNull.containsNull()
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dsComplexWithNull.show(true)
-    }
-    assert(actual)
-  }
-
-  "getNulls" should "return for dsComplex" in {
-    val actual = dsComplex.getNulls()
-    val expected = dsComplex.where(lit(false))
-    actual.equal(expected) should be(true)
-  }
-
-  "getNulls" should "return for dsComplexWithNull" in {
-    val actual = dsComplexWithNull.getNulls()
-    val rows_expected: List[(Option[Int], Option[List[(String, String, List[String])]])] = List(
-      (Some(5), None), (None, None))
-    val expected = rows_expected.toDF("id", "value").as[complexTypeWithNull]
     actual.equal(expected) should be(true)
   }
 

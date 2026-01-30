@@ -72,7 +72,8 @@ trait Quality extends Transform {
    */
   final def getStatsCol(cn: String): List[Column] = getStatsCol(col(cn), cn)
 
-  implicit class DsQuality[T](ds: Dataset[T]) {
+
+  implicit class DsComment[T](ds: Dataset[T]) {
 
     def getColumnComments(implicit implSs: SparkSession): Dataset[(String, String, String)] = {
       import implSs.implicits._
@@ -95,7 +96,10 @@ trait Quality extends Transform {
     def withColumn(colName: String, expr: Column, comment: String): DataFrame = {
       ds.withColumn(colName, withComment(colName, expr, comment))
     }
+  }
 
+
+  implicit class DsQuality[T](ds: Dataset[T]) {
     /**
      * Converts maps to arrays and then counts distinct rows.
      * If the dataset has a map column ds.distinct() throws an exception
@@ -119,7 +123,7 @@ trait Quality extends Transform {
         }
         if (0 < cntDistinctRows && cntRows != cntDistinctRows) {
           logger.warn(s"DataSet $dsName has duplicates! Voilà some examples:")
-          getNonuniqueStats().show(8, truncate = false)
+          ds.getNonuniqueStats().show(8, truncate = false)
         }
         debLogFun(s"$dsName.count() = $cntRows") // may take a long time
         debLogFun(s"$dsName.distinct().count() = $cntDistinctRows") // may take even much longer time
@@ -200,10 +204,10 @@ trait Quality extends Transform {
         .drop(nextFromColName, "_islastrow")
     }
 
+  }
 
 
-    ///// all about nLets, unique keys, PK, nullness /////
-
+  implicit class DsPk[T](ds: Dataset[T]) {
 
     /**
      * returns sub data frame which consists of those rows which contain at least a null in the specified columns
@@ -216,7 +220,6 @@ trait Quality extends Transform {
       ds.where(nullSearch)
     }
 
-
     /**
      * Checks whether the specified columns contain nulls
      *
@@ -224,7 +227,6 @@ trait Quality extends Transform {
      * @return true or false
      */
     def containsNull(cols: Array[String] = ds.columns): Boolean = !getNulls(cols).isEmpty
-
 
     /**
      * counts n-lets of this data frame with respect to specified columns cols.
@@ -273,6 +275,6 @@ trait Quality extends Transform {
       ds.join(dfNonUnique, cols).select(ds.columns.head, ds.columns.tail: _*).as[T](ds.encoder)
     }
 
-
   }
+
 }
