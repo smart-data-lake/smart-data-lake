@@ -34,23 +34,6 @@ object DataFrameUtil {
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger with dataset.Quality {
 
     /**
-     * returns sub data frame which consists of those rows which violate PK condition for specfied columns
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return sub data frame
-     */
-    def getPKviolators(cols: Array[String] = df.columns): DataFrame = df.getNulls(cols)
-      .union(df.getNonuniqueRows(cols))
-
-    /**
-     * Checks whether the specified columns form a candidate key for the data frame
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return true or false
-     */
-    def isCandidateKey(cols: Array[String] = df.columns): Boolean = !df.containsNull(cols) && isMinimalUnique(cols)
-
-    /**
      * checks whether schema is subschema of given [[StructType]].
      *
      * @param scm to test
@@ -65,26 +48,6 @@ object DataFrameUtil {
      * @return result wether provided schema set is a subset of df.schema
      */
     def isSuperSchema(scm: StructType): Boolean = df.schema.toSet.subsetOf(scm.toSet)
-
-    /**
-     * Checks whether the specified columns satisfy uniqueness within the data frame
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return true or false
-     */
-    def isUnique(cols: Array[String] = df.columns): Boolean = project(cols).getNonuniqueStats(cols).isEmpty
-
-    /**
-     * Checks whether the specified columns is a local minimal array of columns satisfying uniqueness within the data frame
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return true or false
-     */
-    def isMinimalUnique(cols: Array[String] = df.columns): Boolean = {
-      def subFrameNotUnique(colName: String): Boolean = !df.isUnique(cols.filter(colName != _))
-
-      df.isUnique(cols) && cols.forall(subFrameNotUnique)
-    }
 
     /**
      * compares df with df2
@@ -103,14 +66,6 @@ object DataFrameUtil {
     def isSchemaEqualIgnoreNullabilty(df2: DataFrame): Boolean = {
       SchemaUtil.schemaDiff(SparkSchema(df.schema), SparkSchema(df2.schema), ignoreNullable = true).isEmpty && SchemaUtil.schemaDiff(SparkSchema(df2.schema), SparkSchema(df.schema), ignoreNullable = true).isEmpty
     }
-
-    /**
-     * projects a data frame onto array of columns
-     *
-     * @param cols : names of columns on which the data frame is to be projected
-     * @return projection of data frame df
-     */
-    def project(cols: Array[String] = df.columns): DataFrame = df.select(cols.map(col): _*)
 
     /**
      * symmetric difference of two data frames: (df∪df2)∖(df∩df2) = (df∖df2)∪(df2∖df)

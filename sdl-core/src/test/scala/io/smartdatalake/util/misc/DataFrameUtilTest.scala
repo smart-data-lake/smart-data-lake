@@ -21,7 +21,7 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -173,132 +173,6 @@ class DataFrameUtilTest extends AnyFunSuite with Matchers with SmartDataLakeLogg
   test("isSchemaEqual_complex_different_order") {
     assert(dfComplex.isSchemaEqualIgnoreNullabilty(dfComplex.select(dfComplex.columns.reverseIterator.map(col).toSeq: _*)))
   }
-
-  test("isCandidateKey_df_complex_withNull") {
-    val actual = dfComplexWithNull.isCandidateKey(Array("id"))
-    if (actual) {
-      logger.error(s"actual = $actual")
-      dfComplexWithNull.show(true)
-    }
-    assert(!actual)
-  }
-
-  test("isCandidateKey_df_TwoCandidateKeys_string12") {
-    val actual = dfTwoCandidateKeys.isCandidateKey(Array("string_id1", "string_id2"))
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dfTwoCandidateKeys.show()
-    }
-    assert(actual)
-  }
-
-  test("isCandidateKey_df_TwoCandidateKeys_int123") {
-    val actual = dfTwoCandidateKeys.isCandidateKey(Array("int_id1", "int_id2", "int_id3"))
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dfTwoCandidateKeys.show()
-    }
-    assert(actual)
-  }
-
-  test("isCandidateKey_df_TwoCandidateKeys_string12int1") {
-    val actual = dfTwoCandidateKeys.isCandidateKey(Array("string_id1", "string_id2", "int_id1"))
-    if (actual) {
-      logger.error(s"actual = $actual")
-      dfTwoCandidateKeys.show()
-    }
-    assert(!actual)
-  }
-
-  test("isMinimalUnique_df_TwoCandidateKeys_string12") {
-    val actual = dfTwoCandidateKeys.isMinimalUnique(Array("string_id1", "string_id2"))
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dfTwoCandidateKeys.show()
-    }
-    assert(actual)
-  }
-
-  test("isMinimalUnique_df_TwoCandidateKeys_int123") {
-    val actual = dfTwoCandidateKeys.isMinimalUnique(Array("int_id1", "int_id2", "int_id3"))
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dfTwoCandidateKeys.show()
-    }
-    assert(actual)
-  }
-
-  test("isMinimalUnique_df_TwoCandidateKeys_string12int1") {
-    val actual = dfTwoCandidateKeys.isMinimalUnique(Array("string_id1", "string_id2", "int_id1"))
-    if (actual) {
-      logger.error(s"actual = $actual")
-      dfTwoCandidateKeys.show()
-    }
-    assert(!actual)
-  }
-
-  test("isUnique_df_complex_withNull") {
-    val actual = dfComplexWithNull.isUnique()
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dfComplexWithNull.show(true)
-    }
-    assert(actual)
-  }
-
-  test("isUnique_df_hierarchy_true") {
-    val actual = dfHierarchy.isUnique()
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      dfHierarchy.show()
-    }
-    assert(actual)
-  }
-
-  test("isUnique_df_hierarchy_false") {
-    val actual = dfHierarchy.isUnique(Array("parent"))
-    if (actual) {
-      logger.error(s"actual = $actual")
-      dfHierarchy.show()
-    }
-    assert(!actual)
-  }
-
-  test("isUnique_df_with_1_column") {
-    val argument = Seq(0, 1, 2).toDF("id")
-    val actual = argument.isUnique()
-    if (!actual) {
-      logger.error(s"actual = $actual")
-      argument.show()
-    }
-    assert(actual)
-  }
-
-  test("isUnique_df_with_nlets") {
-    val actual = dfNonUnique.isUnique()
-    if (actual) {
-      logger.error(s"actual = $actual")
-      dfHierarchy.show()
-    }
-    assert(!actual)
-  }
-
-  test("project_df_complex") {
-    val actual = dfComplex.project(Array("value"))
-    val rows_expected: Seq[Seq[(String, String, Seq[String])]] = Seq(
-      Seq(("a", "A", Seq("a", "A"))),
-      Seq(("b", "B", Seq("b", "B"))),
-      Seq(("c", "C", Seq("c", "C"))),
-      Seq(("d", "D", Seq("d", "D"))),
-      Seq(("e", "E", Seq("e", "E")))
-    )
-    val expected: DataFrame = rows_expected.toDF("value")
-    val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("project_df_complex", Seq(dfNonUnique))(actual)(expected)
-    assert(resultat)
-  }
-
-
 
   /// Schema validation tests
 

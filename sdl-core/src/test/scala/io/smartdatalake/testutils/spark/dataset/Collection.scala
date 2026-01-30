@@ -235,6 +235,24 @@ object Collection extends Types {
   ).asJava
   val df_struct: DataFrame = spark.createDataFrame(rowStruct, schemaStruct)
 
+  /** * DataFrames concerning PK ** */
+
+  val rowsNonUnique: List[(String, String)] = List(("1let", "unilet"),
+    ("2let", "doublet"), ("2let", "doublet"),
+    ("3let", "triplet"), ("3let", "triplet"), ("3let", "triplet"),
+    ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"))
+
+  def dsNonUnique: Dataset[(String, String)] = rowsNonUnique.toDF("id", "value").as[(String, String)]
+
+  val rowsTwoCandidateKeys: List[(String, String, Int, Int, Int, Double)] = List(
+    ("a", "a", 1, 1, 1, 17.3),
+    ("a", "b", 1, 1, 2, 17.3),
+    ("b", "a", 1, 2, 1, 42.0),
+    ("b", "b", 1, 2, 2, -3.14),
+    ("b", "c", 2, 1, 1, -3.14))
+  val dsTwoCandidateKeys: Dataset[(String, String, Int, Int, Int, Double)] = rowsTwoCandidateKeys
+    .toDF("string_id1", "string_id2", "int_id1", "int_id2", "int_id3", "x")
+    .as[(String, String, Int, Int, Int, Double)]
 
   def makeRowManyTypes(r: (Boolean, Int, Int, Int, Int, String, String, String, String, String, String, Double, Double, String, String, String)): Row = {
     Row(r._1, r._2.byteValue(), r._3.shortValue(), r._4, r._5.longValue(), // BooleanType - LongType

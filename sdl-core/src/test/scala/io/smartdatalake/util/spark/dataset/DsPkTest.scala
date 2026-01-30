@@ -44,8 +44,8 @@ class DsPkTest extends AnyFlatSpec with Matchers
 
   "getNonuniqueStats" should "return nLets in projected DataFrame" in {
     val actual = dfHierarchy.getNonuniqueStats("parent")
-    val zeilen_expected: Seq[(String, Long)] = Seq(("a", 2), ("c", 3), ("ca", 2))
-    val expected = zeilen_expected.toDF("parent", "_cnt_")
+    val rowsExpected: List[(String, Long)] = List(("a", 2), ("c", 3), ("ca", 2))
+    val expected = rowsExpected.toDF("parent", "_cnt_")
     actual.equal(expected) should be(true)
   }
 
@@ -58,9 +58,9 @@ class DsPkTest extends AnyFlatSpec with Matchers
 
   "getNonuniqueStats" should "return nLets" in {
     val actual = dfnLets.getNonuniqueStats()
-    val zeilen_expected: List[(String, String, Long)] = List(("2let", "doublet", 2),
+    val rowsExpected: List[(String, String, Long)] = List(("2let", "doublet", 2),
       ("3let", "triplet", 3), ("4let", "quatriplet", 4))
-    val expected = zeilen_expected.toDF("id", "name", "_cnt_")
+    val expected = rowsExpected.toDF("id", "name", "_cnt_")
     actual.equal(expected) should be(true)
   }
 
@@ -79,7 +79,7 @@ class DsPkTest extends AnyFlatSpec with Matchers
       logger.error(s"actual = $actual")
       dsComplexWithNull.show(true)
     }
-    assert(actual)
+    actual shouldBe true
   }
 
   "getNulls" should "return for dsComplex" in {
@@ -96,4 +96,125 @@ class DsPkTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
+  "isCandidateKey" should "return false for id of dsComplexWithNull" in {
+    val actual = dsComplexWithNull.isCandidateKey(Array("id"))
+    if (actual) {
+      logger.error(s"actual = $actual")
+      dsComplexWithNull.show(false)
+    }
+    actual shouldBe false
+  }
+
+  "isCandidateKey" should "return true for (string_id1,string_id2) of dsTwoCandidateKeys" in {
+    val actual = dsTwoCandidateKeys.isCandidateKey(Array("string_id1", "string_id2"))
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dsTwoCandidateKeys.show()
+    }
+    actual shouldBe true
+  }
+
+  "isCandidateKey" should "return true for (int_id1,int_id2,int_id3) of dsTwoCandidateKeys" in {
+    val actual = dsTwoCandidateKeys.isCandidateKey(Array("int_id1", "int_id2", "int_id3"))
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dsTwoCandidateKeys.show()
+    }
+    actual shouldBe true
+  }
+
+  "isCandidateKey" should "return false for (string_id1,string_id2,int_id1) of dsTwoCandidateKeys" in {
+    val actual = dsTwoCandidateKeys.isCandidateKey(Array("string_id1", "string_id2", "int_id1"))
+    if (actual) {
+      logger.error(s"actual = $actual")
+      dsTwoCandidateKeys.show()
+    }
+    actual shouldBe false
+  }
+
+  "isMinimalUnique" should "return true for (string_id1,string_id2) of dsTwoCandidateKeys" in {
+    val actual = dsTwoCandidateKeys.isMinimalUnique(Array("string_id1", "string_id2"))
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dsTwoCandidateKeys.show()
+    }
+    actual shouldBe true
+  }
+
+  "isMinimalUnique" should "return true for (int_id1,int_id2,int_id3) of dsTwoCandidateKeys" in {
+    val actual = dsTwoCandidateKeys.isMinimalUnique(Array("int_id1", "int_id2", "int_id3"))
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dsTwoCandidateKeys.show()
+    }
+    actual shouldBe true
+  }
+
+  "isMinimalUnique" should "return false for (string_id1,string_id2,int_id1) of dsTwoCandidateKeys" in {
+    val actual = dsTwoCandidateKeys.isMinimalUnique(Array("string_id1", "string_id2", "int_id1"))
+    if (actual) {
+      logger.error(s"actual = $actual")
+      dsTwoCandidateKeys.show()
+    }
+    actual shouldBe false
+  }
+
+  "isUnique" should "return true for dsComplexWithNull" in {
+    val actual = dsComplexWithNull.isUnique()
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dsComplexWithNull.show(true)
+    }
+    actual shouldBe true
+  }
+
+  "isUnique" should "return true for dfHierarchy" in {
+    val actual = dfHierarchy.isUnique()
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dfHierarchy.show()
+    }
+    actual shouldBe true
+  }
+
+  "isUnique" should "return false for dfHierarchy" in {
+    val actual = dfHierarchy.isUnique(Array("parent"))
+    if (actual) {
+      logger.error(s"actual = $actual")
+      dfHierarchy.show()
+    }
+    actual shouldBe false
+  }
+
+  "isUnique" should "return true for DaatFrame with 1 column" in {
+    val argument = List(0, 1, 2).toDF("id")
+    val actual = argument.isUnique()
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      argument.show()
+    }
+    actual shouldBe true
+  }
+
+  "isUnique" should "return false for dsNonUnique" in {
+    val actual = dsNonUnique.isUnique()
+    if (actual) {
+      logger.error(s"actual = $actual")
+      dfHierarchy.show()
+    }
+    actual shouldBe false
+  }
+
+  "project" should "project dfComplex onto value only" in {
+    val actual = dsComplex.project(Array("value"))
+    val rows_expected: List[List[(String, String, List[String])]] = List(
+      List(("a", "A", List("a", "A"))),
+      List(("b", "B", List("b", "B"))),
+      List(("c", "C", List("c", "C"))),
+      List(("d", "D", List("d", "D"))),
+      List(("e", "E", List("e", "E")))
+    )
+    val expected = rows_expected.toDF("value")
+    actual.equal(expected) shouldBe true
+  }
 }

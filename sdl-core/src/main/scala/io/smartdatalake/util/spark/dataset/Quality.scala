@@ -246,7 +246,8 @@ trait Quality extends Transform {
       val dfColumns: Array[String] = dfProjected.columns
       // If df contains forbidden column then the result contains two columns with the same name
       forbiddenColumnNames.foreach(str =>
-        require(!dfColumns.contains(str), s"data frame df must not contain column named $str. cols = ${dfColumns.mkString(",")}")
+        require(!dfColumns.contains(str),
+          s"data frame df must not contain column named $str. cols = ${dfColumns.mkString(",")}")
       )
 
       dfProjected.groupBy(dfColumns.head, dfColumns.tail: _*)
@@ -274,6 +275,51 @@ trait Quality extends Transform {
       val dfNonUnique = getNonuniqueStats(cols, "_duplicationCount_").drop("_duplicationCount_")
       ds.join(dfNonUnique, cols).select(ds.columns.head, ds.columns.tail: _*).as[T](ds.encoder)
     }
+
+    /**
+     * projects a data frame onto array of columns
+     *
+     * @param cols : names of columns on which the data frame is to be projected
+     * @return projection of data frame df
+     */
+    def project(cols: Array[String] = ds.columns): DataFrame = ds.select(cols.map(col): _*)
+
+    /**
+     * Checks whether the specified columns satisfy uniqueness within the data frame
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def isUnique(cols: Array[String] = ds.columns): Boolean = project(cols).getNonuniqueStats(cols).isEmpty
+
+    /**
+     * returns sub data frame which consists of those rows which violate PK condition for specfied columns
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return sub data frame
+     */
+    def getPKviolators(cols: Array[String] = ds.columns): Dataset[T] = getNulls(cols)
+      .union(getNonuniqueRows(cols))
+
+    /**
+     * Checks whether the specified columns is a local minimal array of columns satisfying uniqueness within the data frame
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def isMinimalUnique(cols: Array[String] = ds.columns): Boolean = {
+      def subFrameNotUnique(colName: String): Boolean = !ds.isUnique(cols.filter(colName != _))
+
+      ds.isUnique(cols) && cols.forall(subFrameNotUnique)
+    }
+
+    /**
+     * Checks whether the specified columns form a candidate key for the data frame
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def isCandidateKey(cols: Array[String] = ds.columns): Boolean = !containsNull(cols) && isMinimalUnique(cols)
 
   }
 

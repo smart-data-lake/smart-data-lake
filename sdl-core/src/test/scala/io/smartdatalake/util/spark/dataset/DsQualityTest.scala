@@ -29,7 +29,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.Double.{NaN, NegativeInfinity}
 
-class QualityTest extends AnyFlatSpec with Matchers
+class DsQualityTest extends AnyFlatSpec with Matchers
   with Quality with Equality {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = createSparkSession()
