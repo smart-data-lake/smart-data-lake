@@ -24,7 +24,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField, StructType}
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 import org.slf4j.Logger
 
 import scala.util.{Failure, Success, Try}
@@ -73,23 +73,20 @@ trait Quality extends Transform {
   final def getStatsCol(cn: String): List[Column] = getStatsCol(col(cn), cn)
 
   implicit class DsQuality[T](ds: Dataset[T]) {
-    val cols: Array[String] = ds.columns
-    val scheme: StructType = ds.schema
-    implicit val enkoder: Encoder[T] = ds.encoder
 
     def getColumnComments(implicit implSs: SparkSession): Dataset[(String, String, String)] = {
       import implSs.implicits._
-      cols.map { cn => (cn, scheme(cn).dataType.catalogString, scheme(cn).getComment().getOrElse("")) }
+      ds.columns.map { cn => (cn, ds.schema(cn).dataType.catalogString, ds.schema(cn).getComment().getOrElse("")) }
         .toList.toDF("column", "datatype", "comment").as[(String, String, String)]
     }
 
     def setColumnComments(commentMap: Map[String, String])(implicit logger: Logger): Dataset[T] = {
       def commentField(fld: StructField): StructField = commentMap.get(fld.name).map(comment => fld.withComment(comment)).getOrElse(fld)
 
-      val superfluousComments = commentMap.keys.toSeq.diff(cols)
+      val superfluousComments = commentMap.keys.toSeq.diff(ds.columns)
       if (superfluousComments.nonEmpty) logger.warn(s"Superfluous comment detected for columns ${superfluousComments.mkString(", ")}")
-      val commentedCols = scheme.map(f => col(f.name).as(f.name, commentField(f).metadata))
-      ds.select(commentedCols: _*).as[T]
+      val commentedCols = ds.schema.map(f => col(f.name).as(f.name, commentField(f).metadata))
+      ds.select(commentedCols: _*).as[T](ds.encoder)
     }
 
     /**
@@ -122,7 +119,7 @@ trait Quality extends Transform {
         }
         if (0 < cntDistinctRows && cntRows != cntDistinctRows) {
           logger.warn(s"DataSet $dsName has duplicates! Voilà some examples:")
-          getNletten().show(8, truncate = false)
+          getNonuniqueStats().show(8, truncate = false)
         }
         debLogFun(s"$dsName.count() = $cntRows") // may take a long time
         debLogFun(s"$dsName.distinct().count() = $cntDistinctRows") // may take even much longer time
@@ -141,7 +138,7 @@ trait Quality extends Transform {
     }
 
 
-    /** * treating gaps in axis (time or space) ** */
+    ///// treating gaps in axis (time or space) /////
 
     /**
      * Fills data gaps with either the next or the previous value.
@@ -157,7 +154,6 @@ trait Quality extends Transform {
      */
     final def fillGaps(keyColNames: Iterable[String], dataColNames: Iterable[String],
                        orderColName: String, takeNextValueFirst: Boolean = true): DataFrame = {
-      val dsColumns = ds.columns
       val fenestra_next = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.currentRow, Window.unboundedFollowing)
       val fenestra_prev = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.unboundedPreceding, Window.currentRow)
 
@@ -169,7 +165,7 @@ trait Quality extends Transform {
         col(colName)
       }
       // TODO: find a way to declare columns as not-nullable
-      ds.select(dsColumns.map(newColumn): _*)
+      ds.select(ds.columns.map(newColumn): _*)
     }
 
     /**
@@ -205,41 +201,78 @@ trait Quality extends Transform {
     }
 
 
-    /** * checking for N-letten ** */
+
+    ///// all about nLets, unique keys, PK, nullness /////
+
 
     /**
-     * returns Nletten of this data frame with an additional count column
-     * overloaded version because used often to check whether columnName forms a unique key
+     * returns sub data frame which consists of those rows which contain at least a null in the specified columns
      *
-     * @param columName : names of column which is to be considered
-     * @return subdataframe of Nletten with an additional count column
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return sub data frame
      */
-    def getNletten(columName: String): DataFrame = getNletten(cols = Array(columName))
+    def getNulls(cols: Array[String] = ds.columns): Dataset[T] = {
+      val nullSearch: Column = ds.columns.map(col).foldLeft(lit(false))({ case (x, y) => x.or(y.isNull) })
+      ds.where(nullSearch)
+    }
+
 
     /**
-     * returns Nletten of this data frame with an additional count column
-     * usefull to check whether cols form a unique key
+     * Checks whether the specified columns contain nulls
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def containsNull(cols: Array[String] = ds.columns): Boolean = !getNulls(cols).isEmpty
+
+
+    /**
+     * counts n-lets of this data frame with respect to specified columns cols.
+     * The result data frame possesses the columns cols and an additional count column countColname.
      *
      * @param cols         : names of columns which are to be considered, unspecified or empty Array mean all columns of df
      * @param countColname : name of count column, default name: cnt
-     * @return subdataframe of Nletten with an additional count column
+     * @return subdataframe of n-lets
      */
-    def getNletten(cols: Array[String] = ds.columns, countColname: String = "cnt"): DataFrame = {
+    def getNonuniqueStats(cols: Array[String] = ds.columns, countColname: String = "_cnt_"): DataFrame = {
       val forbiddenColumnNames = Array("count", countColname)
       // for better usability we define empty Array of cols to mean all columns of df
-      val colsInDs: Array[String] = if (cols.isEmpty) ds.columns else ds.columns.intersect(cols)
-      if (colsInDs.isEmpty) throw new IllegalArgumentException(s"Argument cols must contain at least 1 name of a column of your dataset.\n   ds.columns = ${ds.columns.mkString(",")}\n   cols = ${cols.mkString(",")} ")
+      val colsInDs: Array[String] = if (cols.isEmpty) cols else cols.intersect(cols)
+      if (colsInDs.isEmpty) throw new IllegalArgumentException(s"Argument cols must contain at least 1 name" +
+        s" of a column of your dataset.\n   cols = ${cols.mkString(",")}\n   cols = ${cols.mkString(",")} ")
       val dfProjected: DataFrame = ds.select(colsInDs.map(col): _*)
       val dfColumns: Array[String] = dfProjected.columns
       // If df contains forbidden column then the result contains two columns with the same name
       forbiddenColumnNames.foreach(str =>
-        require(!dfColumns.contains(str), s"data frame df must not contain column named $str. df.columns = ${dfColumns.mkString(",")}")
+        require(!dfColumns.contains(str), s"data frame df must not contain column named $str. cols = ${dfColumns.mkString(",")}")
       )
 
       dfProjected.groupBy(dfColumns.head, dfColumns.tail: _*)
         .count().withColumnRenamed("count", countColname)
         .where(col(countColname) > 1)
     }
+
+    /**
+     * returns nLets of this data frame with an additional count column
+     * overloaded version because used often to check whether columnName forms a unique key
+     *
+     * @param columName : names of column which is to be considered
+     * @return subdataframe of nLets with an additional count column
+     */
+    def getNonuniqueStats(columName: String): DataFrame = getNonuniqueStats(cols = Array(columName))
+
+    /**
+     * Returns rows of this data frame which violate uniqueness for specified columns cols.
+     * The result data frame possesses an additional count column countColname.
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return subdataframe of n-lets
+     */
+    def getNonuniqueRows(cols: Array[String] = ds.columns): Dataset[T] = {
+      val dfNonUnique = getNonuniqueStats(cols, "_duplicationCount_").drop("_duplicationCount_")
+      ds.join(dfNonUnique, cols).select(ds.columns.head, ds.columns.tail: _*).as[T](ds.encoder)
+    }
+
 
   }
 }

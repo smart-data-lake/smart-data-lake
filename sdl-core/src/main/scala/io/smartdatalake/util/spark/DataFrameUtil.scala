@@ -31,63 +31,7 @@ import org.apache.spark.sql.types._
 @deprecated(since = "2.8.2")
 object DataFrameUtil {
 
-  implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger {
-
-    /**
-     * Checks whether the specified columns contain nulls
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return true or false
-     */
-    def containsNull(cols: Array[String] = df.columns): Boolean = !getNulls().isEmpty
-
-    /**
-     * counts n-lets of this data frame with respect to specified columns cols.
-     * The result data frame possesses the columns cols and an additional count column countColname.
-     *
-     * @param cols         : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @param countColname : name of count column, default name: cnt
-     * @return subdataframe of n-lets
-     */
-    def getNonuniqueStats(cols: Array[String] = df.columns, countColname: String = "_cnt_"): DataFrame = {
-      val forbiddenColumnNames = Array("count", countColname)
-      // for better usability we define empty Array of cols to mean all columns of df
-      val colsInDf: Array[String] = if (cols.isEmpty) df.columns else df.columns.intersect(cols)
-      if (colsInDf.isEmpty) throw new IllegalArgumentException(s"Argument cols must contain at least 1 name of a column of data frame df.\n   df.columns = ${df.columns.mkString(",")}\n   cols = ${cols.mkString(",")} ")
-      val projectedDf = df.select(colsInDf.head, colsInDf.tail: _*)
-      val dfColumns: Array[String] = projectedDf.columns
-      // If df contains forbidden column then the result contains two columns with the same name
-      forbiddenColumnNames.foreach(str =>
-        if (dfColumns.contains(str)) throw new IllegalArgumentException(s"data frame df must not contain column named $str. df.columns = ${dfColumns.mkString(",")}")
-      )
-
-      projectedDf.groupBy(dfColumns.head, dfColumns.tail: _*)
-        .count().withColumnRenamed("count", countColname)
-        .where(col(countColname) > 1)
-    }
-
-    /**
-     * Returns rows of this data frame which violate uniqueness for specified columns cols.
-     * The result data frame possesses an additional count column countColname.
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return subdataframe of n-lets
-     */
-    def getNonuniqueRows(cols: Array[String] = df.columns): DataFrame = {
-      val dfNonUnique = getNonuniqueStats(cols, "_duplicationCount_").drop("_duplicationCount_")
-      df.join(dfNonUnique, cols).select(df.columns.head, df.columns.tail: _*)
-    }
-
-    /**
-     * returns sub data frame which consists of those rows which contain at least a null in the specified columns
-     *
-     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
-     * @return sub data frame
-     */
-    def getNulls(cols: Array[String] = df.columns): DataFrame = {
-      val nullSearch: Column = cols.map(col).foldLeft(lit(false))({ case (x, y) => x.or(y.isNull) })
-      df.where(nullSearch)
-    }
+  implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger with dataset.Quality {
 
     /**
      * returns sub data frame which consists of those rows which violate PK condition for specfied columns
@@ -95,7 +39,8 @@ object DataFrameUtil {
      * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
      * @return sub data frame
      */
-    def getPKviolators(cols: Array[String] = df.columns): DataFrame = getNulls(cols).union(getNonuniqueRows(cols))
+    def getPKviolators(cols: Array[String] = df.columns): DataFrame = df.getNulls(cols)
+      .union(df.getNonuniqueRows(cols))
 
     /**
      * Checks whether the specified columns form a candidate key for the data frame
@@ -103,7 +48,7 @@ object DataFrameUtil {
      * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
      * @return true or false
      */
-    def isCandidateKey(cols: Array[String] = df.columns): Boolean = !containsNull(cols) && isMinimalUnique(cols)
+    def isCandidateKey(cols: Array[String] = df.columns): Boolean = !df.containsNull(cols) && isMinimalUnique(cols)
 
     /**
      * checks whether schema is subschema of given [[StructType]].

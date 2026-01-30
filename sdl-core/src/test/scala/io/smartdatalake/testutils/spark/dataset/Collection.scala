@@ -59,6 +59,29 @@ object Collection extends Types {
     StructField(name = "x", dataType = IntegerType, nullable = true)))
   val dsNull: Dataset[(String, Int)] = spark.createDataFrame(ArrayBuffer(Row("A", None)).asJava, schemaNull).as[(String, Int)]
 
+  type complexType = (Int, List[(String, String, List[String])])
+  val rowsComplex: List[complexType] = List(
+    (1, List(("a", "A", List("a", "A")))),
+    (2, List(("b", "B", List("b", "B")))),
+    (3, List(("c", "C", List("c", "C")))),
+    (4, List(("d", "D", List("d", "D")))),
+    (5, List(("e", "E", List("e", "E"))))
+  )
+  val dsComplex: Dataset[complexType] = rowsComplex
+    .toDF("id", "value")
+    .as[complexType]
+
+  type complexTypeWithNull = (Option[Int], Option[List[(String, String, Option[List[String]])]])
+  val rowsComplexWithNull: List[complexTypeWithNull] = List(
+    (Some(1), Some(List(("a", "A", Some(List("a", "A")))))),
+    (Some(2), Some(List(("b", "B", Some(List("b", "B")))))),
+    (Some(3), Some(List(("c", "C", None)))),
+    (Some(4), Some(List(("d", "D", Some(List("d", "D")))))),
+    (Some(5), None),
+    (None, None)
+  )
+  val dsComplexWithNull: Dataset[complexTypeWithNull] = rowsComplexWithNull
+    .toDF("id", "value").as[(Option[Int], Option[List[(String, String, Option[List[String]])]])]
 
   val dfTemporalPeriods: DataFrame = List(
     (1, Some(0.0), Some(1.2), 3.14, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
@@ -101,12 +124,12 @@ object Collection extends Types {
     (9, "cb", "X"), (10, "c", "cc"), (11, "cc", "X"), (12, "X", "Y"), (13, "Y", "Z"))
   val dfHierarchy: DataFrame = rowsHierarchy.toDF("id", "parent", "child")
 
-  // DataFrame with Nletten
-  val rowsNletten: List[(String, String)] = List(("1lette", "Unilette"),
-    ("2lette", "Doublette"), ("2lette", "Doublette"),
-    ("3lette", "Trilette"), ("3lette", "Trilette"), ("3lette", "Trilette"),
-    ("4lette", "Quatrilette"), ("4lette", "Quatrilette"), ("4lette", "Quatrilette"), ("4lette", "Quatrilette"))
-  val dfNletten: DataFrame = rowsNletten.toDF("id", "name")
+  // DataFrame with nLets
+  val rowsnLets: List[(String, String)] = List(("1let", "Unilet"),
+    ("2let", "doublet"), ("2let", "doublet"),
+    ("3let", "triplet"), ("3let", "triplet"), ("3let", "triplet"),
+    ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"))
+  val dfnLets: DataFrame = rowsnLets.toDF("id", "name")
 
 
   /** * DataFrame with Decimals ** */

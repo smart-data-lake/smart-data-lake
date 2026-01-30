@@ -80,7 +80,7 @@ class QualityTest extends AnyFlatSpec with Matchers
     actual shouldBe expected
   }
 
-  /** * tests treating gaps in axis (time or space) ** */
+  ///// tests treating gaps in axis (time or space) /////
 
   "fillGaps_next" should "fill the gaps taking value from next row" in {
     val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt")
@@ -117,32 +117,65 @@ class QualityTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
-  /** * tests checking for N-letten ** */
+  ///// tests about nLets, unique keys, PK, nullness /////
 
-  "getNletten" should "return empty dataFrame if there are no Nletten" in {
-    val actual = dfHierarchy.getNletten()
-    val expected = dfHierarchy.where(lit(false)).withColumn("cnt", lit(0: Long))
+  "getNonuniqueStats" should "return empty dataFrame if there are no nLets" in {
+    val actual = dfHierarchy.getNonuniqueStats()
+    val expected = dfHierarchy.where(lit(false)).withColumn("_cnt_", lit(0: Long))
     actual.equal(expected) should be(true)
   }
 
-  "getNletten" should "return Nletten of a particular column" in {
-    val actual = dfHierarchy.getNletten("parent")
+  "getNonuniqueStats" should "return nLets in projected DataFrame" in {
+    val actual = dfHierarchy.getNonuniqueStats("parent")
     val zeilen_expected: Seq[(String, Long)] = Seq(("a", 2), ("c", 3), ("ca", 2))
-    val expected = zeilen_expected.toDF("parent", "cnt")
+    val expected = zeilen_expected.toDF("parent", "_cnt_")
     actual.equal(expected) should be(true)
   }
 
-  "getNletten" should "return Nletten of a dataFrame which consists one column only of" in {
+  "getNonuniqueStats" should "return nLets of a dataFrame which consists one column only of" in {
     val argument = List(0, 1, 2).toDF("id")
-    val actual = argument.getNletten()
-    val expected = argument.where(lit(false)).withColumn("cnt", lit(0: Long))
+    val actual = argument.getNonuniqueStats()
+    val expected = argument.where(lit(false)).withColumn("_cnt_", lit(0: Long))
     actual.equal(expected) should be(true)
   }
 
-  "getNletten" should "return Nletten" in {
-    val actual = dfNletten.getNletten()
-    val zeilen_expected: Seq[(String, String, Long)] = Seq(("2lette", "Doublette", 2), ("3lette", "Trilette", 3), ("4lette", "Quatrilette", 4))
-    val expected = zeilen_expected.toDF("id", "name", "cnt")
+  "getNonuniqueStats" should "return nLets" in {
+    val actual = dfnLets.getNonuniqueStats()
+    val zeilen_expected: List[(String, String, Long)] = List(("2let", "doublet", 2),
+      ("3let", "triplet", 3), ("4let", "quatriplet", 4))
+    val expected = zeilen_expected.toDF("id", "name", "_cnt_")
+    actual.equal(expected) should be(true)
+  }
+
+  "containsNull" should "return for dsComplex" in {
+    val actual = dsComplex.containsNull()
+    if (actual) {
+      logger.error(s"actual = $actual")
+      dsComplex.show(true)
+    }
+    actual shouldBe false
+  }
+
+  "containsNull" should "return for dsComplexWithNull" in {
+    val actual = dsComplexWithNull.containsNull()
+    if (!actual) {
+      logger.error(s"actual = $actual")
+      dsComplexWithNull.show(true)
+    }
+    assert(actual)
+  }
+
+  "getNulls" should "return for dsComplex" in {
+    val actual = dsComplex.getNulls()
+    val expected = dsComplex.where(lit(false))
+    actual.equal(expected) should be(true)
+  }
+
+  "getNulls" should "return for dsComplexWithNull" in {
+    val actual = dsComplexWithNull.getNulls()
+    val rows_expected: List[(Option[Int], Option[List[(String, String, List[String])]])] = List(
+      (Some(5), None), (None, None))
+    val expected = rows_expected.toDF("id", "value").as[complexTypeWithNull]
     actual.equal(expected) should be(true)
   }
 
