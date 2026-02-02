@@ -31,7 +31,6 @@ import scala.util.{Failure, Success, Try}
 
 trait Quality extends Transform {
 
-
   final def comment(commentString: String): Metadata = new MetadataBuilder()
     .putString("comment", commentString).build()
 
