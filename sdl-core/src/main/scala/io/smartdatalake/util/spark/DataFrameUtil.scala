@@ -34,22 +34,6 @@ object DataFrameUtil {
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger with dataset.Quality {
 
     /**
-     * checks whether schema is subschema of given [[StructType]].
-     *
-     * @param scm to test
-     * @return result wether provided schema set is a subset of df.schema
-     */
-    def isSubSchema(scm: StructType): Boolean = scm.toSet.subsetOf(df.schema.toSet)
-
-    /**
-     * checks whether schema is superschema of given [[StructType]].
-     *
-     * @param scm to test
-     * @return result wether provided schema set is a subset of df.schema
-     */
-    def isSuperSchema(scm: StructType): Boolean = df.schema.toSet.subsetOf(scm.toSet)
-
-    /**
      * compares df with df2
      *
      * @param df2 : data frame to comapre with
@@ -80,22 +64,6 @@ object DataFrameUtil {
       val colOrder = df.columns.map(col)
       df.except(df2.select(colOrder: _*)).withColumn(diffColName, lit(true))
         .unionByName(df2.select(colOrder: _*).except(df).withColumn(diffColName, lit(false)))
-    }
-
-    /**
-     * Computes the set difference between the columns of `otherSchema` and of the columns defined in this data frame's
-     * schema: `Set(otherSchema)` \ `Set(this.schema)`.
-     *
-     * Note the order: this returns the set of columns contained in
-     * `otherSchema` that are missing in this data frame's schema.
-     *
-     * @param schemaOther    the schema whose [[StructField]]s to subtract.
-     * @param ignoreNullable if `true`, columns that only differ in their `nullable` property are considered equal.
-     * @return the set of columns contained in `otherSchema` but not in `this.schema`.
-     */
-    def schemaDiffTo(schemaOther: StructType, ignoreNullable: Boolean = false, deep: Boolean = false): Set[StructField] = {
-      SchemaUtil.schemaDiff(SparkSchema(schemaOther), SparkSchema(df.schema), ignoreNullable = ignoreNullable, deep = deep)
-        .map(_.asInstanceOf[SparkField].inner)
     }
 
     /**

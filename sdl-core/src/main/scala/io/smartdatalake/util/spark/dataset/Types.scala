@@ -29,7 +29,7 @@ trait Types extends Serializable {
    * @param fields : fields as triple (name, data type, is nullable)
    * @return StructType
    */
-  protected final def createStruct(fields: Array[(String, DataType, Boolean)]): StructType = StructType(
+  final def createStruct(fields: Array[(String, DataType, Boolean)]): StructType = StructType(
     fields.map(x => StructField(name = x._1, dataType = x._2: DataType, nullable = x._3))
   )
 
@@ -39,7 +39,7 @@ trait Types extends Serializable {
    * @param fields : nullable fields as pair (name, data type)
    * @return StructType
    */
-  protected final def createStruct(fields: Array[(String, DataType)]): StructType = createStruct(
+  final def createStruct(fields: Array[(String, DataType)]): StructType = createStruct(
     fields.map { case (fldName, dTyp) => (fldName, dTyp, true) }
   )
 
@@ -51,6 +51,6 @@ trait Types extends Serializable {
    * @param nullable  : is field nullable ?
    * @return StructType
    */
-  protected final def createStruct(fieldName: String, fieldType: DataType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
+  final def createStruct(fieldName: String, fieldType: DataType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
 
 }

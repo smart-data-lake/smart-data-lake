@@ -65,5 +65,24 @@ trait StructTypeUtil {
       }
       result
     }
+
+
+    /**
+     * checks whether schema is subschema of given [[StructType]].
+     *
+     * @param scm to test
+     * @return result whether this is subset of provided schema
+     */
+    final def isSubSetOf(scm: StructType): Boolean = st.toSet.subsetOf(scm.toSet)
+
+    /**
+     * checks whether schema is superschema of given [[StructType]].
+     *
+     * @param scm to test
+     * @return result whether this is superset of provided schema
+     */
+    final def isSuperSetOf(scm: StructType): Boolean = scm.toSet.subsetOf(st.toSet)
+
   }
+  
 }

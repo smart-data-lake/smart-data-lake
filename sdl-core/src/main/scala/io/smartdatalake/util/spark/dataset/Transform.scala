@@ -32,6 +32,8 @@ trait Transform extends Serializable {
 
   implicit class DsTransform[T](ds: Dataset[T]) {
 
+    val asDf: DataFrame = ds.select(ds.columns.map(col) :_*)
+
     /** * transformCols: generic workers used by many other methods ** */
 
     /**

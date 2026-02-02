@@ -20,16 +20,16 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestTool
+import io.smartdatalake.testutils.spark.dataset.Collection._
 import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.slf4j.{Logger, LoggerFactory}
 
-class StructTypeUtilTest extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks
-  with TestTool with Equality {
+class StructTypeUtilTest extends AnyFlatSpec with Matchers
+  with TestTool with StructTypeUtil with Transform {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = createSparkSession()
 
@@ -98,6 +98,71 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers with ScalaCheckProper
         StructField("code_d", ArrayType(StringType, containsNull = false), nullable = true)
       ))
     leftSchema.equal(rightSchema) shouldBe false
+  }
+
+  "schema" should "be superset of itself" in {
+    val argExpMap: Map[DataFrame, Boolean] = Map(
+      dsComplex.asDf -> true,
+      dsComplexWithNull.asDf -> true,
+      dfHierarchy -> true,
+      dsNonUnique.asDf -> true,
+      dsTwoCandidateKeys.asDf -> true
+    )
+    val testFun: DataFrame => Boolean = df => df.schema.isSuperSetOf(df.schema)
+    testArgumentExpectedMap[DataFrame, Boolean](testFun, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
+  }
+
+  "schema" should "be subset of itself" in {
+    val argExpMap: Map[DataFrame, Boolean] = Map(
+      dsComplex.asDf -> true,
+      dsComplexWithNull.asDf -> true,
+      dfHierarchy -> true,
+      dsNonUnique.asDf -> true,
+      dsTwoCandidateKeys.asDf -> true
+    )
+    val testFun: DataFrame => Boolean = df => df.schema.isSubSetOf(df.schema)
+    testArgumentExpectedMap[DataFrame, Boolean](testFun, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
+  }
+
+  "schema" should "be superset of itself reversed" in {
+    val argExpMap: Map[DataFrame, Boolean] = Map(
+      dsComplex.asDf -> true,
+      dsComplexWithNull.asDf -> true,
+      dfHierarchy -> true,
+      dsNonUnique.asDf -> true,
+      dsTwoCandidateKeys.asDf -> true
+    )
+    val testFun: DataFrame => Boolean = df => df.schema.isSuperSetOf(new StructType(df.schema.fields.reverse))
+    testArgumentExpectedMap[DataFrame, Boolean](testFun, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
+  }
+
+  "schema" should "be subset of itself reversed" in {
+    val argExpMap: Map[DataFrame, Boolean] = Map(
+      dsComplex.asDf -> true,
+      dsComplexWithNull.asDf -> true,
+      dfHierarchy -> true,
+      dsNonUnique.asDf -> true,
+      dsTwoCandidateKeys.asDf -> true
+    )
+    val testFun: DataFrame => Boolean = df => df.schema.isSubSetOf(new StructType(df.schema.fields.reverse))
+    testArgumentExpectedMap[DataFrame, Boolean](testFun, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
+  }
+
+  "schema" should "be superset of itself with first column dropped" in {
+    val argExpMap: Map[DataFrame, Boolean] = Map(
+      dsComplex.asDf -> true,
+      dsComplexWithNull.asDf -> true,
+      dfHierarchy -> true,
+      dsNonUnique.asDf -> true,
+      dsTwoCandidateKeys.asDf -> true
+    )
+    val testFun: DataFrame => Boolean = df => df.schema.isSuperSetOf(new StructType(df.schema.drop(1).toArray))
+    testArgumentExpectedMap[DataFrame, Boolean](testFun, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
   }
 
 }
