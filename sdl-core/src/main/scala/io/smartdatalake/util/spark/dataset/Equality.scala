@@ -56,11 +56,14 @@ trait Equality extends StructTypeUtil with Transform {
      * @param that the right dataframe
      * @return whether or not the dataframes are equal
      */
-    final def getSymmetricDifference(that: Dataset[T])(implicit logger: Logger): DataFrame = {
+    final def getSymmetricDifference(that: Dataset[T], ignoreColnameCase: Boolean = true)
+                                    (implicit logger: Logger): DataFrame = {
       // Spark 3 needs alias for joins from same DataFrame with same column names
-      val thiss = ds.explodeMaps.explodeArrays.unfoldStructs()
+      val thiss = if (ignoreColnameCase) ds.explodeMaps.explodeArrays.unfoldStructs().renameCols(renameFun = _.toLowerCase)
+      else ds.explodeMaps.explodeArrays.unfoldStructs()
       val thissColLogString = s"thiss.columns  = Array(${thiss.columns.mkString(",")})"
-      val thatt = that.explodeMaps.explodeArrays.unfoldStructs()
+      val thatt = if (ignoreColnameCase) that.explodeMaps.explodeArrays.unfoldStructs().renameCols(renameFun = _.toLowerCase)
+      else that.explodeMaps.explodeArrays.unfoldStructs()
       require(thiss.columns sameElements thatt.columns,
         s"""getSymmetricDifference: DFs must have the same columns!
            | $thissColLogString

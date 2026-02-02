@@ -25,7 +25,7 @@ import org.apache.spark.sql.types._
 /**
  * Provides utility functions for [[DataFrame]]s.
  */
-@deprecated(message = "use io.smartdatalake.util.spark.dataset",since = "2.9.0")
+@deprecated(message = "use io.smartdatalake.util.spark.dataset", since = "2.9.0")
 object DataFrameUtil {
 
   /**

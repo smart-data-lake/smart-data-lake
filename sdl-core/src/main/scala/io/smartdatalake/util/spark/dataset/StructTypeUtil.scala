@@ -25,7 +25,12 @@ import org.slf4j.Logger
 
 trait StructTypeUtil {
 
+  def structField2String(sf: StructField): String = s"StructField(name=${sf.name}, dataType=${sf.dataType}," +
+    s" nullable=${sf.nullable}, metadata=${sf.metadata})"
+
   implicit class StructSDLB(st: StructType) {
+
+    val niceString: String = s"StructType(\n ${st.map(structField2String).mkString("\n ")} )"
 
     /**
      *
@@ -39,29 +44,36 @@ trait StructTypeUtil {
      */
     final def equal(that: StructType,
                     ignoreColumnOrder: Boolean = true, ignoreNullability: Boolean = true,
+                    ignoreColnameCase: Boolean = true, ignoreMetadata: Boolean = true,
                     showDiff: Boolean = true)(implicit logger: Logger): Boolean = {
-      LogUtils.debugLog(s"schemataEqual: st  =  ${st.catalogString}")
-      LogUtils.debugLog(s"schemataEqual: rightSchema = ${that.catalogString}")
-      LogUtils.debugLog(s"schemataEqual: ignoreColumnOrder = $ignoreColumnOrder , ignoreNullability = $ignoreNullability , showDiff = $showDiff")
+      LogUtils.debugLog(s"StructSDLB.equal: this = $niceString")
+      LogUtils.debugLog(s"StructSDLB.equal: that = ${that.niceString}")
+      LogUtils.debugLog(s"StructSDLB.equal: ignoreColumnOrder = $ignoreColumnOrder , ignoreNullability = $ignoreNullability ," +
+        s" ignoreColnameCase = $ignoreColnameCase , showDiff = $showDiff")
 
       def fieldOrder(f1: StructField, f2: StructField): Boolean = f1.name < f2.name
 
-      def makeNullableIfIgnored(sf: StructField): StructField = StructField(sf.name, sf.dataType, ignoreNullability || sf.nullable, sf.metadata)
+      def prepare(sf: StructField): StructField = StructField(dataType = sf.dataType,
+        name = if (ignoreColnameCase) sf.name.toLowerCase else sf.name,
+        nullable = ignoreNullability || sf.nullable,
+        metadata = if (ignoreMetadata) Metadata.empty else sf.metadata
+      )
 
-      val lSch = st.map(makeNullableIfIgnored)
-      val rSch = that.map(makeNullableIfIgnored)
+      val lSch: Seq[StructField] = st.map(prepare)
+      val rSch: Seq[StructField] = that.map(prepare)
       val result = lSch == rSch || (ignoreColumnOrder && lSch.sortWith(fieldOrder) == rSch.sortWith(fieldOrder))
 
-      if (!result && showDiff) {
-        logger.info("schemataEqual: schemata differ !")
+      //if (!result && showDiff) {
+      if (true) {
+        logger.info("StructSDLB.equal: schemata differ !")
         logger.info(s"ignoreColumnOrder = $ignoreColumnOrder")
         logger.info(s"ignoreNullability = $ignoreNullability")
-        logger.info(s"st  = ${st.mkString(", ")}")
+        logger.info(s"this = $niceString")
         st.printTreeString
-        logger.info(s"rightSchema = ${that.mkString(", ")}")
+        logger.info(s"that = ${that.niceString}")
         that.printTreeString
-        logger.info(s"st minus rightSchema = ${st.diff(that).mkString(", ")}")
-        logger.info(s"rightSchema minus st = ${that.diff(st).mkString(", ")}")
+        logger.info(s"this minus that = ${st.diff(that).map(structField2String).mkString(", ")}")
+        logger.info(s"that minus this = ${that.diff(st).map(structField2String).mkString(", ")}")
       }
       result
     }
@@ -84,5 +96,5 @@ trait StructTypeUtil {
     final def isSuperSetOf(scm: StructType): Boolean = scm.toSet.subsetOf(st.toSet)
 
   }
-  
+
 }
