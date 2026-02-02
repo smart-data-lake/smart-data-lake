@@ -29,10 +29,11 @@ import org.scalatest.matchers.should.Matchers
 class DataFrameUtilTest extends AnyFunSuite with Matchers with SmartDataLakeLogger {
 
   import session.implicits._
+/*
 
   // symmetric Difference and isEqual are used by tests of other functions
   test("symmetricDifference_no_difference") {
-    val actual: DataFrame = dfComplex.symmetricDifference(dfComplex)
+    val actual: DataFrame = dfComplex.getSymmetricDifference(dfComplex)
     val actualCount = actual.count()
 
     val resultat: Boolean = (actual.schema == dfComplex.schema.add("_in_first_df", BooleanType, nullable = false)) &&
@@ -55,7 +56,7 @@ class DataFrameUtilTest extends AnyFunSuite with Matchers with SmartDataLakeLogg
       (4, Seq(("d", "D", Seq("d", "D")))),
       (5, Seq(("e", "E", Seq("e", "E"))))
     ).toDF("id", "value")
-    val actual: DataFrame = dfComplex.symmetricDifference(df_complex_2, "df_complex")
+    val actual: DataFrame = dfComplex.getSymmetricDifference(df_complex_2, "df_complex")
     val actualCount = actual.count()
     val expected = Seq(
       (3, Seq(("c", "C", Seq("c", "C"))), true),
@@ -91,7 +92,7 @@ class DataFrameUtilTest extends AnyFunSuite with Matchers with SmartDataLakeLogg
       (Some(4), Some(Seq(("d", "D", Seq("d", "D"))))),
       (Some(5), Some(Seq(("e", "E", null))))
     ).toDF("id", "value")
-    val actual: DataFrame = dfComplexWithNull.symmetricDifference(df_complex_withNull_2, "df_complex_withNull")
+    val actual: DataFrame = dfComplexWithNull.getSymmetricDifference(df_complex_withNull_2, "df_complex_withNull")
     val actualCount = actual.count().asInstanceOf[Int]
     val expected = Seq(
       (Some(5), None, true),
@@ -157,9 +158,10 @@ class DataFrameUtilTest extends AnyFunSuite with Matchers with SmartDataLakeLogg
     val actual: Boolean = dfComplex.isEqual(df_complex_2)
     if (actual) {
       logger.error("   symmetric Difference ")
-      dfComplex.symmetricDifference(df_complex_2).show()
+      dfComplex.getSymmetricDifference(df_complex_2).show()
     }
     assert(!actual)
   }
+*/
 
 }

@@ -31,6 +31,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.Logger
 
 import java.time.Duration
 
@@ -38,8 +39,10 @@ import java.time.Duration
  * Unit tests for historization
  *
  */
-class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
 
+  private implicit val loggerImpl: Logger = logger
   private implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -79,7 +82,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
       .unionByName(dfResultExistingRowNull)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -101,7 +104,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.Existing)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History unchanged when deleting columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History unchanged when deleting columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -123,7 +126,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = dfUnchanged
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("The history should stay unchanged when using the current load again")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("The history should stay unchanged when using the current load again")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -146,7 +149,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = dfUnchanged
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History should stay unchanged when using current load but with different column sorting")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History should stay unchanged when using current load but with different column sorting")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -175,7 +178,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld).unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -200,7 +203,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = dfUpdatedOld.unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -226,7 +229,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = dfAdded.unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -261,7 +264,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfExpected = dfAdded.unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -289,7 +292,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
     val dfHistorized = Historization.fullHistorize(dfHistory, dfNew, Seq("id"), referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -342,7 +345,7 @@ class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDa
       .cache
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
     assert(result)
 
     println(dfHistorized.showString(Map("truncate" -> "100")))

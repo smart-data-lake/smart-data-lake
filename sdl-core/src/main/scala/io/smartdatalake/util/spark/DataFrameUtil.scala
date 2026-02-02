@@ -19,10 +19,8 @@
 
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.dataframe.spark.{SparkField, SparkSchema}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 
 /**
@@ -32,39 +30,6 @@ import org.apache.spark.sql.types._
 object DataFrameUtil {
 
   implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger with dataset.Quality {
-
-    /**
-     * compares df with df2
-     *
-     * @param df2 : data frame to comapre with
-     * @return true if both data frames have the same cardinality, schema and an empty symmetric difference
-     */
-    def isEqual(df2: DataFrame): Boolean = {
-      // As a set-theoretic function symmetricDifference ignores multiple occurences of the same row.
-      // Thus we need also to compare the cardinalities and the schemata of the two data frames.
-      // For the schema, the order of columns doesn't need to match.
-      // Note that we ignore the nullability of the columns to compare schemata.
-      isSchemaEqualIgnoreNullabilty(df2) && symmetricDifference(df2).isEmpty && df.count() == df2.count()
-    }
-
-    def isSchemaEqualIgnoreNullabilty(df2: DataFrame): Boolean = {
-      SchemaUtil.schemaDiff(SparkSchema(df.schema), SparkSchema(df2.schema), ignoreNullable = true).isEmpty && SchemaUtil.schemaDiff(SparkSchema(df2.schema), SparkSchema(df.schema), ignoreNullable = true).isEmpty
-    }
-
-    /**
-     * symmetric difference of two data frames: (df∪df2)∖(df∩df2) = (df∖df2)∪(df2∖df)
-     *
-     * @param df2         : data frame to compare with
-     * @param diffColName : name of boolean column which indicates whether the row belongs to df
-     * @return data frame
-     */
-    def symmetricDifference(df2: DataFrame, diffColName: String = "_in_first_df"): DataFrame = {
-      require(df.columns.map(_.toLowerCase).toSet == df2.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
-      // reorder columns according to the original df for calculating symmetricDifference
-      val colOrder = df.columns.map(col)
-      df.except(df2.select(colOrder: _*)).withColumn(diffColName, lit(true))
-        .unionByName(df2.select(colOrder: _*).except(df).withColumn(diffColName, lit(false)))
-    }
 
     /**
      * If colName is defined, creates an additional column with a given expression on a DataFrame

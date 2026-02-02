@@ -27,12 +27,10 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.misc.StringUtil.replaceNonSqlWithUnderscores
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, ParquetFileDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
@@ -58,7 +56,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Utility methods for testing.
  */
-object TestUtil extends SmartDataLakeLogger {
+object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dataset.Equality {
 
   // extract keystore file from resource jar for wiremock server
   private lazy val wiremockKeyStoreFile = {
@@ -202,34 +200,6 @@ object TestUtil extends SmartDataLakeLogger {
     stubFor(get(urlMatching("/bad/*/"))
       .willReturn(aResponse.withStatus(404))
     )
-  }
-
-  def printFailedTestResultGeneric(testName: String, arguments: Seq[GenericDataFrame] = Seq())(actual: GenericDataFrame)(expected: GenericDataFrame): Unit = {
-    (actual, expected) match {
-      case (actual: SparkDataFrame, expected: SparkDataFrame) =>
-        assert(arguments.forall(_.isInstanceOf[SparkDataFrame]))
-        printFailedTestResult(testName, arguments.map(_.asInstanceOf[SparkDataFrame].inner))(actual.inner)(expected.inner)
-    }
-  }
-
-  def printFailedTestResult(testName: String, arguments: Seq[DataFrame] = Seq())(actual: DataFrame)(expected: DataFrame): Unit = {
-    def printDf(df: DataFrame): Unit = {
-      logger.error(df.schema.simpleString)
-      df.printSchema()
-      df.orderBy(df.columns.head, df.columns.tail: _*).show(false)
-    }
-
-    logger.error(s"!!!! Test $testName Failed !!!")
-    logger.error("   Arguments ")
-    arguments.foreach(printDf)
-    logger.error("   Actual ")
-    printDf(actual)
-    logger.error("   Expected ")
-    printDf(expected)
-    logger.error(s"  Do schemata equal? ${actual.schema.fields.toSet == expected.schema.fields.toSet}")
-    logger.error(s"  Do cardinalities equal? ${actual.count() == expected.count()}")
-    logger.error("   symmetric Difference ")
-    actual.symmetricDifference(expected, "actual").show(false)
   }
 
   def testArgumentExpectedMapWithComment[K, V](experiendum: K => V, argExpMapComm: Map[(String, K), V]): Unit = {

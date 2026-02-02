@@ -221,7 +221,8 @@ trait GenericDataFrame extends GenericTypedObject {
    * @return data frame
    */
   def symmetricDifference(other: GenericDataFrame, diffColName: String = "_in_first_df"): GenericDataFrame = {
-    require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
+    require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet,
+      "DataFrames must have the same columns for symmetricDifference calculation")
     // reorder columns according to the original df for calculating symmetricDifference
     val colOrder = schema.columns.map(functions.col)
     val dfOtherPrep = other.select(colOrder)

@@ -20,9 +20,10 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject, Table}
@@ -30,12 +31,15 @@ import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, Execution
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
+class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
+  with TestToolDataset with Equality {
+  private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   // set additional spark options for delta lake
   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
@@ -79,8 +83,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
         .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -103,8 +107,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -130,8 +134,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
         .drop(Historization.historizeHashColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
       assert(resultat)
     }
   }
@@ -166,8 +170,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeDummyColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -191,8 +195,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeDummyColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -219,8 +223,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
         .drop(Historization.historizeDummyColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
       assert(resultat)
     }
   }
