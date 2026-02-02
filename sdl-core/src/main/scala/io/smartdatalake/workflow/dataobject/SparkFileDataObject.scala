@@ -25,8 +25,8 @@ import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
+import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
-import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, DfSDL}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -55,7 +55,8 @@ import scala.util.Try
 trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
-  with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger {
+  with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger
+  with io.smartdatalake.util.spark.dataset.Transform {
 
   /**
    * The Spark-Format provider to be used

@@ -62,23 +62,23 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
   private lazy val wiremockKeyStoreFile = {
     val resource = "test_keystore.pkcs12"
     val keyStorePath = Files.createTempDirectory("test").resolve(resource)
-    val inputStream = Option(getClass.getResourceAsStream("/"+resource))
+    val inputStream = Option(getClass.getResourceAsStream("/" + resource))
       .getOrElse(throw new RuntimeException(s"Could not find resource $resource in classpath"))
     Files.copy(inputStream, keyStorePath)
     inputStream.close()
     keyStorePath.toString
   }
 
-  def sparkSessionBuilder(additionalSparkProperties: Map[String,StringOrSecret] = Map()) : SparkSession.Builder = {
+  def sparkSessionBuilder(additionalSparkProperties: Map[String, StringOrSecret] = Map()): SparkSession.Builder = {
     // create builder
     val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
-      case (builder, config) => builder.config(config._1, config._2.resolve())
-    }
+        case (builder, config) => builder.config(config._1, config._2.resolve())
+      }
       .config("hive.exec.dynamic.partition", "true")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
       .config("spark.sql.shuffle.partitions", "2")
-    //.config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
+      //.config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
       // add nodata spark extension
       .withExtensions(new SDLSparkExtension)
     // Configure hive metastore location
@@ -90,7 +90,7 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
   }
 
   // create SparkSession if needed
-  lazy val session : SparkSession = sparkSessionBuilder().getOrCreate()
+  lazy val session: SparkSession = sparkSessionBuilder().getOrCreate()
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     getDefaultActionPipelineContext(session) // initialize with Spark session incl. Hive support
@@ -202,6 +202,7 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
     )
   }
 
+  @deprecated(message = "use TestTool.testArgumentExpectedMapWithComment", since = "2.9.0")
   def testArgumentExpectedMapWithComment[K, V](experiendum: K => V, argExpMapComm: Map[(String, K), V]): Unit = {
 
     def logFailure(argument: K, actual: V, expected: V, comment: String): Unit = {
@@ -228,6 +229,7 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
     assert(results.forall(p => p))
   }
 
+  @deprecated(message = "use TestTool.testArgumentExpectedMap", since = "2.9.0")
   def testArgumentExpectedMap[K, V](experiendum: K => V, argExpMap: Map[K, V]): Unit = {
     def addEmptyComment(x: (K, V)): ((String, K), V) = x match {
       case (k, v) => (("", k), v)
@@ -239,6 +241,7 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
 
 
   // a few data frames
+  @deprecated(message = "use Collection.dsComplex", since = "2.9.0")
   def dfComplex: DataFrame = {
     import session.implicits._
     val rowsComplex: Seq[(Int, Seq[(String, String, Seq[String])])] = Seq(
@@ -299,8 +302,8 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
 
   def dfHierarchy: DataFrame = {
     import session.implicits._
-    val rowsHierarchy: Seq[(String, String)] = Seq(("a","ab"), ("a","ac"), ("ac","aca"), ("b","ba"),
-      ("c","ca"), ("ca","caa"), ("ca","cab"), ("c","cb"), ("cb","X"), ("c","cc"), ("cc","X"), ("X","Y"), ("Y","Z"))
+    val rowsHierarchy: Seq[(String, String)] = Seq(("a", "ab"), ("a", "ac"), ("ac", "aca"), ("b", "ba"),
+      ("c", "ca"), ("ca", "caa"), ("ca", "cab"), ("c", "cb"), ("cb", "X"), ("c", "cc"), ("cc", "X"), ("X", "Y"), ("Y", "Z"))
     rowsHierarchy.toDF("parent", "child")
   }
 
@@ -308,7 +311,7 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
     import session.implicits._
     val rowsNonUnique: Seq[(String, String)] = Seq(("1let", "unilet"),
       ("2let", "doublet"), ("2let", "doublet"),
-      ("3let", "triplet"), ("3let", "triplet"),("3let", "triplet"),
+      ("3let", "triplet"), ("3let", "triplet"), ("3let", "triplet"),
       ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"))
     rowsNonUnique.toDF("id", "value")
   }
@@ -347,14 +350,16 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
         case DoubleType => Arbitrary.arbDouble.arbitrary.sample.get
         case TimestampType => new Timestamp(Gen.choose(0L, Instant.now().toEpochMilli).sample.get) // arbDate creates dates too far in the past (negative millis), we use a custom generator therefore...
         case d: StructType => arbitraryRow(d.fields)
-        case d: ArrayType => (1 to nbOfArrayRecords).map( x => arbitraryValue(d.elementType))
+        case d: ArrayType => (1 to nbOfArrayRecords).map(x => arbitraryValue(d.elementType))
       }
     }
+
     def arbitraryRow(fields: Array[StructField]): Row = {
-      val colValues = fields.map( f => arbitraryValue(f.dataType))
+      val colValues = fields.map(f => arbitraryValue(f.dataType))
       Row.fromSeq(colValues)
     }
-    val rows = (1 to nbRecords).map( x => arbitraryRow(schema.fields)).asJava
+
+    val rows = (1 to nbRecords).map(x => arbitraryRow(schema.fields)).asJava
     session.createDataFrame(rows, schema)
   }
 
@@ -368,6 +373,7 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
     Runtime.getRuntime.addShutdownHook(new Thread(() => buffer.foreach(p => FileUtils.deleteQuietly(new File(p)))))
     buffer
   }
+
   def deleteOnExit(path: String): Unit = {
     pathToDeleteOnExit.append(path)
   }

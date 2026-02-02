@@ -32,7 +32,16 @@ trait Transform extends Serializable {
 
   implicit class DsTransform[T](ds: Dataset[T]) {
 
-    val asDf: DataFrame = ds.select(ds.columns.map(col) :_*)
+    val asDf: DataFrame = ds.select(ds.columns.map(col): _*)
+
+
+    /**
+     * If colName is defined, creates an additional column with a given expression on a DataFrame
+     */
+    def withOptionalColumn(colName: Option[String], expr: Column): DataFrame = {
+      if (colName.isDefined) ds.withColumn(colName.get, expr)
+      else ds.asDf
+    }
 
     /** * transformCols: generic workers used by many other methods ** */
 

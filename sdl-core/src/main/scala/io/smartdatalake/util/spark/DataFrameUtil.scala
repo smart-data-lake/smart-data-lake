@@ -19,31 +19,14 @@
 
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
 /**
  * Provides utility functions for [[DataFrame]]s.
  */
-@deprecated(since = "2.8.2")
+@deprecated(message = "use io.smartdatalake.util.spark.dataset",since = "2.9.0")
 object DataFrameUtil {
-
-  implicit class DfSDL(df: DataFrame) extends SmartDataLakeLogger with dataset.Quality {
-
-    /**
-     * If colName is defined, creates an additional column with a given expression on a DataFrame
-     */
-    def withOptionalColumn(colName: Option[String], expr: Column): DataFrame = {
-      if (colName.isDefined) df.withColumn(colName.get, expr)
-      else df
-    }
-
-    /**
-     * Execute df.show and return it as String instead of printing it directly
-     */
-    def showString(): String = DatasetHelper.showString(df)
-  }
 
   /**
    * pimpMyLibrary pattern to add DataFrameReader utility functions

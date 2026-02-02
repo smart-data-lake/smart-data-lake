@@ -23,10 +23,9 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.metrics.SparkStageMetricsListener
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.LogUtils.debugLog
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -141,7 +140,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema {
+  extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
+    with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema
+    with io.smartdatalake.util.spark.dataset.Transform {
 
   private implicit val loggImpl: Logger = logger
 
