@@ -25,8 +25,7 @@ import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
-import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils}
-import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.dataset.{ReadWrite, Transform, getEmptyDataFrame}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -56,7 +55,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger
-  with io.smartdatalake.util.spark.dataset.Transform {
+  with ReadWrite with Transform{
 
   /**
    * The Spark-Format provider to be used
@@ -618,7 +617,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
 }
 
-object SparkFileDataObject extends SmartDataLakeLogger {
+object SparkFileDataObject extends SmartDataLakeLogger with ReadWrite {
   /**
    * This method is searching for files processed by a given DataFrame by looking at its execution plan.
    */

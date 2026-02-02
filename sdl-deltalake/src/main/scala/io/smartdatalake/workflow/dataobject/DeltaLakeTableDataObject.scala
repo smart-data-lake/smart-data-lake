@@ -29,8 +29,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactor
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
-import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
+import io.smartdatalake.util.spark.SparkQueryUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
@@ -130,7 +129,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
+    with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints
+    with io.smartdatalake.util.spark.dataset.ReadWrite {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -160,7 +161,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path $hadoopPathHolder. New path definition $getAbsolutePath is ignored!")
       }
     }
     hadoopPathHolder
@@ -178,7 +179,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite and Append supported for now.")
 
-  def deltaTable(implicit session: SparkSession) = DeltaTable.forName(session, table.fullName)
+  def deltaTable(implicit session: SparkSession): DeltaTable = DeltaTable.forName(session, table.fullName)
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
@@ -306,7 +307,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
+    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint
     metadata.flatMap(_.description).foreach {addTableComment}
   }
 
@@ -578,7 +579,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
     try {
-      implicit val session = context.sparkSession
+      implicit val session: SparkSession = context.sparkSession
       import session.implicits._
       val dfHistory = deltaTable.history()
         .select("timestamp", "userMetadata").as[(Long,String)]
