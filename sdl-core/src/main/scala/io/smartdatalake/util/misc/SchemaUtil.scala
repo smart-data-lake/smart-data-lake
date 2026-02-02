@@ -98,10 +98,13 @@ object SchemaUtil {
    *
    *         TODO #935: probably doesnt work for structs nested in arrays...
    */
-  private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
+  private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField],
+                                                        right: Seq[GenericField],
+                                                        ignoreNullable: Boolean = false,
+                                                        caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
-    left.toSet.flatMap { leftField: GenericField =>
-      val leftName = if (caseSensitive) leftField.name else leftField.name.toLowerCase
+    left.map { leftField: GenericField =>
+      val leftName: String = if (caseSensitive) leftField.name else leftField.name.toLowerCase
       rightNamesIndex.get(leftName) match {
         case Some(rightFieldsWithSameName) if rightFieldsWithSameName.foldLeft(false) {
           (hasPreviousSubset, rightField) =>
@@ -109,10 +112,10 @@ object SchemaUtil {
               (ignoreNullable || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
                 && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullable, caseSensitive) //left field must be a subset of right field
               )
-        } => Set.empty //found a match
+        } => Set.empty[GenericField] //found a match
         case _ => Set(leftField) //left field is not contained in right
       }
-    }
+    }.toSet.flatten
   }
 
   /**
