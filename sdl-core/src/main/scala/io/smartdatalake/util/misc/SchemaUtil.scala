@@ -104,7 +104,7 @@ object SchemaUtil {
                                                         caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
     left.map { leftField: GenericField =>
-      val leftName: String = if (caseSensitive) leftField.name else leftField.name.toLowerCase
+      val leftName = if (caseSensitive) leftField.name else leftField.name.toLowerCase
       rightNamesIndex.get(leftName) match {
         case Some(rightFieldsWithSameName) if rightFieldsWithSameName.foldLeft(false) {
           (hasPreviousSubset, rightField) =>
