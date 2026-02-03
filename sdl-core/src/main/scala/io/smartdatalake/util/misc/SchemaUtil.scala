@@ -307,7 +307,7 @@ object SchemaUtil {
     JavaTypeInference.inferDataType(beanClass)._1.asInstanceOf[StructType]
   }
 
-  private def getSchemaFromJsonSchema(jsonSchemaContent: String, strictTyping: Boolean, additionalPropertiesDefault: Boolean): StructType = {
+  def getSchemaFromJsonSchema(jsonSchemaContent: String, strictTyping: Boolean, additionalPropertiesDefault: Boolean): StructType = {
     JsonSchemaConverter.convertToSpark(jsonSchemaContent, strictTyping, additionalPropertiesDefault)
   }
 
