@@ -311,7 +311,7 @@ object SchemaUtil {
     JsonSchemaConverter.convertToSpark(jsonSchemaContent, strictTyping, additionalPropertiesDefault)
   }
 
-  private def getSchemaFromAvroSchema(avroSchemaContent: String): StructType = {
+  def getSchemaFromAvroSchema(avroSchemaContent: String): StructType = {
     AvroSchemaConverter.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
   }
 
