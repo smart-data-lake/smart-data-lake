@@ -150,7 +150,7 @@ object SchemaUtil {
     Encoders.product[T].schema
   }
 
-  private def getSchemaFromCaseClass(tpe: Type): StructType = {
+  def getSchemaFromCaseClass(tpe: Type): StructType = {
     val schema = ProductUtil.createSchema(tpe)
     enrichSchemaCommentsFromCaseClass(schema, tpe)
   }
