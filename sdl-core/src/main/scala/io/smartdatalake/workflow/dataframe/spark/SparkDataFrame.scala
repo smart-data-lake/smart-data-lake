@@ -24,7 +24,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.evolution.SchemaEvolution.listFind
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
@@ -114,7 +114,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
 
   override def withColumnRenamed(colName: String, newName: String): SparkDataFrame = {
-      SparkDataFrame(inner.withColumnRenamed(colName, newName))
+    SparkDataFrame(inner.withColumnRenamed(colName, newName))
   }
 
   override def drop(colName: String): SparkDataFrame = SparkDataFrame(inner.drop(colName))
@@ -233,7 +233,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getEmptyDataFrame(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
-    SparkDataFrame(DataFrameUtil.getEmptyDataFrame(inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(inner)(context.sparkSession))
   }
 
   override def getDataType(colName: String): SparkDataType = {
@@ -344,6 +344,7 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def desc: GenericColumn = SparkColumn(inner.desc)
 
   override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
+
   override def getName: Option[String] = inner.expr match {
     case c: NamedExpression => Some(c.name)
     case _ => None

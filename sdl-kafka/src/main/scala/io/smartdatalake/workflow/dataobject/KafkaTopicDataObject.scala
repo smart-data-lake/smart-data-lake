@@ -23,8 +23,9 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.metrics.SparkStageMetricsListener
+import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -43,6 +44,7 @@ import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
+import org.slf4j.Logger
 
 import java.sql.Timestamp
 import java.time._
@@ -138,7 +140,11 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema {
+  extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
+    with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema
+    with io.smartdatalake.util.spark.dataset.Transform {
+
+  private implicit val loggImpl: Logger = logger
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
@@ -219,7 +225,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
-    import DataFrameUtil._
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
     dfRaw
@@ -250,7 +255,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
           .map { case (p, o) => (p.partition, Option(o).map(_.offset).orElse(currentOffsetsLkp(p.partition)).orElse(Some(0L))) }
       } else currentOffsets
       incrementalOutputState = Some(endingOffsets)
-      logger.debug(s"($id) incremental state current offsets are: ${endingOffsets.mkString(",")}")
+      debugLog(s"($id) incremental state current offsets are: ${endingOffsets.mkString(",")}")
       createDataFrameForTopicPartitionOffsets(TopicPartitionOffsets.fromOffsets(topicName, committedOffsets, endingOffsets), s"increment (kafka state)")
     } else if (incrementalOutputState.nonEmpty && context.isExecPhase) {
       val lastOffsets = incrementalOutputState.get
@@ -258,7 +263,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       assert(lastOffsets.map(_._1).sorted == partitions.asScala.map(_.partition).sorted, s"($id) last incremental state kafka partitions are different from current kafak topics partitions: ${lastOffsets.map(_._1).sorted.mkString(",")} != ${partitions.asScala.map(_.partition).sorted.mkString(",")}")
       val currentOffsets = getCurrentOffsets(partitions.asScala.map(p => new TopicPartition(topicName, p.partition)).toSeq)
       incrementalOutputState = Some(currentOffsets)
-      logger.debug(s"($id) incremental state current offsets are: ${currentOffsets.mkString(",")}")
+      debugLog(s"($id) incremental state current offsets are: ${currentOffsets.mkString(",")}")
       createDataFrameForTopicPartitionOffsets(TopicPartitionOffsets.fromOffsets(topicName, lastOffsets, currentOffsets), s"increment")
     } else if (partitionValues.nonEmpty) {
       assert(datePartitionCol.nonEmpty, s"($id) Can not process partition values when datePartitionCol is not configured!")
@@ -287,7 +292,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
             }
         }
       } else dateRanges
-      logger.debug(s"($id) querying date ranges $dateRangesCombined for topic $topicName with readConsecutivePartitionsAsRanges=$batchReadConsecutivePartitionsAsRanges")
+      debugLog(s"($id) querying date ranges $dateRangesCombined for topic $topicName with readConsecutivePartitionsAsRanges=$batchReadConsecutivePartitionsAsRanges")
       // create and union DataFrames
       val dfsRaw = dateRangesCombined.map {
         case (startTimeIncl, endTimeExcl) =>
@@ -458,7 +463,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     val pctChronoUnitWaitToComplete = 0.02 // percentage of one chrono unit to wait after partition end date until the partition is assumed to be complete. This is to handle kafka late data.
     val partitions = consumer.partitionsFor(topicName)
     require(partitions!=null, s"($id) topic $topicName doesn't exist")
-    logger.debug(s"($id) got kafka partitions ${partitions.asScala.map(_.partition)} for topic $topicName")
+    debugLog(s"($id) got kafka partitions ${partitions.asScala.map(_.partition)} for topic $topicName")
     val topicPartitions = partitions.asScala.map( p => new TopicPartition(topicName, p.partition)).toSeq
     // determine last completed partition - we need to wait some time after considering a partition to be complete because of late data
     val currentPartitionStartTime = datePartitionCol.get.current
@@ -473,12 +478,13 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
 
     // search how many partitions / chrono units back of data we have
     var cntEmptyConsecutive = 0
+    // TODO: once Scala 2.12 has been reomved replace Stream by LazyList
     val detectedPartitions = Stream.from(0).map {
       unitsBack =>
         val startTimeIncl = datePartitionCol.get.previous(lastCompletedPartitionStartTime, unitsBack)
         val endTimeExcl = datePartitionCol.get.next(startTimeIncl)
         val topicPartitionsStartRaw = getTopicPartitionsAtTstmp(topicPartitions, startTimeIncl)
-        val topicPartitionsStart = topicPartitionsStartRaw.map{ case (topicPartition, start) => (topicPartition, Option(start).map(_.timestamp))}
+        val topicPartitionsStart = topicPartitionsStartRaw.map { case (topicPartition, start) => (topicPartition, Option(start).map(_.timestamp)) }
         val minStartTime = topicPartitionsStart.flatMap(_._2).sorted.headOption
         val isEmpty = minStartTime.isEmpty || minStartTime.exists(_ >= endTimeExcl.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli)
         (startTimeIncl, isEmpty, minStartTime)
@@ -486,9 +492,9 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       case (startTimeIncl, isEmpty, minStartTime) =>
         cntEmptyConsecutive = if (isEmpty) cntEmptyConsecutive + 1
         else 0
-        (cntEmptyConsecutive <= maxEmptyConsecutive)
+        cntEmptyConsecutive <= maxEmptyConsecutive
     }.toVector
-    logger.debug(s"($id) detected completed date partitions $detectedPartitions for topic $topicName")
+    debugLog(s"($id) detected completed date partitions $detectedPartitions for topic $topicName")
 
     // convert to partition values
     detectedPartitions.reverse.dropWhile(_._2).map(_._1)
@@ -507,7 +513,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
           .add("timestamp", TimestampType)
           .add("timestampType", IntegerType)
         // apply selected columns and return schema
-        SparkSchema(convertToReadDataFrame(DataFrameUtil.getEmptyDataFrame(readSchemaRaw)).schema)
+        SparkSchema(convertToReadDataFrame(getEmptyDataFrame(readSchemaRaw)).schema)
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${writeSchema.subFeedType.typeSymbol.name} in method createReadSchema")
     }
   }
@@ -636,5 +642,6 @@ object KafkaTopicDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): KafkaTopicDataObject = {
     extract[KafkaTopicDataObject](config)
   }
+
   final val delayedMaxTimestampOption = "delayedMaxTimestamp"
 }

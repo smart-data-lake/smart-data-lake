@@ -20,13 +20,13 @@
 package io.smartdatalake.testutils.spark.dataset
 
 import io.smartdatalake.app.AppUtil
-import io.smartdatalake.util.spark.dataset.Types
+import io.smartdatalake.util.spark.dataset.StructTypeUtil
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaStr, gaussian, nonEmptyListOf, poisson}
 
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
 import scala.Double.{NaN, NegativeInfinity, PositiveInfinity}
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
@@ -35,7 +35,7 @@ import scala.jdk.CollectionConverters._
  * A collection of DataSets
  * mainly used for testing
  * */
-object Collection extends Types {
+object Collection extends StructTypeUtil {
 
   private val spark = AppUtil.createSparkSession(name = "TransformTest", enableHive = false)
 
@@ -59,6 +59,29 @@ object Collection extends Types {
     StructField(name = "x", dataType = IntegerType, nullable = true)))
   val dsNull: Dataset[(String, Int)] = spark.createDataFrame(ArrayBuffer(Row("A", None)).asJava, schemaNull).as[(String, Int)]
 
+  type complexType = (Int, List[(String, String, List[String])])
+  val rowsComplex: List[complexType] = List(
+    (1, List(("a", "A", List("a", "A")))),
+    (2, List(("b", "B", List("b", "B")))),
+    (3, List(("c", "C", List("c", "C")))),
+    (4, List(("d", "D", List("d", "D")))),
+    (5, List(("e", "E", List("e", "E"))))
+  )
+  val dsComplex: Dataset[complexType] = rowsComplex
+    .toDF("id", "value")
+    .as[complexType]
+
+  type complexTypeWithNull = (Option[Int], Option[List[(String, String, Option[List[String]])]])
+  val rowsComplexWithNull: List[complexTypeWithNull] = List(
+    (Some(1), Some(List(("a", "A", Some(List("a", "A")))))),
+    (Some(2), Some(List(("b", "B", Some(List("b", "B")))))),
+    (Some(3), Some(List(("c", "C", None)))),
+    (Some(4), Some(List(("d", "D", Some(List("d", "D")))))),
+    (Some(5), None),
+    (None, None)
+  )
+  val dsComplexWithNull: Dataset[complexTypeWithNull] = rowsComplexWithNull
+    .toDF("id", "value").as[(Option[Int], Option[List[(String, String, Option[List[String]])]])]
 
   val dfTemporalPeriods: DataFrame = List(
     (1, Some(0.0), Some(1.2), 3.14, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
@@ -101,12 +124,12 @@ object Collection extends Types {
     (9, "cb", "X"), (10, "c", "cc"), (11, "cc", "X"), (12, "X", "Y"), (13, "Y", "Z"))
   val dfHierarchy: DataFrame = rowsHierarchy.toDF("id", "parent", "child")
 
-  // DataFrame with Nletten
-  val rowsNletten: List[(String, String)] = List(("1lette", "Unilette"),
-    ("2lette", "Doublette"), ("2lette", "Doublette"),
-    ("3lette", "Trilette"), ("3lette", "Trilette"), ("3lette", "Trilette"),
-    ("4lette", "Quatrilette"), ("4lette", "Quatrilette"), ("4lette", "Quatrilette"), ("4lette", "Quatrilette"))
-  val dfNletten: DataFrame = rowsNletten.toDF("id", "name")
+  // DataFrame with nLets
+  val rowsnLets: List[(String, String)] = List(("1let", "Unilet"),
+    ("2let", "doublet"), ("2let", "doublet"),
+    ("3let", "triplet"), ("3let", "triplet"), ("3let", "triplet"),
+    ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"))
+  val dfnLets: DataFrame = rowsnLets.toDF("id", "name")
 
 
   /** * DataFrame with Decimals ** */
@@ -212,6 +235,63 @@ object Collection extends Types {
   ).asJava
   val df_struct: DataFrame = spark.createDataFrame(rowStruct, schemaStruct)
 
+  /** * DataFrames concerning PK ** */
+
+  val rowsNonUnique: List[(String, String)] = List(("1let", "unilet"),
+    ("2let", "doublet"), ("2let", "doublet"),
+    ("3let", "triplet"), ("3let", "triplet"), ("3let", "triplet"),
+    ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"))
+
+  def dsNonUnique: Dataset[(String, String)] = rowsNonUnique.toDF("id", "value").as[(String, String)]
+
+  val rowsTwoCandidateKeys: List[(String, String, Int, Int, Int, Double)] = List(
+    ("a", "a", 1, 1, 1, 17.3),
+    ("a", "b", 1, 1, 2, 17.3),
+    ("b", "a", 1, 2, 1, 42.0),
+    ("b", "b", 1, 2, 2, -3.14),
+    ("b", "c", 2, 1, 1, -3.14))
+  val dsTwoCandidateKeys: Dataset[(String, String, Int, Int, Int, Double)] = rowsTwoCandidateKeys
+    .toDF("string_id1", "string_id2", "int_id1", "int_id2", "int_id3", "x")
+    .as[(String, String, Int, Int, Int, Double)]
+
+  def makeRowManyTypes(r: (Boolean, Int, Int, Int, Int, String, String, String, String, String, String, Double, Double, String, String, String)): Row = {
+    Row(r._1, r._2.byteValue(), r._3.shortValue(), r._4, r._5.longValue(), // BooleanType - LongType
+      Decimal(new java.math.BigDecimal(r._6), 2, 0),
+      Decimal(new java.math.BigDecimal(r._7), 4, 0),
+      Decimal(new java.math.BigDecimal(r._8), 10, 0),
+      Decimal(new java.math.BigDecimal(r._9), 11, 0),
+      Decimal(new java.math.BigDecimal(r._10), 4, 3),
+      Decimal(new java.math.BigDecimal(r._11), 38, 1),
+      r._12.floatValue(), r._13, Date.valueOf(r._14), Timestamp.valueOf(r._15), r._16) // FloatType - StringType
+  }
+
+  val rowsManyTypes: List[(Boolean, Int, Int, Int, Int, String, String, String, String, String, String, Double, Double, String, String, String)] = List(
+    (false, 0, 0, 0, 0, "0", "0", "0", "0", "0.0", "0.0", 0.0, 0.0, "1970-01-01", "1970-01-01 02:34:56.789", "zero"),
+    (true, 127, 32767, Int.MaxValue, Int.MaxValue, "99", "9999", "9999999999", "99999999999", "1.234", "1234567890123456789012345678901234567.8",
+      Float.MaxValue, Double.MaxValue, "2020-02-29", "2020-02-29 12:34:56.789", "maximal")
+  )
+
+  def dfManyTypes: DataFrame = {
+    val schemaManyTypes: StructType = StructType(
+      StructField("_boolean", BooleanType, nullable = true) ::
+        StructField("_byte", ByteType, nullable = true) ::
+        StructField("_short", ShortType, nullable = true) ::
+        StructField("_integer", IntegerType, nullable = true) ::
+        StructField("_long", LongType, nullable = true) ::
+        StructField("_decimal_2_0", DecimalType(2, 0), nullable = true) ::
+        StructField("_decimal_4_0", DecimalType(4, 0), nullable = true) ::
+        StructField("_decimal_10_0", DecimalType(10, 0), nullable = true) ::
+        StructField("_decimal_11_0", DecimalType(11, 0), nullable = true) ::
+        StructField("_decimal_4_3", DecimalType(4, 3), nullable = true) ::
+        StructField("_decimal_38_1", DecimalType(38, 1), nullable = true) ::
+        StructField("_float", FloatType, nullable = true) ::
+        StructField("_double", DoubleType, nullable = true) ::
+        StructField("_date", DateType, nullable = true) ::
+        StructField("_timestamp", TimestampType, nullable = true) ::
+        StructField("_string", StringType, nullable = true) ::
+        Nil)
+    spark.createDataFrame(rowsManyTypes.map(makeRowManyTypes).asJava, schemaManyTypes): DataFrame
+  }
 
   /** Generated DataFrames */
 

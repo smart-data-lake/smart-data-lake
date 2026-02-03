@@ -22,7 +22,6 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.Historization
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -31,13 +30,17 @@ import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
+class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
 
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -91,8 +94,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeHashColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -115,8 +118,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context2)
         .drop(Historization.historizeHashColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -142,8 +145,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
         .drop(Historization.historizeHashColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
       assert(resultat)
     }
   }
@@ -182,8 +185,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeDummyColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -207,8 +210,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context1)
         .drop(Historization.historizeDummyColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -235,8 +238,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
       val actual = tgtDO.getSparkDataFrame()(context3)
         .drop(Historization.historizeDummyColName)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
       assert(resultat)
     }
   }

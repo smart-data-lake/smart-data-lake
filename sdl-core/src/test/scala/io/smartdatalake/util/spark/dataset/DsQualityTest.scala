@@ -19,10 +19,9 @@
 
 package io.smartdatalake.util.spark.dataset
 
-import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import io.smartdatalake.testutils.spark.dataset.Collection._
+import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.{ArrayType, IntegerType}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -30,7 +29,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.Double.{NaN, NegativeInfinity}
 
-class QualityTest extends AnyFlatSpec with Matchers
+class DsQualityTest extends AnyFlatSpec with Matchers
   with Quality with Equality {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = createSparkSession()
@@ -65,8 +64,7 @@ class QualityTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
-
-  /** * tests treating gaps in axis (time or space) ** */
+  ///// tests treating gaps in axis (time or space) /////
 
   "fillGaps_next" should "fill the gaps taking value from next row" in {
     val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt")
@@ -100,35 +98,6 @@ class QualityTest extends AnyFlatSpec with Matchers
       (Some(1), Some(20190103), Some(-21.3), None),
       (Some(1), Some(20190104), Some(-21.3), None)).toDF("id", "dt", "x", "y")
 
-    actual.equal(expected) should be(true)
-  }
-
-  /** * tests checking for N-letten ** */
-
-  "getNletten" should "return empty dataFrame if there are no Nletten" in {
-    val actual = dfHierarchy.getNletten()
-    val expected = dfHierarchy.where(lit(false)).withColumn("cnt", lit(0: Long))
-    actual.equal(expected) should be(true)
-  }
-
-  "getNletten" should "return Nletten of a particular column" in {
-    val actual = dfHierarchy.getNletten("parent")
-    val zeilen_expected: Seq[(String, Long)] = Seq(("a", 2), ("c", 3), ("ca", 2))
-    val expected = zeilen_expected.toDF("parent", "cnt")
-    actual.equal(expected) should be(true)
-  }
-
-  "getNletten" should "return Nletten of a dataFrame which consists one column only of" in {
-    val argument = List(0, 1, 2).toDF("id")
-    val actual = argument.getNletten()
-    val expected = argument.where(lit(false)).withColumn("cnt", lit(0: Long))
-    actual.equal(expected) should be(true)
-  }
-
-  "getNletten" should "return Nletten" in {
-    val actual = dfNletten.getNletten()
-    val zeilen_expected: Seq[(String, String, Long)] = Seq(("2lette", "Doublette", 2), ("3lette", "Trilette", 3), ("4lette", "Quatrilette", 4))
-    val expected = zeilen_expected.toDF("id", "name", "cnt")
     actual.equal(expected) should be(true)
   }
 
