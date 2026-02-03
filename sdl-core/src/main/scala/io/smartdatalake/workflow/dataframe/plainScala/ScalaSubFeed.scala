@@ -127,7 +127,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
    */
 
 
-  def throwNotImplementedError = throw new NotImplementedError("This Spark-like Dataframe function is not implemented for the plainScala version")
+  private def throwNotImplementedError = throw new NotImplementedError("This Spark-like Dataframe function is not implemented for the plainScala version")
 
   def approxCountDistinct(columns: GenericColumn, rsd: Option[Double]): GenericColumn = throwNotImplementedError
 
@@ -147,7 +147,23 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def countDistinct(columns: GenericColumn*): GenericColumn = throwNotImplementedError
 
-  def explode(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def explode(column: GenericColumn): GenericColumn = {
+    column match {
+      case col: ScalaColumn[Iterable[_]] if col.dataType == ScalaSeqDataType  => {
+        val zipped = col.data.zipWithIndex
+        val pairs = zipped.flatMap(pair => for (element <- pair._1.asInstanceOf[Seq[_]]) yield (element, pair._2)).toIndexedSeq
+
+        // infer datatype based on first value (same as the ScalaDataFrame)
+        val dataType = ScalaDataType.getFor(pairs.head._1.getClass)
+        val definition = dataType.createColumnDefinition(name = col.definition.name + "_exploded", nullable = col.definition.nullable, comment = col.definition.comment)
+        definition match {
+          case d: ScalaColumnDefinition[Any] => ScalaExplodingColumn[Any](definition =  d, data = pairs)
+          case _ => throw new IllegalStateException("ScalaExplodingColumn was initialized with a dataType that was not a subtype of Any!")
+        }
+      }
+      case _ => throw new IllegalArgumentException("The 'explode' function can only be used with a Sequence data type (ScalaSeqDataType)")
+    }
+  }
 
   def expr(sqlExpr: String): GenericColumn = throwNotImplementedError
 

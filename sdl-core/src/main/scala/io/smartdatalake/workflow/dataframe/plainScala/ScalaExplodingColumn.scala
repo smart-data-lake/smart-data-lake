@@ -24,38 +24,37 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import scala.reflect.ClassTag
 
 /**
- * A column in a ScalaDataFrame
- * The data is stored as an IndexedSeq
+ * A column in a ScalaDataFrame that is created by the explode() function
+ * The data and the index of the original row are stored an IndexedSeq[A, Int]
  *
  * @param definition definition of the column including name and data type
- * @param data       the actual data of the column
+ * @param data       the actual data of the column and the index of the original row
  * @tparam A the Scala type of the column
  */
-case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: IndexedSeq[A]) extends ScalaAbstractColumn with SmartDataLakeLogger {
+case class ScalaExplodingColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: IndexedSeq[(A, Int)]) extends ScalaAbstractColumn with SmartDataLakeLogger {
 
   override def dataType: ScalaDataType[A] = definition.dataType
 
   override def getName: Option[String] = Some(definition.name)
 
-  override def toScalaColumn(df: ScalaDataFrame): ScalaColumn[_] = this
+  override def apply(extraction: Any): ScalaColumn[A] = throw new NotImplementedError("The 'apply' method is not applicable for a ScalaExplodingColumn instance")
 
-  override def apply(extraction: Any): ScalaColumn[A] = throw new NotImplementedError("The 'apply' method is not applicable for a ScalaColumn instance")
+  def mergeWithScalaDataFrame(df: ScalaDataFrame): ScalaDataFrame = {
+    val explodedRows: Seq[ScalaRow] = for (row <- df.rows.zipWithIndex;
+         (field, ix) <- this.data
+         if row._2 == ix) yield ScalaRow(row._1.values :+ field)
+    val newSchema: ScalaSchema = df.schema.add(this.definition)
+    ScalaDataFrame.fromScalaRows(explodedRows, schemaIn = Some(newSchema))
+  }
 
-  // Support methods for DataFrame operations
-  def append(other: ScalaColumn[A]): ScalaColumn[A] = copy(data = data ++ other.data)
-
-  def unsafeAppend(other: ScalaColumn[_]): ScalaColumn[A] = append(other.asInstanceOf[ScalaColumn[A]])
-
-  def limit(n: Int): ScalaColumn[A] = copy(data = data.take(n))
-
-  def length: Int = data.length
-
+  def changeColumnName(newName: String): ScalaExplodingColumn[A] = {
+    val definition: ScalaColumnDefinition[A] = this.definition.copy(name = newName, _dataType = Some(dataType))
+    this.copy(definition = definition)
+  }
 }
 
 
-object ScalaColumn {
-
-  def apply[A: ClassTag](name: String, data: Seq[A]) = new ScalaColumn[A](ScalaColumnDefinition[A](name = name), data = data.toIndexedSeq)
+object ScalaExplodingColumn {
 
   private val colCounter = new java.util.concurrent.atomic.AtomicLong(0)
 

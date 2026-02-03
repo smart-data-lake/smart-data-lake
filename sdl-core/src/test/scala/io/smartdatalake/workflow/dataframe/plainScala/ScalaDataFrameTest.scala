@@ -146,12 +146,20 @@ class ScalaDataFrameTest extends AnyFunSuite {
     assert(df1.distinct.dim == (3,2)) //3 rows 2 cols
   }
 
+  test("ScalaSequenceDataType works") {
+    val df = ScalaDataFrame.apply(Seq(Seq(Seq("asdf")), Seq(Seq("dfdsf")), Seq(Seq("fdsfsd"))))
+    print(df.schema)
+  }
 
+
+  test("Exploding a column with simple data types") {
+    val df = ScalaDataFrame.apply(Seq(Seq("row1", Seq(1,2,3)), Seq("row2", Seq(4,5,6))))
+    val exploded_df = df.withColumn("values", ScalaSubFeed.explode(df("col1")))
+    val expected_pairs = Seq(("row1", 1), ("row1", 2), ("row1", 3),("row2", 4), ("row2", 5), ("row2", 6))
+    assert(exploded_df.drop("col1").rows.map(row => (row.values(0), row.values(1))) == expected_pairs)
+  }
 
 
   // TODO: check null values handling
-
-  // TODO: implement explode function, so that FinalMetricsWriter can use ScalaDataFrame...
-
 
 }

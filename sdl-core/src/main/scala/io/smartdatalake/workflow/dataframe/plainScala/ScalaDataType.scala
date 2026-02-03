@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericSimpleDataType}
+import io.smartdatalake.util.misc.MetricsLog
 import org.json4s.{JString, JValue}
 
 import scala.reflect.ClassTag
@@ -125,6 +126,53 @@ object ScalaBooleanDataType extends ScalaDataType[Boolean] {
   }
 }
 
+object ScalaSeqDataType extends ScalaDataType[Seq[_]] {
+
+  private object SeqOrdering extends Ordering[Seq[_]] {
+    def compare(x: Seq[_], y: Seq[_]): Int = if (x.head == y.head) 0 else 1
+  }
+
+  def ordering: Ordering[Seq[_]] = SeqOrdering
+
+  def getCastFunction(fromDataType: ScalaDataType[_]): Any => Seq[_] = {
+    fromDataType match {
+      case ScalaIntDataType => (x => Seq(x.asInstanceOf[Int]))
+      case ScalaStringDataType => (x => Seq(x.asInstanceOf[String].toInt))
+      case ScalaDoubleDataType => (x => Seq(x.asInstanceOf[Double].toInt))
+      case ScalaBooleanDataType => (x => Seq(if (x.asInstanceOf[Boolean]) 1 else 0))
+    }
+  }
+
+  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = this
+
+  def isNumeric: Boolean = false
+
+  override def isSimpleType: Boolean = false
+}
+
+object ScalaMetricsLogDataType extends ScalaDataType[MetricsLog] {
+
+  private object MetricsLogOrdering extends Ordering[MetricsLog] {
+    def compare(x: MetricsLog, y: MetricsLog): Int = x.start_tstmp.compareTo(y.start_tstmp)
+  }
+
+  def ordering: Ordering[MetricsLog] = MetricsLogOrdering
+
+  def getCastFunction(fromDataType: ScalaDataType[_]): Any => MetricsLog = throw new UnsupportedOperationException("A MetricLog object cannot be cast from the types supported in ScalaDataFrame")
+
+  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = {
+      other match {
+        case ScalaStringDataType => other
+        case _ => this
+      }
+  }
+
+  def isNumeric: Boolean = false
+
+  override def isSimpleType: Boolean = false
+
+}
+
 abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSimpleDataType {
 
   val scalaClass: Class[_] = implicitly[ClassTag[A]].runtimeClass
@@ -141,7 +189,7 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   def getDecimalSpec: Option[(Int, Int)] = None; //not relevant as java.math.BigDecimal is not accepted as input
 
-  override def isSimpleType: Boolean = true; //only simple types as of now
+  override def isSimpleType: Boolean = true;
 
   def sql: String = typeName
 
@@ -192,11 +240,13 @@ object ScalaDataType {
   def getFor[A](implicit ct: ClassTag[A]): ScalaDataType[A] = getFor(ct.runtimeClass).asInstanceOf[ScalaDataType[A]]
 
   def getFor(cls: Class[_]): ScalaDataType[_] = {
+    val isSequenceOrList = cls.getName == "scala.collection.Seq" || cls.getName == "scala.collection.immutable.$colon$colon"
     cls match {
       case cls if cls == classOf[String] => ScalaStringDataType
       case cls if cls == classOf[Int] || cls == classOf[java.lang.Integer] => ScalaIntDataType
       case cls if cls == classOf[Double] => ScalaDoubleDataType
       case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
+      case _ if isSequenceOrList => ScalaSeqDataType
       case _ =>
         println(cls.getName)
         throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with class ${cls.getSimpleName}")

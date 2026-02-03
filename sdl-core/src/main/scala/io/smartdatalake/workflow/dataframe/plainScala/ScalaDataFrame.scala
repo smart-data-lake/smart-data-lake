@@ -170,6 +170,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   }
 
   override def withColumn(colName: String, expression: GenericColumn): ScalaDataFrame = expression match {
+    case exploding: ScalaExplodingColumn[Any] => exploding.changeColumnName(colName).mergeWithScalaDataFrame(this)
     case sc: ScalaAbstractColumn => withColumnScala(colName, sc.toScalaColumn(this))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
   }

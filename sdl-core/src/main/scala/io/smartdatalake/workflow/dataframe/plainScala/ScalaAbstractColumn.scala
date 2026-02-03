@@ -30,6 +30,7 @@ import scala.reflect.runtime.universe.typeOf
  * Abstraction of columns that include data (ScalaColumn), and expressions that calculate data and can be evaluated to a column.
  */
 abstract class ScalaAbstractColumn extends GenericColumn {
+
   def dataType: ScalaDataType[_]
 
   def data: Seq[_]
