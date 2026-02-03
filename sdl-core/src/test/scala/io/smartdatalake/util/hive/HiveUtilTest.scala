@@ -20,21 +20,23 @@ package io.smartdatalake.util.hive
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataobject.Table
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SaveMode, SparkSession}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.Logger
 
 import java.nio.file.{Files, Path, Paths}
 
 /**
  * Unit tests for HiveUtil
  */
-class HiveUtilTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class HiveUtilTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
 
+  private implicit val loggerImpl: Logger = logger
   implicit lazy val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -87,11 +89,11 @@ class HiveUtilTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLog
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(session.table(hiveTable.fullName).isEqual(testDataA))
+    assert(session.table(hiveTable.fullName).equal(testDataA))
 
     logger.info("Overwriting data in existing table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(session.table(hiveTable.fullName).isEqual(testDataA))
+    assert(session.table(hiveTable.fullName).equal(testDataA))
   }
 
   test("Create unpartitioned external table and overwrite data with schema evolution") {
@@ -103,11 +105,11 @@ class HiveUtilTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLog
       // AnalysisException expected because table is not partitioned
       HiveUtil.getTablePartitions(hiveTable).isEmpty
     }
-    assert(session.table(hiveTable.fullName).isEqual(testDataA))
+    assert(session.table(hiveTable.fullName).equal(testDataA))
 
     logger.info("Overwriting data in existing table with modified schema")
     HiveUtil.writeDfToHive(testDataB, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
-    assert(session.table(hiveTable.fullName).isEqual(testDataB))
+    assert(session.table(hiveTable.fullName).equal(testDataB))
   }
 
   test("Create partitioned external table and overwrite data") {
@@ -116,12 +118,12 @@ class HiveUtilTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLog
     logger.info("Creating table")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(checkPartitionsExpected(hiveTable, Seq(Map("part" -> "X"), Map("part" -> "Y"))))
-    assert(session.table(hiveTable.fullName).isEqual(testDataA))
+    assert(session.table(hiveTable.fullName).equal(testDataA))
 
     logger.info("Overwriting data in existing table with modified schema")
     HiveUtil.writeDfToHive(testDataA, hdfsTablePath, hiveTable, partitions, SaveMode.Overwrite)
     assert(checkPartitionsExpected(hiveTable, Seq(Map("part" -> "X"), Map("part" -> "Y"))))
-    assert(session.table(hiveTable.fullName).isEqual(testDataA))
+    assert(session.table(hiveTable.fullName).equal(testDataA))
   }
 
 }

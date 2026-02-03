@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -47,7 +47,7 @@ case class CustomDfDataObject(override val id: DataObjectId,
     // Because during the exec phase, the DataFrame will be created again anyway, leading to multiple calls to creator.exec
     // If the CustomDfDataObject reads lots of data from e.g. a webservice, this might be expensive
     val df = creator.schema match {
-      case Some(schema) if context.phase != ExecutionPhase.Exec => DataFrameUtil.getEmptyDataFrame(schema)
+      case Some(schema) if context.phase != ExecutionPhase.Exec => getEmptyDataFrame(schema)
       case _ => creator.exec
     }
 

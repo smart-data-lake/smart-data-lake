@@ -19,20 +19,24 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
+class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
+  with TestToolDataset with Equality {
+  private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   // set additional spark options for delta lake
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -72,8 +76,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context1)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -90,8 +94,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context2)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -112,8 +116,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       val expected = Seq(("doe", "john", 10, Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", 5, None, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, None, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context3)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
@@ -143,8 +147,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       val expected = Seq(("doe", "john", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context1)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -161,8 +165,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       val expected = Seq(("doe", "john", Some(10), Timestamp.valueOf(refTimestamp2)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context2)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -183,8 +187,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
       val expected = Seq(("doe", "john", Some(10), Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", Some(5), None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), None, Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), None, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context3)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
   }

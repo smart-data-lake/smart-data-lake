@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.testutils.custom
 
-import io.smartdatalake.testutils.TestUtil.dfManyTypes
+import io.smartdatalake.testutils.spark.dataset.Collection.dfManyTypes
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreator
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}

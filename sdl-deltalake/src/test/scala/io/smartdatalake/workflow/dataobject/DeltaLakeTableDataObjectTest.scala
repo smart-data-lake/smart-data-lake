@@ -22,9 +22,10 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
@@ -34,13 +35,16 @@ import io.smartdatalake.workflow.dataobject.expectation.SQLExpectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
-import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
-class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll {
+class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll
+  with TestToolDataset with Equality {
+  private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   // set additional spark options for delta lake
   protected implicit val session : SparkSession = DeltaLakeTestUtils.session
@@ -82,8 +86,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
-    val resultat = expected.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("CustomDf2DeltaTable",Seq())(actual)(expected)
+    val resultat = expected.equal(actual)
+    if (!resultat) printFailedTestResult("CustomDf2DeltaTable",Seq())(actual)(expected)
     assert(resultat)
 
     // check statistics
@@ -111,8 +115,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = expected.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("CustomDf2DeltaTable_partitioned",Seq())(actual)(expected)
+    val resultat: Boolean = actual.equal(expected)
+    if (!resultat) printFailedTestResult("CustomDf2DeltaTable_partitioned",Seq())(actual)(expected)
     assert(resultat)
 
     // move partition
@@ -132,8 +136,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat: Boolean = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: overwrite all with different schema
@@ -141,8 +145,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating2", "test")
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()
-    val resultat2: Boolean = df2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite",Seq())(actual2)(df2)
+    val resultat2: Boolean = df2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode overwrite",Seq())(actual2)(df2)
     assert(resultat2)
   }
 
@@ -156,8 +160,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat: Boolean = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: overwrite all with different schema
@@ -165,8 +169,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating2", "test")
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()
-    val resultat2: Boolean = df2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite",Seq())(actual2)(df2)
+    val resultat2: Boolean = df2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode overwrite",Seq())(actual2)(df2)
     assert(resultat2)
   }
 
@@ -181,8 +185,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val result = df1.isEqual(actual)
-    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val result = df1.equal(actual)
+    if (!result) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(result)
 
     // 2nd load: append all with different schema
@@ -191,7 +195,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
     val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
-    if (!result2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
+    if (!result2) printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
     assert(result2)
   }
 
@@ -205,8 +209,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val result = df1.isEqual(actual)
-    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val result = df1.equal(actual)
+    if (!result) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(result)
 
     // 2nd load: append all with different schema
@@ -215,7 +219,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
     val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
-    if (!result2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
+    if (!result2) printFailedTestResult("SaveMode append",Seq())(actual2)(df2)
     assert(result2)
   }
 
@@ -230,8 +234,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat: Boolean = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
@@ -243,8 +247,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2, partitionValues = Seq(PartitionValues(Map("type"->"ext"))))
     val expected2 = df2.union(df1.where($"type"=!="ext"))
     val actual2 = targetDO.getSparkDataFrame()
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
+    val resultat2: Boolean = expected2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
     assert(resultat2)
 
     // delete partition
@@ -264,8 +268,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val result = df1.isEqual(actual)
-    if (!result) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val result = df1.equal(actual)
+    if (!result) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(result)
 
     assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
@@ -276,8 +280,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2) // allowed overwriting partitions because of partitionOverwriteMode=dynamic
     val expected2 = df2.union(df1.where($"type"=!="ext"))
     val actual2 = targetDO.getSparkDataFrame()
-    val resul2 = expected2.isEqual(actual2)
-    if (!resul2) TestUtil.printFailedTestResult("SaveMode overwrite partitions dynamically",Seq())(actual2)(expected2)
+    val resul2 = expected2.equal(actual2)
+    if (!resul2) printFailedTestResult("SaveMode overwrite partitions dynamically",Seq())(actual2)(expected2)
     assert(resul2)
   }
 
@@ -291,8 +295,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat: Boolean = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type"->"ext")), PartitionValues(Map("type"->"int"))))
@@ -304,8 +308,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2, partitionValues = Seq(PartitionValues(Map("type"->"ext"))))
     val expected2 = df2.union(df1.where($"type"=!="ext"))
     val actual2 = targetDO.getSparkDataFrame()
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
+    val resultat2: Boolean = expected2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode overwrite and delete partition",Seq())(actual2)(expected2)
     assert(resultat2)
 
     // delete partition
@@ -324,8 +328,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: append data
@@ -334,8 +338,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = df2.union(df1)
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(expected2)
+    val resultat2: Boolean = expected2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode append",Seq())(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -349,8 +353,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: append data
@@ -359,8 +363,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = df2.union(df1)
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode append",Seq())(actual2)(expected2)
+    val resultat2: Boolean = expected2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode append",Seq())(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -375,8 +379,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key
@@ -386,8 +390,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = Seq(("ext","doe","john",10),("ext","smith","peter",3),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating")
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    val resultat2: Boolean = expected2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -402,8 +406,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key with different schema
@@ -415,8 +419,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
       .toDF("type", "lastname", "firstname", "rating", "rating2")
-    val resultat2: Boolean = expected2.isEqual(actual2)
-    if (!resultat2) TestUtil.printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    val resultat2: Boolean = expected2.equal(actual2)
+    if (!resultat2) printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -434,8 +438,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
-    val resultat = df1.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    val resultat = df1.equal(actual)
+    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key with different schema

@@ -41,7 +41,7 @@ trait Compare extends Serializable {
    */
   final def originMap[A](sL: Set[A], sR: Set[A]): Map[A, OriginTag] = sL.intersect(sR)
     .map(x => (x, LeftAndRight)).toMap ++
-    sL.diff(sR).map(x => (x, Left)).toMap ++ sR.diff(sL).map(x => (x, Right)).toMap
+    sL.diff(sR).map(x => (x, FromLeft)).toMap ++ sR.diff(sL).map(x => (x, FromRight)).toMap
 
   /**
    * checks whether 2 values are almost equal
@@ -123,7 +123,7 @@ trait Compare extends Serializable {
                                   (f: Map[K, V], g: Map[K, V])
                                   (implicit num: Numeric[V]): Map[K, (OriginTag, Option[V], Option[V])] = originMap(f.keySet, g.keySet)
     .map { case (vK, vFound) => (vK, (vFound, f.get(vK), g.get(vK))) }
-    .filter { case (_, (vFound, vF, vG)) => vFound == LeftAndRight && !almostEqual(epsilon, vF.get, vG.get) }
+    .filterNot { case (_, (vFound, vF, vG)) => vFound == LeftAndRight && almostEqual(epsilon, vF.get, vG.get) }
 
   /**
    * checks wheter 2 values of type A are ordered as desired

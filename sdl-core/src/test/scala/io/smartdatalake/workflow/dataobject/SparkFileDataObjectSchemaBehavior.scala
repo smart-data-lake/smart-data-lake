@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
@@ -86,7 +86,7 @@ trait SparkFileDataObjectSchemaBehavior {
       val path = tempFilePath(fileExtension)
       implicit val session: SparkSession = context.sparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
-      createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(userSchema)))
+      createFile(path, getEmptyDataFrame(StructType(userSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
       try {
         val dataObj = createDataObject(path, Some(StructType(userSchema)))
@@ -107,7 +107,7 @@ trait SparkFileDataObjectSchemaBehavior {
       val path = tempFilePath(fileExtension)
       implicit val session: SparkSession = context.sparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
-      createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
+      createFile(path, getEmptyDataFrame(StructType(embeddedSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
       try {
         val dataObj = createDataObject(path, None)

@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SaveModeMergeOptions
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
@@ -29,11 +28,15 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
-class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
+class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
 
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -78,8 +81,8 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       val expected = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5))
         .toDF("lastname", "firstname", "rating")
       val actual = tgtDO.getSparkDataFrame()(contextExec)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -93,8 +96,8 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter {
       val expected = Seq(("doe", "john", Some(5), Some(10)), ("pan", "peter", Some(5), Some(5)), ("pan", "peter2", None, Some(5)), ("hans", "muster", Some(5), None))
         .toDF("lastname", "firstname", "rating", "rating2")
       val actual = tgtDO.getSparkDataFrame()(contextExec)
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }

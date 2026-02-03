@@ -24,20 +24,23 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.explode
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.xml.XsdSchemaConverter
 import org.apache.spark.sql.{DataFrame, functions}
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 import scala.io.Source
 
 
-class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
+class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
 
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   import session.implicits._
 
   testsFor(readNonExistingSources(createDataObject, ".xml"))
@@ -64,13 +67,13 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // read with list of partition values
     val dfResult1 = dataObjPartitioned.getSparkDataFrame(pv1)(contextExec).cache
     assert(dfResult1.columns.toSet == Set("h1", "h2", "h3", "_filename"))
-    assert(dfResult1.drop("_filename").isEqual(df1))
+    assert(dfResult1.drop("_filename").equal(df1))
     assert(dfResult1.where($"_filename".isNull).isEmpty)
 
     // read all
     val dfResult2 = dataObjPartitioned.getSparkDataFrame()(contextExec).cache
     assert(dfResult2.columns.toSet == Set("h1", "h2", "h3", "_filename"))
-    assert(dfResult2.drop("_filename").isEqual(df1))
+    assert(dfResult2.drop("_filename").equal(df1))
     assert(dfResult2.where($"_filename".isNull).isEmpty)
   }
 

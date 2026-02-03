@@ -22,7 +22,6 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -31,11 +30,15 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
-class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter {
+class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
 
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -95,8 +98,8 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter {
     assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
     val actual = tgtDO.getSparkDataFrame()
     val expected = df1.withColumn("dt", lit("20201101"))
-    val resultat = actual.isEqual(expected)
-    if (!resultat) TestUtil.printFailedTestResult("historize 1st load mergeModeEnable")(actual)(expected)
+    val resultat = actual.equal(expected)
+    if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable")(actual)(expected)
     assert(resultat)
   }
 
@@ -122,7 +125,7 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter {
     // check partition dt=20201201 is archived and dt=20201101 is compacted
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
     assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
-    assert(tgtDO.getSparkDataFrame().isEqual(df1.withColumn("dt", lit("20201101"))))
+    assert(tgtDO.getSparkDataFrame().equal(df1.withColumn("dt", lit("20201101"))))
   }
 
 }

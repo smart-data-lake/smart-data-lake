@@ -152,9 +152,15 @@ object ProcessAllMode extends FromConfigFactory[ExecutionMode] {
 
 /**
  * Result of execution mode application
+ * @param inputPartitionValues selected partition values for main input
+ * @param outputPartitionValues override of partition values for main output. If None, output partition values are created by transformPartitionValues in getOutputPartitionValues, otherwise not.
  */
-case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Seq[PartitionValues] = Seq()
-                                , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map())
+case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Option[Seq[PartitionValues]] = None
+                                , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map()) {
+  def getOutputPartitionValues(partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues]): Seq[PartitionValues] = {
+    outputPartitionValues.getOrElse(partitionValuesTransform(inputPartitionValues).values.toSeq.distinct)
+  }
+}
 
 /**
  * Attributes definition for spark expressions used as ExecutionMode conditions.

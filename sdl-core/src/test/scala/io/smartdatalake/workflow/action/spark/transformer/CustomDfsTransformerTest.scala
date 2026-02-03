@@ -24,16 +24,20 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.testutils.{MockDataObject, TestUtil}
 import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.reflect.runtime.universe.typeOf
 
-class CustomDfsTransformerTest extends AnyFunSuite {
+class CustomDfsTransformerTest extends AnyFunSuite
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
+
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -80,7 +84,7 @@ class CustomDfsTransformerTest extends AnyFunSuite {
     action.init(initSubFeeds)
     action.exec(initSubFeeds)(contextExec)
 
-    assert(dfSrc.isEqual(tgt.getSparkDataFrame()))
+    assert(dfSrc.equal(tgt.getSparkDataFrame()))
   }
 
   test("CustomDataFrameAction with dynamic transformer returning one Dataset[Test]") {
@@ -125,7 +129,7 @@ class CustomDfsTransformerTest extends AnyFunSuite {
     action.init(initSubFeeds)
     action.exec(initSubFeeds)(contextExec)
 
-    assert(dfSrc.isEqual(tgt.getSparkDataFrame()))
+    assert(dfSrc.equal(tgt.getSparkDataFrame()))
   }
 
   test("CustomDfsTransformer can dynamically map parameters") {

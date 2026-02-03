@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.json.JsonUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
@@ -115,7 +115,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
     val df = context.phase match {
       // init phase -> return empty dataframe
       case ExecutionPhase.Init =>
-        DataFrameUtil.getEmptyDataFrame(schema.get)
+        getEmptyDataFrame(schema.get)
       // exec phase -> read: return data
       case ExecutionPhase.Exec =>
         val configuredCatalog = ConfiguredAirbyteCatalog(List(configuredStream.get))

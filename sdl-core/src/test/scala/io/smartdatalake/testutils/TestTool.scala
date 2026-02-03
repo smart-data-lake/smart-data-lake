@@ -17,8 +17,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util
+package io.smartdatalake.testutils
 
+import io.smartdatalake.util.Compare
 import org.apache.spark.sql.Dataset
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{choose, nonEmptyListOf}

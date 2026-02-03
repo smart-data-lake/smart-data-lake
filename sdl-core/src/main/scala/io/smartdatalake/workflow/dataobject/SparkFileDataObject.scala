@@ -25,8 +25,7 @@ import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkRepartitionDef}
 import io.smartdatalake.util.misc.{CompactionUtil, EnvironmentUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
-import io.smartdatalake.util.spark.DataFrameUtil
-import io.smartdatalake.util.spark.DataFrameUtil.{DataFrameReaderUtils, DataFrameWriterUtils, getEmptyDataFrame}
+import io.smartdatalake.util.spark.dataset.{ReadWrite, Transform, getEmptyDataFrame}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -55,7 +54,8 @@ import scala.util.Try
 trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
-  with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger {
+  with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger
+  with ReadWrite with Transform{
 
   /**
    * The Spark-Format provider to be used
@@ -146,7 +146,6 @@ trait SparkFileDataObject extends HadoopFileDataObject
     new Path( new Path(dataObjectRootPath, ".schema"), "currentSchema.json")
   }
   protected def inferSchemaFromPath(path: String)(implicit context: ActionPipelineContext): SparkSchema = {
-    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
     val df = context.sparkSession.read
       .format(readFormat)
       .options(options)
@@ -208,7 +207,6 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
-    import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 
     val wrongPartitionValues = PartitionValues.checkWrongPartitionValues(partitionValues, partitions)
     assert(wrongPartitionValues.isEmpty, s"getDataFrame got request with PartitionValues keys ${wrongPartitionValues.mkString(",")} not included in $id partition columns ${partitions.mkString(", ")}")
@@ -280,7 +278,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   /**
    * Hook for subclasses to customize content on read. Default 1:1.
    */
-  protected def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext) = df
+  protected def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = df
 
   /**
    * Prepares the DataFrame with the content when reading.
@@ -311,7 +309,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
           } else {
             // create empty data frame in init phase
             require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-            DataFrameUtil.getEmptyDataFrame(schema.get)
+            getEmptyDataFrame(schema.get)
           }
         }
     }
@@ -356,7 +354,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
           } else {
             // create empty data frame in init phase
             require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-            DataFrameUtil.getEmptyDataFrame(schema.get)
+            getEmptyDataFrame(schema.get)
           }
         }
     }
@@ -399,7 +397,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       } else {
         // create empty data frame in init phase
         require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-        DataFrameUtil.getEmptyDataFrame(schema.get)
+        getEmptyDataFrame(schema.get)
       }
     }
   }
@@ -495,7 +493,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     validateSchemaMin(SparkSchema(df.schema), "write")
     schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
     // update current schema storage - this is to avoid schema inference and remember the schema if there is no data.
-    if (!schema.isDefined && !context.simulation) createSchemaFile(df)
+    if (schema.isEmpty && !context.simulation) createSchemaFile(df)
   }
 
   private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
@@ -619,7 +617,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
 }
 
-object SparkFileDataObject extends SmartDataLakeLogger {
+object SparkFileDataObject extends SmartDataLakeLogger with ReadWrite {
   /**
    * This method is searching for files processed by a given DataFrame by looking at its execution plan.
    */
