@@ -25,7 +25,7 @@ import org.apache.spark.sql.types._
 trait ReadWrite extends Serializable {
 
   implicit class DataFrameReaderUtils(reader: DataFrameReader) {
-    final def optionalSchema(schema: Option[StructType]): DataFrameReader = {
+    def optionalSchema(schema: Option[StructType]): DataFrameReader = {
       if (schema.isDefined) reader.schema(schema.get) else reader
     }
 
