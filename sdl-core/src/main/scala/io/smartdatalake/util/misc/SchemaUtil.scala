@@ -155,7 +155,7 @@ object SchemaUtil {
     enrichSchemaCommentsFromCaseClass(schema, tpe)
   }
 
-  private def enrichSchemaCommentsFromCaseClass(schema: StructType, tpe: Type): StructType = {
+  def enrichSchemaCommentsFromCaseClass(schema: StructType, tpe: Type): StructType = {
     if (tpe <:< typeOf[Product]) {
       val tpeAccessors = ProductUtil.classAccessors(tpe)
       val scaladocParamTags = ScaladocUtil.extractScalaDoc(tpe.typeSymbol.annotations)
