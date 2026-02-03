@@ -485,7 +485,7 @@ object SchemaUtil {
   /**
    * A function to transform recursively the fields of a schema.
    */
-  private def transformSchemaFields(sparkSchema: SparkSchema, fieldTransformer: StructField => StructField): SparkSchema = {
+  def transformSchemaFields(sparkSchema: SparkSchema, fieldTransformer: StructField => StructField): SparkSchema = {
     def visitField(field: StructField): StructField = {
       val transformedField = fieldTransformer(field)
       val newType = visitType(transformedField.dataType)
