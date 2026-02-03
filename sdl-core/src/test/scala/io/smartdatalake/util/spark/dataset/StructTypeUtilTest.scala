@@ -35,7 +35,17 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   loggEnv
 
-  "schemataEqual equals" should "fail if column count differ" in {
+  "createStruct" should "created a struct" in {
+    val argument = Array[(String, DataType, Boolean)](("id", IntegerType, false),
+      ("name", StringType, false), ("birthdate", DateType, true))
+    val actual = createStruct(argument)
+    val expected = StructType(Array(StructField("id", IntegerType, nullable = false),
+      StructField("name", StringType, nullable = false),
+      StructField("birthdate", DateType, nullable = true)))
+    actual shouldEqual expected
+  }
+
+  "euqal" should "fail if column count differ" in {
     val schL: StructType = StructType(Array(
       StructField(name = "x", dataType = IntegerType, nullable = true),
       StructField(name = "y", dataType = IntegerType, nullable = true)))
@@ -43,7 +53,7 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
     schL.equal(schR) shouldBe false
   }
 
-  "Schemata equal" should "pass even if column order differ" in {
+  "equal" should "pass even if column order differ" in {
     val schL: StructType = StructType(Array(
       StructField(name = "x", dataType = IntegerType, nullable = true),
       StructField(name = "y", dataType = IntegerType, nullable = true)))
@@ -53,7 +63,7 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
     schL.equal(schR) shouldBe true
   }
 
-  "Schemata equal" should "pass even if nullability differs" in {
+  "equal" should "pass even if nullability differs" in {
     val schL: StructType = StructType(Array(
       StructField(name = "x", dataType = IntegerType, nullable = true),
       StructField(name = "y", dataType = IntegerType, nullable = true)))
@@ -63,7 +73,7 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
     schL.equal(schR) shouldBe true
   }
 
-  "Schemata equal" should "fail if types differ" in {
+  "equal" should "fail if types differ" in {
     val schL: StructType = StructType(Array(
       StructField(name = "x", dataType = IntegerType, nullable = true),
       StructField(name = "y", dataType = DoubleType, nullable = true)))
@@ -73,7 +83,7 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
     schL.equal(schR) shouldBe false
   }
 
-  "Schemata equal" should "fail if nested types differ" in {
+  "equal" should "fail if nested types differ" in {
     val valuesL: StructType = StructType(Array(
       StructField(name = "x", dataType = IntegerType, nullable = true),
       StructField(name = "y", dataType = DoubleType, nullable = true)))
@@ -89,7 +99,7 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
     schL.equal(schR) shouldBe false
   }
 
-  "Schemata equal" should "ignore nullability but not containsNull" in {
+  "equal" should "ignore nullability but not containsNull" in {
     val rightSchema = StructType(Array(
       StructField("code_d", ArrayType(StringType, containsNull = true), nullable = true)
     ))

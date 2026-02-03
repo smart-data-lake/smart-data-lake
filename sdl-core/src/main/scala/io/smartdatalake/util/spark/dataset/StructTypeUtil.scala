@@ -28,6 +28,36 @@ trait StructTypeUtil {
   def structField2String(sf: StructField): String = s"StructField(name=${sf.name}, dataType=${sf.dataType}," +
     s" nullable=${sf.nullable}, metadata=${sf.metadata})"
 
+  /**
+   * creates Struct
+   *
+   * @param fields : fields as triple (name, data type, is nullable)
+   * @return StructType
+   */
+  def createStruct(fields: Array[(String, DataType, Boolean)]): StructType = StructType(
+    fields.map(x => StructField(name = x._1, dataType = x._2: DataType, nullable = x._3))
+  )
+
+  /**
+   * creates Struct with nullable fields
+   *
+   * @param fields : nullable fields as pair (name, data type)
+   * @return StructType
+   */
+  def createStruct(fields: Array[(String, DataType)]): StructType = createStruct(
+    fields.map { case (fldName, dTyp) => (fldName, dTyp, true) }
+  )
+
+  /**
+   * creates Struct with one field
+   *
+   * @param fieldName : name of field
+   * @param fieldType : data type of field
+   * @param nullable  : is field nullable ?
+   * @return StructType
+   */
+  def createStruct(fieldName: String, fieldType: DataType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
+
   implicit class StructSDLB(st: StructType) {
 
     val niceString: String = s"StructType(\n ${st.map(structField2String).mkString("\n ")} )"

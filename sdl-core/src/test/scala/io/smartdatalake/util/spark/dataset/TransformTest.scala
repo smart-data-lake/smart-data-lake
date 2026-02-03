@@ -36,7 +36,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
 class TransformTest extends AnyFlatSpec with Matchers
-  with TestTool with TestToolDataset with Equality with Types {
+  with TestTool with TestToolDataset with Equality with StructTypeUtil {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = createSparkSession()
 
