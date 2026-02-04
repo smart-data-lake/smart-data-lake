@@ -4,7 +4,7 @@
 
 **Smart Data Lake Builder** is a data lake automation framework built on Apache Spark and Hadoop. It provides a declarative, configuration-driven approach to creating data pipelines for loading and transforming data.
 
-- **Language**: Scala (2.12.18 default, 2.13.12 supported)
+- **Language**: Scala (2.13.12 preferred, 2.12.18 supported)
 - **Build System**: Maven (multi-module project)
 - **Main Tech Stack**: Apache Spark 3.5.5, Hadoop 3.3.6, Hive 2.3.9
 - **License**: GPLv3
@@ -40,22 +40,22 @@ The repository is organized as a Maven multi-module project:
 ### Maven Basics
 
 ```bash
-# Build with Scala 2.12 (default)
-mvn -P scala-2.12 clean install
+# Build with Scala 2.13 (preferred)
+mvn -P scala-2.13 clean install
 
 # Run tests
-mvn -P scala-2.12 -B clean test
+mvn -P scala-2.13 -B clean test
 
 # Build excluding Debezium shaded connectors (faster for development)
-mvn -P scala-2.12 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+mvn -P scala-2.13 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 
-# Build with Scala 2.13
-mvn -P scala-2.13 clean install
+# Build with Scala 2.12
+mvn -P scala-2.12 clean install
 ```
 
 ### Important Maven Profiles
 
-- `scala-2.12` / `scala-2.13`: Scala version selection (2.12 is default)
+- `scala-2.12` / `scala-2.13`: Scala version selection (2.13 is preferred)
 - `fat-jar`: Build executable fat-jar with all dependencies except Spark/Hadoop
 - `fat-jar-with-spark`: Build fat-jar including Spark
 - `copy-libs`: Copy runtime dependencies to target/lib
@@ -92,14 +92,14 @@ The Debezium shaded connector modules take a long time to build. For most develo
 ### Running Tests
 
 ```bash
-# Run all tests for Scala 2.12
-mvn -P scala-2.12 -B clean test
+# Run all tests for Scala 2.13
+mvn -P scala-2.13 -B clean test
 
 # Run tests for a specific module
-mvn -P scala-2.12 -B clean test -pl sdl-core
+mvn -P scala-2.13 -B clean test -pl sdl-core
 
 # Run a specific test class
-mvn -P scala-2.12 -B test -Dtest=HousekeepingModeTest -pl sdl-core
+mvn -P scala-2.13 -B test -Dtest=HousekeepingModeTest -pl sdl-core
 ```
 
 ### Test Resources
@@ -178,7 +178,7 @@ Typical configuration includes:
 ### CI Build Details
 
 - **Java Version**: JDK 17 (Temurin distribution)
-- **Build Command**: `mvn -P scala-2.12 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'`
+- **Build Command**: `mvn -P scala-2.13 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'`
 - **Caching**: Maven repository cached with `~/.m2/repository`
 - **SonarCloud**: Only runs for Scala 2.13 builds
 
@@ -225,7 +225,7 @@ Typical configuration includes:
 
 **Workaround**: Exclude the shaded connector modules for development:
 ```bash
-mvn -P scala-2.12 clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+mvn -P scala-2.13 clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 ```
 
 ### Issue 2: Integration Tests Failing
@@ -240,11 +240,11 @@ mvn -P scala-2.12 clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,
 
 **Workaround**: The project supports both via Maven profiles. CI automatically tests both. For local development, use:
 ```bash
-# Scala 2.12 (default)
-mvn -P scala-2.12 clean test
-
-# Scala 2.13
+# Scala 2.13 (preferred)
 mvn -P scala-2.13 clean test
+
+# Scala 2.12
+mvn -P scala-2.12 clean test
 ```
 
 ### Issue 4: Memory Issues During Build
@@ -309,7 +309,7 @@ The main application entry point is `io.smartdatalake.app.SparkSmartDataLakeBuil
 ### Artifact Naming
 
 Artifacts are suffixed with Scala version:
-- Example: `sdl-core_2.12-2.8.2-SNAPSHOT.jar`
+- Example: `sdl-core_2.13-2.8.2-SNAPSHOT.jar`
 - Pattern: `{artifactId}_${scala.minor.version}-${version}.jar`
 
 ### Publishing
@@ -343,16 +343,16 @@ Main documentation is hosted at [smartdatalake.ch/docs](https://smartdatalake.ch
 
 ```bash
 # Build and test (fast - excludes Debezium shaded)
-mvn -P scala-2.12 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+mvn -P scala-2.13 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 
 # Build specific module
-mvn -P scala-2.12 clean install -pl sdl-core
+mvn -P scala-2.13 clean install -pl sdl-core
 
 # Run specific test
-mvn -P scala-2.12 test -Dtest=MyTest -pl sdl-core
+mvn -P scala-2.13 test -Dtest=MyTest -pl sdl-core
 
 # Build fat jar
-mvn -P scala-2.12,fat-jar clean package
+mvn -P scala-2.13,fat-jar clean package
 
 # Check for dependency updates
 mvn versions:display-dependency-updates
@@ -382,5 +382,5 @@ find . -name target -type d -exec rm -rf {} +
 
 ---
 
-**Last Updated**: 2026-02-02
+**Last Updated**: 2026-02-04
 **Version**: For Smart Data Lake Builder 2.8.2-SNAPSHOT
