@@ -1,0 +1,183 @@
+@startuml
+class smartdatalake.util.PrecisionDef {
+  + {method} <init>
+  + {field} precision
+  + {field} relThreshold
+  + {field} strict
+}
+interface smartdatalake.util.spark.dataset.Equality extends smartdatalake.util.spark.dataset.StructTypeUtil, smartdatalake.util.spark.dataset.Transform
+smartdatalake.util.spark.dataset.Equality o-- "smartdatalake.util.spark.dataset.Equality#DsEqual"
+class "smartdatalake.util.spark.dataset.Equality#DsEqual"<T> {
+  + {method} <init>
+  + {method} almostEqual
+  + {method} almostEqual
+  - {field} ds
+  + {method} equal
+  # {method} getCommonImpreciseCols
+  # {method} getRowDifferences
+  + {method} getSymmetricDifference
+  + {method} hasAlmostEqualRows
+  - {method} isImpreciseType
+}
+"smartdatalake.util.spark.dataset.Equality#DsEqual" o-- smartdatalake.util.PrecisionDef
+interface smartdatalake.util.spark.dataset.StructTypeUtil {
+  + {method} createStruct
+  + {method} createStruct
+  + {method} createStruct
+  + {method} structField2String
+}
+smartdatalake.util.spark.dataset.StructTypeUtil o-- "smartdatalake.util.spark.dataset.StructTypeUtil#StructSDLB"
+class "smartdatalake.util.spark.dataset.StructTypeUtil#StructSDLB" {
+  + {method} <init>
+  + {method} equal
+  + {method} isSubSetOf
+  + {method} isSuperSetOf
+  + {field} niceString
+  - {field} st
+}
+interface smartdatalake.util.spark.dataset.Transform
+smartdatalake.util.spark.dataset.Transform o-- "smartdatalake.util.spark.dataset.Transform#DsTransform"
+class "smartdatalake.util.spark.dataset.Transform#DsTransform"<T> {
+  + {method} <init>
+  - {method} applyFunToValues
+  + {field} asDf
+  + {method} breakLineageIfNotExecPhase
+  + {method} castAll2String
+  + {method} castAllDate2Timestamp
+  + {method} castAllDecimal2IntegralFloat
+  + {method} castColumnsOfTypeTo
+  + {method} castColumnsTo
+  + {method} castColumnTo
+  + {method} castDecimalsToFloatDouble
+  + {method} castDecimalsToIntegralType
+  + {method} castMapsToArrays
+  + {method} colsToRows
+  + {method} curryDataFrameOneColumn
+  + {method} dataSet2curryFrame
+  + {method} decomposeArrayColumn
+  - {field} ds
+  + {method} enumerateGroups
+  + {method} explodeArrays
+  + {method} explodeMaps
+  + {method} fromUtc
+  + {method} renameCols
+  + {method} toUtc
+  + {method} transformCols
+  + {method} transformCols
+  + {method} transformCols
+  + {method} transpose
+  - {method} unfoldStructCol
+  + {method} unfoldStructs
+  + {method} unpivotCast
+  + {method} withOptionalColumn
+}
+interface smartdatalake.util.spark.dataset.Quality extends smartdatalake.util.spark.dataset.Transform {
+  + {method} comment
+  + {method} getStatsCol
+  + {method} getStatsCol
+  + {method} withComment
+  + {method} withComment
+  + {method} withComment
+}
+Quality o-- "smartdatalake.util.spark.dataset.Quality#DsComment"
+Quality o-- "smartdatalake.util.spark.dataset.Quality#DsPk"
+Quality o-- "smartdatalake.util.spark.dataset.Quality#DsQuality"
+class "smartdatalake.util.spark.dataset.Quality#DsComment"<T> {
+  + {method} <init>
+  - {field} ds
+  + {method} getColumnComments
+  + {method} setColumnComments
+  + {method} withColumn
+}
+class "smartdatalake.util.spark.dataset.Quality#DsPk"<T> {
+  + {method} <init>
+  + {method} containsNull
+  - {field} ds
+  + {method} getNonuniqueRows
+  + {method} getNonuniqueStats
+  + {method} getNonuniqueStats
+  + {method} getNulls
+  + {method} getPKviolators
+  + {method} isCandidateKey
+  + {method} isMinimalUnique
+  + {method} isUnique
+  + {method} project
+}
+class "smartdatalake.util.spark.dataset.Quality#DsQuality"<T> {
+  + {method} <init>
+  + {method} countDistinctRows
+  + {method} createdLog
+  - {field} ds
+  + {method} fillGaps
+  + {method} getGaps
+  + {method} getStats
+}
+interface smartdatalake.util.spark.dataset.ReadWrite
+smartdatalake.util.spark.dataset.ReadWrite o-- "smartdatalake.util.spark.dataset.ReadWrite#DataFrameReaderUtils"
+smartdatalake.util.spark.dataset.ReadWrite o-- "smartdatalake.util.spark.dataset.ReadWrite#DataFrameWriterUtils"
+class "smartdatalake.util.spark.dataset.ReadWrite#DataFrameReaderUtils" {
+  + {method} <init>
+  + {method} optionalOption
+  + {method} optionalSchema
+  - {field} reader
+}
+class "smartdatalake.util.spark.dataset.ReadWrite#DataFrameWriterUtils"<T> {
+  + {method} <init>
+  + {method} conditionalOption
+  + {method} optionalOption
+  + {method} optionalPartitionBy
+  - {field} writer
+}
+
+interface smartdatalake.testutils.TestTool extends smartdatalake.util.Compare {
+  # {field} four
+  # {method} getCurrentTime
+  # {method} getCurrentTimeString
+  # {method} getDoubleIter
+  # {field} myIntList
+  # {field} myIntVec
+  # {field} one
+  # {field} oneOpt
+  + {method} readResourceFile
+  # {field} squareRootMap
+  # {field} ten
+  + {method} testArgumentExpectedMap
+  + {method} testArgumentExpectedMapWithComment
+  # {field} testDouble
+  # {field} testFloat
+  # {field} testFloats
+  # {field} testListNatNums
+  # {field} testMaxCode
+  # {field} testMinCode
+  # {field} testNatNum
+  # {field} testNatNums
+  # {field} testPercentage
+  # {field} testPosInt
+  # {field} testPosIntPair
+  # {field} testPosInts
+  # {field} three
+  # {field} two
+  # {field} twoOpt
+  # {field} zero
+}
+interface smartdatalake.util.Compare {
+  + {method} almostEqual
+  + {method} almostEqual
+  + {method} anyEqual
+  + {method} isOrdered
+  + {method} isOrdered
+  + {method} mapAlmostSymDiff
+  + {method} originMap
+}
+class smartdatalake.util.Constants {
+  + {static} {field} epsilonDouble
+  + {static} {field} epsilonFloat
+  + {static} {field} halfDouble
+  + {static} {field} halfFloat
+  + {static} {field} halfPi
+  + {static} {field} quarterDouble
+  + {static} {field} quarterFloat
+  + {static} {field} quarterPi
+  + {static} {field} twoPi
+}
+@enduml
