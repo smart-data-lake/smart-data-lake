@@ -29,11 +29,15 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.Logger
 
 import scala.reflect.runtime.universe.typeOf
 
-class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
 
+  private implicit val loggerImpl: Logger = logger
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -68,7 +72,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     val expected = SparkDataFrame(rows_expected.toDF)
 
     // Comparing actual with expected
-    val resultat: Boolean = expected.isEqual(actual)
+    val resultat: Boolean = actual.isEqual(expected)
     if (!resultat) printFailedTestResult("normal pk violations", Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }
@@ -96,7 +100,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     )
     val expected = SparkDataFrame(rows_expected.toDF)
 
-    val resultat: Boolean = expected.isEqual(actual)
+    val resultat: Boolean = actual.isEqual(expected)
     if (!resultat) printFailedTestResult("pk violations with null values",
       Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
@@ -155,7 +159,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
       rows_expectedWithData.toDF.union(rows_expectedWithOutData.toDF)
     )
 
-    val resultat: Boolean = expected.isEqual(actual)
+    val resultat: Boolean = actual.isEqual(expected)
     if (!resultat) printFailedTestResult("pk violations for multiple sources",
       Seq(customDO.getSparkDataFrame(), hiveTablePKidDO.getSparkDataFrame(), hiveTableNoPKDO.getSparkDataFrame(), hiveTablePKidValueDO.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)

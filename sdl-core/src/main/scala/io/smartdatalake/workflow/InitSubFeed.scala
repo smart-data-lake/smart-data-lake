@@ -67,7 +67,7 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
   }
 
-  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false)
   }
 }

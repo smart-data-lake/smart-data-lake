@@ -106,8 +106,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
             updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForInput(result, mainInput.id)))
           }
           outputSubFeeds = outputSubFeeds.map(subFeed =>
-            // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
-            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result)), Some(transformPartitionValues))
+            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result, transformPartitionValues)))
           )
           executionModeResultOptions = result.options
         case _ => ()
@@ -306,7 +305,6 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   /**
    * Updates the partition values of a SubFeed to the partition columns of the given output data object:
    * - transform partition values
-   * - add run_id_partition value if needed
    * - removing not existing columns from the partition values.
    */
   private def updateOutputPartitionValues(dataObject: DataObject, subFeed: S, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues, PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {

@@ -18,13 +18,14 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
+import com.typesafe.config.Config
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil.createParquetDataObject
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionModeResult, PartitionDiffMode}
+import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionMode, ExecutionModeResult, PartitionDiffMode}
 import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
@@ -32,7 +33,7 @@ import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTran
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, SQLExpectation}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -344,12 +345,27 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerOptions].getName)
-    val customExecutionMode = CustomMode(className = classOf[TestResultOptionsCustomMode].getName)
+    val customExecutionMode = TestResultOptionsCustomMode()
     val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionMode = Some(customExecutionMode))
     val l1 = Seq(("20100101", "jonson", "rob", 5), ("20100103", "doe", "bob", 3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextExec)
+  }
+
+  test("custom execution mode result output partition values") {
+    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
+    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("dt")).register
+
+    // prepare & simulate load (init only)
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
+    val customExecutionMode = TestResultOutputPvsExecutionMode()
+    val action1 = CustomDataFrameAction("ca", List(srcDO.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionMode = Some(customExecutionMode))
+    val l1 = Seq(("20100101", "jonson", "rob", 5), ("20100103", "doe", "bob", 3)).toDF("dt", "lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+    val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("dt" -> "20100101")), PartitionValues(Map("dt" -> "20100103"))))
+    val tgtSubFeed = action1.init(Seq(srcSubFeed))(contextExec).head
+    assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "20100101"))))
   }
 
   test("copy load detect no-data warning from SparkPlan on main output") {
@@ -555,9 +571,28 @@ class TestDfsTransformerFilterDummy extends CustomDfsTransformer {
   }
 }
 
-class TestResultOptionsCustomMode extends CustomModeLogic {
-  override def apply(options: Map[String, String], actionId: SdlConfigObject.ActionId, input: DataObject, output: DataObject, givenPartitionValues: Seq[Map[String, String]], context: ActionPipelineContext): Option[ExecutionModeResult] = {
+case class TestResultOptionsCustomMode() extends ExecutionMode {
+  override def apply(actionId: SdlConfigObject.ActionId, input: DataObject, output: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     Some(ExecutionModeResult(options = Map("testOption" -> "test")))
+  }
+  override def factory: FromConfigFactory[ExecutionMode] = TestResultOptionsCustomMode
+}
+object TestResultOptionsCustomMode extends FromConfigFactory[ExecutionMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestResultOptionsCustomMode = {
+    extract[TestResultOptionsCustomMode](config)
+  }
+}
+
+case class TestResultOutputPvsExecutionMode() extends ExecutionMode {
+  override def apply(actionId: SdlConfigObject.ActionId, input: DataObject, output: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    // only first inputPartitionValue as outputPartitionValue
+    Some(ExecutionModeResult(inputPartitionValues = subFeed.partitionValues, outputPartitionValues = Some(subFeed.partitionValues.take(1))))
+  }
+  override def factory: FromConfigFactory[ExecutionMode] = TestResultOutputPvsExecutionMode
+}
+object TestResultOutputPvsExecutionMode extends FromConfigFactory[ExecutionMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestResultOutputPvsExecutionMode = {
+    extract[TestResultOutputPvsExecutionMode](config)
   }
 }
 

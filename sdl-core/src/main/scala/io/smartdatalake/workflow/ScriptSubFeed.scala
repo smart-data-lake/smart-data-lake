@@ -65,8 +65,8 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): ScriptSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
   }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): ScriptSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, parameters = None)
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ScriptSubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, parameters = None)
   }
 }
 object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {

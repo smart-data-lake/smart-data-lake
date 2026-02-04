@@ -31,16 +31,18 @@ import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
+import org.slf4j.Logger
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
+class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with BeforeAndAfter
+  with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger
+  with io.smartdatalake.util.spark.dataset.Equality {
 
-class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger {
-
-  import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
+  private implicit val loggImp: Logger = logger
   import session.implicits._
 
   private val kafkaConnection = KafkaConnection("kafkaCon1", brokers = "localhost:6001", schemaRegistry = Some("http://localhost:6002"))
@@ -61,7 +63,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     val df = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
     dataObject.writeSparkDataFrame(df, Seq())
     val dfRead = dataObject.getSparkDataFrame(Seq())
-    assert(dfRead.symmetricDifference(df).isEmpty)
+    assert(dfRead.getSymmetricDifference(df).isEmpty)
   }
 
   test("DataObject can write and stream once kafka topic") {
@@ -86,7 +88,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     // check
     val df2 = dataObject2.getSparkDataFrame().cache()
-    assert(df2.symmetricDifference(df1).isEmpty)
+    assert(df2.getSymmetricDifference(df1).isEmpty)
   }
 
   test("Can list and query partitions") {
