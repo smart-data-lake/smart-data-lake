@@ -82,8 +82,12 @@ case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
       .asInstanceOf[ScalaSubFeed]
   }
 
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): ScalaSubFeed = {
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): ScalaSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
+  }
+
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ScalaSubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
   }
 }
 

@@ -20,7 +20,6 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed

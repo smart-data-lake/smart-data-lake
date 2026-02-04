@@ -62,10 +62,10 @@ class CustomDfsTransformerTest extends AnyFunSuite
          |}
          |dataObjects {
          |  src {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |  tgt {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |}
          |""".stripMargin).resolve
@@ -107,10 +107,10 @@ class CustomDfsTransformerTest extends AnyFunSuite
          |}
          |dataObjects {
          |  src {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |  tgt {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |}
          |""".stripMargin).resolve

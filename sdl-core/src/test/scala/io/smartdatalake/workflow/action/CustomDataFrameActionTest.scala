@@ -25,7 +25,7 @@ import io.smartdatalake.testutils.TestUtil.createParquetDataObject
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionMode, ExecutionModeResult, PartitionDiffMode}
+import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult, PartitionDiffMode}
 import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
@@ -354,8 +354,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("custom execution mode result output partition values") {
-    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("dt")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("dt")).register
 
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
