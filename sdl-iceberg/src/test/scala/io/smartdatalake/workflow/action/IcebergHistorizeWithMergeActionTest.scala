@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -61,7 +61,7 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfte
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "historize_output", primaryKey = Some(Seq("lastname", "firstname")))
     val tgtDO = IcebergTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable(context)
@@ -148,7 +148,7 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfte
     val context = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "historize_output", primaryKey = Some(Seq("lastname", "firstname")))
     val tgtDO = IcebergTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable(context)

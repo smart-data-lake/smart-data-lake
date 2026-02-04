@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutil.KafkaTestUtil
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
@@ -65,7 +65,7 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
     val feed = "actionpipeline"
     val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
     instanceRegistry.register(kafkaConnection)
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     createCustomTopic("topic1", Map(), 1, 1)
     val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"))
     instanceRegistry.register(tgt1DO)

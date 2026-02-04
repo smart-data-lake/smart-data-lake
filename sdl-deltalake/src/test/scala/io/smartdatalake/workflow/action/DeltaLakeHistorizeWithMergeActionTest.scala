@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -60,7 +60,7 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     val tgtTable = Table(Some(deltaDb), "historize_output", None, Some(Seq("lastname", "firstname")))
     val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable(context)
@@ -145,7 +145,7 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     val context = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     val tgtTable = Table(Some(deltaDb), "historize_output", None, Some(Seq("lastname", "firstname")))
     val tgtDO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
     tgtDO.dropTable(context)
@@ -397,7 +397,7 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     val tgt1Table = Table(Some(deltaDb), "historize_output1", None, Some(Seq("lastname", "firstname")))
     val tgt1DO = DeltaLakeTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), table = tgt1Table)
     tgt1DO.dropTable(context)
