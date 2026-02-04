@@ -17,3 +17,5 @@ jobs:
         run: |
           yarn install --frozen-lockfile
           yarn build
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}

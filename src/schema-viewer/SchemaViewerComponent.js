@@ -1,5 +1,5 @@
 import React from 'react';
-import { SchemaViewer, defaultTheme } from 'sdlb-schema-viewer';
+import { SchemaViewer, defaultTheme } from '@smart-data-lake/sdlb-schema-viewer';
 import { CssVarsProvider } from "@mui/joy";
 import UseColorMode from "./UseColorMode";
 import useBaseUrl from '@docusaurus/useBaseUrl';
