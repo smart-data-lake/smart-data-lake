@@ -29,7 +29,7 @@ case class ScalaColumnDefinition[A: ClassTag](name: String,
                                               comment: Option[String] = None,
                                              _dataType: Option[ScalaDataType[A]] = None) extends GenericField {
 
-  // datatype is deduced from generic type A.
+  // datatype is deduced from generic type A if not explicitly provided
   val dataType: ScalaDataType[A] = _dataType.getOrElse(ScalaDataType.getFor[A])
 
   def makeNullable: ScalaColumnDefinition[A] = copy(nullable = true)

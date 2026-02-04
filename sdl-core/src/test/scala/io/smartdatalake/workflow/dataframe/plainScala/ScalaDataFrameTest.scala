@@ -146,9 +146,11 @@ class ScalaDataFrameTest extends AnyFunSuite {
     assert(df1.distinct.dim == (3,2)) //3 rows 2 cols
   }
 
-  test("ScalaSequenceDataType works") {
-    val df = ScalaDataFrame.apply(Seq(Seq(Seq("asdf")), Seq(Seq("dfdsf")), Seq(Seq("fdsfsd"))))
-    print(df.schema)
+  test("ScalaSequenceDataType stores Sequences in its cell values") {
+    val df = ScalaDataFrame.apply(Seq(Seq(Seq(1,2,3,4)), Seq(Seq(5,6,7)), Seq(Seq(8,9,10))))
+    val hasCorrectType = df.schema("col0").dataType == ScalaSeqDataType
+    val storesCorrectData = Seq(0,1,2).forall(ix => df(ix)(0).isInstanceOf[Seq[Int]])
+    assert(hasCorrectType && storesCorrectData)
   }
 
 

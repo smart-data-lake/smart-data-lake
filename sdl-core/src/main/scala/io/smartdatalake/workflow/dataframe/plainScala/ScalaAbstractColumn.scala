@@ -27,7 +27,7 @@ import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
 /**
- * Abstraction of columns that include data (ScalaColumn), and expressions that calculate data and can be evaluated to a column.
+ * Abstraction of columns that include data (ScalaColumn and ScalaExplodingColumn), and expressions that calculate data and can be evaluated to a column.
  */
 abstract class ScalaAbstractColumn extends GenericColumn {
 
