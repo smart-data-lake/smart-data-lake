@@ -20,23 +20,27 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.script.CmdScript
 import org.apache.spark.sql.types.DataType
 import org.json4s.{Formats, JBool, JInt, JObject, JString}
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 import scala.collection.mutable
 
-class AirbyteDataObjectTest extends DataObjectTestSuite {
+class AirbyteDataObjectTest extends DataObjectTestSuite
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
+
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   private def parseMessage(msg: String): AirbyteMessage = {
-    AirbyteMessage.parseOutput(Stream(msg), mutable.Buffer(), false).head
+    AirbyteMessage.parseOutput(Stream(msg), mutable.Buffer(), filterLog = false).head
   }
 
   import session.implicits._
@@ -61,8 +65,8 @@ class AirbyteDataObjectTest extends DataObjectTestSuite {
     val actual = dataObject.getSparkDataFrame()(contextExec)
     val expected = Seq(("TEST", true, "123", BigDecimal(2345.67), "Test Auto", Timestamp.valueOf("2022-11-22 01:23:45"), LocalDateTime.parse("2022-11-22T01:23:45")))
       .toDF("produkttyp", "flag", "artikelID", "price", "artikelbezeichnung", "updated", "updatedNTZ")
-    val resultat = expected.isEqual(actual)
-    if (!resultat) TestUtil.printFailedTestResult("wsl cmd test", Seq())(actual)(expected)
+    val resultat = expected.equal(actual)
+    if (!resultat) printFailedTestResult("wsl cmd test", Seq())(actual)(expected)
     assert(resultat)
   }
 

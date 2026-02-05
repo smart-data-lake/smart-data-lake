@@ -20,14 +20,34 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.util.LogUtils.{debLogFun, debugLog}
+import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame, Dataset}
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 import org.slf4j.Logger
 
 import scala.util.{Failure, Success, Try}
 
 trait Quality extends Transform {
+
+  final def comment(commentString: String): Metadata = new MetadataBuilder()
+    .putString("comment", commentString).build()
+
+  final def withComment(colName: String, column: Column, commentText: String): Column = column
+    .as(alias = colName, metadata = comment(commentText))
+
+  final def withComment(colName: String, commentText: String): Column = withComment(colName, col(colName), commentText)
+
+  final def withComment(column: Column, commentText: String): Column = {
+    val colName = column.expr match {
+      case c: NamedExpression => c.name
+      case _ => throw new IllegalArgumentException(s"Cannot extract name from Column $column," +
+        s" as it is not a NamedExpression." +
+        s" use withComment(colName: String, column: Column, commentText: String) instead.")
+    }
+    withComment(colName, commentText)
+  }
 
   /**
    *
@@ -51,8 +71,34 @@ trait Quality extends Transform {
    */
   final def getStatsCol(cn: String): List[Column] = getStatsCol(col(cn), cn)
 
-  implicit class DsQuality[T](ds: Dataset[T]) {
 
+  implicit class DsComment[T](ds: Dataset[T]) {
+
+    def getColumnComments(implicit implSs: SparkSession): Dataset[(String, String, String)] = {
+      import implSs.implicits._
+      ds.columns.map { cn => (cn, ds.schema(cn).dataType.catalogString, ds.schema(cn).getComment().getOrElse("")) }
+        .toList.toDF("column", "datatype", "comment").as[(String, String, String)]
+    }
+
+    def setColumnComments(commentMap: Map[String, String])(implicit logger: Logger): Dataset[T] = {
+      def commentField(fld: StructField): StructField = commentMap.get(fld.name).map(comment => fld.withComment(comment)).getOrElse(fld)
+
+      val superfluousComments = commentMap.keys.toSeq.diff(ds.columns)
+      if (superfluousComments.nonEmpty) logger.warn(s"Superfluous comment detected for columns ${superfluousComments.mkString(", ")}")
+      val commentedCols = ds.schema.map(f => col(f.name).as(f.name, commentField(f).metadata))
+      ds.select(commentedCols: _*).as[T](ds.encoder)
+    }
+
+    /**
+     * Add a column include a comment
+     */
+    def withColumn(colName: String, expr: Column, comment: String): DataFrame = {
+      ds.withColumn(colName, withComment(colName, expr, comment))
+    }
+  }
+
+
+  implicit class DsQuality[T](ds: Dataset[T]) {
     /**
      * Converts maps to arrays and then counts distinct rows.
      * If the dataset has a map column ds.distinct() throws an exception
@@ -76,7 +122,7 @@ trait Quality extends Transform {
         }
         if (0 < cntDistinctRows && cntRows != cntDistinctRows) {
           logger.warn(s"DataSet $dsName has duplicates! Voilà some examples:")
-          getNletten().show(8, truncate = false)
+          ds.getNonuniqueStats().show(8, truncate = false)
         }
         debLogFun(s"$dsName.count() = $cntRows") // may take a long time
         debLogFun(s"$dsName.distinct().count() = $cntDistinctRows") // may take even much longer time
@@ -95,7 +141,7 @@ trait Quality extends Transform {
     }
 
 
-    /** * treating gaps in axis (time or space) ** */
+    ///// treating gaps in axis (time or space) /////
 
     /**
      * Fills data gaps with either the next or the previous value.
@@ -111,7 +157,6 @@ trait Quality extends Transform {
      */
     final def fillGaps(keyColNames: Iterable[String], dataColNames: Iterable[String],
                        orderColName: String, takeNextValueFirst: Boolean = true): DataFrame = {
-      val dsColumns = ds.columns
       val fenestra_next = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.currentRow, Window.unboundedFollowing)
       val fenestra_prev = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.unboundedPreceding, Window.currentRow)
 
@@ -123,10 +168,10 @@ trait Quality extends Transform {
         col(colName)
       }
       // TODO: find a way to declare columns as not-nullable
-      ds.select(dsColumns.map(newColumn): _*)
+      ds.select(ds.columns.map(newColumn): _*)
     }
 
-     /**
+    /**
      * adds a column which indicates whether the next interval [fromColName , toColName[ is adjacent
      *
      * @param keyColNames      : Column names of the key
@@ -135,16 +180,16 @@ trait Quality extends Transform {
      * @param orderColNames    : Sorting columns
      * @param gapIndicatorName : Name of the result column indicating gaps
      *
-     * Notes:
-     * - The `keyColNames` are used as part of the primary key.
-     * - `fromColName` and `toColName` are examined for gaps in the data.
-     * - `orderColNames` determines the order of data points (e.g., `valid_from` and `valid_to`).
-     * - `gapIndicatorName` holds a value indicating whether a gap was detected in `fromColName` or `toColName`.
+     *                         Notes:
+     *                         - The `keyColNames` are used as part of the primary key.
+     *                         - `fromColName` and `toColName` are examined for gaps in the data.
+     *                         - `orderColNames` determines the order of data points (e.g., `valid_from` and `valid_to`).
+     *                         - `gapIndicatorName` holds a value indicating whether a gap was detected in `fromColName` or `toColName`.
      *
-     * Usage:
-     * - This method fills gaps in data intervals defined by `fromColName` and `toColName`.
-     * - The `orderColNames` (e.g., `valid_from` and `valid_to`) are critical for correctly ordering data points.
-     * - The `gapIndicatorName` can be used to identify areas where data is missing.
+     *                         Usage:
+     *                         - This method fills gaps in data intervals defined by `fromColName` and `toColName`.
+     *                         - The `orderColNames` (e.g., `valid_from` and `valid_to`) are critical for correctly ordering data points.
+     *                         - The `gapIndicatorName` can be used to identify areas where data is missing.
      */
     final def getGaps(keyColNames: Iterable[String],
                       fromColName: String, toColName: String,
@@ -158,36 +203,50 @@ trait Quality extends Transform {
         .drop(nextFromColName, "_islastrow")
     }
 
+  }
 
-    /** * checking for N-letten ** */
+
+  implicit class DsPk[T](ds: Dataset[T]) {
 
     /**
-     * returns Nletten of this data frame with an additional count column
-     * overloaded version because used often to check whether columnName forms a unique key
+     * returns sub data frame which consists of those rows which contain at least a null in the specified columns
      *
-     * @param columName : names of column which is to be considered
-     * @return subdataframe of Nletten with an additional count column
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return sub data frame
      */
-    def getNletten(columName: String): DataFrame = getNletten(cols = Array(columName))
+    def getNulls(cols: Array[String] = ds.columns): Dataset[T] = {
+      val nullSearch: Column = ds.columns.map(col).foldLeft(lit(false))({ case (x, y) => x.or(y.isNull) })
+      ds.where(nullSearch)
+    }
 
     /**
-     * returns Nletten of this data frame with an additional count column
-     * usefull to check whether cols form a unique key
+     * Checks whether the specified columns contain nulls
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def containsNull(cols: Array[String] = ds.columns): Boolean = !getNulls(cols).isEmpty
+
+    /**
+     * counts n-lets of this data frame with respect to specified columns cols.
+     * The result data frame possesses the columns cols and an additional count column countColname.
      *
      * @param cols         : names of columns which are to be considered, unspecified or empty Array mean all columns of df
      * @param countColname : name of count column, default name: cnt
-     * @return subdataframe of Nletten with an additional count column
+     * @return subdataframe of n-lets
      */
-    def getNletten(cols: Array[String] = ds.columns, countColname: String = "cnt"): DataFrame = {
+    def getNonuniqueStats(cols: Array[String] = ds.columns, countColname: String = "_cnt_"): DataFrame = {
       val forbiddenColumnNames = Array("count", countColname)
       // for better usability we define empty Array of cols to mean all columns of df
-      val colsInDs: Array[String] = if (cols.isEmpty) ds.columns else ds.columns.intersect(cols)
-      if (colsInDs.isEmpty) throw new IllegalArgumentException(s"Argument cols must contain at least 1 name of a column of your dataset.\n   ds.columns = ${ds.columns.mkString(",")}\n   cols = ${cols.mkString(",")} ")
+      val colsInDs: Array[String] = if (cols.isEmpty) cols else cols.intersect(cols)
+      if (colsInDs.isEmpty) throw new IllegalArgumentException(s"Argument cols must contain at least 1 name" +
+        s" of a column of your dataset.\n   cols = ${cols.mkString(",")}\n   cols = ${cols.mkString(",")} ")
       val dfProjected: DataFrame = ds.select(colsInDs.map(col): _*)
       val dfColumns: Array[String] = dfProjected.columns
       // If df contains forbidden column then the result contains two columns with the same name
       forbiddenColumnNames.foreach(str =>
-        require(!dfColumns.contains(str), s"data frame df must not contain column named $str. df.columns = ${dfColumns.mkString(",")}")
+        require(!dfColumns.contains(str),
+          s"data frame df must not contain column named $str. cols = ${dfColumns.mkString(",")}")
       )
 
       dfProjected.groupBy(dfColumns.head, dfColumns.tail: _*)
@@ -195,5 +254,72 @@ trait Quality extends Transform {
         .where(col(countColname) > 1)
     }
 
+    /**
+     * returns nLets of this data frame with an additional count column
+     * overloaded version because used often to check whether columnName forms a unique key
+     *
+     * @param columName : names of column which is to be considered
+     * @return subdataframe of nLets with an additional count column
+     */
+    def getNonuniqueStats(columName: String): DataFrame = getNonuniqueStats(cols = Array(columName))
+
+    /**
+     * Returns rows of this data frame which violate uniqueness for specified columns cols.
+     * The result data frame possesses an additional count column countColname.
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return subdataframe of n-lets
+     */
+    def getNonuniqueRows(cols: Array[String] = ds.columns): Dataset[T] = {
+      val dfNonUnique = getNonuniqueStats(cols, "_duplicationCount_").drop("_duplicationCount_")
+      ds.join(dfNonUnique, cols).select(ds.columns.head, ds.columns.tail: _*).as[T](ds.encoder)
+    }
+
+    /**
+     * projects a data frame onto array of columns
+     *
+     * @param cols : names of columns on which the data frame is to be projected
+     * @return projection of data frame df
+     */
+    def project(cols: Array[String] = ds.columns): DataFrame = ds.select(cols.map(col): _*)
+
+    /**
+     * Checks whether the specified columns satisfy uniqueness within the data frame
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def isUnique(cols: Array[String] = ds.columns): Boolean = project(cols).getNonuniqueStats(cols).isEmpty
+
+    /**
+     * returns sub data frame which consists of those rows which violate PK condition for specfied columns
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return sub data frame
+     */
+    def getPKviolators(cols: Array[String] = ds.columns): Dataset[T] = getNulls(cols)
+      .union(getNonuniqueRows(cols))
+
+    /**
+     * Checks whether the specified columns is a local minimal array of columns satisfying uniqueness within the data frame
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def isMinimalUnique(cols: Array[String] = ds.columns): Boolean = {
+      def subFrameNotUnique(colName: String): Boolean = !ds.isUnique(cols.filter(colName != _))
+
+      ds.isUnique(cols) && cols.forall(subFrameNotUnique)
+    }
+
+    /**
+     * Checks whether the specified columns form a candidate key for the data frame
+     *
+     * @param cols : names of columns which are to be considered, unspecified or empty Array mean all columns of df
+     * @return true or false
+     */
+    def isCandidateKey(cols: Array[String] = ds.columns): Boolean = !containsNull(cols) && isMinimalUnique(cols)
+
   }
+
 }

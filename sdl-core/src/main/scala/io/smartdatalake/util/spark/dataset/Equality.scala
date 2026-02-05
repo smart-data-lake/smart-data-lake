@@ -24,55 +24,9 @@ import io.smartdatalake.util.{LogUtils, PrecisionDef}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.Logger
 
-/**
- * Documentation can be found in Confluence, see
- * https://confluence.sbb.ch/x/4BUXf
- */
-
-trait Equality extends Transform {
-  private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-
-  /**
-   *
-   * Returns whether two schemata equal
-   *
-   * @param leftSchema        the left schema
-   * @param rightSchema       the right schema
-   * @param ignoreColumnOrder whether or not to ignore the order of columns
-   * @param ignoreNullability whether or not to ignore nullability of fields
-   * @param showDiff          whether or not to log a diff
-   * @return whether or not the schemata are equal
-   */
-  final def schemataEqual(leftSchema: StructType, rightSchema: StructType,
-                          ignoreColumnOrder: Boolean = true, ignoreNullability: Boolean = true,
-                          showDiff: Boolean = true)(implicit logger: Logger): Boolean = {
-    LogUtils.debugLog(s"schemataEqual: leftSchema  =  ${leftSchema.catalogString}")
-    LogUtils.debugLog(s"schemataEqual: rightSchema = ${rightSchema.catalogString}")
-    LogUtils.debugLog(s"schemataEqual: ignoreColumnOrder = $ignoreColumnOrder , ignoreNullability = $ignoreNullability , showDiff = $showDiff")
-
-    def fieldOrder(f1: StructField, f2: StructField): Boolean = f1.name < f2.name
-
-    def makeNullableIfIgnored(sf: StructField): StructField = StructField(sf.name, sf.dataType, ignoreNullability || sf.nullable, sf.metadata)
-
-    val lSch = leftSchema.map(makeNullableIfIgnored)
-    val rSch = rightSchema.map(makeNullableIfIgnored)
-    val result = lSch == rSch || (ignoreColumnOrder && lSch.sortWith(fieldOrder) == rSch.sortWith(fieldOrder))
-
-    if (!result && showDiff) {
-      logger.info("schemataEqual: schemata differ !")
-      logger.info(s"ignoreColumnOrder = $ignoreColumnOrder")
-      logger.info(s"ignoreNullability = $ignoreNullability")
-      logger.info(s"leftSchema  = ${leftSchema.mkString(", ")}")
-      leftSchema.printTreeString
-      logger.info(s"rightSchema = ${rightSchema.mkString(", ")}")
-      rightSchema.printTreeString
-      logger.info(s"leftSchema minus rightSchema = ${leftSchema.diff(rightSchema).mkString(", ")}")
-      logger.info(s"rightSchema minus leftSchema = ${rightSchema.diff(leftSchema).mkString(", ")}")
-    }
-    result
-  }
+trait Equality extends StructTypeUtil with Transform {
 
   implicit class DsEqual[T](ds: Dataset[T]) {
 
@@ -102,11 +56,14 @@ trait Equality extends Transform {
      * @param that the right dataframe
      * @return whether or not the dataframes are equal
      */
-    final def getSymmetricDifference(that: Dataset[T])(implicit logger: Logger): DataFrame = {
+    final def getSymmetricDifference(that: Dataset[T], ignoreColnameCase: Boolean = true)
+                                    (implicit logger: Logger): DataFrame = {
       // Spark 3 needs alias for joins from same DataFrame with same column names
-      val thiss = ds.explodeMaps.explodeArrays.unfoldStructs()
+      val thiss = if (ignoreColnameCase) ds.explodeMaps.explodeArrays.unfoldStructs().renameCols(renameFun = _.toLowerCase)
+      else ds.explodeMaps.explodeArrays.unfoldStructs()
       val thissColLogString = s"thiss.columns  = Array(${thiss.columns.mkString(",")})"
-      val thatt = that.explodeMaps.explodeArrays.unfoldStructs()
+      val thatt = if (ignoreColnameCase) that.explodeMaps.explodeArrays.unfoldStructs().renameCols(renameFun = _.toLowerCase)
+      else that.explodeMaps.explodeArrays.unfoldStructs()
       require(thiss.columns sameElements thatt.columns,
         s"""getSymmetricDifference: DFs must have the same columns!
            | $thissColLogString
@@ -289,7 +246,7 @@ trait Equality extends Transform {
                           precisionMap: Map[String, PrecisionDef],
                           showDiff: Boolean,
                           pk: Iterable[String])(implicit logger: Logger): Boolean = {
-      schemataEqual(ds.schema, that.schema, ignoreColumnOrder, ignoreNullability, showDiff) &&
+      ds.schema.equal(that.schema, ignoreColumnOrder, ignoreNullability, showDiff) &&
         ds.select(ds.columns.map(col): _*)
           .hasAlmostEqualRows(that.select(ds.columns.map(col): _*), precisionMap, showDiff, pk)
     }

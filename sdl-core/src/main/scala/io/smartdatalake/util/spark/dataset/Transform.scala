@@ -30,19 +30,18 @@ import scala.jdk.CollectionConverters._
 
 trait Transform extends Serializable {
 
-  /**
-   * Create empty DataFrame with defined Schema
-   */
-  def getEmptyDataFrame(scheme: StructType)(implicit ss: SparkSession): DataFrame = ss
-    .createDataFrame(List[Row]().asJava, scheme)
-
-  def getDecimalPrecisionScale(t: DataType): Option[(Int, Int)] = t match {
-    case DecimalType() => Some((t.asInstanceOf[DecimalType].precision,
-      t.asInstanceOf[DecimalType].scale))
-    case _ => None
-  }
-
   implicit class DsTransform[T](ds: Dataset[T]) {
+
+    val asDf: DataFrame = ds.select(ds.columns.map(col): _*)
+
+
+    /**
+     * If colName is defined, creates an additional column with a given expression on a DataFrame
+     */
+    def withOptionalColumn(colName: Option[String], expr: Column): DataFrame = {
+      if (colName.isDefined) ds.withColumn(colName.get, expr)
+      else ds.asDf
+    }
 
     /** * transformCols: generic workers used by many other methods ** */
 
@@ -137,24 +136,69 @@ trait Transform extends Serializable {
     }
 
     /**
+     * Converts the data type of columns to a specified type.
+     *
+     * Notes:
+     * - This function takes a column name and a target data type and updates the column's type accordingly.
+     * - The returned data frame reflects the updated column types.
+     *
+     * @param newType     : The desired data type to convert to
+     * @param currentType : columns of this type will be casted to newType
+     * @return A data frame with the column type updated
+     *
+     */
+    def castColumnsOfTypeTo(newType: DataType)(currentType: DataType): DataFrame = transformCols(
+      transformFun = cn => List(col(cn).cast(newType)),
+      colFilter = ds.schema.apply(_).dataType == currentType)
+
+    /**
+     * Converts the data type of columns to a specified type.
+     *
+     * Notes:
+     * - This function takes a column name and a target data type and updates the column's type accordingly.
+     * - The returned data frame reflects the updated column types.
+     *
+     * @param newType  : The desired data type to convert to
+     * @param colNames : List of column names whose type is to be converted
+     * @return A data frame with the column type updated
+     *
+     */
+    def castColumnsTo(newType: DataType)(colNames: Seq[String]): DataFrame = {
+      transformCols(transformFun = cn => List(col(cn).cast(newType)), colFilter = colNames.contains)
+    }
+
+    /**
      * Converts the data type of a column to a specified type.
      *
      * Notes:
      * - This function takes a column name and a target data type and updates the column's type accordingly.
      * - The returned data frame reflects the updated column types.
      *
-     * @param typ     : The desired data type to convert to
+     * @param newType : The desired data type to convert to
      * @param colName : The name of the column whose type is to be converted
      * @return A data frame with the column type updated
      *
      */
-    def castColumnTo(typ: DataType)(colName: String): DataFrame = {
-      transformCols(transformFun = cn => List(col(cn).cast(typ)), colFilter = _ == colName)
-    }
+    def castColumnTo(newType: DataType)(colName: String): DataFrame = castColumnsTo(newType)(List(colName))
+
+    /**
+     * Casts type of all columns to [[StringType]].
+     *
+     * @return casted [[DataFrame]]
+     */
+    def castAll2String: DataFrame = castColumnsTo(newType = StringType)(colNames = ds.columns)
+
+    /**
+     * Casts type of all [[DataType]] columns to [[TimestampType]].
+     *
+     * @return casted [[DataFrame]]
+     */
+    def castAllDate2Timestamp: DataFrame = castColumnsOfTypeTo(newType = TimestampType)(currentType = DateType)
+
 
     /**
      *
-     * @param typ    desired data type if any (should be a large enough integral type)
+     * @param typOpt desired data type if any (should be a large enough integral type)
      * @param strict Shall the upper bounds for precision of Decicmal be a strict bound?
      *               If strict then there an overflow cannot occur
      *               if not(strict) then the precision is the number of digits of the integral type
@@ -162,27 +206,45 @@ trait Transform extends Serializable {
      *               Set strict to false on your own risk
      * @return data frame of which all unscaled Decimal columns are converted to Integral type
      */
-    def castDecimalsToIntegralType(typ: Option[DataType] = None, strict: Boolean = true): DataFrame = {
+    def castDecimalsToIntegralType(typOpt: Option[DataType] = None,
+                                   strict: Boolean = true): DataFrame = {
       val oldType: String => DataType = cn => ds.schema(cn).dataType
       val oldTypePrecisionScale: String => Option[(Int, Int)] = cn => getDecimalPrecisionScale(oldType(cn))
       val cFilter: String => Boolean = oldTypePrecisionScale(_).map(_._2).contains(0)
 
       def isPrecisionSmallerThan(upperBound: Int)(p: Int) = p < upperBound || (!strict & p == upperBound)
 
-      val trfFun: String => Iterable[Column] = cn => {
-        val newType = if (typ.isEmpty) oldTypePrecisionScale(cn).map(_._1).getOrElse(0) match {
-          case n if n <= 0 => oldType(cn)
+      val trfFun: String => Iterable[Column] = colName => {
+        val newType = if (typOpt.isDefined) typOpt.get else oldTypePrecisionScale(colName).map(_._1).get match {
+          case n if n <= 0 => oldType(colName)
           case n if isPrecisionSmallerThan(3)(n) => ByteType
           case n if isPrecisionSmallerThan(5)(n) => ShortType
           case n if isPrecisionSmallerThan(10)(n) => IntegerType
           case n if isPrecisionSmallerThan(19)(n) => LongType
-          case _ => oldType(cn)
-        } else typ.get
-        Seq(col(cn).cast(newType))
+          case _ => oldType(colName)
+        }
+        Seq(col(colName).cast(newType))
       }
       transformCols(transformFun = trfFun, colFilter = cFilter)
     }
 
+    def castDecimalsToFloatDouble(castIntegral: Boolean = false): DataFrame = {
+      val oldType: String => DataType = cn => ds.schema(cn).dataType
+      val oldTypePrecisionScale: String => Option[(Int, Int)] = cn => getDecimalPrecisionScale(oldType(cn))
+      val cFilter: String => Boolean = oldTypePrecisionScale(_).map(castIntegral || _._2 > 0).exists(identity)
+      val trfFun: String => Iterable[Column] = colName => {
+        val newType = if (oldTypePrecisionScale(colName).map(_._1 < 8).get) FloatType else DoubleType
+        Seq(col(colName).cast(newType))
+      }
+      transformCols(transformFun = trfFun, colFilter = cFilter)
+    }
+
+    /**
+     * Casts type of all columns of [[DecimalType]] to an [[IntegralType]] or [[FloatType]].
+     *
+     * @return casted [[DataFrame]]
+     */
+    def castAllDecimal2IntegralFloat: DataFrame = castDecimalsToIntegralType(strict = false).castDecimalsToFloatDouble()
 
     /**
      * @return DataFrame with columns of MapType casted to ArrayType
@@ -260,6 +322,8 @@ trait Transform extends Serializable {
       }
     }
 
+    ///// Renaming Columns /////
+
     /**
      * renames columns given by the renaming function
      * but transforms Dataset to DataFrame
@@ -276,6 +340,9 @@ trait Transform extends Serializable {
       val rename: String => Iterable[String] = cn => Seq(renameFun(cn))
       transformCols(renameFun = rename, colFilter = colFilter, keepOriginalCols = keepOriginalCols)
     }
+
+
+    ///// Unfolding Structs /////
 
     /**
      * loest Struct-Column in die Elementfelder auf
@@ -325,7 +392,7 @@ trait Transform extends Serializable {
     }
 
 
-    /** * unpivotCast, transpose et al ** */
+    ///// unpivotCast, transpose et al /////
 
     /**
      * Transforms (reshapes) a wide dataframe to a long DataFrame by transforming columns into rows
@@ -456,5 +523,6 @@ trait Transform extends Serializable {
       if (!isExec) getEmptyDataFrame(ds.schema)(ds.sparkSession)
       else ds.toDF
     }
+
   }
 }

@@ -20,9 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -33,11 +31,13 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path => NioPath}
 
-class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter {
-
+class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -76,7 +76,7 @@ class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter {
 
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = expected.isEqual(actual)
+    val resultat: Boolean = expected.equal(actual)
     if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(expected)
     assert(resultat)
   }
@@ -106,7 +106,7 @@ class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter {
       .withColumn("_decimal_11_0", $"_decimal_11_0".cast(LongType))
       .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
       .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
-    val resultat: Boolean = expected.isEqual(actual)
+    val resultat: Boolean = expected.equal(actual)
     if (!resultat) printFailedTestResult("Df2HiveTable_Decimal2IntegralFloat", Seq())(actual)(expected)
     assert(resultat)
   }

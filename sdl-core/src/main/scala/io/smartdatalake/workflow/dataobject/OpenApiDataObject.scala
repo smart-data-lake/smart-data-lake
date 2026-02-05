@@ -26,7 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
 import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend}
 import io.smartdatalake.util.webservice._
@@ -171,7 +171,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
     val df = context.phase match {
       // init phase -> return empty dataframe
       case ExecutionPhase.Init =>
-        DataFrameUtil.getEmptyDataFrame(schema.get)
+        getEmptyDataFrame(schema.get)
       // exec phase -> read: return data
       case ExecutionPhase.Exec =>
         val targetUrl = s"$baseUrl/${operation.get.path.dropWhile(_ == '/')}"

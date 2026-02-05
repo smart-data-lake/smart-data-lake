@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceiver, TextMessageHandler}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -75,10 +75,10 @@ case class JmsDataObject(override val id: DataObjectId,
     // Do not process any data during init phase as messages received will not be available during Exec phase
     val df = context.phase match {
       case ExecutionPhase.Init => {
-        DataFrameUtil.getEmptyDataFrame(schemaFixed)
+        getEmptyDataFrame(schemaFixed)
       }
       case _ => {
-        receiver.receiveMessages().getOrElse(DataFrameUtil.getEmptyDataFrame(schemaFixed))
+        receiver.receiveMessages().getOrElse(getEmptyDataFrame(schemaFixed))
       }
     }
     df
