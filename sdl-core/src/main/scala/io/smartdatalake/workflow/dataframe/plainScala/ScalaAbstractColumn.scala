@@ -37,7 +37,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
 
   def inputColumns: Set[String] = Set()
 
-  def setInputData(inputData: Map[String, Seq[_]], size: Int): Unit = Unit
+  def setInputData(inputData: Map[String, Seq[_]], size: Int): Unit = ()
 
   def visit[X](func: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = func(this)
 
@@ -50,7 +50,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
       .map(c => (c.getName.get, c.data)).toMap
     assert(inputData.keySet == inputColumns, s"Missing input data for column(s): ${inputColumns.diff(inputData.keySet).mkString(", ")}")
     // set input data
-    visit[Unit](expr => expr.setInputData(inputData, df.nrRows), (_, _) => Unit)
+    visit[Unit](expr => expr.setInputData(inputData, df.nrRows), (_, _) => ())
     // create column
     dataType
       .createColumnDefinition(getName.getOrElse(ScalaColumn.nextColName))
@@ -227,7 +227,7 @@ case class ScalaLiteral[A: ClassTag](value: A) extends ScalaAbstractColumn {
   }
 
   override def data: Seq[_] = {
-    Seq.fill(colSize.getOrElse(throw new IllegalStateException("Literal is not initialized")))(value).view
+    Seq.fill(colSize.getOrElse(throw new IllegalStateException("Literal is not initialized")))(value)
   }
 
   override def apply(extraction: Any): ScalaUnaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
@@ -258,7 +258,7 @@ case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
   }
 
   override def data: Seq[_] = {
-    resolvedData.getOrElse(throw new IllegalStateException(s"Unresolved Column reference with name '$name'")).view
+    resolvedData.getOrElse(throw new IllegalStateException(s"Unresolved Column reference with name '$name'"))
   }
 
   override def getName: Option[String] = Some(name)
