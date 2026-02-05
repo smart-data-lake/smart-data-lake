@@ -93,6 +93,8 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   private val hasQuery: Boolean = table.query.isDefined
 
+  override val forceGenericObservation: Boolean = writeMethod == "direct" // in direct mode, Spark Observations are not working properly with the BigQuery connector as it uses an optimized write API.
+
   //Using options that are only valid for write operations doesn't have any effect on the readDataFrame method and viceversa --> We can use one map for the entire data object.
   private def sparkOptions: Map[String, String] =
       connection.getConnectionOptions() ++ options ++ Map(
