@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action.spark.transformer
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
@@ -62,10 +62,10 @@ class CustomDfsTransformerTest extends AnyFunSuite
          |}
          |dataObjects {
          |  src {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |  tgt {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |}
          |""".stripMargin).resolve
@@ -73,8 +73,8 @@ class CustomDfsTransformerTest extends AnyFunSuite
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
-    val src = instanceRegistry.get[MockDataObject](DataObjectId("src"))
-    val tgt = instanceRegistry.get[MockDataObject](DataObjectId("tgt"))
+    val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
+    val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))
     val action = instanceRegistry.get[CustomDataFrameAction](ActionId("dynamicDfTransform"))
     val initSubFeeds = Seq(InitSubFeed("src", Seq()))
 
@@ -107,10 +107,10 @@ class CustomDfsTransformerTest extends AnyFunSuite
          |}
          |dataObjects {
          |  src {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |  tgt {
-         |    type = io.smartdatalake.testutils.MockDataObject
+         |    type = io.smartdatalake.testutils.MockSparkDataObject
          |  }
          |}
          |""".stripMargin).resolve
@@ -118,8 +118,8 @@ class CustomDfsTransformerTest extends AnyFunSuite
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
-    val src = instanceRegistry.get[MockDataObject](DataObjectId("src"))
-    val tgt = instanceRegistry.get[MockDataObject](DataObjectId("tgt"))
+    val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
+    val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))
     val action = instanceRegistry.get[CustomDataFrameAction](ActionId("dynamicDsTransform"))
     val initSubFeeds = Seq(InitSubFeed("src", Seq()))
 

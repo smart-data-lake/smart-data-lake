@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataobject.{CanMergeDataFrame, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.{CanMergeDataFrame, CanWriteSparkDataFrame, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.explode
@@ -34,7 +34,7 @@ import java.sql.Timestamp
 
 /**
  * Writes final metrics and action executions to given DataObjects.
- * The DataObjects have to implement TransactionalSparkTableDataObject and be able to merge records, e.g. JdbcTableDataObject or DeltaLakeTableDataObject
+ * The DataObjects have to implement TransactionalTableDataObject and be able to merge records, e.g. JdbcTableDataObject or DeltaLakeTableDataObject
  *
  * To enable add this state listener as follows to global config section:
  *
@@ -51,8 +51,8 @@ class FinalMetricsLogWriter(options: Map[String, StringOrSecret]) extends StateL
   // get data objects
   private val metricsLogDataObjectId = DataObjectId(options("metricsLogDataObjectId").resolve())
   private val actionLogDataObjectId = DataObjectId(options("actionLogDataObjectId").resolve())
-  private lazy val metricsLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanMergeDataFrame](metricsLogDataObjectId)
-  private lazy val actionLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanMergeDataFrame](actionLogDataObjectId)
+  private lazy val metricsLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanWriteSparkDataFrame with CanMergeDataFrame](metricsLogDataObjectId)
+  private lazy val actionLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanWriteSparkDataFrame with CanMergeDataFrame](actionLogDataObjectId)
 
   // primary keys:
   private val metricsLogPrimaryKey = Seq("run_id", "run_start_tstmp", "action_id", "data_object_id")

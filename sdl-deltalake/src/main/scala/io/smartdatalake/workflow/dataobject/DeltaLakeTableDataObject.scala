@@ -129,7 +129,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints
     with io.smartdatalake.util.spark.dataset.ReadWrite {
 

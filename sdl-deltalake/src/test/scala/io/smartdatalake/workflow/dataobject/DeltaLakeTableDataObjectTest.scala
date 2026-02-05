@@ -23,7 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
 import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
@@ -452,7 +452,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   }
 
   test("returns correct metrics") {
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
 

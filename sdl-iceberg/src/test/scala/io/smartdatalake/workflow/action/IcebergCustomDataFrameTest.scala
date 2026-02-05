@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -55,13 +55,13 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
 
   test("CustomDataFrameAction with recursiveInput") {
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1")
+    val srcDO1 = MockSparkDataObject("src1")
     instanceRegistry.register(srcDO1)
     val recTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "recursive1", primaryKey = Some(Seq("lastname", "cnt")))
     val recDO = IcebergTableDataObject("rec1", Some(tempPath + s"/${recTable.fullName}"), table = recTable, schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("lastname string, cnt long"))))
     recDO.dropTable
     instanceRegistry.register(recDO)
-    val tgt1DO = MockDataObject("tgt1")
+    val tgt1DO = MockSparkDataObject("tgt1")
     instanceRegistry.register(tgt1DO)
 
     // prepare DAG

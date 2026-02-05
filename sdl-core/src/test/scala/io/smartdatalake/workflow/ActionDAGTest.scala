@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
@@ -415,10 +415,10 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // Action C reads DataObject tgtA
 
     // setup DataObjects
-    val srcD1 = MockDataObject("src1", partitions = Seq("lastname")).register
-    val srcD2 = MockDataObject("src2", partitions = Seq("lastname")).register
-    val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname", "firstname")))
-    val tgtADO = HiveTableDataObject("tgt_A", Some(tempPath + s"/${tgtATable.fullName}"), table = tgtATable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
+    val srcD1 = MockSparkDataObject("src1", partitions = Seq("lastname")).register
+    val srcD2 = MockSparkDataObject("src2", partitions = Seq("lastname")).register
+    val tgtATable = Table(Some("default"), "tgt_a", None, Some(Seq("lastname","firstname")))
+    val tgtADO = HiveTableDataObject("tgt_A", Some(tempPath+s"/${tgtATable.fullName}"), table = tgtATable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
     tgtADO.dropTable
     instanceRegistry.register(tgtADO)
 
@@ -1215,8 +1215,8 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
   test("action dag with Action skipped because of no-data fails with metricsFailCondition") {
     // setup DataObjects
     val feed = "actionpipeline"
-    val srcDO = MockDataObject("src1").register
-    val tgt1DO = MockDataObject("tgt1").register
+    val srcDO = MockSparkDataObject("src1").register
+    val tgt1DO = MockSparkDataObject("tgt1").register
 
     // prepare DAG, note that srcDO remains empty to trigger NoDataToProcessWarning
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id,
@@ -1339,12 +1339,12 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   test("action dag with 2 actions in sequence and output from second action as recursive input for first action") {
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1")
+    val srcDO1 = MockSparkDataObject("src1")
     instanceRegistry.register(srcDO1)
-    val recDO = MockDataObject("rec1", schemaMin = Some(SparkSchema(StructType(Seq(StructField("lastname", StringType), StructField("role", StringType))))))
+    val recDO = MockSparkDataObject("rec1", schemaMin = Some(SparkSchema(StructType(Seq(StructField("lastname", StringType), StructField("role", StringType))))))
     recDO.dropTable
     instanceRegistry.register(recDO)
-    val tgt1DO = MockDataObject("tgt1")
+    val tgt1DO = MockSparkDataObject("tgt1")
     instanceRegistry.register(tgt1DO)
 
     // initialize global config (used for validating allowAsRecursiveInput)

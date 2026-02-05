@@ -22,10 +22,10 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.TestUtil.createParquetDataObject
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.executionMode.{CustomMode, CustomModeLogic, ExecutionMode, ExecutionModeResult, PartitionDiffMode}
+import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult, PartitionDiffMode}
 import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
@@ -66,10 +66,10 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("spark action with custom transformation class to load multiple sources into multiple targets") {
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
-    val tgtDO1 = MockDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
-    val tgtDO2 = MockDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val tgtDO1 = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO2 = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     val customTransformerConfig = ScalaClassSparkDfsTransformer(
@@ -105,8 +105,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("spark action with recursive input") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerRecursive].getName)
@@ -140,8 +140,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy with partition diff execution mode 2 iterations") {
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1", partitions = Seq("type")).register
-    val tgtDO = MockDataObject("tgt1", partitions = Seq("type"), primaryKey = Some(Seq("type", "lastname", "firstname"))).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("type")).register
+    val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("type"), primaryKey = Some(Seq("type", "lastname", "firstname"))).register
 
     // prepare action
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
@@ -180,12 +180,12 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy with partition diff execution mode and mainInput/Output") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1", partitions = Seq("type")).register
-    val srcDO2 = MockDataObject("src2", partitions = Seq("type")).register
-    val srcDO3 = MockDataObject("src3").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("type")).register
-    val tgtDO2 = MockDataObject("tgt2", partitions = Seq("type")).register
-    val tgtDO3 = MockDataObject("tgt3").register
+    val srcDO1 = MockSparkDataObject("src1", partitions = Seq("type")).register
+    val srcDO2 = MockSparkDataObject("src2", partitions = Seq("type")).register
+    val srcDO3 = MockSparkDataObject("src3").register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("type")).register
+    val tgtDO2 = MockSparkDataObject("tgt2", partitions = Seq("type")).register
+    val tgtDO3 = MockSparkDataObject("tgt3").register
 
     // prepare action
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
@@ -219,11 +219,11 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load with multiple transformations and multiple outputs from sql code") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
-    val intDO1 = MockDataObject("int1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
-    val tgtDO2 = MockDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val intDO1 = MockSparkDataObject("int1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO2 = MockSparkDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     // note that src2 is passed on to customTransformerConfig2, even if it's not re-defined in customTransformerConfig1
@@ -255,9 +255,9 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load with transformer, 2 inputs and skip condition") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare
     val customTransformerConfig = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1 union all select * from src2"))
@@ -293,9 +293,9 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load with transformer, a regular and a skipped input, skipped input is reset after decision to execute Action was made") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare
     val customTransformerConfig = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1 union all select * from src2"))
@@ -322,8 +322,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("date to month aggregation with partition value transformation") {
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("mt")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("mt")).register
 
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerPartitionValues].getName)
@@ -340,8 +340,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("custom execution mode result options") {
-    val srcDO = MockDataObject("src1").register
-    val tgtDO1 = MockDataObject("tgt1").register
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO1 = MockSparkDataObject("tgt1").register
 
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerOptions].getName)
@@ -354,8 +354,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("custom execution mode result output partition values") {
-    val srcDO = MockDataObject("src1", partitions = Seq("dt")).register
-    val tgtDO1 = MockDataObject("tgt1", partitions = Seq("dt")).register
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
+    val tgtDO1 = MockSparkDataObject("tgt1", partitions = Seq("dt")).register
 
     // prepare & simulate load (init only)
     val customTransformerConfig = ScalaClassSparkDfsTransformer(className = classOf[TestDfsTransformerDummy].getName)
@@ -371,8 +371,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load detect no-data warning from SparkPlan on main output") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
     val tgtDO1 = createParquetDataObject("tgt1")
     val tgtDO2 = createParquetDataObject("tgt2")
 
@@ -397,8 +397,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load ignore no-data warning from SparkPlan if not main output ") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2").register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
     val tgtDO1 = createParquetDataObject("tgt1")
     val tgtDO2 = createParquetDataObject("tgt2")
 
@@ -423,18 +423,18 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load with constraints and expectations non-main input no_data") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1", expectations = Seq(
+    val srcDO1 = MockSparkDataObject("src1", expectations = Seq(
       CountExpectation(name = "count", expectation = Some(">= 1"))
     )).register
-    val srcDO2 = MockDataObject("src2", expectations = Seq(
+    val srcDO2 = MockSparkDataObject("src2", expectations = Seq(
       CountExpectation(name = "count", expectation = Some("= 0")),
       CountExpectation(name = "countAll", expectation = Some("= 0"), scope = ExpectationScope.All)
     )).register
-    val tgtDO1 = MockDataObject("tgt1", expectations = Seq(
+    val tgtDO1 = MockSparkDataObject("tgt1", expectations = Seq(
       CountExpectation(expectation = Some(">= 1")),
       SQLExpectation("tgt1AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
     )).register
-    val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
+    val tgtDO2 = MockSparkDataObject("tgt2", expectations = Seq(
       CountExpectation(expectation = Some("= 0")),
       SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)"),
     )).register
@@ -467,18 +467,18 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load with constraints and expectations main input no_data") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1", expectations = Seq(
+    val srcDO1 = MockSparkDataObject("src1", expectations = Seq(
       CountExpectation(name = "count", expectation = Some("= 0"))
     )).register
-    val srcDO2 = MockDataObject("src2", expectations = Seq(
+    val srcDO2 = MockSparkDataObject("src2", expectations = Seq(
       CountExpectation(name = "count", expectation = Some("= 2")),
       CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All)
     )).register
-    val tgtDO1 = MockDataObject("tgt1", expectations = Seq(
+    val tgtDO1 = MockSparkDataObject("tgt1", expectations = Seq(
       CountExpectation(expectation = Some("= 0")),
       SQLExpectation("tgt1AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
     )).register
-    val tgtDO2 = MockDataObject("tgt2", expectations = Seq(
+    val tgtDO2 = MockSparkDataObject("tgt2", expectations = Seq(
       CountExpectation(expectation = Some("= 2")),
       SQLExpectation("tgt2AvgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
     )).register

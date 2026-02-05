@@ -119,7 +119,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val preWriteSql: Option[String] = None,
                                   override val postWriteSql: Option[String] = None)
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput
     with io.smartdatalake.util.spark.dataset.ReadWrite {
 

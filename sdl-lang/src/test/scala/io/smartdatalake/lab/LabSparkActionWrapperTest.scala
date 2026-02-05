@@ -20,7 +20,7 @@
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.EnvironmentUtil
 import io.smartdatalake.workflow.action.CustomDataFrameAction
@@ -41,10 +41,10 @@ class LabSparkActionWrapperTest extends AnyFunSuite {
 
   test("test applying transformers") {
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1").register
-    val srcDO2 = MockDataObject("src2", partitions = Seq("lastname")).register
-    val tgtDO1 = MockDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
-    val tgtDO2 = MockDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2", partitions = Seq("lastname")).register
+    val tgtDO1 = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgtDO2 = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
     val customTransformerConfig1 = ScalaClassSparkDfsTransformer(

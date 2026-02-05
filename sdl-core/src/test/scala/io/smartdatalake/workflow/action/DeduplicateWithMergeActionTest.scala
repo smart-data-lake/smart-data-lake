@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -65,7 +65,7 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
   test("deduplicate load mergeModeEnable") {
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname")))
     val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
@@ -130,7 +130,7 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
     val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
@@ -196,7 +196,7 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
   test("deduplicate 1st 2nd load with transformer changing schema") {
 
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
+    val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
     val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)

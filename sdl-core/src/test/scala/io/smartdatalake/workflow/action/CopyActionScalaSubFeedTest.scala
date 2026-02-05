@@ -19,20 +19,16 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOptions}
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeGenericOptions}
 import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
-import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.LogUtil.getRootCause
-import io.smartdatalake.workflow.action.executionMode.{FileIncrementalMoveMode, PartitionDiffMode}
-import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, TransferRateExpectation}
+import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
-import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, SparkRepartitionTransformer}
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.dataobject.expectation._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{lit, substring}
@@ -40,9 +36,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
+
 import java.nio.file.{Files, Path => NioPath}
 
-class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
+class CopyActionScalaSubFeedTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -64,230 +61,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
   after {
     FileUtils.deleteDirectory(tempDir.toFile)
   }
-
-  test("copy load with custom transformation class and incremental move mode (delete)") {
-
-    // setup DataObjects
-    val feed = "copy"
-    val srcDO = ParquetFileDataObject("src1", tempPath + s"/src1", filenameColumn = Some("_filename"))
-    srcDO.deleteAll
-    instanceRegistry.register(srcDO)
-    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname", "firstname")))
-    val tgtDO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite = true, table = tgtTable, numInitialHdfsPartitions = 1)
-    tgtDO.dropTable
-    instanceRegistry.register(tgtDO)
-
-    // prepare & start load
-    val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestDfTransformer].getName)
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(FileIncrementalMoveMode()))
-    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-    assert(srcDO.getFileRefs(Seq()).nonEmpty)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "jonson"))))
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
-    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
-    assert(tgtSubFeed.dataObjectId == tgtDO.id)
-
-    // check output
-    val r1 = session.table(s"${tgtTable.fullName}")
-      .select($"rating")
-      .as[Int].collect().toSet
-    assert(r1 == Set(4, 6)) // should be increased by 1 through TestDfTransformer
-
-    // check input deleted by incremental move mode
-    assert(srcDO.getFileRefs(Seq()).isEmpty)
-  }
-
-  test("copy load with custom transformation from code string, incremental move mode (archive) and schema file test") {
-
-    // define custom transformation
-    val codeStr =
-      """
-      import org.apache.spark.sql.{DataFrame, SparkSession}
-      def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
-        import session.implicits._
-        df.withColumn("rating", $"rating" + 1)
-      }
-      // return as function
-      transform _
-    """
-    val customTransformerConfig = ScalaCodeSparkDfTransformer(code = Some(codeStr))
-
-    // setup DataObjects
-    val feed = "copy"
-    val srcDO = ParquetFileDataObject("src1", tempPath + s"/src1")
-    srcDO.deleteAll
-    instanceRegistry.register(srcDO)
-    val tgtTable = Table(Some("default"), "copy_output", None, Some(Seq("lastname", "firstname")))
-    val tgtDO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), analyzeTableAfterWrite = true, table = tgtTable, numInitialHdfsPartitions = 1)
-    tgtDO.dropTable
-    instanceRegistry.register(tgtDO)
-
-    // prepare data
-    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(executionMode))
-    val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-
-    // start load
-    val srcFiles = srcDO.getFileRefs(Seq()).map(_.fullPath)
-    assert(srcFiles.nonEmpty)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
-    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
-
-    // check result
-    val r1 = session.table(s"${tgtTable.fullName}")
-      .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
-    // check input archived by incremental move mode
-    assert(srcDO.getFileRefs(Seq()).isEmpty)
-    val srcDOArchived = ParquetFileDataObject("src1", tempPath + s"/src1/archive")
-    assert(srcDOArchived.getFileRefs(Seq()).nonEmpty)
-
-    // start second load without new files - schema should be present because of schema file
-    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
-  }
-
-  test("copy load incremental move mode (archive) V1 DataSource") {
-
-    // setup DataObjects
-    val feed = "copy"
-    val srcDO = XmlFileDataObject("src1", tempPath + s"/src1")
-    srcDO.deleteAll
-    instanceRegistry.register(srcDO)
-    val tgtDO = MockSparkDataObject("tgt1")
-    instanceRegistry.register(tgtDO)
-
-    // prepare data
-    val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, executionMode = Some(executionMode))
-    val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-
-    // start load
-    val srcFiles = srcDO.getFileRefs(Seq()).map(_.fullPath)
-    assert(srcFiles.nonEmpty)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
-    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
-
-    // check input archived by incremental move mode
-    assert(srcDO.getFileRefs(Seq()).isEmpty)
-    val srcDOArchived = XmlFileDataObject("src1", tempPath + s"/src1/archive")
-    assert(srcDOArchived.getFileRefs(Seq()).nonEmpty)
-
-    // start second load without new files - schema should be present because of schema file
-    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec).head)
-  }
-
-  test("copy load with transformation from sql code and constraint and expectation - Generic DataFrame observations") {
-    // if approximate=false, metrics are calculated as generic calculated metrics (because Spark does not support count_distinct as observations aggregate expression)
-    testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint = false)
-  }
-
-  test("copy load with transformation from sql code and constraint and expectation - Spark DataFrame observations") {
-    // if approximateUniqueConstraint=true, metrics are calculated as Spark DataFrame observations
-    testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint = true)
-  }
-
-  def testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint: Boolean): Unit = {
-
-    // setup DataObjects
-    val srcDO = MockSparkDataObject("src1",
-      expectations = Seq(
-        CountExpectation(name = "count", expectation = Some(">= 1")),
-        CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All),
-      )
-    ).register
-    val tgtTable = Table(Some("default"), "copy_output", None, primaryKey = Some(Seq("lastname", "firstname")))
-    val tgtDO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), Seq("lastname"), analyzeTableAfterWrite = true, table = tgtTable, numInitialHdfsPartitions = 1,
-      constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
-      expectations = Seq(
-        CountExpectation(expectation = Some(">= 1")),
-        SQLExpectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
-        SQLFractionExpectation("pctBob", countConditionExpression = "firstname = 'bob'", expectation = Some("= 0")), // because we only select Rob and not Bob...
-        CountExpectation(name = "countPerPartition", expectation = Some(">= 1"), scope = ExpectationScope.JobPartition),
-        CountExpectation(name = "countAll", expectation = Some(">= 1"), scope = ExpectationScope.All),
-        SQLQueryExpectation(name = "countOfPartitionsWith1Record", code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)", scope = ExpectationScope.All),
-        SQLExpectation("resultNull", Some("dont fail if result is null"), "null", Some("> 1")),
-        UniqueKeyExpectation("primaryKey", approximate = approximateUniqueConstraint)
-      )
-    )
-    tgtDO.dropTable
-    instanceRegistry.register(tgtDO)
-
-    // prepare & start load with positive constraint and expectation evaluation
-    val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = Some("select * from %{inputViewName} where rating = 5"))
-    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = Some("select * from %{inputViewName} where rating = 5")) // test multiple transformers - it doesnt matter if they do the same.
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
-      transformers = Seq(customTransformerConfig1, customTransformerConfig2),
-      expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
-    )
-    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
-    assert(tgtSubFeed1.dataObjectId == tgtDO.id)
-
-    // check result
-    val r1 = session.table(s"${tgtTable.fullName}")
-      .select($"lastname")
-      .as[String].collect().toSeq
-    assert(r1 == Seq("jonson")) // only one record has rating 5 (see where condition)
-
-    // check expectation value in metrics
-    val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "countAll" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 0.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0))
-
-    // overwrite src with 2 record to process
-    val l2 = Seq(("dau", "peter", 5), ("dau", "pan", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l2, Seq())
-    action1.reset
-    val tgtSubFeed2 = action1.exec(Seq(srcSubFeed))(contextExec).head
-
-    // check expectation value in metrics - countAll should be 2 now, but count should stay 1
-    val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 2, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 2, "count#src1" -> 2, "count#mainInput" -> 2, "pctTransfer" -> 1.0, "countAll" -> 3, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 1.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0))
-
-    // fail tgt constraint evaluation
-    val tgtDOConstraintFail = HiveTableDataObject("tgt1constraintFail", Some(tempPath + s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
-      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null")),
-    )
-    instanceRegistry.register(tgtDOConstraintFail)
-    val actionTgtConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
-    val ex1 = intercept[TaskFailedException](actionTgtConstraintFail.exec(Seq(srcSubFeed))(contextExec))
-    assert(getRootCause(ex1).isInstanceOf[RuntimeException])
-
-    // fail src constraint evaluation (validate on read)
-    val srcDOConstraintFail = MockSparkDataObject("src1constraintFail",
-      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null"))).register
-    srcDOConstraintFail.writeSparkDataFrame(l1, Seq())
-    val actionSrcConstraintFail = CopyAction("ca", srcDOConstraintFail.id, tgtDO.id)
-    val ex2 = intercept[TaskFailedException](actionSrcConstraintFail.exec(Seq(SparkSubFeed(None, srcDOConstraintFail.id, Seq())))(contextExec))
-    assert(getRootCause(ex2).isInstanceOf[RuntimeException])
-
-    // fail tgt expectation evaluation
-    val tgtDOExpectationFail = HiveTableDataObject("tgt1expectationFail", Some(tempPath + s"/${tgtTable.fullName}"), Seq("lastname"), table = tgtTable,
-      expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
-    )
-    instanceRegistry.register(tgtDOExpectationFail)
-    val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)
-    val ex3 = intercept[TaskFailedException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
-    assert(getRootCause(ex3).isInstanceOf[ExpectationValidationException])
-
-    // fail src expectation evaluation
-    val srcDOExpectationFail = MockSparkDataObject("src1expectationFail",
-      expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))).register
-    srcDOExpectationFail.writeSparkDataFrame(l1, Seq())
-    val actionSrcExpectationFail = CopyAction("ca", srcDOExpectationFail.id, tgtDO.id)
-    val ex4 = intercept[TaskFailedException](actionSrcExpectationFail.exec(Seq(SparkSubFeed(None, srcDOExpectationFail.id, Seq())))(contextExec))
-    assert(getRootCause(ex4).isInstanceOf[ExpectationValidationException])
-  }
-
-  // TODO: test UniqueKeyExpectation fail with scope=Job / All!
 
   // Almost the same as copy load but without any transformation
   test("copy load without transformer (similar to old ingest action)") {
@@ -590,43 +363,16 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     action1.init(Seq(srcSubFeed))(contextInit).head
     val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
   }
-
-
-  test("copy load detect no-data rowCount=0 from SparkPlan") {
-
-    // setup DataObjects
-    val feed = "copy"
-    val srcDO = ParquetFileDataObject("src1", tempPath + s"/src1")
-    srcDO.deleteAll
-    instanceRegistry.register(srcDO)
-    val tgtDO = ParquetFileDataObject("tgt1", tempPath + s"/tgt1")
-    instanceRegistry.register(tgtDO)
-
-    // prepare empty Parquet file & start load
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(SparkRepartitionTransformer(numberOfTasksPerPartition = 10)))
-    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
-      .where(lit(false)) // write empty DataFrame
-    Environment._enableSparkPlanNoDataCheck = Some(false)
-    srcDO.writeSparkDataFrame(l1, Seq())
-    Environment._enableSparkPlanNoDataCheck = Some(true)
-    assert(srcDO.getFileRefs(Seq()).nonEmpty)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(contextInit)
-    intercept[NoDataToProcessWarning](action1.exec(Seq(srcSubFeed))(contextExec))
-
-    // check that no files have been written to tgt1
-    assert(tgtDO.getFileRefs(Seq()).isEmpty)
-  }
 }
 
-class TestScalaDfTransformer extends CustomDfTransformer {
+class TestDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
     import session.implicits._
     df.withColumn("rating", $"rating" + 1)
   }
 }
 
-class TestScalaOptionsDfTransformer extends CustomDfTransformer {
+class TestOptionsDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
     import session.implicits._
     df.withColumn("rating", $"rating" + 1)
@@ -634,7 +380,7 @@ class TestScalaOptionsDfTransformer extends CustomDfTransformer {
   }
 }
 
-class TestScalaAggDfTransformer extends CustomDfTransformer {
+class TestAggDfTransformer extends CustomDfTransformer {
   def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
     import session.implicits._
     df.withColumn("mt", substring($"dt", 1, 6))
