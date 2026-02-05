@@ -35,7 +35,7 @@
         <module>sdl-snowflake</module>
         <module>sdl-azure</module>
         <module>sdl-lang</module>
-<!--        <module>sdl-gcp</module>-->
+        <module>sdl-gcp</module>
         <module>sdl-debezium</module>
         <module>sdl-debezium/debezium-connector-mariadb-shaded</module>
         <module>sdl-debezium/debezium-connector-mysql-shaded</module>
