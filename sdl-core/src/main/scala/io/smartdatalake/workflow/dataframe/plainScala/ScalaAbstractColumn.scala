@@ -127,7 +127,9 @@ abstract class ScalaAbstractColumn extends GenericColumn {
     }
   }
 
-  override def isin(list: Any*): GenericColumn = ???
+  override def isin(list: Any*): ScalaAbstractColumn = {
+    ScalaUnaryExpr(this, "isin", x => list.contains(x), Some(ScalaBooleanDataType))
+  }
 
   override def isNull: ScalaAbstractColumn = {
     ScalaUnaryExpr(this, "isNull", x => x == null, Some(ScalaBooleanDataType))
