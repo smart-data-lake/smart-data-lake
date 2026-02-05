@@ -139,7 +139,7 @@ object ScalaSeqDataType extends ScalaDataType[Seq[_]] {
       case ScalaIntDataType => (x => Seq(x.asInstanceOf[Int]))
       case ScalaStringDataType => (x => Seq(x.asInstanceOf[String].toInt))
       case ScalaDoubleDataType => (x => Seq(x.asInstanceOf[Double].toInt))
-      case ScalaBooleanDataType => (x => Seq(if (x.asInstanceOf[Boolean]) 1 else 0))
+      case ScalaBooleanDataType => (x => Seq(x.asInstanceOf[Boolean]))
     }
   }
 
@@ -240,13 +240,12 @@ object ScalaDataType {
   def getFor[A](implicit ct: ClassTag[A]): ScalaDataType[A] = getFor(ct.runtimeClass).asInstanceOf[ScalaDataType[A]]
 
   def getFor(cls: Class[_]): ScalaDataType[_] = {
-    val isSequenceOrList = cls.getName == "scala.collection.Seq" || cls.getName == "scala.collection.immutable.$colon$colon"
     cls match {
       case cls if cls == classOf[String] => ScalaStringDataType
       case cls if cls == classOf[Int] || cls == classOf[java.lang.Integer] => ScalaIntDataType
       case cls if cls == classOf[Double] => ScalaDoubleDataType
       case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
-      case _ if isSequenceOrList => ScalaSeqDataType
+      case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaSeqDataType
       case _ =>
         println(cls.getName)
         throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with class ${cls.getSimpleName}")
