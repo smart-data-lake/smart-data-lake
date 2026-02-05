@@ -111,6 +111,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     connection.getSnowparkSession
   }
 
+  override def options: Map[String, String] = sparkOptions
+
   // check for invalid save modes
   assert(Seq(SDLSaveMode.Overwrite,SDLSaveMode.Append,SDLSaveMode.ErrorIfExists,SDLSaveMode.Ignore).contains(saveMode), s"($id) Unsupported saveMode $saveMode")
 
