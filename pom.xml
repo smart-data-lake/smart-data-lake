@@ -35,6 +35,7 @@
         <module>sdl-snowflake</module>
         <module>sdl-azure</module>
         <module>sdl-lang</module>
+        <module>sdl-gcp</module>
         <module>sdl-debezium</module>
         <module>sdl-debezium/debezium-connector-mariadb-shaded</module>
         <module>sdl-debezium/debezium-connector-mysql-shaded</module>
@@ -589,6 +590,7 @@
         <snowflake-snowpark.version>1.17.0</snowflake-snowpark.version>
         <delta.version>3.3.2</delta.version>
         <iceberg.version>1.8.1</iceberg.version>
+        <bigquery.version>0.42.1</bigquery.version>
 
         <json4s.version>3.7.0-M11</json4s.version>
 

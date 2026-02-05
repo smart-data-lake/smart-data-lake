@@ -1,8 +1,7 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <!--
   ~ Smart Data Lake - Build your data lake the smart way.
   ~
-  ~ Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+  ~ Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
@@ -17,113 +16,127 @@
   ~ You should have received a copy of the GNU General Public License
   ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
   -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>sdl-parent</artifactId>
         <groupId>io.smartdatalake</groupId>
+        <artifactId>sdl-parent</artifactId>
         <version>2.9.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>sdl-lang_${scala.minor.version}</artifactId>
+    <artifactId>sdl-gcp_${scala.minor.version}</artifactId>
     <packaging>jar</packaging>
 
-    <name>sdl-lang</name>
+    <name>sdl-gcp</name>
+
+    <profiles>
+        <profile>
+            <id>fat-jar</id>
+            <!-- maven appends new entries and overwrites existing entries from the same profile defined in sdl-parent -->
+            <properties>
+                <!-- do not include sdl-core into fat-jar for this module, as sdl-core is normally put into classpath separately -->
+                <sdl-core.scope>provided</sdl-core.scope>
+            </properties>
+        </profile>
+    </profiles>
+
+    <properties>
+        <sdl-core.scope>compile</sdl-core.scope>
+        <bigquery.version>0.42.1</bigquery.version>
+    </properties>
 
     <dependencies>
 
-        <!-- override scope for spark dependencies to include/exclude them correctly for the fat-jar -->
-        <!-- note that the corresponding profile defining spark.deps.scope is inherited from sdl-parent -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.minor.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>${spark.deps.scope}</scope>
-        </dependency>
-        <!-- all modules needed to create configuration schema, but not as transitive dependencies (-> optional=true) -->
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
-            <exclusions>
-                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-annotations</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-azure_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-deltalake_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-iceberg_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-jms_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-kafka_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-            <exclusions>
-                <!-- this is to exclude hadoop-annations, which is shaded into hadoop-client-api -->
-                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience" when searching for annotations with reflection -->
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client-runtime</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-snowflake_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-splunk_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-gcp_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
+            <scope>${sdl-core.scope}</scope>
         </dependency>
 
         <dependency>
-            <groupId>com.github.scopt</groupId>
-            <artifactId>scopt_${scala.minor.version}</artifactId>
-            <version>${scopt.version}</version>
+            <groupId>com.github.takezoe</groupId>
+            <artifactId>runtime-scaladoc-reader_${scala.minor.version}</artifactId>
+            <version>${scaladoc.reader.version}</version>
         </dependency>
 
         <dependency>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.servlet.jsp</groupId>
+                    <artifactId>jsp-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.minor.version}</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+        <!--
+             prevent hitting missing dependency exception
+             see https://stackoverflow.com/questions/42327777/spark-sql-errors
+         -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-tags_${scala.minor.version}</artifactId>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.cloud.spark</groupId>
+            <artifactId>spark-bigquery-with-dependencies_${scala.minor.version}</artifactId>
+            <version>${bigquery.version}</version>
+        </dependency>
+
+        <!--
+        Needed for writing to BigQuery, see https://github.com/GoogleCloudDataproc/spark-bigquery-connector/issues/599
+        -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-mllib_${scala.minor.version}</artifactId>
+            <version>${spark.version}</version>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-reflect</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.kxbmap</groupId>
+            <artifactId>configs_${scala.minor.version}</artifactId>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
+
 
         <!-- TEST dependencies -->
         <dependency>
@@ -131,13 +144,35 @@
             <artifactId>scalatest_${scala.minor.version}</artifactId>
             <scope>test</scope>
         </dependency>
-        <!--		 sdl-core test utils-->
+        <dependency>
+            <groupId>org.scalactic</groupId>
+            <artifactId>scalactic_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- sdl-core test utils -->
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <classifier>test-jar</classifier>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-sftp</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-common</artifactId>
+            <version>${sshd.test.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -232,27 +267,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
             </plugin>
-
-            <!-- generate json schema as resource -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>generate-json-schema</id>
-                        <phase>prepare-package</phase>
-                        <goals><goal>java</goal></goals>
-                        <configuration>
-                            <mainClass>io.smartdatalake.meta.jsonschema.JsonSchemaExporter</mainClass>
-                            <arguments>
-                                <argument>--filename</argument><argument>${project.build.outputDirectory}/sdl-schema.json</argument>
-                                <argument>--version</argument><argument>${project.parent.version}</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
-
 </project>
