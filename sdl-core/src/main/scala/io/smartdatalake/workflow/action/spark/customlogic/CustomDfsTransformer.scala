@@ -277,7 +277,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
     } else if (returnType <:< typeOf[Map[String, Dataset[_]]]) {
       transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF).toMap
     } else if (returnType =:= typeOf[DataFrame]) {
-      require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
+      require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambiguous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
       Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
     } else if (returnType <:< typeOf[Dataset[_]]) {
       require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
