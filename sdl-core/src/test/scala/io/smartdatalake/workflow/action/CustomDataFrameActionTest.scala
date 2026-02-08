@@ -252,6 +252,68 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
   }
 
+  test("scala class transformer respects input and output id mappings") {
+
+    val srcCustomers = MockSparkDataObject("srcCustomers").register
+    val srcOrders = MockSparkDataObject("srcOrders").register
+    val tgtPrimary = MockSparkDataObject("tgtPrimary").register
+    val tgtSecondary = MockSparkDataObject("tgtSecondary").register
+
+    val customTransformerConfig = ScalaClassSparkDfsTransformer(
+      className = classOf[TestDfsTransformerMappings].getName,
+      renamedInputIds = Map(srcCustomers.id.id -> "customers", srcOrders.id.id -> "orders"),
+      renamedOutputIds = Map("primaryOut" -> tgtPrimary.id.id, "secondaryOut" -> tgtSecondary.id.id)
+    )
+
+    val action = CustomDataFrameAction(
+      "mappingAction",
+      List(srcCustomers.id, srcOrders.id),
+      List(tgtPrimary.id, tgtSecondary.id),
+      transformers = Seq(customTransformerConfig)
+    )
+    instanceRegistry.register(action)
+
+    val dfCustomers = Seq(("gold", "alice", 5)).toDF("lastname", "firstname", "rating")
+    val dfOrders = Seq(("silver", "bob", 3)).toDF("lastname", "firstname", "rating")
+    srcCustomers.writeSparkDataFrame(dfCustomers, Seq())
+    srcOrders.writeSparkDataFrame(dfOrders, Seq())
+
+    val srcSubFeeds = Seq(
+      SparkSubFeed(None, srcCustomers.id.id, Seq()),
+      SparkSubFeed(None, srcOrders.id.id, Seq())
+    )
+    val tgtSubFeeds = action.exec(srcSubFeeds)(contextExec)
+    assert(tgtSubFeeds.map(_.dataObjectId).toSet == Set(tgtPrimary.id, tgtSecondary.id))
+  }
+
+  test("scala class transformer uses output id override for single dataframe return") {
+
+    val srcDO = MockSparkDataObject("src").register
+    val src2DO = MockSparkDataObject("src2").register
+    val tgtDO = MockSparkDataObject("tgtOverride").register
+
+    val filterTransformer = ScalaClassSparkDfsTransformer(
+      className = classOf[TestSingleDfTransformer].getName,
+      overrideOutputId = Some("filteredCustomers"),
+    )
+    val passThroughTransformer = SQLDfsTransformer(code = Map(tgtDO.id.id -> s"select * from %{inputViewName_filteredCustomers}"))
+
+    val action = CustomDataFrameAction(
+      "overrideAction",
+      List(srcDO.id, src2DO.id),
+      List(tgtDO.id),
+      transformers = Seq(filterTransformer, passThroughTransformer)
+    )
+    instanceRegistry.register(action)
+
+    val df = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(df, Seq())
+    src2DO.writeSparkDataFrame(df, Seq())
+
+    val tgtSubFeeds = action.exec(Seq(SparkSubFeed(None, srcDO.id.id, Seq()),SparkSubFeed(None, src2DO.id.id, Seq())))(contextExec)
+    assert(tgtSubFeeds.map(_.dataObjectId).toSet == Set(tgtDO.id))
+  }
+
   test("copy load with transformer, 2 inputs and skip condition") {
 
     // setup DataObjects
@@ -544,6 +606,22 @@ class TestDfsTransformerDummy extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     // one to one...
     dfs.map { case (id, df) => (id.replaceFirst("src", "tgt"), df) }
+  }
+}
+
+class TestDfsTransformerMappings extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
+    Map(
+      "primaryOut" -> dfs("customers").withColumn("origin", lit("customers")),
+      "secondaryOut" -> dfs("orders").withColumn("origin", lit("orders"))
+    )
+  }
+}
+
+class TestSingleDfTransformer extends CustomDfsTransformer {
+  def transform(dfSrc: DataFrame): DataFrame = {
+    import dfSrc.sparkSession.implicits._
+    dfSrc.filter($"rating" >= 5)
   }
 }
 
