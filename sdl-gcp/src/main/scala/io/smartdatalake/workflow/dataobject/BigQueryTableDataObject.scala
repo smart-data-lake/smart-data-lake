@@ -79,7 +79,8 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
                                    connectionId: ConnectionId,
 
                                    override val metadata: Option[DataObjectMetadata] = None)
-                                  (@transient implicit val instanceRegistry: InstanceRegistry) extends TransactionalTableDataObject with ExpectationValidation {
+                                  (@transient implicit val instanceRegistry: InstanceRegistry)
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame with ExpectationValidation {
 
 
 
@@ -97,15 +98,15 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   //Using options that are only valid for write operations doesn't have any effect on the readDataFrame method and viceversa --> We can use one map for the entire data object.
   private def sparkOptions: Map[String, String] =
-      connection.getConnectionOptions() ++ options ++ Map(
+    connection.getConnectionOptions() ++ options ++ Map(
       "viewsEnabled" -> viewsEnabled.toString,
       "materializationDataset" -> (if (materializationDataset.isEmpty) table.db.get else materializationDataset.get),
       "writeMethod" -> writeMethod
     ) ++ Map(
-        "temporaryGcsBucket" -> temporaryGcsBucket,
-        "persistentGcsBucket" -> persistentGcsBucket,
-        "persistentGcsPath" -> persistentGcsPath,
-        "project" -> project
+      "temporaryGcsBucket" -> temporaryGcsBucket,
+      "persistentGcsBucket" -> persistentGcsBucket,
+      "persistentGcsPath" -> persistentGcsPath,
+      "project" -> project
     ).collect({case (key, Some(value)) => key -> value})
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
@@ -139,10 +140,10 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     require(isTableExisting, f"The provided table ${table.name} doesn't exist")
     val df = context.sparkSession
-            .read
-            .format("bigquery")
-            .options(sparkOptions)
-            .load(table.query.getOrElse(table.fullName))
+      .read
+      .format("bigquery")
+      .options(sparkOptions)
+      .load(table.query.getOrElse(table.fullName))
 
     validateSchemaMin(SparkSchema(df.schema), "read")
     df

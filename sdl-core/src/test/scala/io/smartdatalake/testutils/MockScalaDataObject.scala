@@ -48,7 +48,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
                           override val expectations: Seq[Expectation] = Seq(),
                           saveMode: SDLSaveMode = SDLSaveMode.Overwrite
                               )
-  extends DataObject with TransactionalTableDataObject
+  extends DataObject with TransactionalTableDataObject with CanCreateDataFrame with CanWriteDataFrame
     with CanHandlePartitions with ExpectationValidation {
   assert(partitions.isEmpty || saveMode==SDLSaveMode.Overwrite, s"($id) Only saveMode=Overwrite implemented for partitioned MockDataObjects")
   assert(saveMode==SDLSaveMode.Overwrite || saveMode==SDLSaveMode.Append, s"($id) Only saveMode=Overwrite or saveMode=Append implemented for MockDataObjects")
