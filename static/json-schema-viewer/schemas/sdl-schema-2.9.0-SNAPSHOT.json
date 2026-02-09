@@ -594,6 +594,8 @@
             "type" : "object",
             "additionalProperties" : {
               "oneOf" : [ {
+                "$ref" : "#/definitions/Connection/BigQueryTableConnection"
+              }, {
                 "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
               }, {
                 "$ref" : "#/definitions/Connection/HadoopFileConnection"
@@ -635,6 +637,8 @@
             "type" : "object",
             "additionalProperties" : {
               "oneOf" : [ {
+                "$ref" : "#/definitions/Connection/BigQueryTableConnection"
+              }, {
                 "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
               }, {
                 "$ref" : "#/definitions/Connection/HadoopFileConnection"
@@ -684,6 +688,8 @@
             "type" : "object",
             "additionalProperties" : {
               "oneOf" : [ {
+                "$ref" : "#/definitions/Connection/BigQueryTableConnection"
+              }, {
                 "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
               }, {
                 "$ref" : "#/definitions/Connection/HadoopFileConnection"
@@ -943,6 +949,125 @@
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
         "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by an Avro data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Avro formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementations are provided by\nthe [databricks spark-avro](https://github.com/databricks/spark-avro) project.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
+      },
+      "BigQueryTableDataObject" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "BigQueryTableDataObject"
+          },
+          "table" : {
+            "$ref" : "#/definitions/Others/Table",
+            "description" : "BigQuery table to by written by this output. BigQuery requires a table name and a dataset."
+          },
+          "viewsEnabled" : {
+            "type" : "boolean",
+            "description" : "Required if the table is being read with a query, as BigQuery will create a temporary table in the background."
+          },
+          "materializationDataset" : {
+            "type" : "string",
+            "description" : "Required if the table is being read with a query, as BigQuery will create a temporary table in the background.  \nThis argument defines on which dataset the view will be created. Defaults to the same dataset as the table."
+          },
+          "writeMethod" : {
+            "type" : "string",
+            "description" : "Can be 'direct' or 'indirect'. The indirect mode stores the data in a Bucket or a path first and load it to BigQuery in a second step.  \nIf 'indirect' mode is used, one of the options 'temporaryGcsBucket', 'persistentGscBucket' or 'persistentGscPath' must be set.  \nDefaults to 'direct'"
+          },
+          "temporaryGcsBucket" : {
+            "type" : "string",
+            "description" : "Temporary Bucket to store data if saving with \"indirect\" mode."
+          },
+          "persistentGcsBucket" : {
+            "type" : "string",
+            "description" : "Persistent Bucket to store data if saving with \"indirect\" mode."
+          },
+          "persistentGcsPath" : {
+            "type" : "string",
+            "description" : "Temporary GSC Path to store data if saving with \"indirect\" mode."
+          },
+          "project" : {
+            "type" : "string",
+            "description" : "Defaults to the project of the project Id of the service account being used"
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Additional Spark options provided by the connector.  \nPlease seehttps://github.com/GoogleCloudDataproc/spark-bigquery-connector for more information."
+          },
+          "schemaMin" : {
+            "type" : "string",
+            "description" : "An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.  \nDefine schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of row-level`Constraint`s to enforce when writing to this data object."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List of`Expectation`s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
+          },
+          "saveMode" : {
+            "type" : "string",
+            "description" : "`SDLSaveMode` to use when writing files, default is \"append\". Overwrite, Append are supported for now.",
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+          },
+          "connectionId" : {
+            "type" : "string",
+            "description" : "Id of`io.smartdatalake.workflow.connection.BigQueryTableConnection`"
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/DataObjectMetadata",
+            "description" : "Metadata of the Object in form Key-Value form."
+          }
+        },
+        "title" : "BigQueryTableDataObject",
+        "required" : [ "type", "table", "connectionId" ],
+        "additionalProperties" : false,
+        "description" : "`DataObject` of type BigQueryTableDataObject.  \nProvides details to access BigQuery Tables to an Action.  \nThe object uses the official Spark-connector by Google see: https://github.com/GoogleCloudDataproc/spark-bigquery-connector.  \nAs of now, the only authentication mode supported is a Service Account Key."
       },
       "CsvFileDataObject" : {
         "type" : "object",
@@ -4907,6 +5032,52 @@
       }
     },
     "Connection" : {
+      "BigQueryTableConnection" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "BigQueryTableConnection"
+          },
+          "authMode" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
+              "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AWSUserPwdAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AzureADClientGrantAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/BasicAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/CustomHttpAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/OAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/TokenAuthMode"
+            } ],
+            "description" : "Credentials to be used for this connection using`GCPCredentialsKeyAuth` As of now, only Service Account keys (either as encoded Strings or as json-files)\nare supported as an authentication method."
+          },
+          "parentProject" : {
+            "type" : "string",
+            "description" : "project used for this connection. It is defined as the GCP Project ID of the table\nto bull for the export. It defaults to the project of the Service Account being used\nin the credentials."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/ConnectionMetadata",
+            "description" : "Additional metadata for the Connection"
+          }
+        },
+        "title" : "BigQueryTableConnection",
+        "required" : [ "type", "authMode", "parentProject" ],
+        "additionalProperties" : false,
+        "description" : "Connection information for GCP BigQuery Tables"
+      },
       "DeltaLakeTableConnection" : {
         "type" : "object",
         "properties" : {
@@ -5186,6 +5357,8 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
@@ -5308,6 +5481,8 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
@@ -5355,6 +5530,8 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
@@ -5445,6 +5622,8 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
@@ -5523,6 +5702,8 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
@@ -6555,6 +6736,8 @@
           },
           "authMode" : {
             "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
               "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
             }, {
               "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
@@ -6737,6 +6920,26 @@
       }
     },
     "AuthMode" : {
+      "GCPCredentialsKeyAuth" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "GCPCredentialsKeyAuth"
+          },
+          "serviceAccountKey" : {
+            "type" : "string",
+            "description" : "A String that represents the Service Account Key encoded in Base64.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+          },
+          "serviceAccountKeyFile" : {
+            "type" : "string",
+            "description" : "A path that represents the location of the JSON-file with the service account key.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+          }
+        },
+        "title" : "GCPCredentialsKeyAuth",
+        "required" : [ "type" ],
+        "additionalProperties" : false,
+        "description" : "Authorization parameters to access a GCP-ressource using Service Account Keys.  \nA Service Account Key can be either read as Base64-encoded JSON file (String),\nor as a path containing the JSON-File with the key, as described by Google. Only one of the options should be provided."
+      },
       "PublicKeyAuthMode" : {
         "type" : "object",
         "properties" : {
@@ -7523,6 +7726,8 @@
       "type" : "object",
       "additionalProperties" : {
         "oneOf" : [ {
+          "$ref" : "#/definitions/Connection/BigQueryTableConnection"
+        }, {
           "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
         }, {
           "$ref" : "#/definitions/Connection/HadoopFileConnection"
@@ -7555,6 +7760,8 @@
           "$ref" : "#/definitions/DataObject/AirbyteDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/AvroFileDataObject"
+        }, {
+          "$ref" : "#/definitions/DataObject/BigQueryTableDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/CsvFileDataObject"
         }, {
