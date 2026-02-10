@@ -7307,6 +7307,24 @@
               "type" : "string"
             },
             "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+          },
+          "renamedInputIds" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional map of [input DataFrame name, renamed input DataFrame name].  \nAdapt names of input DataFrames to the expected names in the transformation.  \nThis is useful if the transformation expects specific input names, or if you want to use more\ngeneric names in the transformation than the actual input DataObjectIds."
+          },
+          "renamedOutputIds" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional map of [output DataFrame name, renamed output DataFrame name].  \nAdapt names of output DataFrames of the transformation to the expected names of the output DataObjects or the next transformation.  \nThis is useful if the transformation returns DataFrames with specific names, or if you want to use more\ngeneric names in the transformation than the actual output DataObjectIds."
+          },
+          "overrideOutputId" : {
+            "type" : "string",
+            "description" : "override name of output DataFrame, if the transformer returns a single DataFrame/Dataset, and not a Map of type String → DataFrame.  \nBy default, a single DataFrame/Dataset is named after the output DataObjectId of the Action if the action has only one output DataObject.  \nWith this parameter you can explicitly define the name of the output DataFrame/Dataset independent of the output DataObjectId of the Action.  \nThis parameter is ignored if the transformation returns multiple DataFrames."
           }
         },
         "title" : "ScalaClassSparkDfsTransformer",
