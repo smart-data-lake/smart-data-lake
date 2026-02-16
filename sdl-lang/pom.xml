@@ -113,6 +113,12 @@
             <version>${project.parent.version}</version>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-debezium_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>com.github.scopt</groupId>
