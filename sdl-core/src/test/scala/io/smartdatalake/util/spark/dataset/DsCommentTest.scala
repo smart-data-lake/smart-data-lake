@@ -49,4 +49,18 @@ class DsCommentTest extends AnyFlatSpec with Matchers
     actual shouldBe expected
   }
 
+  "withComment" should "split alias from column name" in {
+    val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
+    val dfCommented = df.as("a")
+      .select(
+        withComment("a.id", "desc_id"),
+        withComment("x", "desc_x"),
+        withComment("y", $"y", "desc_y")
+      )
+    val actual = dfCommented.getColumnComments.select("comment").as[String].collect().toSet
+    val expected = Set("desc_id", "desc_x", "desc_y")
+    actual shouldBe expected
+    dfCommented.columns shouldBe df.columns
+  }
+
 }

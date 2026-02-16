@@ -37,7 +37,7 @@ trait Quality extends Transform {
   final def withComment(colName: String, column: Column, commentText: String): Column = column
     .as(alias = colName, metadata = comment(commentText))
 
-  final def withComment(colName: String, commentText: String): Column = withComment(colName, col(colName), commentText)
+  final def withComment(colName: String, commentText: String): Column = withComment(colName.split('.').last, col(colName), commentText)
 
   final def withComment(column: Column, commentText: String): Column = {
     val colName = column.expr match {
