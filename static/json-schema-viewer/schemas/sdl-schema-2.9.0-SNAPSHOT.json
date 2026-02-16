@@ -596,6 +596,8 @@
               "oneOf" : [ {
                 "$ref" : "#/definitions/Connection/BigQueryTableConnection"
               }, {
+                "$ref" : "#/definitions/Connection/DebeziumConnection"
+              }, {
                 "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
               }, {
                 "$ref" : "#/definitions/Connection/HadoopFileConnection"
@@ -638,6 +640,8 @@
             "additionalProperties" : {
               "oneOf" : [ {
                 "$ref" : "#/definitions/Connection/BigQueryTableConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/DebeziumConnection"
               }, {
                 "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
               }, {
@@ -689,6 +693,8 @@
             "additionalProperties" : {
               "oneOf" : [ {
                 "$ref" : "#/definitions/Connection/BigQueryTableConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/DebeziumConnection"
               }, {
                 "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
               }, {
@@ -1314,6 +1320,45 @@
         "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all `DataObject`s\nthat are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `DataObject`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config. Example:\n```\ndataObjects = {\n ...  \n dataobject-exporter {\n   type = DataObjectsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading."
+      },
+      "DebeziumCdcDataObject" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "DebeziumCdcDataObject"
+          },
+          "connectionId" : {
+            "type" : "string",
+            "description" : "optional id of`io.smartdatalake.workflow.connection.DebeziumConnection`"
+          },
+          "table" : {
+            "$ref" : "#/definitions/Others/Table",
+            "description" : "Source table to get change data from"
+          },
+          "schemaMin" : {
+            "type" : "string",
+            "description" : "An optional, minimal schema that a `DataObject`schema must have to pass schema validation.\n\nThe schema validation semantics are:\n- Schema A is valid in respect to a minimal schema B when B is a subset of A. This means: the whole column set of B is contained in the column set of A.  \n- A column of B is contained in A when A contains a column with equal name and data type.  \n- Column order is ignored.  \n- Column nullability is ignored.  \n- Duplicate columns in terms of name and data type are eliminated (set semantics).\n\nNote: This is mainly used by the functionality defined in `CanCreateDataFrame` and `CanWriteDataFrame`, that is,\nwhen reading or writing Spark data frames from/to the underlying data container. `io.smartdatalake.workflow.action.Action`s that work with files ignore the `schemaMin` attribute\nif it is defined.  \nAdditionally schemaMin can be used to define the schema used if there is no data or table doesn't yet exist."
+          },
+          "debeziumProperties" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Properties for the specific Debezium connector"
+          },
+          "maxWaitTimeAfterLastBatchMilliSeconds" : {
+            "type" : "integer",
+            "description" : "(optional) Waiting time interval for debezium to finish (when a batch arrived, the engine waits the defined interval for completion), default = 10 seconds\nExample config:\nSource {\ntype = DebeziumCdcDataObject\nconnectionId = \"connection1\"\ntable = \"Test\"\ndebeziumProperties = {\n\"database.server.id\" = \"1234345345\"\n\"plugin.name\" = \"pgoutput\"\n\"schema.history.internal\" = \"io.debezium.storage.file.history.FileSchemaHistory\"\n\"schema.history.internal.file.filename\" = \"C://TEMP/schemahistory.dat\"\n}\n}"
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/DataObjectMetadata",
+            "description" : "(optional) data object metadata"
+          }
+        },
+        "title" : "DebeziumCdcDataObject",
+        "required" : [ "type", "connectionId", "table" ],
+        "additionalProperties" : false,
+        "description" : "`DataObject` of type DebeziumCdcDataObject.  \nProvides details to access Change data over Debezium Engine.  \nNote that this implementation is not yet tested on production, and must therefore be seen as experimental."
       },
       "DeltaLakeTableDataObject" : {
         "type" : "object",
@@ -5078,6 +5123,63 @@
         "additionalProperties" : false,
         "description" : "Connection information for GCP BigQuery Tables"
       },
+      "DebeziumConnection" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "DebeziumConnection"
+          },
+          "dbEngine" : {
+            "type" : "string",
+            "description" : "what database engine to use, currently supported engines: mysql, postgresql, oracle, mariadb, mongodb, sqlserver, db2, vitess, spanner"
+          },
+          "hostname" : {
+            "type" : "string",
+            "description" : "database server"
+          },
+          "db" : {
+            "type" : "string",
+            "description" : "database to read data from"
+          },
+          "port" : {
+            "type" : "integer"
+          },
+          "authMode" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
+              "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AWSUserPwdAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AzureADClientGrantAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/BasicAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/CustomHttpAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/OAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/TokenAuthMode"
+            } ],
+            "description" : "authentication information: for now BasicAuthMode is supported."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/ConnectionMetadata",
+            "description" : "optional connection metadata\nExample config:\ndbzCon {\ntype = DebeziumConnection\ndbEngine = \"postgresql\"\nhostname = \"localhost\"\ndb = \"test\"\nport = 5432\nauthMode {\ntype = BasicAuthMode\nuserVariable = \"ENV#POSTGRES_USER\"\npasswordVariable  = \"ENV#POSTGRES_PW\"\n}\n}"
+          }
+        },
+        "title" : "DebeziumConnection",
+        "required" : [ "type", "dbEngine", "hostname", "port", "authMode" ],
+        "additionalProperties" : false,
+        "description" : "Connection information for debezium connection"
+      },
       "DeltaLakeTableConnection" : {
         "type" : "object",
         "properties" : {
@@ -7746,6 +7848,8 @@
         "oneOf" : [ {
           "$ref" : "#/definitions/Connection/BigQueryTableConnection"
         }, {
+          "$ref" : "#/definitions/Connection/DebeziumConnection"
+        }, {
           "$ref" : "#/definitions/Connection/DeltaLakeTableConnection"
         }, {
           "$ref" : "#/definitions/Connection/HadoopFileConnection"
@@ -7788,6 +7892,8 @@
           "$ref" : "#/definitions/DataObject/CustomFileDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/DataObjectsExporterDataObject"
+        }, {
+          "$ref" : "#/definitions/DataObject/DebeziumCdcDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/DeltaLakeTableDataObject"
         }, {
