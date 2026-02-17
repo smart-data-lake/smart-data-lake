@@ -95,6 +95,34 @@ trait Quality extends Transform {
     def withColumn(colName: String, expr: Column, comment: String): DataFrame = {
       ds.withColumn(colName, withComment(colName, expr, comment))
     }
+
+    /**
+     * transformCommentCols allows to not only transform columns
+     * but also to add comments to the obtained columns.
+     *
+     * If a DataFrame is persisted as table (e.g. hive, Databricks) the column
+     * comments are saved in the corresponding MetaStore and thus visible
+     * and Databrick Catalog and DB Tools like Dbeaver.
+     *
+     * @param transformRenameCommentFun : function to transform, rename and comment columns
+     * @param colFilter                 : predicate on column names to filter
+     * @param keepOriginalCols          : whether to keep original cols (make sure that there is no ambiguity!)
+     * @return DataFrame with transformed, renamed and commented columns
+     */
+    def transformCommentCols(transformRenameCommentFun: String => Iterable[CommentedColumn],
+                             colFilter: String => Boolean = _ => true,
+                             keepOriginalCols: Boolean = false)
+                            (implicit logger: Logger): DataFrame = {
+      val commentMap = ds.columns.filter(colFilter)
+        .flatMap(transformRenameCommentFun(_).map(_.nameComment))
+        .toMap
+
+      ds.transformCols((cn: String) => transformRenameCommentFun(cn).map(_.defName),
+          colFilter, keepOriginalCols)
+        .setColumnComments(commentMap)
+    }
+
+
   }
 
 

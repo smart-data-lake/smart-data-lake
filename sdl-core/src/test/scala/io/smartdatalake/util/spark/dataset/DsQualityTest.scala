@@ -22,6 +22,7 @@ package io.smartdatalake.util.spark.dataset
 import io.smartdatalake.testutils.spark.dataset.Collection._
 import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, IntegerType}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -83,7 +84,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
-  "fillGaps_next" should "fill the gaps taking value from preivous row" in {
+  "fillGaps_next" should "fill the gaps taking value from previous row" in {
     val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt", takeNextValueFirst = false)
     val expected = Seq(
       (Some(0), Some(20190101), Some(3.14), Some(-2.37)),
@@ -101,4 +102,22 @@ class DsQualityTest extends AnyFlatSpec with Matchers
     actual.equal(expected) should be(true)
   }
 
+  "transformCommentCols" should "square column x only and add a comment" in {
+    val argument = List((0, 0d), (1, 1d), (2, 2d), (3, 3d)).toDF("id", "x")
+
+    def transformRenameCommentFun(cn: String): List[CommentedColumn] = List(
+      CommentedColumn(colname = s"${cn}_square",
+        definition = col(cn) * col(cn),
+        comment = "square of x")
+    )
+
+    val actual = argument.transformCommentCols(transformRenameCommentFun, colFilter = _ == "x")
+    val expected = List((0, 0d), (1, 1d), (2, 4d), (3, 9d)).toDF("id", "x_square")
+    val expectedComments = List(("id", "int", ""),
+      ("x_square", "double", "square of x"))
+      .toDF("column", "datatype", "comment")
+      .as[(String, String, String)]
+
+    actual.equal(expected) && actual.getColumnComments.equal(expectedComments) should be(true)
+  }
 }
