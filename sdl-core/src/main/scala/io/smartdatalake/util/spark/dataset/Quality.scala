@@ -104,7 +104,8 @@ trait Quality extends Transform {
         .flatMap(transformRenameCommentFun(_).map(_.nameComment))
         .toMap
 
-      ds.transformCols(transformRenameCommentFun(_).map(_.defName), colFilter, keepOriginalCols)
+      ds.transformCols((cn: String) => transformRenameCommentFun(cn).map(_.defName),
+          colFilter, keepOriginalCols)
         .setColumnComments(commentMap)
     }
 
