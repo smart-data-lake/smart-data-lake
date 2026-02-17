@@ -22,6 +22,13 @@ package io.smartdatalake.util.spark.dataset
 import org.apache.spark.sql.Column
 
 /**
+ * CommentedColumn is part of return type of DsComment.transformCommentCols
+ * That method allows to not only transform columns
+ * but also to add comments to the obtained columns.
+ *
+ * If a DataFrame is persisted as table (e.g. hive, Databricks) the column
+ * comments are saved in the corresponding MetaStore and thus visible
+ * and Databrick Catalog and DB Tools like Dbeaver.
  *
  * @param colname    name of column
  * @param definition expression of column

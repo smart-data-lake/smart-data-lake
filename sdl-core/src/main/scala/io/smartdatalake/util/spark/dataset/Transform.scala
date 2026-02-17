@@ -52,7 +52,7 @@ trait Transform extends Serializable {
      * @param transformRenameFun : function to transform and rename columns
      * @param colFilter          : predicate on column names to filter
      * @param keepOriginalCols   : whether to keep original cols (make sure that there is no ambiguity!)
-     * @return DataFrame with renamed columns
+     * @return DataFrame with transformed and renamed columns
      */
     def transformCols(transformRenameFun: String => Iterable[(Column, String)],
                       colFilter: String => Boolean,
