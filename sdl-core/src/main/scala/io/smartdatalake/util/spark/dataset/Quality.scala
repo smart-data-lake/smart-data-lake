@@ -95,6 +95,20 @@ trait Quality extends Transform {
     def withColumn(colName: String, expr: Column, comment: String): DataFrame = {
       ds.withColumn(colName, withComment(colName, expr, comment))
     }
+
+    def transformCommentCols(transformRenameCommentFun: String => Iterable[CommentedColumn],
+                             colFilter: String => Boolean = _ => true,
+                             keepOriginalCols: Boolean = false)
+                            (implicit logger: Logger): DataFrame = {
+      val commentMap = ds.columns.filter(colFilter)
+        .flatMap(transformRenameCommentFun(_).map(_.nameComment))
+        .toMap
+
+      ds.transformCols(transformRenameCommentFun(_).map(_.defName), colFilter, keepOriginalCols)
+        .setColumnComments(commentMap)
+    }
+
+
   }
 
 
