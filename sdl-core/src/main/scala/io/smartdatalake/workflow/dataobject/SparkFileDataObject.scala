@@ -55,7 +55,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger
-  with ReadWrite with Transform{
+  with ReadWrite with Transform with ExpectationValidation {
 
   /**
    * The Spark-Format provider to be used
@@ -522,6 +522,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
     dfPrepared = sparkRepartition.map(_.prepareDataFrame(dfPrepared, partitions, partitionValues, id))
       .getOrElse(dfPrepared)
 
+    // Setup constraints validation and expectations observation
+    val (dfWithExpectations, observations) = if (context.isExecPhase) {
+      import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+      setupConstraintsAndJobExpectations(SparkDataFrame(dfPrepared))
+    } else (SparkDataFrame(dfPrepared), Seq())
+
     // apply special save modes
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     finalSaveMode match {
@@ -555,12 +561,31 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // write
     val metrics = try {
-      writeSparkDataFrameToPath(dfPrepared, hadoopPath, finalSaveMode)
+      writeSparkDataFrameToPath(dfWithExpectations.asInstanceOf[SparkDataFrame].inner, hadoopPath, finalSaveMode)
     } catch {
       // cleanup partition directory on failure to ensure restartability for PartitionDiffMode.
       case t: Throwable if partitionValues.nonEmpty && SparkSaveMode.from(finalSaveMode) == SaveMode.Overwrite =>
         deletePartitions(filterPartitionsExisting(partitionValues))
         throw t
+    }
+
+    // collect expectation metrics and validate
+    val observationMetrics = if (context.isExecPhase) observations.flatMap(_.getMetrics).toMap else Map()
+    val allMetrics = metrics ++ observationMetrics
+    
+    // Validate expectations after write
+    if (context.isExecPhase && expectations.nonEmpty) {
+      val (_, exceptions) = validateExpectations(
+        subFeedType = typeOf[SparkSubFeed],
+        dfJob = Some(dfWithExpectations),
+        dfAll = dfWithExpectations,
+        partitionValues = partitionValues,
+        scopeJobAndInputMetrics = allMetrics,
+        enrichmentFunc = identity,
+        scopeJobOnly = true,
+        loggerContext = "write"
+      )
+      if (exceptions.nonEmpty) throw exceptions.head
     }
 
     // make sure empty partitions are created as well
@@ -570,7 +595,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     sparkRepartition.foreach(_.renameFiles(getFileRefs(partitionValues))(filesystem))
 
     // return
-    metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
+    allMetrics ++ allMetrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
   }
 
   override private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
