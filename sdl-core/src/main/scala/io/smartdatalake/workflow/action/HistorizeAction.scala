@@ -369,7 +369,7 @@ case class HistorizeAction(
       val pkColsStr = pks.mkString(", ")
       val duplicateSample = duplicates.limit(sampleSize).showString()
       
-      throw new ConfigurationException(
+      throw new DuplicateInputDataException(
         s"($id) Input data uniqueness validation failed: Found $duplicateCount duplicate records based on primary key [$pkColsStr]. " +
         s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness.\n" +
         s"Sample of duplicate records:\n$duplicateSample"
@@ -394,3 +394,8 @@ object HistorizeAction extends FromConfigFactory[Action] {
     extract[HistorizeAction](config)
   }
 }
+/**
+ * Exception to signal that input data contains duplicate records based on primary key constraints.
+ * This is a data quality issue rather than a configuration problem.
+ */
+case class DuplicateInputDataException(message: String) extends RuntimeException(message)

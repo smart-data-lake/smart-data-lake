@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -89,9 +89,9 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src2", Seq())
 
-    // Execute action - should fail with ConfigurationException
+    // Execute action - should fail with DuplicateInputDataException
     action.init(Seq(srcSubFeed))(contextInit)
-    val ex = intercept[ConfigurationException] {
+    val ex = intercept[DuplicateInputDataException] {
       action.exec(Seq(srcSubFeed))(contextExec)
     }
     
@@ -177,7 +177,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
 
     // Execute action - should fail
     action.init(Seq(srcSubFeed))(contextInit)
-    val ex = intercept[ConfigurationException] {
+    val ex = intercept[DuplicateInputDataException] {
       action.exec(Seq(srcSubFeed))(contextExec)
     }
     
