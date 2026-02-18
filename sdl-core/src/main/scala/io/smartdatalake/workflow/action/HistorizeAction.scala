@@ -86,7 +86,7 @@ import scala.util.{Failure, Success, Try}
  *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
  *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode is no longer needed.
  * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
- * @param checkInputUnique If true, validates that input records have unique primary keys before historization.
+ * @param checkInputUnique If true, validates that input records have unique primary keys according to output DataObject primary key before historization.
  *                         This is a fail-fast mechanism to detect data quality issues early and prevent incorrect historization.
  *                         If duplicate keys are found, the job will fail with details about the duplicate records.
  *                         Default is false to maintain backward compatibility.
