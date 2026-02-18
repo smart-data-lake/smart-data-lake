@@ -27,6 +27,7 @@ import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.{AclDef,StringUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -65,6 +66,8 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val filenameColumn: Option[String] = None,
                                override val expectedPartitionsCondition: Option[String] = None,
                                override val housekeepingMode: Option[HousekeepingMode] = None,
+                               override val constraints: Seq[Constraint] = Seq(),
+                               override val expectations: Seq[Expectation] = Seq(),
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
