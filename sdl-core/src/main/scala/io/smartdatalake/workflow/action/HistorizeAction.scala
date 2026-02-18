@@ -358,7 +358,6 @@ case class HistorizeAction(
    */
   private def validateInputUniqueness(df: GenericDataFrame, pks: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
-    import functions._
     
     // Get duplicate records
     val duplicates = df.getNonuniqueRows(pks)
@@ -366,16 +365,11 @@ case class HistorizeAction(
     
     if (duplicateCount > 0) {
       // Collect a sample of duplicate records for error message
-      val sampleSize = math.min(10, duplicateCount).toInt
-      val duplicateSample = duplicates.limit(sampleSize).collect
+      val sampleSize = math.min(10, duplicateCount.toInt)
       val pkColsStr = pks.mkString(", ")
-      val sampleStr = duplicateSample.map { row =>
-        pks.map(col => s"$col=${row.getAs[Any](col)}").mkString("(", ", ", ")")
-      }.mkString(", ")
       
       throw new ConfigurationException(
         s"($id) Input data uniqueness validation failed: Found $duplicateCount duplicate records based on primary key [$pkColsStr]. " +
-        s"Sample of duplicate keys: $sampleStr. " +
         s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness."
       )
     }
