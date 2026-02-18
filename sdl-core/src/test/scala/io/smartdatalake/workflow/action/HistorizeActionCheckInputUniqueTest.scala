@@ -99,6 +99,8 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     assert(ex.getMessage.contains("uniqueness validation failed"))
     assert(ex.getMessage.contains("duplicate"))
     assert(ex.getMessage.contains("id"))
+    // Verify error message contains sample of duplicate records
+    assert(ex.getMessage.contains("Sample of duplicate records:"))
   }
 
   test("HistorizeAction with checkInputUnique=false should succeed with duplicate input keys (default behavior)") {
@@ -183,5 +185,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     assert(ex.getMessage.contains("uniqueness validation failed"))
     assert(ex.getMessage.contains("duplicate"))
     assert(ex.getMessage.contains("country") && ex.getMessage.contains("city"))
+    // Verify error message contains sample of duplicate records
+    assert(ex.getMessage.contains("Sample of duplicate records:"))
   }
 }

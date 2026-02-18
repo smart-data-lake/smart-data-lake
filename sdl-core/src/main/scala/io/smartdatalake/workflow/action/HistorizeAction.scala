@@ -367,10 +367,12 @@ case class HistorizeAction(
       // Collect a sample of duplicate records for error message
       val sampleSize = math.min(10, duplicateCount.toInt)
       val pkColsStr = pks.mkString(", ")
+      val duplicateSample = duplicates.limit(sampleSize).showString()
       
       throw new ConfigurationException(
         s"($id) Input data uniqueness validation failed: Found $duplicateCount duplicate records based on primary key [$pkColsStr]. " +
-        s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness."
+        s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness.\n" +
+        s"Sample of duplicate records:\n$duplicateSample"
       )
     }
   }
