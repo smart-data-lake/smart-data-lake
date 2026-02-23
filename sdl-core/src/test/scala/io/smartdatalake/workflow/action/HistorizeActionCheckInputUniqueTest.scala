@@ -22,7 +22,8 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.util.dag.TaskFailedException
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
@@ -37,18 +38,17 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+  val contextPrepare: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
 
   before {
     instanceRegistry.clear()
   }
 
   test("HistorizeAction with checkInputUnique=true should succeed with unique input keys") {
+
     // Setup DataObjects
     val srcDO = MockSparkDataObject("src1").register
     val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("id"))).register
-
-    // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha1", srcDO.id, tgtDO.id, checkInputUnique = true)
 
     // Create input data with unique keys
     val inputDf = Seq(
@@ -56,11 +56,16 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
       (2, "bob", 200),
       (3, "charlie", 300)
     ).toDF("id", "name", "amount")
-    
+
+    // Prepare action with checkInputUnique enabled
+    val action = HistorizeAction("ha1", srcDO.id, tgtDO.id, checkInputUnique = true)
+
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
 
     // Execute action - should succeed
+    action.prepare(contextPrepare)
+    action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
     val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec).head
     
@@ -90,10 +95,12 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val srcSubFeed = SparkSubFeed(None, "src2", Seq())
 
     // Execute action - should fail with DuplicateInputDataException
+    action.prepare(contextPrepare)
+    action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
-    val ex = intercept[DuplicateInputDataException] {
+    val ex = intercept[TaskFailedException] {
       action.exec(Seq(srcSubFeed))(contextExec)
-    }
+    }.getCause
     
     // Verify error message mentions uniqueness validation failure
     assert(ex.getMessage.contains("uniqueness validation failed"))
@@ -122,6 +129,8 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val srcSubFeed = SparkSubFeed(None, "src3", Seq())
 
     // Execute action - should succeed (duplicates are silently dropped)
+    action.prepare(contextPrepare)
+    action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
     val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec).head
     
@@ -149,6 +158,8 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val srcSubFeed = SparkSubFeed(None, "src5", Seq())
 
     // Execute action - should succeed
+    action.prepare(contextPrepare)
+    action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
     val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec).head
     
@@ -176,10 +187,12 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val srcSubFeed = SparkSubFeed(None, "src6", Seq())
 
     // Execute action - should fail
+    action.prepare(contextPrepare)
+    action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
-    val ex = intercept[DuplicateInputDataException] {
+    val ex = intercept[TaskFailedException] {
       action.exec(Seq(srcSubFeed))(contextExec)
-    }
+    }.getCause
     
     // Verify error message mentions uniqueness validation failure and both key columns
     assert(ex.getMessage.contains("uniqueness validation failed"))
