@@ -946,6 +946,57 @@
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
             "description" : "Additional metadata for the DataObject"
@@ -1205,6 +1256,57 @@
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -1718,6 +1820,57 @@
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -2381,6 +2534,57 @@
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
             "description" : "Additional metadata for the DataObject"
@@ -2905,6 +3109,57 @@
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
             "description" : "Additional metadata for the DataObject"
@@ -3052,6 +3307,57 @@
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -3201,6 +3507,57 @@
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -3745,6 +4102,57 @@
               "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
             } ],
             "description" : "Configure a housekeeping mode to e.g cleanup, archive and compact partitions.\n\nDefault is None."
+          },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of constraint definitions to validate on write, see `Constraint` for details.  \nConstraints are expressions defined on row-level and validated during evaluation of the DataFrame.  \nIf validation fails an exception is thrown and further processing is stopped.  \nNote that this is done while evaluating the DataFrame when writing to the DataObject. It doesn't need a separate action on the DataFrame.  \nIf a constraint validation for a row fails, it will throw an exception and abort writing to the DataObject."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List expectation definitions to evaluate on write, see `Expectation` for details.  \nExpectations are aggregation expressions defined on dataset-level and evaluated on every write.  \nBy default their result is logged with level info (ok) and error (failed), but this can be customized to be logged as warning.  \nIn case of failed expectations logged as error, an exceptions is thrown and further processing is stopped.  \nNote that the exception is thrown after writing to the DataObject is finished.\n\nThe following expectations names are reserved to create default metrics and should not be used:\n- count"
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -4723,6 +5131,10 @@
           "mergeModeCDCDeletedValue" : {
             "type" : "string",
             "description" : "Optional value of mergeModeCDCColumn that marks a record as deleted."
+          },
+          "checkInputUnique" : {
+            "type" : "boolean",
+            "description" : "If true, validates that input records have unique primary keys according to output DataObject primary key before historization.  \nThis is a fail-fast mechanism to detect data quality issues early and prevent incorrect historization.  \nIf duplicate keys are found, the job will fail with details about the duplicate records.  \nDefault is false to maintain backward compatibility. In that case dropDuplicate(primary key columns) is applied on input DataFrame."
           },
           "timeAxisUnit" : {
             "type" : "string",
