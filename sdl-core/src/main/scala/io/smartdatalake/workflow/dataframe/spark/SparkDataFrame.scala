@@ -179,6 +179,8 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   }
 
   override def apply(columnName: String): GenericColumn = SparkColumn(inner.apply(columnName))
+
+  override def isStreaming: Boolean = inner.isStreaming
 }
 
 case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends GenericGroupedDataFrame {

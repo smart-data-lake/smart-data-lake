@@ -68,6 +68,7 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
         .getOrElse(throw NoDataToProcessWarning("mock", s"($id) partitionedDataFrameMock not initialized"))
     } else {
       dataFrameMock
+        .orElse(schemaMin.map(subFeedCompanion.getEmptyDataFrame(_, id).asInstanceOf[SparkDataFrame].inner))
         .getOrElse(throw NoDataToProcessWarning("mock", s"($id) dataFrameMock not initialized"))
     }
   }
@@ -116,7 +117,10 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = true
 
-  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = true
+  override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
+    if (partitions.nonEmpty) partitionValuesMock.nonEmpty
+    else dataFrameMock.isDefined
+  }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     partitionValuesMock = Set()

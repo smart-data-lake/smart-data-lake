@@ -86,6 +86,10 @@ import scala.util.{Failure, Success, Try}
  *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
  *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode is no longer needed.
  * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
+ * @param checkInputUnique If true, validates that input records have unique primary keys according to output DataObject primary key before historization.
+ *                         This is a fail-fast mechanism to detect data quality issues early and prevent incorrect historization.
+ *                         If duplicate keys are found, the job will fail with details about the duplicate records.
+ *                         Default is false to maintain backward compatibility. In that case dropDuplicate(primary key columns) is applied on input DataFrame.
  * @param timeAxisUnit             Time between ticks on the time axis. Used to create valid to timestamp for existing/old records.
  *                                 Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is exclusive).
  *                                 Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d.
@@ -108,6 +112,7 @@ case class HistorizeAction(
                             mergeModeAdditionalJoinPredicate: Option[String] = None,
                             mergeModeCDCColumn: Option[String] = None,
                             mergeModeCDCDeletedValue: Option[String] = None,
+                            checkInputUnique: Boolean = false,
                             timeAxisUnit: Duration = Duration.ofMillis(1),
                             override val breakDataFrameLineage: Boolean = false,
                             override val persist: Boolean = false,
@@ -270,7 +275,12 @@ case class HistorizeAction(
       case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
     }
 
-    val newFeedDf = newDf.dropDuplicates(pks)
+    // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
+    // Note that drop duplicate might be non deterministic and cause attributes switching in history with every run.
+    if (checkInputUnique && context.isExecPhase) {
+      validateInputUniqueness(newDf, pks)
+    }
+    val newFeedDf = if (!checkInputUnique) newDf.dropDuplicates(pks) else newDf
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
@@ -296,7 +306,12 @@ case class HistorizeAction(
 
   protected def incrementalHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
 
-    val newFeedDf = newDf.dropDuplicates(pks)
+    // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
+    // Note that drop duplicate might be non deterministic and cause attributes switching in history with every run.
+    if (checkInputUnique && context.isExecPhase) {
+      validateInputUniqueness(newDf, pks)
+    }
+    val newFeedDf = if (!checkInputUnique) newDf.dropDuplicates(pks) else newDf
 
     // if context is init check if column needs to be added -> save in needsHashColumn
     if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
@@ -319,6 +334,15 @@ case class HistorizeAction(
 
   protected def incrementalCDCHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], mergeModeDeletedRecordsConditionExpr: GenericColumn, refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
 
+    // Check input uniqueness if requested (excluding deleted records)
+    if (checkInputUnique && context.isExecPhase) {
+      implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
+      import functions._
+      // For CDC mode, only validate non-deleted records
+      val nonDeletedDf = newDf.where(not(mergeModeDeletedRecordsConditionExpr))
+      validateInputUniqueness(nonDeletedDf, pks)
+    }
+
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
       if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, Environment.capturedColumnName)
@@ -326,6 +350,31 @@ case class HistorizeAction(
       // note that schema evolution is done by output DataObject
       Historization.incrementalCDCHistorize(newDf, mergeModeDeletedRecordsConditionExpr, refTimestamp, timeAxisUnitOpt)
     } else Historization.getInitialHistoryWithDummyCol(newDf, refTimestamp)
+  }
+
+  /**
+   * Validates that the input DataFrame has unique primary keys.
+   * Throws an exception with details about duplicate records if uniqueness is violated.
+   */
+  private def validateInputUniqueness(df: GenericDataFrame, pks: Seq[String])(implicit context: ActionPipelineContext): Unit = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
+    
+    // Get duplicate records
+    val duplicates = df.getNonuniqueRows(pks)
+    val duplicateCount = duplicates.count
+    
+    if (duplicateCount > 0) {
+      // Collect a sample of duplicate records for error message
+      val sampleSize = math.min(10, duplicateCount.toInt)
+      val pkColsStr = pks.mkString(", ")
+      val duplicateSample = duplicates.limit(sampleSize).showString()
+      
+      throw new DuplicateInputDataException(
+        s"($id) Input data uniqueness validation failed: Found $duplicateCount duplicate records based on primary key [$pkColsStr]. " +
+        s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness.\n" +
+        s"Sample of duplicate records:\n$duplicateSample"
+      )
+    }
   }
 
   private def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime = {
@@ -345,3 +394,8 @@ object HistorizeAction extends FromConfigFactory[Action] {
     extract[HistorizeAction](config)
   }
 }
+/**
+ * Exception to signal that input data contains duplicate records based on primary key constraints.
+ * This is a data quality issue rather than a configuration problem.
+ */
+case class DuplicateInputDataException(message: String) extends RuntimeException(message)

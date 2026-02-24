@@ -55,7 +55,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger
-  with ReadWrite with Transform{
+  with ReadWrite with Transform with ExpectationValidation {
 
   /**
    * The Spark-Format provider to be used
