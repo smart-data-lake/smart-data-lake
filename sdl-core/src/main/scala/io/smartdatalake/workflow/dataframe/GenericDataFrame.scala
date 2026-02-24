@@ -260,6 +260,8 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def apply(columnName: String): GenericColumn
 
+  def isStreaming: Boolean = false
+
 }
 
 /**

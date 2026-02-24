@@ -171,11 +171,11 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
     val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkSchema]
     SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
   }
-  override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): SparkDataFrame = {
     schema match {
       case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(context.sparkSession))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
