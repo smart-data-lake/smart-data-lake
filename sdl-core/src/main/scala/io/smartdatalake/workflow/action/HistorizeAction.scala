@@ -89,7 +89,7 @@ import scala.util.{Failure, Success, Try}
  * @param checkInputUnique If true, validates that input records have unique primary keys according to output DataObject primary key before historization.
  *                         This is a fail-fast mechanism to detect data quality issues early and prevent incorrect historization.
  *                         If duplicate keys are found, the job will fail with details about the duplicate records.
- *                         Default is false to maintain backward compatibility.
+ *                         Default is false to maintain backward compatibility. In that case dropDuplicate(primary key columns) is applied on input DataFrame.
  * @param timeAxisUnit             Time between ticks on the time axis. Used to create valid to timestamp for existing/old records.
  *                                 Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is exclusive).
  *                                 Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d.
@@ -275,12 +275,12 @@ case class HistorizeAction(
       case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
     }
 
-    // Check input uniqueness if requested
+    // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
+    // Note that drop duplicate might be non deterministic and cause attributes switching in history with every run.
     if (checkInputUnique && context.isExecPhase) {
       validateInputUniqueness(newDf, pks)
     }
-
-    val newFeedDf = newDf.dropDuplicates(pks)
+    val newFeedDf = if (!checkInputUnique) newDf.dropDuplicates(pks) else newDf
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
@@ -306,12 +306,12 @@ case class HistorizeAction(
 
   protected def incrementalHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
 
-    // Check input uniqueness if requested
+    // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
+    // Note that drop duplicate might be non deterministic and cause attributes switching in history with every run.
     if (checkInputUnique && context.isExecPhase) {
       validateInputUniqueness(newDf, pks)
     }
-
-    val newFeedDf = newDf.dropDuplicates(pks)
+    val newFeedDf = if (!checkInputUnique) newDf.dropDuplicates(pks) else newDf
 
     // if context is init check if column needs to be added -> save in needsHashColumn
     if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
