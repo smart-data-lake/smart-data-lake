@@ -23,7 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
@@ -58,7 +58,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     ).toDF("id", "name", "amount")
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha1", srcDO.id, tgtDO.id, checkInputUnique = true)
+    val action = HistorizeAction("ha1", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
 
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -82,7 +82,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("id"))).register
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha2", srcDO.id, tgtDO.id, checkInputUnique = true)
+    val action = HistorizeAction("ha2", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
 
     // Create input data with duplicate keys
     val inputDf = Seq(
@@ -116,7 +116,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt3", primaryKey = Some(Seq("id"))).register
 
     // Prepare action with checkInputUnique disabled (default)
-    val action = HistorizeAction("ha3", srcDO.id, tgtDO.id, checkInputUnique = false)
+    val action = HistorizeAction("ha3", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = false)
 
     // Create input data with duplicate keys
     val inputDf = Seq(
@@ -145,7 +145,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt5", primaryKey = Some(Seq("country", "city"))).register
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha5", srcDO.id, tgtDO.id, checkInputUnique = true)
+    val action = HistorizeAction("ha5", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
 
     // Create input data with unique composite keys
     val inputDf = Seq(
@@ -174,7 +174,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt6", primaryKey = Some(Seq("country", "city"))).register
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha6", srcDO.id, tgtDO.id, checkInputUnique = true)
+    val action = HistorizeAction("ha6", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
 
     // Create input data with duplicate composite keys
     val inputDf = Seq(

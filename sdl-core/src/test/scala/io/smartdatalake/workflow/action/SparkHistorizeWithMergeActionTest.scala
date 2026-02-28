@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
@@ -36,7 +36,7 @@ import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
+class SparkHistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
   with io.smartdatalake.testutils.spark.dataset.TestToolDataset
   with io.smartdatalake.util.spark.dataset.Equality {
 
@@ -68,19 +68,20 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // setup DataObjects
     val srcTable = Table(Some("default"), "historize_input")
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = MockSparkDataObject("src1")
     srcDO.dropTable(context)
     instanceRegistry.register(srcDO)
     instanceRegistry.register(jdbcConnection)
     val tgtTable = Table(Some("public"), "historize_output", None, Some(Seq("lastname", "firstname")))
-    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1") //, jdbcOptions = Map("createTableColumnTypes"->"lastname varchar, firstname varchar"))
+    val tgtDO = MockSparkDataObject("tgt1", primaryKey = tgtTable.primaryKey)
+    //val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1") //, jdbcOptions = Map("createTableColumnTypes"->"lastname varchar, firstname varchar"))
     tgtDO.dropTable(context)
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeEnable = true)
+    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction=Some(action1))
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -101,8 +102,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val action2 = HistorizeAction("ha2", srcDO.id, tgtDO.id, mergeModeEnable = true)
+    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
     val l2 = Seq(("doe", "john", 10)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())(context2)
     val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
@@ -125,10 +126,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // prepare & start 3rd load with schema evolution
     val refTimestamp3 = LocalDateTime.now()
-    val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
-    val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
-    instanceRegistry.register(tgtDOwithSchemaEvolution)
-    val action3 = HistorizeAction("ha3", srcDO.id, tgtDOwithSchemaEvolution.id, mergeModeEnable = true)
+    val action3 = HistorizeAction("ha3", srcDO.id, tgtDO.id, mergeModeEnable = true)
+    val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec, currentAction = Some(action3))
     val l3 = Seq(("doe", "john", 10, "test")).toDF("lastname", "firstname", "rating", "test")
     srcDO.writeSparkDataFrame(l3, Seq())(context3)
     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())

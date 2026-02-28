@@ -32,7 +32,7 @@ import java.util.UUID
 /**
  * This code is inspired from org.apache.spark.sql.Observation.
  *
- * Note 1: Observations are not supported streaming Datasets
+ * Note 1: Observations are not supported for streaming Datasets
  * Note 2: the name is used to make metrics unique across parallel queries in the same Spark session
  */
 private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends DataFrameObservation with SmartDataLakeLogger {
@@ -78,16 +78,18 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
    * Set an observation name prefix of others metrics to extract if possible.
    * This is used to extract spark observations setup independently, using e.g. ActionId as prefix.
    */
-  def setOtherObservationsPrefix(prefix: String): Unit = {
+  def setOtherObservationsPrefix(prefix: String): SparkObservation = {
     otherObservationsPrefix = Some(prefix)
+    this
   }
   private var otherObservationsPrefix: Option[String] = None
 
   /**
    * Set names of other observation to extract if possible.
    */
-  def setOtherObservationNames(names: Seq[String]): Unit = {
+  def setOtherObservationNames(names: Seq[String]): SparkObservation = {
     otherObservationNames = names
+    this
   }
   private var otherObservationNames: Seq[String] = Seq()
 
