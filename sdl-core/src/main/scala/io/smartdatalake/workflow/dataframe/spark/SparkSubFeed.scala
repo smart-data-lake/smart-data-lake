@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataframe.spark
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
-import io.smartdatalake.util.spark.{dataset, DummyStreamProvider}
+import io.smartdatalake.util.spark.{DummyStreamProvider, dataset}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
@@ -383,6 +383,18 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
 
   override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
     SparkMapDataType(MapType(keyTpe.asInstanceOf[SparkDataType].inner, valueTpe.asInstanceOf[SparkDataType].inner))
+  }
+
+  override def createDataFrame[A <: Product](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val spark = context.sparkSession
+    import spark.implicits._
+    SparkDataFrame(rows.toDF)
+  }
+
+  override def createDataFrame[A <: Product](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val spark = context.sparkSession
+    import spark.implicits._
+    SparkDataFrame(rows.toDF(colNames:_*))
   }
 }
 

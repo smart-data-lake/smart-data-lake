@@ -152,6 +152,21 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
   def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType
 
   def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType
+
+  def createDataFrame[A <: Product](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame
+  def createDataFrame[A <: Product](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame
+
+  object implicits {
+    implicit case class ProductExtensions[A <: Product](rows: Seq[A]) {
+      def toDF(implicit context: ActionPipelineContext): GenericDataFrame = {
+        createDataFrame(rows)
+      }
+
+      def toDF(colNames: String*)(implicit context: ActionPipelineContext): GenericDataFrame = {
+        createDataFrame(rows, colNames)
+      }
+    }
+  }
 }
 
 object DataFrameSubFeed {

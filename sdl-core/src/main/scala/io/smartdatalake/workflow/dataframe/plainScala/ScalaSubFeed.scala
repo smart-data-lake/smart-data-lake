@@ -228,6 +228,14 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = throwNotImplementedError
 
   def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
+
+  override def createDataFrame[A <: Product](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    ScalaDataFrame(rows)
+  }
+
+  override def createDataFrame[A <: Product](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    ScalaDataFrame(rows.map(_.productIterator.toSeq), colNames)
+  }
 }
 
 

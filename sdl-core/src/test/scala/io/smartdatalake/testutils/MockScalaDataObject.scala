@@ -60,7 +60,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
 
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = partitionValuesMock.toSeq
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type = ScalaSubFeed.subFeedType)(implicit context: ActionPipelineContext): GenericDataFrame = {
     if (subFeedType =:= typeOf[ScalaSubFeed]) getScalaDataFrame(partitionValues)
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }

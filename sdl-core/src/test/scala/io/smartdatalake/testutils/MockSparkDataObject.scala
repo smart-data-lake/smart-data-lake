@@ -51,7 +51,7 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
                                override val expectations: Seq[Expectation] = Seq(),
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite
                               )
-  extends DataObject with TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanHandlePartitions with ExpectationValidation with CanMergeDataFrame {
   assert(partitions.isEmpty || saveMode == SDLSaveMode.Overwrite, s"($id) Only saveMode=Overwrite implemented for partitioned MockDataObjects")
   assert(saveMode == SDLSaveMode.Overwrite || saveMode == SDLSaveMode.Append, s"($id) Only saveMode=Overwrite or saveMode=Append implemented for MockDataObjects")
@@ -63,7 +63,7 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
 
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = partitionValuesMock.toSeq
 
-  override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     if (partitions.nonEmpty) {
       partitionedDataFrameMock
         .map(_.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).values.reduce(_ unionAll _))
