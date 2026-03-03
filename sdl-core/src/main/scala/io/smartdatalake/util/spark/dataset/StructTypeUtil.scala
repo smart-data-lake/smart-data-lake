@@ -93,8 +93,7 @@ trait StructTypeUtil {
       val rSch: Seq[StructField] = that.map(prepare)
       val result = lSch == rSch || (ignoreColumnOrder && lSch.sortWith(fieldOrder) == rSch.sortWith(fieldOrder))
 
-      //if (!result && showDiff) {
-      if (true) {
+      if (!result && showDiff) {
         logger.info("StructSDLB.equal: schemata differ !")
         logger.info(s"ignoreColumnOrder = $ignoreColumnOrder")
         logger.info(s"ignoreNullability = $ignoreNullability")
