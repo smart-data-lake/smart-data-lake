@@ -137,11 +137,17 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 
   override def agg(columns: Seq[GenericColumn]): ScalaDataFrame = throw new NotImplementedError("Aggregations using the agg-expression are not supported at the moment")
 
-  override def unionByName(other: GenericDataFrame): ScalaDataFrame = other match {
+  override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame => {
-      checkColumnsExist(otherScala, columns)
-      val zipped = cols.sortBy(_.definition.name) zip otherScala.cols.filter(c => columns.contains(c.definition.name)).sortBy(_.definition.name)
-      ScalaDataFrame(zipped.map(pair => pair._1 unsafeAppend pair._2))
+      if (!allowMissingColumns) checkColumnsExist(otherScala, columns)
+      val thisCols = this.cols.map(c => c.definition.name -> c).toMap
+      val otherCols = otherScala.cols.map(c => c.definition.name -> c).toMap
+      val allColNames = columns ++ otherScala.columns.diff(columns)
+      val unionData = allColNames.map { colName =>
+        thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(null)))
+          .unsafeAppend(otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(null))))
+      }
+      ScalaDataFrame(unionData)
     }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
@@ -158,6 +164,18 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
     val newDf = withColumn("filterExpr", expression).asInstanceOf[ScalaDataFrame]
     val filteredRows = newDf.rows.filter(_.values.last == true).map(r => r.copy(values = r.values.init)) //requires withColumn() to write the new column at the last index
     ScalaDataFrame.fromScalaRows(filteredRows, Some(schema))
+  }
+
+  override def orderBy(columns: Seq[GenericColumn]): ScalaDataFrame = {
+    require(columns.nonEmpty && columns.forall(_.isInstanceOf[ScalaColumn[_]]), "The 'orderBy' operation requires at least one column, which must be of type ScalaColumn")
+    val sortColDef = columns.map(_.asInstanceOf[ScalaColumn[_]].definition)
+    val combinedOrdering = sortColDef.map { c =>
+      val ordering = c.dataType.ordering.asInstanceOf[Ordering[Any]]
+      val idx = cols.indexWhere(_.definition.name == c.name)
+      Ordering.by[ScalaRow, Any](row => row.values(idx))(ordering)
+    }.reduceLeft(_ orElse _)
+    val sortedRows = rows.sorted(combinedOrdering)
+    ScalaDataFrame(sortedRows)
   }
 
   override def collect: Seq[GenericRow] = rows

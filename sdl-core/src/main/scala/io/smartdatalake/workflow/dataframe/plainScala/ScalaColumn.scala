@@ -55,7 +55,7 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: 
 
 object ScalaColumn {
 
-  def apply[A: ClassTag](name: String, data: Seq[A]) = new ScalaColumn[A](ScalaColumnDefinition[A](name = name), data = data.toIndexedSeq)
+  def apply[A: ClassTag](name: String, data: Seq[A]): ScalaColumn[A] = new ScalaColumn[A](ScalaColumnDefinition[A](name = name), data = data.toIndexedSeq)
 
   private val colCounter = new java.util.concurrent.atomic.AtomicLong(0)
 

@@ -27,7 +27,9 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.reflect.runtime.universe.TypeTag
 
 case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
                         override val dataObjectId: DataObjectId,
@@ -183,6 +185,12 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def min(column: GenericColumn): GenericColumn = throwNotImplementedError
 
+  def abs(column: GenericColumn): GenericColumn = throwNotImplementedError
+
+  def least(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+
+  def greatest(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+
   def not(column: GenericColumn): GenericColumn = throwNotImplementedError
 
   def raise_error(column: GenericColumn): GenericColumn = throwNotImplementedError
@@ -229,11 +237,11 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 
-  override def createDataFrame[A <: Product](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
     ScalaDataFrame(rows)
   }
 
-  override def createDataFrame[A <: Product](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     ScalaDataFrame(rows.map(_.productIterator.toSeq), colNames)
   }
 }

@@ -73,9 +73,9 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail: _*))
   }
 
-  override def unionByName(other: GenericDataFrame): SparkDataFrame = {
+  override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): SparkDataFrame = {
     other match {
-      case sparkOther: SparkDataFrame => SparkDataFrame(inner.unionByName(sparkOther.inner))
+      case sparkOther: SparkDataFrame => SparkDataFrame(inner.unionByName(sparkOther.inner, allowMissingColumns))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -96,6 +96,12 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def limit(n: Int): SparkDataFrame = {
     SparkDataFrame(inner.limit(n))
+  }
+
+  override def orderBy(columns: Seq[GenericColumn]): SparkDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
+    SparkDataFrame(inner.orderBy(sparkCols: _*))
   }
 
   override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
@@ -270,6 +276,13 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
 
+  override def <=>(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner <=> sparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
   override def >(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner > sparkColumn.inner)
@@ -280,6 +293,20 @@ case class SparkColumn(inner: Column) extends GenericColumn {
   override def <(other: GenericColumn): GenericColumn = {
     other match {
       case sparkColumn: SparkColumn => SparkColumn(inner < sparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def >=(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner >= sparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def <=(other: GenericColumn): GenericColumn = {
+    other match {
+      case sparkColumn: SparkColumn => SparkColumn(inner <= sparkColumn.inner)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -410,12 +437,15 @@ case class SparkSimpleDataType(inner: DataType) extends SparkDataType with Gener
 
   override def isNumeric: Boolean = inner.isInstanceOf[NumericType]
 
+  override def isImpreciseNumeric: Boolean = inner.isInstanceOf[FloatType] || inner.isInstanceOf[DoubleType]
+
   override def getDecimalSpec: Option[(Int, Int)] = inner match {
     case d: DecimalType => Some((d.precision, d.scale))
     case _ => None
   }
 
   def toJson: JValue = JString(inner.typeName)
+
 }
 
 case class SparkStructDataType(override val inner: StructType) extends SparkDataType with GenericStructDataType {

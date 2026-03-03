@@ -287,7 +287,7 @@ object Historization extends SmartDataLakeLogger {
       .withColumn(historizeOperationColName, explode(col("_operations"))) // note: this filters records with no action
       .drop("_operations")
       .withColumn(historizeDummyColName, // dummy column is needed in merge join condition to avoid deduplication in merge statement
-        when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(false)) // inster should not match with existing records in merge join condition
+        when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(false)) // insert should not match with existing records in merge join condition
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), lit(true)) // should match with existing records in merge join condition
       )
       .withColumn(Environment.capturedColumnName,

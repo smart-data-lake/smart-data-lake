@@ -57,7 +57,7 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def agg(columns: Seq[GenericColumn]): GenericDataFrame
 
-  def unionByName(other: GenericDataFrame): GenericDataFrame
+  def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): GenericDataFrame
 
   def except(other: GenericDataFrame): GenericDataFrame
 
@@ -66,6 +66,8 @@ trait GenericDataFrame extends GenericTypedObject {
   def where(expression: GenericColumn): GenericDataFrame = filter(expression)
 
   def limit(n: Int): GenericDataFrame
+
+  def orderBy(columns: Seq[GenericColumn]): GenericDataFrame
 
   def collect: Seq[GenericRow]
 
@@ -78,6 +80,10 @@ trait GenericDataFrame extends GenericTypedObject {
   def drop(colName: String): GenericDataFrame
 
   def drop(col: GenericColumn): GenericDataFrame
+
+  def drop(cols: Seq[String]): GenericDataFrame = {
+    cols.foldLeft(this)((df, colName) => df.drop(colName))
+  }
 
   def createOrReplaceTempView(viewName: String): Unit
 
@@ -108,12 +114,18 @@ trait GenericDataFrame extends GenericTypedObject {
    */
   def showString(options: Map[String, String] = Map()): String
 
+  def show(options: Map[String, String] = Map()): Unit = println(showString(options))
+
+  def printSchema(): Unit = schema.printSchema()
+
   /**
    * Get a formatted execution plan of the DataFrame using explain method.
    *
    * @param options options for explain method, possible keys are dependent on the subFeedType.
    */
   def explainString(options: Map[String, String] = Map()): String
+
+  def explain(options: Map[String, String] = Map()): Unit = println(explainString(options))
 
   /**
    * Create an Observation of metrics on this DataFrame.
@@ -283,8 +295,8 @@ trait GenericSchema extends GenericTypedObject {
     SchemaConverter.convert(this, toSubFeedType)
   }
 
-  def equalsSchema(schema: GenericSchema): Boolean = {
-    diffSchema(schema).isEmpty && schema.diffSchema(this).isEmpty
+  def equalsSchema(that: GenericSchema): Boolean = {
+    this.diffSchema(that).isEmpty && that.diffSchema(this).isEmpty
   }
 
   def diffSchema(schema: GenericSchema): Option[GenericSchema]
@@ -324,6 +336,8 @@ trait GenericSchema extends GenericTypedObject {
   def toJson: JArray = JArray(fields.map(_.toJson).toList)
 
   def treeString(level: Int = Int.MaxValue): String
+
+  def printSchema(level: Int = Int.MaxValue): Unit = println(treeString(level))
 
   def apply(colName: String): GenericField = fields.find(_.name == colName)
     .getOrElse(throw new IllegalArgumentException("field $colName not found"))
@@ -380,9 +394,15 @@ trait GenericColumn extends GenericTypedObject {
 
   def =!=(other: GenericColumn): GenericColumn
 
+  def <=>(other: GenericColumn): GenericColumn
+
   def >(other: GenericColumn): GenericColumn
 
   def <(other: GenericColumn): GenericColumn
+
+  def >=(other: GenericColumn): GenericColumn
+
+  def <=(other: GenericColumn): GenericColumn
 
   def +(other: GenericColumn): GenericColumn
 
@@ -481,6 +501,8 @@ trait GenericDataType extends GenericTypedObject {
  */
 trait GenericSimpleDataType {
   def isNumeric: Boolean
+
+  def isImpreciseNumeric: Boolean
 
   def getDecimalSpec: Option[(Int, Int)]
 }

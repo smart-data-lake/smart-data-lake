@@ -476,7 +476,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     action1.exec(srcSubFeeds)(contextExec).head
 
     // check that tgt1 is not empty
-    assert(tgtDO1.getSparkDataFrame().count == 2)
+    assert(tgtDO1.getSparkDataFrame().count() == 2)
     // check that tgt2 is empty
     // getSparkDataFrame will throw IllegalArgumentException because it no files have been written to this DataObject...
     intercept[IllegalArgumentException](tgtDO2.getSparkDataFrame())

@@ -24,18 +24,17 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkObservation, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataframe.spark._
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
-import org.apache.spark.sql.{DataFrame, Observation, functions}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
 import scala.jdk.CollectionConverters._
@@ -45,8 +44,11 @@ import scala.jdk.CollectionConverters._
  * Set dataFrame and partitionValues to be served by using writeSparkDataFrame.
  * PartitionValues are inferred if parameter of writeSparkDataFrame is empty.
  */
-case class MockSparkDataObject(override val id: DataObjectId, override val partitions: Seq[String] = Seq(),
-                               override val schemaMin: Option[GenericSchema] = None, primaryKey: Option[Seq[String]] = None, tableName: String = "mock",
+case class MockSparkDataObject(override val id: DataObjectId,
+                               override val partitions: Seq[String] = Seq(),
+                               override val schemaMin: Option[GenericSchema] = None,
+                               primaryKey: Option[Seq[String]] = None,
+                               tableName: String = "mock",
                                override val constraints: Seq[Constraint] = Seq(),
                                override val expectations: Seq[Expectation] = Seq(),
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite
@@ -73,6 +75,18 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
       dataFrameMock
         .orElse(schemaMin.map(subFeedCompanion.getEmptyDataFrame(_, id).asInstanceOf[SparkDataFrame].inner))
         .getOrElse(throw NoDataToProcessWarning("mock", s"($id) dataFrameMock not initialized"))
+    }
+  }
+
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+    val genericDf = SparkDataFrame(df)
+    validateSchemaMin(genericDf.schema, "write")
+    validateSchemaHasPartitionCols(df, "write")
+    validateSchemaHasPrimaryKeyCols(df, "write")
+    val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
+    if (!isTableExisting) {
+      if (partitions.nonEmpty) partitionedDataFrameMock = Some(Map(partitionValues.head -> saveModeTargetDf.where(lit(false))))
+      else dataFrameMock = Some(saveModeTargetDf.where(lit(false)))
     }
   }
 
@@ -107,11 +121,12 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
           dataFrameMock = Some(newDf)
           Map("records_written" -> insertCnt)
         case SDLSaveMode.Append =>
-          dataFrameMock = Some(Seq(dataFrameMock, Some(newDf)).flatten.reduceLeft(_.unionAll(_)))
+          dataFrameMock = Some(Seq(dataFrameMock, Some(newDf)).flatten.reduceLeft(_.unionByName(_)))
           Map("records_written" -> insertCnt)
         case SDLSaveMode.Merge  =>
-          val (df, metrics) = mergeDataFrameByPrimaryKey(newDf, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
-          dataFrameMock = Some(df)
+          val (dfMerged, metrics) = mergeDataFrameByPrimaryKey(newDf, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions)
+            .getOrElse(SaveModeMergeOptions()))
+          dataFrameMock = Some(dfMerged)
           metrics
       }
       partitionValuesMock = Set()
@@ -121,7 +136,7 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
   }
 
   private def materialize(df: DataFrame): (DataFrame, Int) = {
-    val records = df.collect.toSeq
+    val records = df.collect().toSeq
     val dfMaterialized = df.sparkSession.createDataFrame(records.asJava, df.schema)
     (dfMaterialized, records.length)
   }
@@ -130,17 +145,18 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
     val session = context.sparkSession
     import session.implicits._
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
+    val saveModeExpr = saveModeOptions.getExpressions(SparkSubFeed.subFeedType)
 
     val dfExisting = dataFrameMock
-      .getOrElse(SparkSubFeed.getEmptyDataFrame(SparkSchema(dfNew.drop(Historization.historizeOperationColName).schema), id).inner)
+      .getOrElse(SparkSubFeed.getEmptyDataFrame(SparkSchema(dfNew.drop(saveModeOptions.insertColumnsToIgnore:_*).schema), id).inner)
       .as("existing")
     val existingColumns = dfExisting.columns
-    val targetColumns = (existingColumns ++ dfNew.columns.diff(Seq(Historization.historizeOperationColName))).distinct
+    val targetColumns = (existingColumns ++ dfNew.columns.diff(saveModeOptions.insertColumnsToIgnore)).distinct
 
     // prepare join condition
     val pkCols = table.primaryKey.get
     val joinCondition = pkCols.map(colName => col(s"new.$colName") === col(s"existing.$colName")).reduce(_ and _)
-      .and(saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
+      .and(saveModeExpr.additionalMergePredicateExpr.map(_.asInstanceOf[SparkColumn].inner).getOrElse(lit(true)))
     val dfJoined = dfExisting.join(dfNew.as("new"), joinCondition, "full")
     var dfMatched = dfJoined.where($"new.${pkCols.head}".isNotNull and $"existing.${table.primaryKey.get.head}".isNotNull)
       .observe("merge1", count("*").as("rows_matched"))
@@ -150,8 +166,8 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
       .select($"existing.*")
 
     // remove records from dfMatched if deleteCondition is defined
-    saveModeOptions.deleteConditionExpr.foreach{
-      c => dfMatched = dfMatched.where(not(c))
+    saveModeExpr.deleteConditionExpr.foreach{
+      c => dfMatched = dfMatched.where(not(c.asInstanceOf[SparkColumn].inner))
         .observe("merge2", count("*").as("rows_matched_without_deleted"))
     }
 
@@ -159,7 +175,7 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
     val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(dfNew.columns.toSeq.diff(table.primaryKey.get))
     val updateSelectCols = targetColumns
       .map(c => (if (updateCols.contains(c)) col(s"new.$c") else if (existingColumns.contains(c)) col(s"existing.$c") else lit(null)).as(c))
-    val updateCondition = saveModeOptions.updateConditionExpr.getOrElse(lit(true))
+    val updateCondition = saveModeExpr.updateConditionExpr.map(_.asInstanceOf[SparkColumn].inner).getOrElse(lit(true))
     val dfUpdated = dfMatched.where(updateCondition).select(updateSelectCols: _*)
       .observe("merge3", count("*").as("rows_updated"))
     val dfNotUpdated = dfMatched.where(not(updateCondition)).select($"existing.*")
@@ -169,8 +185,8 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
       val updateCols = dfNew.columns.toSeq.diff(Seq(Historization.historizeOperationColName))
       val updateSelectCols = targetColumns
         .map(c => (if (updateCols.contains(c)) col(s"new.$c") else if (existingColumns.contains(c)) col(s"existing.$c") else lit(null)).as(c))
-      val updateExistingCondition = saveModeOptions.updateExistingConditionExpr.get
-      val dfUpdatedExisting = dfMatched.where(updateExistingCondition and not(updateCondition)).select(updateSelectCols: _*)
+      val updateExistingCondition = saveModeExpr.updateExistingConditionExpr.get.asInstanceOf[SparkColumn].inner
+      val dfUpdatedExisting = dfMatched.where(updateExistingCondition and not(updateCondition.asInstanceOf[SparkColumn].inner)).select(updateSelectCols: _*)
         .observe(s"merge4", count("*").as("rows_updated_existing"))
       val dfNotUpdated = dfMatched.where(not(updateExistingCondition) and not(updateCondition)).select($"existing.*")
       (dfUpdated.unionByName(dfUpdatedExisting), dfNotUpdated)
@@ -180,8 +196,9 @@ case class MockSparkDataObject(override val id: DataObjectId, override val parti
     // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
     val insertCols = dfNew.columns.diff(saveModeOptions.insertColumnsToIgnore)
     val insertSelectCols = targetColumns
-      .map(c => saveModeOptions.insertValuesOverride.get(c).map(lit(_)).getOrElse(if (insertCols.contains(c)) col(s"new.$c").as(c) else lit(null)).as(c))
-    val dfInsert = dfNewNotMatched.where(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).select(insertSelectCols: _*)
+      .map(c => saveModeOptions.insertValuesOverride.get(c).map(expr).getOrElse(if (insertCols.contains(c)) col(s"new.$c").as(c) else lit(null)).as(c))
+    val dfInsert = dfNewNotMatched.where(saveModeExpr.insertConditionExpr.map(_.asInstanceOf[SparkColumn].inner)
+        .getOrElse(lit(true))).select(insertSelectCols: _*)
       .observe("merge5", count("*").as("rows_inserted"))
     dfMerged = dfMerged
       .unionByName(dfInsert)

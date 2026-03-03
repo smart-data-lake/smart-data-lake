@@ -40,6 +40,10 @@ trait DataFrameFunctions {
   def max(column: GenericColumn): GenericColumn
   def size(column: GenericColumn): GenericColumn
   def explode(column: GenericColumn): GenericColumn
+  def abs(column: GenericColumn): GenericColumn
+  def least(columns: GenericColumn*): GenericColumn
+  def greatest(columns: GenericColumn*): GenericColumn
+
   /**
    * Construct array from given columns and removing null values
    */

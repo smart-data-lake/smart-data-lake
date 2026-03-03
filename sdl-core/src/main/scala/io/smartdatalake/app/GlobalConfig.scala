@@ -199,7 +199,7 @@ extends SmartDataLakeLogger {
       // register in SDL spark session
       config.registerUdf(name, session)
       // register for use in expression evaluation
-      config.registerUdf(name, Environment.expressionEvaluatorFactory)
+      config.registerUdf(name, Environment.expressionEvaluatorFactory())
     }
     pythonUDFs.getOrElse(Map()).foreach { case (name,config) =>
       // register in SDL spark session

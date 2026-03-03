@@ -71,6 +71,13 @@ abstract class ScalaAbstractColumn extends GenericColumn {
     }
   }
 
+  override def <=>(other: GenericColumn): ScalaAbstractColumn = {
+    other match {
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal null", _ => (a,b) => (a == null && b == null) || (a == b), Some(ScalaBooleanDataType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
   override def >(other: GenericColumn): ScalaAbstractColumn = {
     other match {
       case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", _.numeric.gt, Some(ScalaBooleanDataType))
@@ -81,6 +88,20 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   override def <(other: GenericColumn): ScalaAbstractColumn = {
     other match {
       case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", _.numeric.lt, Some(ScalaBooleanDataType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def >=(other: GenericColumn): ScalaAbstractColumn = {
+    other match {
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gteq", _.numeric.gteq, Some(ScalaBooleanDataType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def <=(other: GenericColumn): ScalaAbstractColumn = {
+    other match {
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lteq", _.numeric.lteq, Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }

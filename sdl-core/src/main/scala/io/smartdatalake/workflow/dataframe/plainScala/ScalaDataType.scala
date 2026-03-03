@@ -30,6 +30,8 @@ import scala.reflect.runtime.universe._
 object ScalaStringDataType extends ScalaDataType[String] {
   def isNumeric: Boolean = false
 
+  override def isImpreciseNumeric: Boolean = false
+
   def ordering: Ordering[String] = Ordering[String]
 
   def getCastFunction(fromDataType: ScalaDataType[_]): (Any => String) = {
@@ -49,7 +51,9 @@ object ScalaStringDataType extends ScalaDataType[String] {
 }
 
 object ScalaDoubleDataType extends ScalaDataType[Double] {
-  def isNumeric: Boolean = true
+  override def isNumeric: Boolean = true
+
+  override def isImpreciseNumeric: Boolean = true
 
   private val fractional = implicitly[Fractional[Double]]
 
@@ -77,7 +81,9 @@ object ScalaDoubleDataType extends ScalaDataType[Double] {
 }
 
 object ScalaIntDataType extends ScalaDataType[Int] {
-  def isNumeric: Boolean = true
+  override def isNumeric: Boolean = true
+
+  override def isImpreciseNumeric: Boolean = false
 
   private val integral = implicitly[Integral[Int]]
 
@@ -105,7 +111,9 @@ object ScalaIntDataType extends ScalaDataType[Int] {
 }
 
 object ScalaBooleanDataType extends ScalaDataType[Boolean] {
-  def isNumeric: Boolean = false
+  override def isNumeric: Boolean = false
+
+  override def isImpreciseNumeric: Boolean = false
 
   def ordering: Ordering[Boolean] = Ordering[Boolean]
 
@@ -145,11 +153,14 @@ object ScalaSeqDataType extends ScalaDataType[Seq[_]] {
 
   def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = this
 
-  def isNumeric: Boolean = false
+  override def isNumeric: Boolean = false
+
+  override def isImpreciseNumeric: Boolean = false
 
   override def isSimpleType: Boolean = false
 }
 
+// TODO: who uses this?
 object ScalaMetricsLogDataType extends ScalaDataType[MetricsLog] {
 
   private object MetricsLogOrdering extends Ordering[MetricsLog] {
@@ -167,7 +178,9 @@ object ScalaMetricsLogDataType extends ScalaDataType[MetricsLog] {
       }
   }
 
-  def isNumeric: Boolean = false
+  override def isNumeric: Boolean = false
+
+  override def isImpreciseNumeric: Boolean = false
 
   override def isSimpleType: Boolean = false
 
@@ -193,11 +206,11 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   def sql: String = typeName
 
-  def makeNullable: ScalaDataType[A] = this // this is for only for non-simple types
+  def makeNullable: ScalaDataType[A] = this // this is only for non-simple types
 
-  def toLowerCase: ScalaDataType[A] = this // this is for only for non-simple types
+  def toLowerCase: ScalaDataType[A] = this // this is only for non-simple types
 
-  def removeMetadata: ScalaDataType[A] = this // this is for only for non-simple types
+  def removeMetadata: ScalaDataType[A] = this // this is only for non-simple types
 
   def toJson: JValue = JString(typeName)
 

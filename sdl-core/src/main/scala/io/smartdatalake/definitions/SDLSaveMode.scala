@@ -20,12 +20,14 @@ package io.smartdatalake.definitions
 
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.functions.expr
 import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
 
+import scala.collection.MapView
 import scala.language.implicitConversions
+import scala.reflect.runtime.universe.Type
 
 /**
  * SDL supports more SaveModes than Spark, that's why there is an own definition of SDLSaveMode.
@@ -90,6 +92,7 @@ object SDLSaveMode extends Enumeration {
 
   private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
     implicit val helper: SparkSubFeed.type = SparkSubFeed
+    import org.apache.spark.sql.functions.expr
     saveMode match {
       case SDLSaveMode.Append => writer.append()
       case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty => writer.overwrite(expr(partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql))
@@ -134,16 +137,13 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
                                 insertValuesOverride: Map[String, String] = Map(),
                                 additionalMergePredicate: Option[String] = None
                                ) extends SaveModeOptions {
-  override private[smartdatalake] val saveMode = SDLSaveMode.Merge
-  private[smartdatalake] val deleteConditionExpr = deleteCondition.map(expr)
-  private[smartdatalake] val updateConditionExpr = updateCondition.map(expr)
-  private[smartdatalake] val updateExistingConditionExpr = updateExistingCondition.map(expr)
-  private[smartdatalake] val insertConditionExpr = insertCondition.map(expr)
-  private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
-  private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)
-  private[smartdatalake] val updateColumnsOpt = if (updateColumns.nonEmpty) Some(updateColumns) else None
+  override val saveMode: SDLSaveMode = SDLSaveMode.Merge
 
-  override private[smartdatalake] def convertToTargetSchema[D <: GenericDataFrame](df: D): D = insertColumnsToIgnore.foldLeft(df) {
+  def getExpressions(subFeedType: Type): SaveModeMergeExpressions = SaveModeMergeExpressions(this, subFeedType)
+
+  val updateColumnsOpt: Option[Seq[String]] = if (updateColumns.nonEmpty) Some(updateColumns) else None
+
+  override def convertToTargetSchema[D <: GenericDataFrame](df: D): D = insertColumnsToIgnore.foldLeft(df) {
     case (df, col) => df.drop(col).asInstanceOf[D]
   }
 }
@@ -153,4 +153,15 @@ object SaveModeMergeOptions {
     case m: SaveModeGenericOptions if (m.saveMode == SDLSaveMode.Merge) => SaveModeMergeOptions()
     case m => throw new IllegalStateException(s"Cannot convert ${m.getClass.getSimpleName} $m to SaveModeMergeOptions")
   }
+}
+
+case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType: Type) {
+  private val functions = DataFrameSubFeed.getFunctions(subFeedType)
+  import functions._
+  val deleteConditionExpr: Option[GenericColumn] = saveMode.deleteCondition.map(expr)
+  val updateConditionExpr: Option[GenericColumn] = saveMode.updateCondition.map(expr)
+  val updateExistingConditionExpr: Option[GenericColumn] = saveMode.updateExistingCondition.map(expr)
+  val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(expr)
+  val insertValuesOverrideExpr: MapView[String, GenericColumn] = saveMode.insertValuesOverride.mapValues(expr)
+  val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(expr)
 }
