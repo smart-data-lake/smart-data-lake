@@ -160,10 +160,13 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
-  override def filter(expression: GenericColumn): ScalaDataFrame = {
-    val newDf = withColumn("filterExpr", expression).asInstanceOf[ScalaDataFrame]
-    val filteredRows = newDf.rows.filter(_.values.last == true).map(r => r.copy(values = r.values.init)) //requires withColumn() to write the new column at the last index
-    ScalaDataFrame.fromScalaRows(filteredRows, Some(schema))
+  override def filter(expression: GenericColumn): ScalaDataFrame = expression match {
+    case scalaExpr: ScalaAbstractColumn =>
+      assert(scalaExpr.dataType == ScalaBooleanDataType, "The filter expression must have a boolean return type")
+      val exprData = scalaExpr.toScalaColumn(this).data
+      val filteredRows = this.rows.zip(exprData).filter(_._2 == true).map(_._1)
+      ScalaDataFrame.fromScalaRows(filteredRows, Some(schema))
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
   }
 
   override def orderBy(columns: Seq[GenericColumn]): ScalaDataFrame = {

@@ -53,8 +53,8 @@ trait DataFrameFunctions {
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
-  def countDistinct(columns: GenericColumn*): GenericColumn
-  def approxCountDistinct(columns: GenericColumn, rsd: Option[Double] = None): GenericColumn
+  def countDistinct(column: GenericColumn): GenericColumn
+  def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn
   def coalesce(columns: GenericColumn*): GenericColumn
 
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen

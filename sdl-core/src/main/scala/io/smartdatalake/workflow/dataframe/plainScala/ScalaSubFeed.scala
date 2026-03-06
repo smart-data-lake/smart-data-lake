@@ -135,7 +135,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   private def throwNotImplementedError = throw new NotImplementedError("This Spark-like Dataframe function is not implemented for the plainScala version")
 
-  def approxCountDistinct(columns: GenericColumn, rsd: Option[Double]): GenericColumn = throwNotImplementedError
+  def approxCountDistinct(column: GenericColumn, rsd: Option[Double]): GenericColumn = throwNotImplementedError
 
   def array(columns: GenericColumn*): GenericColumn = throwNotImplementedError
 
@@ -147,11 +147,27 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def col(colName: String): GenericColumn = ScalaColumnReference(colName)
 
-  def concat(exprs: GenericColumn*): GenericColumn = throwNotImplementedError
+  def concat(exprs: GenericColumn*): GenericColumn = {
+    require(exprs.nonEmpty, "concat requires at least one argument")
+    val scalaExprs = exprs.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+    scalaExprs.reduce { (left, right) =>
+      ScalaBinaryExpr(left, right, "concat", _ => (a, b) => s"${Option(a).getOrElse("")}${Option(b).getOrElse("")}", Some(ScalaStringDataType))
+    }
+  }
 
-  def count(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def count(column: GenericColumn): GenericColumn = column match {
+    case c: ScalaAbstractColumn if c == ScalaColumnReference("*") => ScalaAggregateExpr(c, "count", _.size, ScalaIntDataType)
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "count", _.count(v => v != null && v != None), ScalaIntDataType)
+    case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
 
-  def countDistinct(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def countDistinct(column: GenericColumn): GenericColumn = column match {
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "count", _.distinct.size, ScalaIntDataType)
+    case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
 
   def explode(column: GenericColumn): GenericColumn = {
     column match {
@@ -171,7 +187,9 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
-  def expr(sqlExpr: String): GenericColumn = throwNotImplementedError
+  def expr(sqlExpr: String): GenericColumn = {
+    ExpressionParser.parse(sqlExpr)(this)
+  }
 
   def field(name: String, dataType: GenericDataType, nullable: Boolean): GenericField = throwNotImplementedError
 
@@ -187,9 +205,31 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def abs(column: GenericColumn): GenericColumn = throwNotImplementedError
 
-  def least(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def least(columns: GenericColumn*): GenericColumn = {
+    require(columns.nonEmpty, "least requires at least one argument")
+    val scalaColumns = columns.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+    scalaColumns.reduce { (left, right) =>
+      ScalaBinaryExpr(left, right, "least", dataType => {
+        (a, b) => if (dataType.ordering.lteq(a, b)) a else b
+      })
+    }
+  }
 
-  def greatest(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def greatest(columns: GenericColumn*): GenericColumn = {
+    require(columns.nonEmpty, "greatest requires at least one argument")
+    val scalaColumns = columns.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+    scalaColumns.reduce { (left, right) =>
+      ScalaBinaryExpr(left, right, "greatest", dataType => {
+        (a, b) => if (dataType.ordering.gteq(a, b)) a else b
+      })
+    }
+  }
 
   def not(column: GenericColumn): GenericColumn = throwNotImplementedError
 

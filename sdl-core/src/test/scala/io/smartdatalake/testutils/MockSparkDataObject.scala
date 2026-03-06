@@ -186,7 +186,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
       val updateSelectCols = targetColumns
         .map(c => (if (updateCols.contains(c)) col(s"new.$c") else if (existingColumns.contains(c)) col(s"existing.$c") else lit(null)).as(c))
       val updateExistingCondition = saveModeExpr.updateExistingConditionExpr.get.asInstanceOf[SparkColumn].inner
-      val dfUpdatedExisting = dfMatched.where(updateExistingCondition and not(updateCondition.asInstanceOf[SparkColumn].inner)).select(updateSelectCols: _*)
+      val dfUpdatedExisting = dfMatched.where(updateExistingCondition and not(updateCondition)).select(updateSelectCols: _*)
         .observe(s"merge4", count("*").as("rows_updated_existing"))
       val dfNotUpdated = dfMatched.where(not(updateExistingCondition) and not(updateCondition)).select($"existing.*")
       (dfUpdated.unionByName(dfUpdatedExisting), dfNotUpdated)
@@ -197,8 +197,8 @@ case class MockSparkDataObject(override val id: DataObjectId,
     val insertCols = dfNew.columns.diff(saveModeOptions.insertColumnsToIgnore)
     val insertSelectCols = targetColumns
       .map(c => saveModeOptions.insertValuesOverride.get(c).map(expr).getOrElse(if (insertCols.contains(c)) col(s"new.$c").as(c) else lit(null)).as(c))
-    val dfInsert = dfNewNotMatched.where(saveModeExpr.insertConditionExpr.map(_.asInstanceOf[SparkColumn].inner)
-        .getOrElse(lit(true))).select(insertSelectCols: _*)
+    val insertCondition = saveModeExpr.insertConditionExpr.map(_.asInstanceOf[SparkColumn].inner).getOrElse(lit(true))
+    val dfInsert = dfNewNotMatched.where(insertCondition).select(insertSelectCols: _*)
       .observe("merge5", count("*").as("rows_inserted"))
     dfMerged = dfMerged
       .unionByName(dfInsert)

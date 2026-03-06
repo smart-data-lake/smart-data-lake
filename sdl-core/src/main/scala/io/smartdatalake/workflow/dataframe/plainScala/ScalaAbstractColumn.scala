@@ -49,8 +49,13 @@ abstract class ScalaAbstractColumn extends GenericColumn {
     val inputData = df.cols.filter(c => inputColumns.contains(c.getName.get))
       .map(c => (c.getName.get, c.data)).toMap
     assert(inputData.keySet == inputColumns, s"Missing input data for column(s): ${inputColumns.diff(inputData.keySet).mkString(", ")}")
+    toScalaColumn(inputData)
+  }
+
+  def toScalaColumn(inputData: Map[String,IndexedSeq[_]]): ScalaColumn[_] = {
     // set input data
-    visit[Unit](expr => expr.setInputData(inputData, df.nrRows), (_, _) => ())
+    val nbOfRows = if (inputData.isEmpty) 1 else Math.min(inputData.head._2.size,1)
+    visit[Unit](expr => expr.setInputData(inputData, nbOfRows), (_, _) => ())
     // create column
     dataType
       .createColumnDefinition(getName.getOrElse(ScalaColumn.nextColName))
@@ -270,8 +275,8 @@ case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
   def isResolved: Boolean = resolvedData.isDefined
 
   override def setInputData(inputData: Map[String, Seq[_]], size: Int): Unit = {
-    resolvedData = inputData.get(name)
-      .orElse(throw new IllegalStateException(s"Column with name '$name' not found in input data"))
+    resolvedData = if (name == "*") Some(inputData.head._2)
+    else inputData.get(name).orElse(throw new IllegalStateException(s"Column with name '$name' not found in input data"))
   }
 
   override def dataType: ScalaDataType[_] = {
@@ -309,3 +314,31 @@ case class ScalaNamedExpr(in: ScalaAbstractColumn, name: String) extends ScalaAb
 
   override def apply(extraction: Any): ScalaUnaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
 }
+
+/**
+ * Aggregate expression, which applies an aggregation function to an input expression and gives a name to the result
+ * Note: the datatype is the same as the input expression
+ * Note: the output data has always only one value, which is the result of the aggregation function applied to all values of the input expression
+ *
+ * @param in   input expression
+ * @param name name to be given to the expression
+ * @param aggFunc aggregation function
+ * @param outputDataType  output datatype
+ */
+case class ScalaAggregateExpr(in: ScalaAbstractColumn, name: String, aggFunc: Seq[Any] => Any, outputDataType: ScalaDataType[_]) extends ScalaAbstractColumn {
+  override def dataType: ScalaDataType[_] = outputDataType
+
+  override def data: Seq[_] = {
+    val result = aggFunc(in.data)
+    Seq(result)
+  }
+
+  override def getName: Option[String] = Some(name)
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    aggregator(visitorFunc(this), in.visit(visitorFunc, aggregator))
+  }
+
+  override def apply(extraction: Any): ScalaAggregateExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
+}
+
