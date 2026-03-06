@@ -89,6 +89,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   override val format = "csv"
   override val readFormat = "text"// read with Spark as text and then parse csv with custom logic
   override val ignoreSchemaForReader = true // schema will be applied in customizeContent and not by SparkFileDataObject
+  override val customizeBeforeFilename = false // filename column should be added by SparkFileDataObject before calling customizeContent
 
   override val readOptions: Map[String, String] = Map("wholetext" -> "true") // options for Spark text DataSource
 
@@ -125,33 +126,54 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
     df
       .flatMap { csvContentRow =>
         if (csvContentRow.isNullAt(0)) Iterator[Row]()
-        else parseCsvContent(csvContentRow.getString(0), parserOptions)
-          .map { parsedRow =>
-            val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // add partition column values
-            Row(values: _*)
+        else {
+          val content = csvContentRow.getAs[String]("value")
+          val filename = filenameColumn.map(csvContentRow.getAs[String])
+          if (filename.isDefined) logger.debug(s"($id) Parsing file $filename, size=${content.length}")
+          try {
+            parseCsvContent(content, parserOptions, filename)
+              .map { parsedRow =>
+                val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // value column is at pos 0, partition columns (if any) and filename column are after that
+                Row(values: _*)
+              }
           }
-      }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // add partition cols
+        }
+      }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // value column is at pos 0, partition columns (if any) and filename column are after that
   }
 
-  private def parseCsvContent(csvContent: String, parserOptions: CSVOptions)(implicit session: SparkSession): Iterator[Row] = {
+  private def parseCsvContent(csvContent: String, parserOptions: CSVOptions, filename: Option[String])(implicit session: SparkSession): Iterator[Row] = {
 
     // parse header
-    val (headerLine, dataIterator) = getHeaderLine(csvContent, parserOptions) match {
-      case (Some(headerLine), dataIterator) => (headerLine, dataIterator)
-      case _ => throw new SparkException("No header line found")
-    }
-    val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
-    val csvParser = new CsvParser(parserOptions.asParserSettings)
-    val header = CSVUtils.makeSafeHeader(csvParser.parseLine(headerLine), caseSensitive, parserOptions)
-      .map(_.trim) // remove spaces from all column names and potential CR from last column name
-    val headerNormalized = if (caseSensitive) header else header.map(_.toLowerCase)
-    val schemaNormalizedMap = sparkParserSchema.map(field => (if (caseSensitive) field.name else field.name.toLowerCase, field)).toMap
-    assert(headerNormalized.intersect(schemaNormalizedMap.keys.toSeq).nonEmpty, s"No column names match between header and schema. Please check CSV has header (header line: ${headerLine.trim})")
+    enrichException(filename) {
+      val (headerLine, dataIterator) = getHeaderLine(csvContent, parserOptions) match {
+        case (Some(headerLine), dataIterator) => (headerLine, dataIterator)
+        case _ => throw new SparkException("No header line found")
+      }
+      val caseSensitive = SQLConf.get.getConf(SQLConf.CASE_SENSITIVE)
+      val csvParser = new CsvParser(parserOptions.asParserSettings)
+      val header = CSVUtils.makeSafeHeader(csvParser.parseLine(headerLine), caseSensitive, parserOptions)
+        .map(_.trim) // remove spaces from all column names and potential CR from last column name
+      val headerNormalized = if (caseSensitive) header else header.map(_.toLowerCase)
+      val schemaNormalizedMap = sparkParserSchema.map(field => (if (caseSensitive) field.name else field.name.toLowerCase, field)).toMap
+      assert(headerNormalized.intersect(schemaNormalizedMap.keys.toSeq).nonEmpty, s"No column names match between header and schema. Please check CSV has header (header line: ${headerLine.trim})")
 
-    // parse to row with file schema
-    val fileSchema = StructType(headerNormalized.map(name => schemaNormalizedMap.getOrElse(name, StructField(name, StringType))))
-    val parser = new RelaxedParser(fileSchema, sparkParserSchema, parserOptions, treatMissingColumnsAsCorrupt, treatSuperfluousColumnsAsCorrupt)
-    dataIterator.flatMap( line => parser.parse(line.trim)) // remove potential CR from last column value
+      // parse to row with file schema
+      val fileSchema = StructType(headerNormalized.map(name => schemaNormalizedMap.getOrElse(name, StructField(name, StringType))))
+      val parser = new RelaxedParser(fileSchema, sparkParserSchema, parserOptions, treatMissingColumnsAsCorrupt, treatSuperfluousColumnsAsCorrupt)
+      dataIterator.flatMap( line => enrichException(filename)(parser.parse(line.trim))) // remove potential CR from last column value
+    }
+  }
+
+  def enrichException[A](filename: Option[String])(code: => A): A = {
+    try {
+      code
+    } catch {
+      case e: Throwable =>
+        val msg = if (filename.isDefined) s"($id) Error parsing file $filename: ${e.getMessage}"
+        else s"($id) Error parsing CSV-file: ${e.getMessage}"
+        logger.error(msg)
+        throw CsvParserException(msg, e)
+    }
   }
 
   private def getHeaderLine(csvContent: String, parserOptions: CSVOptions): (Option[String], Iterator[String]) = {
@@ -215,7 +237,7 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
     case e: BadRecordException => parserOptions.parseMode match {
       case PermissiveMode => Some(createResultRow(e.partialResults().map(fnRowConverter).headOption, Option(e.record()).map(_.toString), Option(e.cause).map(_.getMessage)))
       case DropMalformedMode => None
-      case FailFastMode => throw new SparkException(s"Malformed records are detected in record parsing, failing because of FailFastMode. inputRecord=${input.take(100)}", e)
+      case FailFastMode => throw new SparkException(s"Malformed records are detected in record parsing, failing because of FailFastMode. inputRecord=${input.take(1000)}", e)
     }
   }
 
@@ -234,3 +256,5 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
     resultRow
   }
 }
+
+case class CsvParserException(message: String, cause: Throwable) extends Exception(message, cause)
