@@ -191,6 +191,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
   protected def recursiveFileLookup: Boolean = options.get("recursiveFileLookup").contains("true")
 
   /**
+   * Hook for subclasses to customize if filename column should be added to DataFrame in getSparkDataFrame before calling customizeContent
+   * Default is true.
+   */
+  protected def customizeBeforeFilename: Boolean = true
+
+  /**
    * Hook to use different options for reading
    */
   protected def readOptions: Map[String, String] = options // hook to use different provider for reading
@@ -231,7 +237,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     else if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     else if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
-    df = customizeContent(df)
+    if (customizeBeforeFilename) df = customizeContent(df)
 
     // early check for no data to process.
     // This also prevents an error on Databricks when using filesObserver if there are no files to process. See also [[CollectSetDeterministic]].
@@ -240,6 +246,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
     // add filename column
     df = df.withOptionalColumn(filenameColumn, if (!doCreateEmptyDataFrame) input_file_name() else lit(""))
+    if (!customizeBeforeFilename) df = customizeContent(df)
 
     // configure observer to get files processed for incremental execution mode
     if (filesObservers.nonEmpty && context.isExecPhase) {
@@ -249,6 +256,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     // finalize & return DataFrame
     afterRead(df)
   }
+
 
   private[smartdatalake] def createEmptyDataFrame(schema: GenericSchema)(implicit session: SparkSession): DataFrame = {
     val sparkSchema = schema.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema]
