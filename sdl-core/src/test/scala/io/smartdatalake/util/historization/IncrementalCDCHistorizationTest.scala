@@ -27,15 +27,20 @@ import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.{SparkSimpleDataType, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.TimestampType
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.Logger
 
 /**
  * Unit tests for historization with incrementalCDCHistorize.
  * incrementalCDCHistorize is much different from incrementalHistorize because it doesn't need an existing DataFrame
  */
-class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
 
+  private implicit val loggerImpl: Logger = logger
   private implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
@@ -56,7 +61,7 @@ class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with 
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("New/updated record creates updateClose and insertNew records for merge statement")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("New/updated record creates updateClose and insertNew records for merge statement")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -75,7 +80,7 @@ class IncrementalCDCHistorizationTest extends FunSuite with BeforeAndAfter with 
       .withColumn(Environment.capturedColumnName, col(Environment.capturedColumnName).cast(SparkSimpleDataType(TimestampType)))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("Deleted record creates updateClose record for merge statement")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("Deleted record creates updateClose record for merge statement")(dfHistorized)(dfExpected)
     assert(result)
   }
 }

@@ -35,9 +35,11 @@ import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import scaladoc.Tag
 
+import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
+// TODO: Merge with package io.smartdatalake.util.spark.dataset
 object SchemaUtil {
 
   /**
@@ -96,9 +98,12 @@ object SchemaUtil {
    *
    *         TODO #935: probably doesnt work for structs nested in arrays...
    */
-  private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField], right: Seq[GenericField], ignoreNullable: Boolean = false, caseSensitive: Boolean = false): Set[GenericField] = {
+  private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField],
+                                                        right: Seq[GenericField],
+                                                        ignoreNullable: Boolean = false,
+                                                        caseSensitive: Boolean = false): Set[GenericField] = {
     val rightNamesIndex = right.groupBy(f => if (caseSensitive) f.name else f.name.toLowerCase)
-    left.toSet.map { leftField: GenericField =>
+    left.map { leftField: GenericField =>
       val leftName = if (caseSensitive) leftField.name else leftField.name.toLowerCase
       rightNamesIndex.get(leftName) match {
         case Some(rightFieldsWithSameName) if rightFieldsWithSameName.foldLeft(false) {
@@ -107,10 +112,10 @@ object SchemaUtil {
               (ignoreNullable || leftField.nullable == rightField.nullable) //either nullability is ignored or nullability must match
                 && deepIsTypeSubset(leftField.dataType, rightField.dataType, ignoreNullable, caseSensitive) //left field must be a subset of right field
               )
-        } => Set.empty //found a match
+        } => Set.empty[GenericField] //found a match
         case _ => Set(leftField) //left field is not contained in right
       }
-    }.flatten
+    }.toSet.flatten
   }
 
   /**
@@ -154,7 +159,7 @@ object SchemaUtil {
     if (tpe <:< typeOf[Product]) {
       val tpeAccessors = ProductUtil.classAccessors(tpe)
       val scaladocParamTags = ScaladocUtil.extractScalaDoc(tpe.typeSymbol.annotations)
-        .toSeq.flatMap(_.tags.collect { case x: Tag.Param => x }).toSeq
+        .toSeq.flatMap(_.tags.collect { case x: Tag.Param => x })
       val newFields = schema.fields.map { field =>
         var newField = field
         // enrich complex type
@@ -197,6 +202,7 @@ object SchemaUtil {
       structWithoutField.add(newField)
     }
 
+    @tailrec
     def handleArrays(from: ArrayType, to: ArrayType): DataType = {
       from.elementType match {
         case struct: StructType => mergeSchemaMetadata(struct, to.elementType.asInstanceOf[StructType]) //casting can be done since to is a superset of from
@@ -206,29 +212,33 @@ object SchemaUtil {
     }
 
     from.fields.foldLeft(to)((struc, field) => field.dataType match {
-      case inner: StructType => {
+      case inner: StructType =>
         val newField = StructField(field.name, mergeSchemaMetadata(inner, struc(field.name).dataType.asInstanceOf[StructType]), struc(field.name).nullable, field.metadata)
         replaceField(struc, newField)
-      }
-      case arr: ArrayType => {
+      case arr: ArrayType =>
         val mergedType = handleArrays(arr, struc(field.name).dataType.asInstanceOf[ArrayType])
         val newField = StructField(field.name, ArrayType(mergedType, struc(field.name).nullable), struc(field.name).nullable, field.metadata)
         replaceField(struc, newField)
-      }
       case _ => replaceField(struc, struc(field.name).copy(metadata = field.metadata))
     })
   }
 
   /**
-   *  This method compares two Schemas and finds existing columns in schema "to" that have a different comment than the ones in schema "from".
-   *  It returns these columns with their new comments. Note that only columns that are present in both schemas (and with the same types) are considered.
+   * This method compares two Schemas and finds existing columns in schema "to"
+   * that have a different comment than theones in schema "from".
+   * It returns these columns with their new comments.
+   * Note that only columns that are present in both schemas (and with the same types) are considered.
+   *
    * @param from The schema with the updated column comments
-   * @param to The schema which already exists and is compared to
-   * @return A map of the type [Queue[String] -> String], where the key represents the parents / path of a nested column, and the value the comment of that column.
-   *         E.g. a result of Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   * @param to   The schema which already exists and is compared to
+   * @return A map of the type [Queue[String] -> String],
+   *         where the key represents the parents / path of a nested column, and the value the comment of that column.
+   *         E.g. a result of Queue("myCol", "mySubCol") -> ("a comment")
+   *         represents a nested column "tableName.myCol.mySubCol" which has a comment.
    */
   def identifyMissingComments(from: StructType, to: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
 
+    @tailrec
     def handleArrays(from: ArrayType, to: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
       (from.elementType, to.elementType) match {
         case (f: StructType, t: StructType) => identifyMissingComments(f, t, parents)
@@ -262,12 +272,16 @@ object SchemaUtil {
 
 
   /**
-   * Returns a Map of columns and comments based on the metadata of a Spark schema. The columns are represented as a Seq of fields (for nested schemas).
-   * E.g. a key-value pair Queue("myCol", "mySubCol") -> ("a comment") represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   * Returns a Map of columns and comments based on the metadata of a Spark schema.
+   * The columns are represented as a Seq of fields (for nested schemas).
+   * E.g. a key-value pair Queue("myCol", "mySubCol") -> ("a comment")
+   * represents a nested column "tableName.myCol.mySubCol" which has a comment.
+   *
    * @param schema The schema containing the metadata
    */
   def columnsComments(schema: StructType, parents: Seq[String] = Queue()): Map[Seq[String], String] = {
 
+    @tailrec
     def handleArrays(a: ArrayType, parents: Seq[String]): Map[Seq[String], String] = {
       a.elementType match {
         case s: StructType => columnsComments(s, parents)
@@ -324,7 +338,7 @@ object SchemaUtil {
   def checkPartitionMatch(configuredPartitions: Seq[String], existingPartitions: Seq[String], caseSensitive: Boolean): (Boolean, Set[String], Set[String]) = {
     val (confPartitions, existPartitions) = if (caseSensitive) (configuredPartitions.toSet, existingPartitions.toSet)
     else (configuredPartitions.map(_.toLowerCase()).toSet, existingPartitions.map(_.toLowerCase()).toSet)
-    (confPartitions==existPartitions, confPartitions, existPartitions)
+    (confPartitions == existPartitions, confPartitions, existPartitions)
   }
 
   /**
@@ -366,11 +380,13 @@ object SchemaUtil {
         } else LazyGenericSchema(schemaConfig)
       case JsonSchemaFile =>
         val valueElements = value.split(";")
-        assert(valueElements.size <= 4, s"Json schema provider configuration error. Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;<additionalPropertiesDefault:Boolean>', but received $value.")
+        assert(valueElements.size <= 4, s"Json schema provider configuration error." +
+          s" Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;" +
+          s"<additionalPropertiesDefault:Boolean>', but received $value.")
         val path = valueElements.head
-        val rowTag = if (valueElements.size>=2) Some(valueElements(1)).filter(_.nonEmpty) else None
-        val strictTyping = if (valueElements.size>=3) Some(valueElements(2).toBoolean) else None
-        val additionalPropertiesDefault = if (valueElements.size>=4) Some(valueElements(3).toBoolean) else None
+        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
+        val strictTyping = if (valueElements.size >= 3) Some(valueElements(2).toBoolean) else None
+        val additionalPropertiesDefault = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
         if (!lazyFileReading) {
           val content = readFromPath(new Path(path))
           val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
@@ -407,26 +423,32 @@ object SchemaUtil {
    *
    * An undocumented feature allows to specify multiple comma-separated rowTags.
    * extractRowTag will extract both schemas and try to build a superset of it.
-   * A use case for this is to extract nodes with same name but different type of different branches of an XML-file, as spark-xml cannot discern those...
+   * A use case for this is to extract nodes with same name
+   * but different type of different branches of an XML-file, as spark-xml cannot discern those...
    */
-  private[smartdatalake] def extractRowTag(schema:StructType, rowTag: String): StructType = {
+  private[smartdatalake] def extractRowTag(schema: StructType, rowTag: String): StructType = {
     val schemas = rowTag.split(",").map(extractSingleRowTag(schema, _))
     schemas.reduceLeft(unifySchemas)
   }
-  private[smartdatalake] def extractSingleRowTag(schema:StructType, rowTag: String): StructType = {
-    rowTag.split("/").filter(_.nonEmpty).foldLeft(schema){
+
+  private[smartdatalake] def extractSingleRowTag(schema: StructType, rowTag: String): StructType = {
+    rowTag.split("/").filter(_.nonEmpty).foldLeft(schema) {
       case (schema, element) =>
         val schemaElement = schema.fields.find(_.name == element)
         assert(schemaElement.isDefined, s"Schema element $element not found while extracting rowTag. Available fields are ${schema.fieldNames.mkString(", ")}")
         var elementDataType = schemaElement.get.dataType
-        if (elementDataType.isInstanceOf[ArrayType]) elementDataType = elementDataType.asInstanceOf[ArrayType].elementType
+        elementDataType match {
+          case arrayType: ArrayType => elementDataType = arrayType.elementType
+          case _ =>
+        }
         assert(elementDataType.isInstanceOf[StructType], s"Schema element $element dataType is ${elementDataType.typeName}, but must be a StructType.")
         elementDataType.asInstanceOf[StructType]
     }
   }
+
   private def unifySchemas(schema1: StructType, schema2: StructType): StructType = {
-    val (fields1Common,fields1Only) = schema1.partition(f => schema2.fieldNames.contains(f.name))
-    val (fields2Common,fields2Only) = schema2.partition(f => schema1.fieldNames.contains(f.name))
+    val (fields1Common, fields1Only) = schema1.partition(f => schema2.fieldNames.contains(f.name))
+    val (fields2Common, fields2Only) = schema2.partition(f => schema1.fieldNames.contains(f.name))
     val fields2CommonMap = fields2Common.map(f => (f.name, f)).toMap
     // check common fields for same dataType
     val commonDifferentType = fields1Common.filter(f => f.dataType != fields2CommonMap(f.name).dataType)
@@ -448,7 +470,7 @@ object SchemaUtil {
    * the singular name of the array element in the XSD has to be converted to a plural name by adding an 's'.
    * Thats what this method does.
    */
-  def makeXsdJsonCompatible(sparkSchema: SparkSchema): SparkSchema = {
+  private def makeXsdJsonCompatible(sparkSchema: SparkSchema): SparkSchema = {
     def renameArrayToPluralForm(field: StructField): StructField = {
       val newName = field.dataType match {
         // add final 's' to singular name of XML array field
@@ -513,20 +535,24 @@ object SchemaProviderType extends Enumeration {
 
   /**
    * Get schema from an XSD file (XML schema definition).
-   * This is using a customized version of spark-xml's XSD support: [[https://github.com/databricks/spark-xml#xsd-support]]
+   * This is using a customized version of spark-xml's XSD support:
+   * [[https://github.com/databricks/spark-xml#xsd-support]]
    * Parameters (semicolon separated):
    * - the hadoop path of the XSD file.
-   * - row tag to extract a subpart from the schema, see also XML source rowTag option. Put an emtpy string to use root tag.
-   *   To extract a nested row tag, split the elements by slash (/).
+   * - row tag to extract a subpart from the schema, see also XML source rowTag option.
+   * Put an emtpy string to use root tag.
+   * To extract a nested row tag, split the elements by slash (/).
    */
   val XsdFile: SchemaProviderType.Value = Value("xsdfile")
 
   /**
-   * Get schema from an Json Schema file, using an adapted verion of zalando-incubator/spark-json-schema library, see also [[JsonSchemaConverter]]
+   * Get schema from an Json Schema file, using an adapted verion of zalando-incubator/spark-json-schema library,
+   * see also [[JsonSchemaConverter]]
    * Parameters (semicolon separated):
    * - the hadoop path of the Json schema file.
-   * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option. Put an emtpy string to use root tag.
-   *   To extract a nested row tag, split the elements by slash (/).
+   * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option.
+   * Put an emtpy string to use root tag.
+   * To extract a nested row tag, split the elements by slash (/).
    */
   val JsonSchemaFile: SchemaProviderType.Value = Value("jsonschemafile")
 
@@ -534,8 +560,9 @@ object SchemaProviderType extends Enumeration {
    * Get schema from an Avro Schema file using methods from spark-avro
    * Parameters (semicolon separated):
    * - the hadoop path of the Avro schema file.
-   * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option. Put an emtpy string to use root tag.
-   *   To extract a nested row tag, split the elements by slash (/).
+   * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option.
+   * Put an emtpy string to use root tag.
+   * To extract a nested row tag, split the elements by slash (/).
    */
   val AvroSchemaFile: SchemaProviderType.Value = Value("avroschemafile")
 

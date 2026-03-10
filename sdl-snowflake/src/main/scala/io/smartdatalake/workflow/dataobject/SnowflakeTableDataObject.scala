@@ -99,7 +99,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
   val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
 
@@ -109,6 +110,8 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   def snowparkSession: snowpark.Session = {
     connection.getSnowparkSession
   }
+
+  override def options: Map[String, String] = sparkOptions
 
   // check for invalid save modes
   assert(Seq(SDLSaveMode.Overwrite,SDLSaveMode.Append,SDLSaveMode.ErrorIfExists,SDLSaveMode.Ignore).contains(saveMode), s"($id) Unsupported saveMode $saveMode")

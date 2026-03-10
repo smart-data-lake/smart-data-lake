@@ -25,9 +25,9 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class StandardizeColNamesTransformerTest extends FunSuite {
+class StandardizeColNamesTransformerTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._

@@ -20,15 +20,15 @@
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class LabSparkDataObjectWrapperTest extends FunSuite {
+class LabSparkDataObjectWrapperTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
@@ -40,7 +40,7 @@ class LabSparkDataObjectWrapperTest extends FunSuite {
   test("test getting DataFrames") {
 
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1", partitions = Seq("lastname")).register
+    val srcDO1 = MockSparkDataObject("src1", partitions = Seq("lastname")).register
     val srcDO1Wrapper = LabSparkDataObjectWrapper(srcDO1, contextExec)
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l1, Seq())

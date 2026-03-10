@@ -29,7 +29,9 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSimpleDat
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.Logger
 
 import java.time.Duration
 
@@ -37,9 +39,12 @@ import java.time.Duration
  * Unit tests for historization
  *
  */
-class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
 
+  private implicit val loggerImpl: Logger = logger
   private implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
@@ -62,14 +67,14 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     //ID 123 has new value and so old record is closed with newcol1=null
-    val dfResultExistingRowNonNull = toHistorizedDf(baseColumnsOldHist.filter(_._1==123), HistorizationPhase.UpdatedOld)
+    val dfResultExistingRowNonNull = toHistorizedDf(baseColumnsOldHist.filter(_._1 == 123), HistorizationPhase.UpdatedOld)
       .withColumn("new_col1", lit(null).cast(SparkSimpleDataType(StringType)))
 
     //ID 123 has new value and so new record is created with newcol1="Test"
-    val dfResultNewRowNonNull = toHistorizedDf(baseColumnsNewFeed.filter(_._1==123), HistorizationPhase.UpdatedNew, colNames :+ "new_col1")
+    val dfResultNewRowNonNull = toHistorizedDf(baseColumnsNewFeed.filter(_._1 == 123), HistorizationPhase.UpdatedNew, colNames :+ "new_col1")
 
     //ID 124 has null new value and so old record is left unchanged but with additional column
-    val dfResultExistingRowNull = toHistorizedDf(baseColumnsOldHist.filter(_._1==124), HistorizationPhase.Existing)
+    val dfResultExistingRowNull = toHistorizedDf(baseColumnsOldHist.filter(_._1 == 124), HistorizationPhase.Existing)
       .withColumn("new_col1", lit(null).cast(SparkSimpleDataType(StringType)))
 
     val dfExpected = dfResultExistingRowNonNull
@@ -77,7 +82,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
       .unionByName(dfResultExistingRowNull)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -99,7 +104,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.Existing)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History unchanged when deleting columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History unchanged when deleting columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -121,7 +126,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = dfUnchanged
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("The history should stay unchanged when using the current load again")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("The history should stay unchanged when using the current load again")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -144,7 +149,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = dfUnchanged
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History should stay unchanged when using current load but with different column sorting")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History should stay unchanged when using current load but with different column sorting")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -173,7 +178,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld).unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -198,7 +203,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = dfUpdatedOld.unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -224,7 +229,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = dfAdded.unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -259,7 +264,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfExpected = dfAdded.unionByName(dfUnchanged)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -287,7 +292,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     val dfHistorized = Historization.fullHistorize(dfHistory, dfNew, Seq("id"), referenceTimestampNewTs, defaultTimeAxisUnit, None, None)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -296,18 +301,20 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
     def rowsEqual(r1: Row, r2: Row): Boolean = {
       r1.hashCode() == r2.hashCode()
     }
-    assert(rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, null, "value"))))
-    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, "value", null)))) // switched field content
-    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, null, "value", "test")))) // additional field
-    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")),Row.fromSeq(Seq(1, null, "value", null)))) // additional null field
+
+    assert(rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, null, "value"))))
+    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, "value", null)))) // switched field content
+    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, null, "value", "test")))) // additional field
+    assert(!rowsEqual(Row.fromSeq(Seq(1, null, "value")), Row.fromSeq(Seq(1, null, "value", null)))) // additional null field
 
     def internalRowsEqual(r1: InternalRow, r2: InternalRow): Boolean = {
       r1.hashCode() == r2.hashCode()
     }
-    assert(internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value")))
-    assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, "value", null))) // switched field content
-    assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value", "test"))) // additional field
-    assert(!internalRowsEqual(InternalRow(1, null, "value"),InternalRow(1, null, "value", null))) // additional null field
+
+    assert(internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, null, "value")))
+    assert(!internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, "value", null))) // switched field content
+    assert(!internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, null, "value", "test"))) // additional field
+    assert(!internalRowsEqual(InternalRow(1, null, "value"), InternalRow(1, null, "value", null))) // additional null field
   }
 
   test("When timeAxisUnit=0, history with half-open intervals should be created") {
@@ -338,7 +345,7 @@ class FullHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataL
       .cache
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
     assert(result)
 
     println(dfHistorized.showString(Map("truncate" -> "100")))

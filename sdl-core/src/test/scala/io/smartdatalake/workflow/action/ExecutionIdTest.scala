@@ -19,9 +19,9 @@
 
 package io.smartdatalake.workflow.action
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ExecutionIdTest extends FunSuite {
+class ExecutionIdTest extends AnyFunSuite {
 
   test("SDLExecutionId Ordering") {
     assert(SDLExecutionId(1,1) < SDLExecutionId(1,2))

@@ -20,26 +20,28 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SparkSession}
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
 
 import java.io.File
 import java.nio.file.Files
 
-trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
+trait SparkFileDataObjectSchemaBehavior {
+  this: AnyFunSuite with Matchers =>
 
   def readNonExistingSources(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with UserDefinedSchema,
-                                     fileExtension: String = null)
-                                         (implicit context: ActionPipelineContext): Unit = {
+                             fileExtension: String = null)
+                            (implicit context: ActionPipelineContext): Unit = {
 
     test("It is not possible to read from an non-existing file without user-defined-schema.") {
       val path = tempFilePath(fileExtension)
       val dataObj = createDataObject(path, None)
-      an [IllegalArgumentException] should be thrownBy dataObj.getSparkDataFrame()
+      an[IllegalArgumentException] should be thrownBy dataObj.getSparkDataFrame()
     }
   }
 
@@ -49,8 +51,8 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
     test("Reading from an empty file with user-defined schema results in an empty data frame.") {
       val schema = Seq(
-          StructField("header1", StringType, nullable = true),
-          StructField("header2", IntegerType, nullable = true)
+        StructField("header1", StringType, nullable = true),
+        StructField("header2", IntegerType, nullable = true)
       )
 
       val path = tempFilePath(fileExtension)
@@ -72,8 +74,8 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
   }
 
   def readEmptySourcesWithEmbeddedSchema(createDataObject: (String, Option[StructType]) => DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with UserDefinedSchema,
-                       fileExtension: String = null)
-                      (implicit context: ActionPipelineContext): Unit = {
+                                         fileExtension: String = null)
+                                        (implicit context: ActionPipelineContext): Unit = {
 
     test("Reading an empty file creates an empty data frame with the user-defined schema.") {
       val userSchema = Seq(
@@ -84,7 +86,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       val path = tempFilePath(fileExtension)
       implicit val session: SparkSession = context.sparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
-      createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(userSchema)))
+      createFile(path, getEmptyDataFrame(StructType(userSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
       try {
         val dataObj = createDataObject(path, Some(StructType(userSchema)))
@@ -105,7 +107,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
       val path = tempFilePath(fileExtension)
       implicit val session: SparkSession = context.sparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
-      createFile(path, DataFrameUtil.getEmptyDataFrame(StructType(embeddedSchema)))
+      createFile(path, getEmptyDataFrame(StructType(embeddedSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
       try {
         val dataObj = createDataObject(path, None)
@@ -121,7 +123,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
   def validateSchemaMinOnWrite(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanWriteSparkDataFrame,
                                fileExtension: String = null)
-                              (implicit context: ActionPipelineContext) : Unit = {
+                              (implicit context: ActionPipelineContext): Unit = {
 
     implicit val session: SparkSession = context.sparkSession
     import session.implicits._
@@ -146,7 +148,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -166,7 +168,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -180,14 +182,14 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         ).toDF("foo", "value")
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.writeSparkDataFrame(df, partitionValues = Seq.empty)
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -201,14 +203,14 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         ).toDF("id", "value")
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.writeSparkDataFrame(df, partitionValues = Seq.empty)
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -222,14 +224,14 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         ).toDF("id")
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.writeSparkDataFrame(df, partitionValues = Seq.empty)
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -240,7 +242,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         val df = session.emptyDataFrame
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           try {
             dataObj.writeSparkDataFrame(df, partitionValues = Seq.empty)
           } catch {
@@ -251,15 +253,15 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
   }
 
   def validateSchemaMinOnRead(createDataObject: (String, Option[StructType], Option[StructType]) => DataObject with CanCreateDataFrame with CanCreateSparkDataFrame,
-                               fileExtension: String = null)
-                              (implicit context: ActionPipelineContext) : Unit = {
+                              fileExtension: String = null)
+                             (implicit context: ActionPipelineContext): Unit = {
 
     implicit val session: SparkSession = context.sparkSession
     import session.implicits._
@@ -285,7 +287,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -306,7 +308,7 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -321,14 +323,14 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         createFile(path, data = df)
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.getSparkDataFrame()
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -343,14 +345,14 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         createFile(path, data = df)
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.getSparkDataFrame()
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -365,14 +367,14 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         createFile(path, data = df)
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.getSparkDataFrame()
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }
@@ -384,18 +386,18 @@ trait SparkFileDataObjectSchemaBehavior { this: FunSuite with Matchers =>
         try {
           createFile(path, data = df)
         } catch {
-          case _: AnalysisException => succeed //data frame writer does not support empty schemata
+          case _: AnalysisException => //data frame writer does not support empty schemata
         }
         val dataObj = createDataObject(path, Some(df.schema), Some(StructType(schemaMin)))
 
-        val thrown = the [SchemaViolationException] thrownBy {
+        val thrown = the[SchemaViolationException] thrownBy {
           dataObj.getSparkDataFrame()
         }
         println(thrown.getMessage)
 
       } finally {
         val f = new File(path)
-        if(f.exists())
+        if (f.exists())
           FileUtils.forceDelete(f)
       }
     }

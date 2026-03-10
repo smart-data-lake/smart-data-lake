@@ -29,8 +29,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactor
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.DataFrameUtil.DataFrameWriterUtils
-import io.smartdatalake.util.spark.{DataFrameUtil, SparkQueryUtil}
+import io.smartdatalake.util.spark.SparkQueryUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
@@ -104,7 +103,8 @@ import scala.util.Try
  * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
- * @param metadata meta data
+ * @param metadata meta data of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
+ *                  attributes are required as the pipeline will try to add the description to the catalog.
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
@@ -129,7 +129,10 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints {
+  extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
+    with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints
+    with io.smartdatalake.util.spark.dataset.ReadWrite {
 
   /**
    * Connection defines db, path prefix (scheme, authority, base path) and acl's in central location
@@ -159,7 +162,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
-          logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")
+          logger.warn(s"($id) Table ${table.fullName} exists already with different path $hadoopPathHolder. New path definition $getAbsolutePath is ignored!")
       }
     }
     hadoopPathHolder
@@ -177,7 +180,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite and Append supported for now.")
 
-  def deltaTable(implicit session: SparkSession) = DeltaTable.forName(session, table.fullName)
+  def deltaTable(implicit session: SparkSession): DeltaTable = DeltaTable.forName(session, table.fullName)
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
@@ -187,6 +190,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
     require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
+    metadata.flatMap(_.description).foreach(_ => {
+      require(table.db.isDefined && table.catalog.isDefined,
+        "Since the attribute metadata.description is set, you must also define a " +
+          "table.db and a table.catalog in order to add a the tableComment" +
+          "to the catalog")
+    })
     // initialize external table if needed
     if (path.isDefined) { // if path is not defined, it is handled as managed table.
       if (!isTableExisting) {
@@ -299,9 +308,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint;
+    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint
     metadata.flatMap(_.description).foreach {addTableComment}
-
   }
 
 
@@ -391,7 +399,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     }
     val deltaMetrics = dfHistory.select("operationMetrics").head().getMap[String,String](0)
       // normalize names lowercase with underscore
-      .map{case (k,v) => (DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
+      .map{case (k,v) => (StringUtil.strCamelCase2LowerCaseWithUnderscores(k), Try(v.toLong).getOrElse(v))}
       // standardize naming
       .map{
         case ("num_output_rows", v) => "rows_inserted" -> v
@@ -572,7 +580,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
     try {
-      implicit val session = context.sparkSession
+      implicit val session: SparkSession = context.sparkSession
       import session.implicits._
       val dfHistory = deltaTable.history()
         .select("timestamp", "userMetadata").as[(Long,String)]

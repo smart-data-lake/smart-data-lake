@@ -44,7 +44,10 @@ case class TestDataObject( id: DataObjectId,
                            primaryKey: Option[Seq[String]] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with TransactionalTableDataObject with CanReceiveScriptNotification {
+  extends DataObject with TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanReceiveScriptNotification {
+
+  override val options: Map[String, String] = Map()
 
   private val connection = connectionId.map( c => getConnection[TestConnection](c))
 

@@ -28,6 +28,7 @@ jobs:
       with:
         ref: ${{ github.base_ref }}
         fetch-depth: 0
+        # PAT token needed to trigger documentation deploy workflow (GITHUB_TOKEN wont trigger other workflows to avoid loops)
         token: ${{ secrets.PAT_ACTIONS }}
     - name: Git Config
       run: |

@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataframe.spark
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
-import io.smartdatalake.util.spark.{DataFrameUtil, DummyStreamProvider}
+import io.smartdatalake.util.spark.{dataset, DummyStreamProvider}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
@@ -105,8 +105,8 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
     this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
       .asInstanceOf[SparkSubFeed]
   }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SparkSubFeed = {
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]))
 }
@@ -171,11 +171,11 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
     val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkSchema]
-    SparkDataFrame(DataFrameUtil.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
   }
-  override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): SparkDataFrame = {
     schema match {
       case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(context.sparkSession))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
@@ -363,6 +363,27 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  override def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = {
+    var field = StructField(name, dataType.asInstanceOf[SparkDataType].inner, nullable)
+    comment.foreach(c => field = field.withComment(c))
+    SparkField(field)
+  }
+
+  override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
+    SparkSimpleDataType(DataType.fromJson(s""""$tpe""""))
+  }
+
+  override def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = {
+    SparkStructDataType(StructType(fields.map(_.asInstanceOf[SparkField].inner)))
+  }
+
+  override def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = {
+    SparkArrayDataType(ArrayType(valueTpe.asInstanceOf[SparkDataType].inner))
+  }
+
+  override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
+    SparkMapDataType(MapType(keyTpe.asInstanceOf[SparkDataType].inner, valueTpe.asInstanceOf[SparkDataType].inner))
+  }
 }
 
 trait SparkWhen extends GenericWhen {

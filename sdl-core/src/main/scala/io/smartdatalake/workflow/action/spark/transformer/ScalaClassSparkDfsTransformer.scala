@@ -26,7 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, FileUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.DefaultExpressionData
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.generic.transformer.{CanRecompileFromSrc, GenericDfsTransformer, OptionsSparkDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{CanRecompileFromSrc, GenericDfsTransformer, OptionsGenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -57,12 +57,27 @@ import org.apache.spark.sql.DataFrame
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param renamedInputIds optional map of [input DataFrame name, renamed input DataFrame name].
+ *                        Adapt names of input DataFrames to the expected names in the transformation.
+ *                        This is useful if the transformation expects specific input names, or if you want to use more
+ *                        generic names in the transformation than the actual input DataObjectIds.
+ * @param renamedOutputIds optional map of [output DataFrame name, renamed output DataFrame name].
+ *                         Adapt names of output DataFrames of the transformation to the expected names of the output DataObjects or the next transformation.
+ *                         This is useful if the transformation returns DataFrames with specific names, or if you want to use more
+ *                         generic names in the transformation than the actual output DataObjectIds.
+ * @param overrideOutputId override name of output DataFrame, if the transformer returns a single DataFrame/Dataset, and not a Map of type String -> DataFrame.
+ *                         By default, a single DataFrame/Dataset is named after the output DataObjectId of the Action if the action has only one output DataObject.
+ *                         With this parameter you can explicitly define the name of the output DataFrame/Dataset independent of the output DataObjectId of the Action.
+ *                         This parameter is ignored if the transformation returns multiple DataFrames.
  */
 case class ScalaClassSparkDfsTransformer(override val name: String = "scalaSparkTransform",
                                          override val description: Option[String] = None,
                                          className: String,
                                          options: Map[String, String] = Map(),
-                                         runtimeOptions: Map[String, String] = Map()
+                                         runtimeOptions: Map[String, String] = Map(),
+                                         renamedInputIds: Map[String, String] = Map(),
+                                         renamedOutputIds: Map[String, String] = Map(),
+                                         overrideOutputId: Option[String] = None
                                         ) extends OptionsSparkDfsTransformer with CanRecompileFromSrc with SmartDataLakeLogger {
   private var customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDfsTransformer](className)
 
@@ -75,8 +90,15 @@ case class ScalaClassSparkDfsTransformer(override val name: String = "scalaSpark
     customTransformer = CustomCodeUtil.compileCode[CustomDfsTransformer](code)
   }
 
-  override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
-    customTransformer.transform(context.sparkSession, options, dfs)
+  override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], inputDfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
+    val mappedInputDfs = inputDfs.map {
+      case (k,v) => (renamedInputIds.getOrElse(k, k), v)
+    }
+    val optionsPrep = options ++ overrideOutputId.map(OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID -> _)
+    val outputDfs = customTransformer.transform(context.sparkSession, optionsPrep, mappedInputDfs)
+    outputDfs.map {
+      case (k,v) => (renamedOutputIds.getOrElse(k, k), v)
+    }
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {

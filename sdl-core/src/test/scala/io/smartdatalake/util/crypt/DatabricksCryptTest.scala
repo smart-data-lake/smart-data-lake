@@ -21,13 +21,13 @@ package io.smartdatalake.util.crypt
 
 import io.smartdatalake.testutils.TestUtil
 import org.apache.spark.sql.SparkSession
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 /**
  * Unit tests for historization
  *
  */
-class DatabricksCryptTest extends FunSuite {
+class DatabricksCryptTest extends AnyFunSuite {
   implicit lazy val session: SparkSession = TestUtil.session
 
   import session.implicits._

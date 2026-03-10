@@ -27,11 +27,11 @@ import io.smartdatalake.workflow.dataobject.Table
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.File
 
-class SDLSparkExtensionTest extends FunSuite {
+class SDLSparkExtensionTest extends AnyFunSuite {
 
   private implicit val session: SparkSession = TestUtil.session
 

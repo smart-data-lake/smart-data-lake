@@ -19,11 +19,11 @@
 
 package io.smartdatalake.util.misc
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.net.URI
 
-class URIUtilTest extends FunSuite {
+class URIUtilTest extends AnyFunSuite {
   test("add path should append path to existing URI path, without changing the rest of the URI") {
     {
       val uri = new URI("https://test.com/abc?name=123")

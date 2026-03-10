@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.dataframe.spark._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.Checkers
 
 
@@ -35,7 +35,7 @@ import org.scalatestplus.scalacheck.Checkers
   * Unit tests for historization
   *
   */
-class SchemaEvolutionTest extends FunSuite with Checkers with SmartDataLakeLogger {
+class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLogger {
 
   implicit lazy val session: SparkSession = TestUtil.session
 

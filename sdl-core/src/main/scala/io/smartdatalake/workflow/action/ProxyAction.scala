@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ExcludeFromSchemaExport, FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.dag.DAGHelper.NodeId
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.agent.Agent
@@ -90,7 +90,7 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   def convertToEmptySparkSubFeed(dataObjectId: DataObjectId, schema: String)(implicit session: SparkSession): SubFeed = {
     val requiredType = StructType.fromDDL(schema)
 
-    val emptyDF = DataFrameUtil.getEmptyDataFrame(requiredType)(session)
+    val emptyDF = getEmptyDataFrame(requiredType)(session)
     SparkSubFeed(dataFrame = Some(SparkDataFrame(emptyDF)), dataObjectId = dataObjectId, partitionValues = Nil,
       isDummy = true, filter = None)
   }

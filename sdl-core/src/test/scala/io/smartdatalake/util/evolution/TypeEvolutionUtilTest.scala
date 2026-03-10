@@ -21,9 +21,9 @@ package io.smartdatalake.util.evolution
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class TypeEvolutionUtilTest extends FunSuite {
+class TypeEvolutionUtilTest extends AnyFunSuite {
   
   test("simple schema, no changes") {
     val srcSchema = StructType(Seq(StructField("a", IntegerType), StructField("b", StringType)))

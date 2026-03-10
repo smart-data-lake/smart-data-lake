@@ -9,8 +9,11 @@ import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.authMode.AuthMode
+import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.reflections.Reflections
 import scaladoc.Tag
 
@@ -32,6 +35,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[Connection],
     typeOf[DataObject],
     typeOf[Action],
+    typeOf[Agent],
     typeOf[Table],
     typeOf[DataObjectMetadata],
     typeOf[ActionMetadata],
@@ -39,12 +43,14 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[GenericDfTransformer],
     typeOf[GenericDfsTransformer],
     typeOf[ParsableScriptDef],
-    typeOf[ExecutionMode],
-    typeOf[HousekeepingMode],
-    typeOf[AuthMode],
+  typeOf[ExecutionMode],
+  typeOf[HousekeepingMode],
+  typeOf[AuthMode],
+  typeOf[HttpAuthMode],
     typeOf[ValidationRule],
     typeOf[SaveModeOptions],
-    typeOf[CustomDfTransformerConfig]
+    typeOf[CustomDfTransformerConfig],
+    typeOf[Expectation]
   )
 
   def getReflections = ReflectionUtil.getReflections("io.smartdatalake")
@@ -61,11 +67,20 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
 
     val mirror = scala.reflect.runtime.currentMirror
 
-    val allTypes = baseTypes.flatMap { baseType =>
+    // For each subtype, pick the most specific baseType (if a subtype belongs to multiple baseTypes
+    // prefer the one that is a subtype of the others). This prevents registering the same concrete
+    // class under multiple definition groups (e.g. BasicAuthMode under both AuthMode and HttpAuthMode).
+    val baseTypesSeq = baseTypes
+    val subtypeToBases = baseTypesSeq.flatMap { baseType =>
       val baseCls = getClass.getClassLoader.loadClass(baseType.typeSymbol.fullName)
-      val subTypeClss = reflections.getSubTypesOf(baseCls).asScala.toSeq
-      subTypeClss.map(cls => (Some(baseType), mirror.classSymbol(cls).toType)) :+ (None, baseType)
+      reflections.getSubTypesOf(baseCls).asScala.toSeq.map(cls => (mirror.classSymbol(cls).toType, baseType))
     }
+    val bestBaseForSubtype: Map[Type, Option[Type]] = subtypeToBases.groupBy(_._1).map { case (tpe, pairs) =>
+      val candidates = pairs.map(_._2)
+      val best = candidates.find(c => !candidates.exists(other => other != c && (other <:< c)))
+      (tpe, best)
+    }
+    val allTypes = bestBaseForSubtype.toSeq.map { case (tpe, baseOpt) => (baseOpt, tpe) } ++ baseTypesSeq.map(bt => (None, bt))
 
     val typeDefsWithCaseClassAttributes = allTypes.map{ case (baseType, tpe) =>
       typeDefForClass(tpe, allTypes.map(_._2), baseType)

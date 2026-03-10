@@ -79,7 +79,7 @@ private[smartdatalake] trait ExpectationValidation {
     val dfConstraints = if (defaultExpectationsOnly) df else setupConstraintsValidation(df)
     // setup job expectations as DataFrame observation
     val jobExpectations = expectations.filter(_.scope == ExpectationScope.Job)
-    val (dfJobExpectations, observations) = {
+    val (dfJobExpectations, observations) = if (!dfConstraints.isStreaming) {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
       // prepare aggregation columns
       val defaultAggColumns = defaultExpectations.flatMap(_.getAggExpressionColumns(this.id))
@@ -96,6 +96,9 @@ private[smartdatalake] trait ExpectationValidation {
         case (o1, o2) => Seq(Some(o1), o2).flatten
       }
       (dfObserved, observations)
+    } else {
+      if (jobExpectations.nonEmpty) logger.warn(s"($id) Job expectations with scope=Job are not supported on streaming DataFrames and will be ignored")
+      (dfConstraints, Seq())
     }
     (dfJobExpectations, observations)
   }

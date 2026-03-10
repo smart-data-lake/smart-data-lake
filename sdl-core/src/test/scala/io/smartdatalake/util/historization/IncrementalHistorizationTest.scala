@@ -26,7 +26,9 @@ import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.Logger
 
 import java.time.Duration
 
@@ -34,9 +36,12 @@ import java.time.Duration
  * Unit tests for historization
  *
  */
-class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with SmartDataLakeLogger {
+class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
 
+  private implicit val loggerImpl: Logger = logger
   private implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
@@ -67,7 +72,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -124,7 +129,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -145,7 +150,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfExpected = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -166,7 +171,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfExpected = toHistorizedDf(baseColumnsAdded, HistorizationPhase.NewlyAdded, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -192,7 +197,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfExpected = toHistorizedDf(baseColumnsAdded, HistorizationPhase.NewlyAdded, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -211,7 +216,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
       .unionByName(toHistorizedDf(baseColumnsNewFeed, HistorizationPhase.NewlyAdded, withOperation = true))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -237,7 +242,7 @@ class IncrementalHistorizationTest extends FunSuite with BeforeAndAfter with Sma
     val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) TestUtil.printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
     assert(result)
 
     assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + Environment.delimitedColumnName) === col("b." + Environment.capturedColumnName), "inner").count == 1)

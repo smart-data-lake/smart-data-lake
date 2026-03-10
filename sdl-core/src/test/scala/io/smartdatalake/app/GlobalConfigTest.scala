@@ -20,9 +20,9 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.util.secrets.{SecretProvider, SecretProviderConfig, StringOrSecret}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class GlobalConfigTest extends FunSuite {
+class GlobalConfigTest extends AnyFunSuite {
   test("sparkOptions secrets are resolved in Hadoop config") {
     // prepare
     val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map()))

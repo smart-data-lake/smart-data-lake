@@ -22,7 +22,6 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.DataFrameTestHelper._
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.spark.DataFrameUtil.DfSDL
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -30,14 +29,19 @@ import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataO
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.time.{LocalDateTime, Month}
 
-class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
+class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with io.smartdatalake.util.spark.dataset.Equality {
 
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -63,12 +67,12 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
   test("deduplicate 1st 2nd load") {
     // setup DataObjects
     val srcTable = Table(Some("default"), "deduplicate_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"),  table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
     instanceRegistry.register(jdbcConnection)
-    val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1")
+    val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1")
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
@@ -76,7 +80,7 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
-    val l1 = Seq(("doe","john",5),("pan","peter",5),("hans","muster",5)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))
@@ -88,15 +92,15 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context1).cache()
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-    val l2 = Seq(("doe","john",10),("pan","peter",5)).toDF("lastname", "firstname", "rating")
+    val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())(context1)
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
 
@@ -105,8 +109,8 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
       val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context1).cache()
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
@@ -115,33 +119,35 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
     instanceRegistry.register(jdbcConnection)
     // setup DataObjects
     val srcTable = Table(Some("default"), "deduplicate_input")
-    val srcPath = tempPath+s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject( "src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcPath = tempPath + s"/${srcTable.fullName}"
+    val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
     instanceRegistry.register(srcDO)
     val tgtTable = Table(Some("public"), "deduplicate_output")
-    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1")
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1")
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
-    intercept[IllegalArgumentException]{DeduplicateAction("dda", srcDO.id, tgtDO.id)}
+    intercept[IllegalArgumentException] {
+      DeduplicateAction("dda", srcDO.id, tgtDO.id)
+    }
   }
 
   test("deduplicate with filter clause") {
     instanceRegistry.register(jdbcConnection)
     // setup DataObjects
     val srcTable = Table(Some("default"), "deduplicate_input")
-    val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
+    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
     srcDO.dropTable
     instanceRegistry.register(srcDO)
-    val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname","firstname")))
-    val tgtDO = JdbcTableDataObject( "tgt1", table = tgtTable, connectionId = "jdbcCon1")
+    val tgtTable = Table(Some("public"), "deduplicate_output", None, Some(Seq("lastname", "firstname")))
+    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1")
     tgtDO.dropTable
     instanceRegistry.register(tgtDO)
 
     // prepare & start 1st load
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(LocalDateTime.now), phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, transformers = Seq(FilterTransformer(filterClause = "lastname='jonson'")))
-    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))
@@ -230,8 +236,8 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context1).cache()
       actual.show
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -248,8 +254,8 @@ class DeduplicateActionTest extends FunSuite with BeforeAndAfter {
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
       val actual = tgtDO.getSparkDataFrame()(context1).cache()
       actual.show
-      val resultat = expected.isEqual(actual)
-      if (!resultat) TestUtil.printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      val resultat = expected.equal(actual)
+      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }

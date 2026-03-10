@@ -34,8 +34,8 @@ import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
-
 import scala.collection.compat._
+
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
@@ -90,10 +90,10 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       id = s"sdl-schema-$version.json#",
       properties = ListMap(
         globalKey -> globalJsonDef,
-        connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map Connection name : definition"))),
+        connectionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Connection]), Some("Map of Connection name and definition"))),
         dataObjectsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[DataObject]), Some("Map of DataObject name and definition"))),
         actionsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Action]), Some("Map of Action name and definition"))),
-        agentsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Agent]), Some("Map of Action name and definition"))),
+        agentsKey -> JsonMapDef(JsonOneOfDef(registry.getJsonRefDefs(typeOf[Agent]), Some("Map of Agent name and definition"))),
       ),
       required = Seq(dataObjectsKey, actionsKey),
       additionalProperties = true,
@@ -161,8 +161,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
           if (refDefs.size > 1) JsonOneOfDef(refDefs, description, deprecated = isDeprecated)
           else refDefs.head
         }
-        case t if registry.typeExists(t) => registry.getJsonRefDef(t, isDeprecated)
-        case t if t <:< typeOf[Product] => fromCaseClass(t.typeSymbol.asClass, isDeprecated)
+        case t if registry.typeExists(t) => Some(registry.getJsonRefDef(t, isDeprecated)).map(x => x.copy(description = description.orElse(x.description))).get
+        case t if t <:< typeOf[Product] => Some(fromCaseClass(t.typeSymbol.asClass, isDeprecated)).map(x => x.copy(description = description.orElse(x.description))).get
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
           val baseCls = getClass.getClassLoader.loadClass(t.typeSymbol.fullName)
           val subTypeClssSym = reflections.getSubTypesOf(baseCls).asScala
@@ -234,8 +234,17 @@ private[smartdatalake] class DefinitionRegistry() {
     baseTypeEntries.put(tpe, jsonType)
   }
   def getJsonRefDefs(baseType: Type): Seq[JsonRefDef] = {
-    val baseTypeEntries = entries.getOrElse(Some(baseType), Map())
-    baseTypeEntries.keys.map( tpe => getJsonRefDef(Some(baseType), tpe)).toSeq.sortBy(_.`$ref`)
+    // Collect JsonRefDefs from all registered groups whose base type is a subtype of the
+    // requested baseType. This ensures that when requesting refs for a general type
+    // (e.g. AuthMode) we also include concrete implementations grouped under a more
+    // specific base (e.g. HttpAuthMode), avoiding missing options in places where the
+    // more general base type is used.
+    val refs = entries.iterator.flatMap {
+      case (Some(registeredBase), typeDefs) if (registeredBase <:< baseType) =>
+        typeDefs.keys.map(tpe => getJsonRefDef(Some(registeredBase), tpe))
+      case _ => Seq.empty[JsonRefDef]
+    }.toSeq
+    refs.sortBy(_.`$ref`)
   }
   def getJsonRefDef(baseType: Option[Type], tpe: Type): JsonRefDef = {
     JsonRefDef(s"#/definitions/${getDefinitionName(baseType, tpe.typeSymbol.name.toString)}")

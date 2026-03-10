@@ -20,15 +20,15 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType}
-import org.scalatest.FunSuite
-import org.scalatest.Matchers.{a, be}
 import org.apache.spark.sql.types._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers.{a, be}
 
 import java.nio.file.Files
 
-class SchemaUtilTest extends FunSuite {
+class SchemaUtilTest extends AnyFunSuite {
 
   private val tempDir = Files.createTempDirectory("schema-util-test")
 
@@ -76,7 +76,7 @@ class SchemaUtilTest extends FunSuite {
   }
 
   test("parse ddl schema from file as a file from classpath") {
-    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#cp:/${ddlSchemaResourceFile.toString}"
+    val schemaConfig = s"${SchemaProviderType.DDLFile.toString}#cp:/$ddlSchemaResourceFile"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("a", "b"))
   }
@@ -100,7 +100,7 @@ class SchemaUtilTest extends FunSuite {
   }
 
   test("parse xsd schema with row tag as a file from classpath") {
-    val schemaConfig = s"${SchemaProviderType.XsdFile.toString}#cp:/${xsdResourceFile};basket"
+    val schemaConfig = s"${SchemaProviderType.XsdFile.toString}#cp:/$xsdResourceFile;basket"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("entry"))
   }
@@ -124,7 +124,7 @@ class SchemaUtilTest extends FunSuite {
   }
 
   test("parse json schema with nested row tag as a file from classpath") {
-    val schemaConfig = s"${SchemaProviderType.JsonSchemaFile.toString}#cp:/${jsonSchemaResourceFile};structure/nestedArray"
+    val schemaConfig = s"${SchemaProviderType.JsonSchemaFile.toString}#cp:/$jsonSchemaResourceFile;structure/nestedArray"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("key", "value"))
   }
@@ -136,7 +136,7 @@ class SchemaUtilTest extends FunSuite {
   }
 
   test("parse avro schema as a file from classpath") {
-    val schemaConfig = s"${SchemaProviderType.AvroSchemaFile.toString}#cp:/${avroSchemaResourceFile};"
+    val schemaConfig = s"${SchemaProviderType.AvroSchemaFile.toString}#cp:/$avroSchemaResourceFile;"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("id", "username", "passwordHash", "signupDate", "emailAddresses"))
   }
@@ -167,20 +167,20 @@ class SchemaUtilTest extends FunSuite {
       StructField("person", ArrayType(subschema2), nullable = false),
       StructField("created_at", TimestampType, nullable = false).withComment("bad comment"),
       StructField("is_active", BooleanType, nullable = false).withComment("bad comment"),
-    ));
+    ))
     (schema1, schema2)
   }
   val (schema1, schema2) = createSchemas()
 
   test("Merge schema metadata into another schema") {
-    val mergedSchema = SchemaUtil.mergeSchemaMetadata(schema1, schema2);
-    assert(mergedSchema.fields.map(_.getComment()).flatten.forall(_ != "bad comment")) //all the bad comments should be overwritten
+    val mergedSchema = SchemaUtil.mergeSchemaMetadata(schema1, schema2)
+    assert(!mergedSchema.fields.flatMap(_.getComment()).contains("bad comment")) //all the bad comments should be overwritten
     assert(mergedSchema("person").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType].fields.count(_.getComment().getOrElse("") == "good comment") == 2) //the good comments are not overwritten
     assert(mergedSchema("person").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType].apply("name").getComment().getOrElse("") == "Full name") //nested comments were overwritten
   }
 
   test("Identify all the columns that have a comment") {
-    val columnsComments = SchemaUtil.columnsComments(schema1).map(kv => (kv._1.mkString(".") -> kv._2))
+    val columnsComments = SchemaUtil.columnsComments(schema1).map(kv => kv._1.mkString(".") -> kv._2)
     val expected = Map(
       "created_at" -> "Timestamp of creation",
       "is_active" -> "Active status",
@@ -193,7 +193,7 @@ class SchemaUtilTest extends FunSuite {
   }
 
   test("Identify existing columns that have a different comment") {
-    val missingColumnsAndComments = SchemaUtil.identifyMissingComments(schema1, schema2).map(kv => (kv._1.mkString(".") -> kv._2))
+    val missingColumnsAndComments = SchemaUtil.identifyMissingComments(schema1, schema2).map(kv => kv._1.mkString(".") -> kv._2)
     val expected = Map(
       "created_at" -> "Timestamp of creation",
       "is_active" -> "Active status",

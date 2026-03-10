@@ -106,8 +106,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
             updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForInput(result, mainInput.id)))
           }
           outputSubFeeds = outputSubFeeds.map(subFeed =>
-            // we need to transform inputPartitionValues again to outputPartitionValues so that partition values from partitions not existing in mainOutput are not lost.
-            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result)), Some(transformPartitionValues))
+            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result, transformPartitionValues)))
           )
           executionModeResultOptions = result.options
         case _ => ()
@@ -198,7 +197,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     val inputIds = if (handleRecursiveInputsAsSubFeeds) (inputs ++ recursiveInputs).map(_.id) else inputs.map(_.id)
     val superfluousSubFeeds = subFeeds.map(_.dataObjectId).diff(inputIds)
     val missingSubFeeds = inputIds.diff(subFeeds.map(_.dataObjectId))
-    assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeeds must match input DataObjects: superfluous=${superfluousSubFeeds.mkString(",")} missing=${missingSubFeeds.mkString(",")})")
+    assert(superfluousSubFeeds.isEmpty && missingSubFeeds.isEmpty, s"($id) input SubFeeds must match input DataObjects: ${if (superfluousSubFeeds.nonEmpty) "superfluous="+superfluousSubFeeds.mkString(",")+" " else ""}${if (missingSubFeeds.nonEmpty) "missing="+missingSubFeeds.mkString(",")})")
   }
 
   override final def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = try {
@@ -306,7 +305,6 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   /**
    * Updates the partition values of a SubFeed to the partition columns of the given output data object:
    * - transform partition values
-   * - add run_id_partition value if needed
    * - removing not existing columns from the partition values.
    */
   private def updateOutputPartitionValues(dataObject: DataObject, subFeed: S, partitionValuesTransform: Option[Seq[PartitionValues] => Map[PartitionValues, PartitionValues]] = None)(implicit context: ActionPipelineContext): S = {

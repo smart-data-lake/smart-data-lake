@@ -21,11 +21,11 @@ package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil}
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.misc.{GenericSchemaUtil,SchemaUtil,SQLUtil,StringUtil}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.json4s.JsonAST.{JBool, JObject}
-import org.json4s.{JArray, JNothing, JString, JValue}
+import org.json4s.jackson.Serialization
+import org.json4s.{Formats, JArray, JNothing, JString, JValue, NoTypeHints}
 
 import scala.reflect.runtime.universe.Type
 
@@ -50,6 +50,7 @@ trait GenericDataFrame extends GenericTypedObject {
   def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): GenericDataFrame
 
   def select(columns: Seq[GenericColumn]): GenericDataFrame
+
   def select(column: GenericColumn): GenericDataFrame = select(Seq(column))
 
   def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame
@@ -61,6 +62,7 @@ trait GenericDataFrame extends GenericTypedObject {
   def except(other: GenericDataFrame): GenericDataFrame
 
   def filter(expression: GenericColumn): GenericDataFrame
+
   def where(expression: GenericColumn): GenericDataFrame = filter(expression)
 
   def limit(n: Int): GenericDataFrame
@@ -83,6 +85,7 @@ trait GenericDataFrame extends GenericTypedObject {
 
   /**
    * isEmpty evaluates the DataFrame and checks if the result size = 0.
+   *
    * @return
    */
   def isEmpty: Boolean
@@ -100,19 +103,22 @@ trait GenericDataFrame extends GenericTypedObject {
 
   /**
    * Get formatted sample data of DataFrame as String using show method.
+   *
    * @param options options for show method, possible keys are dependent on the subFeedType.
    */
-  def showString(options: Map[String,String] = Map()): String
+  def showString(options: Map[String, String] = Map()): String
 
   /**
    * Get a formatted execution plan of the DataFrame using explain method.
+   *
    * @param options options for explain method, possible keys are dependent on the subFeedType.
    */
-  def explainString(options: Map[String,String] = Map()): String
+  def explainString(options: Map[String, String] = Map()): String
 
   /**
    * Create an Observation of metrics on this DataFrame.
-   * @param name name of the observation
+   *
+   * @param name             name of the observation
    * @param aggregateColumns aggregate columns to observe on the DataFrame
    * @return an Observation object which can return observed metrics after execution
    */
@@ -121,7 +127,8 @@ trait GenericDataFrame extends GenericTypedObject {
   /**
    * Observe metrics on this DataFrame.
    * Note that this doesn't create a listener. These metrics will only be collected together using setupObservation.
-   * @param name name of the observation
+   *
+   * @param name             name of the observation
    * @param aggregateColumns aggregate columns to observe on the DataFrame
    * @return the modified DataFrame
    */
@@ -147,6 +154,7 @@ trait GenericDataFrame extends GenericTypedObject {
       .agg(Seq(functions.count(col("*")).as(countColname)))
       .filter(col(countColname) > lit(1))
   }
+
   /**
    * Returns rows of this data frame which violate uniqueness for specified columns cols.
    * The result data frame possesses an additional count column countColname.
@@ -190,15 +198,15 @@ trait GenericDataFrame extends GenericTypedObject {
                           normalizeToAscii: Boolean = true,
                           removeNonStandardSQLNameChars: Boolean = true,
                           replaceNonStandardSQLNameCharsWithUnderscores: Boolean = false)
-                         ( implicit function: DataFrameFunctions): GenericDataFrame = {
+                         (implicit function: DataFrameFunctions): GenericDataFrame = {
     def standardizeColName(name: String): String = {
       assert(!(removeNonStandardSQLNameChars && replaceNonStandardSQLNameCharsWithUnderscores),
         "ERROR: cannot use removeNonStandardSQLNameChars and replaceNonStandardSQLNameCharsWithUnderscores at the same time")
       var standardName = name
-      standardName = if (normalizeToAscii) DataFrameUtil.normalizeToAscii(standardName) else standardName
-      standardName = if (camelCaseToLower) DataFrameUtil.strCamelCase2LowerCaseWithUnderscores(standardName) else standardName.toLowerCase
-      standardName = if (removeNonStandardSQLNameChars) DataFrameUtil.removeNonStandardSQLNameChars(standardName) else standardName
-      standardName = if (replaceNonStandardSQLNameCharsWithUnderscores) DataFrameUtil.replaceNonSqlWithUnderscores(standardName) else standardName
+      standardName = if (normalizeToAscii) StringUtil.normalizeToAscii(standardName) else standardName
+      standardName = if (camelCaseToLower) StringUtil.strCamelCase2LowerCaseWithUnderscores(standardName) else standardName.toLowerCase
+      standardName = if (removeNonStandardSQLNameChars) StringUtil.removeNonStandardSQLNameChars(standardName) else standardName
+      standardName = if (replaceNonStandardSQLNameCharsWithUnderscores) StringUtil.replaceNonSqlWithUnderscores(standardName) else standardName
       // return
       standardName
     }
@@ -208,11 +216,13 @@ trait GenericDataFrame extends GenericTypedObject {
 
   /**
    * symmetric difference of two data frames: (df∪df2)∖(df∩df2) = (df∖df2)∪(df2∖df)
+   *
    * @param diffColName : name of boolean column which indicates whether the row belongs to df
    * @return data frame
    */
   def symmetricDifference(other: GenericDataFrame, diffColName: String = "_in_first_df"): GenericDataFrame = {
-    require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
+    require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet,
+      "DataFrames must have the same columns for symmetricDifference calculation")
     // reorder columns according to the original df for calculating symmetricDifference
     val colOrder = schema.columns.map(functions.col)
     val dfOtherPrep = other.select(colOrder)
@@ -222,6 +232,7 @@ trait GenericDataFrame extends GenericTypedObject {
 
   /**
    * compares df with df2
+   *
    * @return true if both data frames have the same cardinality, schema and an empty symmetric difference
    */
   def isEqual(other: GenericDataFrame): Boolean = {
@@ -234,6 +245,7 @@ trait GenericDataFrame extends GenericTypedObject {
 
   /**
    * compares df with df2 ignoring schema nullability
+   *
    * @return true if both data frames have the same cardinality, schema (ignoring nullability) and an empty symmetric difference
    */
   def isSchemaEqualIgnoreNullabilty(other: GenericDataFrame): Boolean = {
@@ -247,6 +259,8 @@ trait GenericDataFrame extends GenericTypedObject {
   def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
 
   def apply(columnName: String): GenericColumn
+
+  def isStreaming: Boolean = false
 
 }
 
@@ -268,31 +282,94 @@ trait GenericSchema extends GenericTypedObject {
   def convert(toSubFeedType: Type): GenericSchema = {
     SchemaConverter.convert(this, toSubFeedType)
   }
+
   def equalsSchema(schema: GenericSchema): Boolean = {
     diffSchema(schema).isEmpty && schema.diffSchema(this).isEmpty
   }
+
   def diffSchema(schema: GenericSchema): Option[GenericSchema]
+
   def columns: Seq[String]
+
   def fields: Seq[GenericField]
+
   def sql: String
+
   def add(colName: String, dataType: GenericDataType): GenericSchema
+
   def add(field: GenericField): GenericSchema
+
   def remove(colName: String): GenericSchema
+
   def filter(func: GenericField => Boolean): GenericSchema
+
   def getEmptyDataFrame(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+
   def getDataType(colName: String): GenericDataType
+
   def makeNullable: GenericSchema
+
   def toLowerCase: GenericSchema
+
   def removeMetadata: GenericSchema
+
   def filterColumns(columnsFilterList: Seq[String], includeColumns: Boolean = true): Seq[String] = {
     GenericSchemaUtil.filterColumns(this, columnsFilterList, includeColumns)
   }
+
   def columnExists(colName: String): Boolean = {
     GenericSchemaUtil.columnExists(this, colName)
   }
+
   def toJson: JArray = JArray(fields.map(_.toJson).toList)
 
   def treeString(level: Int = Int.MaxValue): String
+
+  def apply(colName: String): GenericField = fields.find(_.name == colName)
+    .getOrElse(throw new IllegalArgumentException("field $colName not found"))
+}
+
+object GenericSchema {
+
+  /**
+   * Parsing schema export created by DataObjectSchemaExporter
+   */
+  def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
+    implicit val formats: Formats = Serialization.formats(NoTypeHints)
+    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+
+    def createDataType(json: JValue): GenericDataType = json match {
+      // simple type
+      case JString(str) => companion.createSimpleDataType(str)
+      // struct
+      case j: JObject if (j \ "dataType") == JString("struct") =>
+        val fields = j \ "fields" match {
+          case jFields: JArray => jFields.arr.map { case jsonField: JObject => parseField(jsonField) }
+        }
+        companion.createStructDataType(fields)
+      // array
+      case j: JObject if (j \ "dataType") == JString("array") =>
+        val valueType = createDataType(j \ "elementType")
+        companion.createArrayDataType(valueType)
+      // map
+      case j: JObject if (j \ "dataType") == JString("map") =>
+        val keyType = createDataType(j \ "keyType")
+        val valueType = createDataType(j \ "valueType")
+        companion.createMapDataType(keyType, valueType)
+    }
+
+    def parseField(json: JObject): GenericField = {
+      companion.createField(
+        (json \ "name").extract[String],
+        createDataType(json \ "dataType"),
+        (json \ "nullable").extract[Boolean],
+        (json \ "comment").toOption.map(_.extract[String])
+      )
+    }
+
+    val fields = json.arr.map { case jsonField: JObject => parseField(jsonField) }
+    companion.createSchema(fields)
+  }
 }
 
 /**
@@ -302,27 +379,43 @@ trait GenericColumn extends GenericTypedObject {
   def ===(other: GenericColumn): GenericColumn
 
   def =!=(other: GenericColumn): GenericColumn
+
   def >(other: GenericColumn): GenericColumn
+
   def <(other: GenericColumn): GenericColumn
+
   def +(other: GenericColumn): GenericColumn
+
   def -(other: GenericColumn): GenericColumn
+
   def /(other: GenericColumn): GenericColumn
+
   def *(other: GenericColumn): GenericColumn
+
   def and(other: GenericColumn): GenericColumn
+
   def or(other: GenericColumn): GenericColumn
+
   @scala.annotation.varargs
   def isin(list: Any*): GenericColumn
+
   def isNull: GenericColumn
 
   def isNotNull: GenericColumn
+
   def as(name: String): GenericColumn
+
   def cast(dataType: GenericDataType): GenericColumn
+
   /**
    * Convert expression to SQL representation
    */
   def exprSql: String
+
   def desc: GenericColumn
+
   def apply(extraction: Any): GenericColumn
+
   def getName: Option[String]
 }
 
@@ -331,12 +424,19 @@ trait GenericColumn extends GenericTypedObject {
  */
 trait GenericField extends GenericTypedObject {
   def name: String
+
   def dataType: GenericDataType
+
   def nullable: Boolean
+
   def comment: Option[String]
+
   def makeNullable: GenericField
+
   def toLowerCase: GenericField
+
   def removeMetadata: GenericField
+
   def toJson: JObject = {
     JObject(
       "name" -> JString(name),
@@ -356,14 +456,20 @@ trait GenericDataType extends GenericTypedObject {
   def isSimpleType: Boolean = this.isInstanceOf[GenericSimpleDataType]
 
   def isSameType(other: GenericDataType): Boolean
+
   def typeName: String
+
   def sql: String
+
   def makeNullable: GenericDataType
+
   def toLowerCase: GenericDataType
+
   def removeMetadata: GenericDataType
+
   def toJson: JValue
 
-  protected def standardizeTypeName(name: String) = name.toLowerCase match {
+  protected def standardizeTypeName(name: String): String = name.toLowerCase match {
     case "integer" => "int"
     case d if d.startsWith("decimal") => "decimal"
     case x => x
@@ -382,13 +488,16 @@ trait GenericSimpleDataType {
 /**
  * Mixin trait for a StructDataType in addition to interface GenericDataType.
  */
-trait GenericStructDataType { this: GenericDataType =>
+trait GenericStructDataType {
+  this: GenericDataType =>
   def fields: Seq[GenericField]
 
   def fieldIndex(fieldName: String): Int
 
   def fieldNames: Seq[String] = fields.map(_.name)
-  def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField],Seq[GenericField]) => T): T
+
+  def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T
+
   def toJson: JValue = JObject(
     "dataType" -> JString("struct"),
     "fields" -> JArray(fields.map(_.toJson).toList)
@@ -402,10 +511,14 @@ trait GenericStructDataType { this: GenericDataType =>
 /**
  * Mixin trait for a ArrayDataType in addition to interface GenericDataType.
  */
-trait GenericArrayDataType { this: GenericDataType =>
+trait GenericArrayDataType {
+  this: GenericDataType =>
   def elementDataType: GenericDataType
-  def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
+
+  def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T
+
   def containsNull: Boolean // Indicates array might contain null entries
+
   def toJson: JValue = JObject(
     "dataType" -> JString("array"),
     "elementType" -> elementDataType.toJson
@@ -415,12 +528,18 @@ trait GenericArrayDataType { this: GenericDataType =>
 /**
  * Mixin trait for a MapDataType in addition to interface GenericDataType.
  */
-trait GenericMapDataType { this: GenericDataType =>
+trait GenericMapDataType {
+  this: GenericDataType =>
   def keyDataType: GenericDataType
+
   def valueDataType: GenericDataType
-  def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
-  def withOtherValueType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType,GenericDataType) => T): T
+
+  def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T
+
+  def withOtherValueType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T
+
   def valueContainsNull: Boolean // Indicates if map values might be set to null
+
   def toJson: JValue = JObject(
     "dataType" -> JString("map"),
     "keyType" -> keyDataType.toJson,
@@ -435,7 +554,9 @@ trait GenericRow extends GenericTypedObject {
   def get(index: Int): Any
 
   def getStruct(index: Int): GenericRow
+
   def getAs[T](index: Int): T
+
   //Note: getAs[T](fieldName: String) can not be implemented as in Snowpark a Row does not know the names of its fields!
   def toSeq: Seq[Any]
 

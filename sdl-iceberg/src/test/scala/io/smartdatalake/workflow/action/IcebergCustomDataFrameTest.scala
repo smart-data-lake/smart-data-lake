@@ -21,18 +21,19 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class IcebergCustomDataFrameTest extends FunSuite with BeforeAndAfter {
+class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
 
   // set additional spark options for delta lake
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -44,8 +45,8 @@ class IcebergCustomDataFrameTest extends FunSuite with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-  val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-  val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
+  private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
+  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
   Environment._globalConfig = GlobalConfig()
 
   before {
@@ -54,13 +55,13 @@ class IcebergCustomDataFrameTest extends FunSuite with BeforeAndAfter {
 
   test("CustomDataFrameAction with recursiveInput") {
     // setup DataObjects
-    val srcDO1 = MockDataObject("src1")
+    val srcDO1 = MockSparkDataObject("src1")
     instanceRegistry.register(srcDO1)
     val recTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "recursive1", primaryKey = Some(Seq("lastname", "cnt")))
     val recDO = IcebergTableDataObject("rec1", Some(tempPath + s"/${recTable.fullName}"), table = recTable, schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("lastname string, cnt long"))))
     recDO.dropTable
     instanceRegistry.register(recDO)
-    val tgt1DO = MockDataObject("tgt1")
+    val tgt1DO = MockSparkDataObject("tgt1")
     instanceRegistry.register(tgt1DO)
 
     // prepare DAG

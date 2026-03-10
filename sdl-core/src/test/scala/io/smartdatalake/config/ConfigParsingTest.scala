@@ -27,9 +27,10 @@ import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.{Action, FileTransferAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata, RawFileDataObject}
 import org.apache.spark.sql.types.StructType
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ConfigParsingTest extends FlatSpec with Matchers {
+class ConfigParsingTest extends AnyFlatSpec with Matchers {
 
   "SdlConfig" must "parse a configuration" in {
     val config = ConfigFactory.parseString(
@@ -137,8 +138,8 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
 
     registry.getDataObjects should have size 1
-    registry.getDataObjects.head shouldBe a [SdlConfigObject]
-    registry.getDataObjects.head shouldBe a [DataObject]
+    registry.getDataObjects.head shouldBe a[SdlConfigObject]
+    registry.getDataObjects.head shouldBe a[DataObject]
     registry.getDataObjects should contain only TestDataObject(id = "tdo", arg1 = "foo", args = List("bar", "!"), connectionId = Some("tcon"))
     registry.getConnections should contain only TestConnection(id = "tcon")
   }
@@ -212,18 +213,18 @@ class ConfigParsingTest extends FlatSpec with Matchers {
     val actions = registry.instances.values.filter(_.isInstanceOf[Action])
 
     actions should have size 1
-    actions.head shouldBe a [SdlConfigObject]
-    actions.head shouldBe a [Action]
+    actions.head shouldBe a[SdlConfigObject]
+    actions.head shouldBe a[Action]
 
     val expected = TestAction(
-        id = "ta1",
-        arg1 = None,
-        inputId = "tdo1",
-        outputId = "tdo2"
+      id = "ta1",
+      arg1 = None,
+      inputId = "tdo1",
+      outputId = "tdo2"
     )
     actions should contain only expected
-    expected.input shouldBe TestDataObject(id = "tdo1", arg1 = "foo", args=List.empty)
-    expected.output shouldBe TestDataObject(id = "tdo2", arg1 = "bar", args=List.empty)
+    expected.input shouldBe TestDataObject(id = "tdo1", arg1 = "foo", args = List.empty)
+    expected.output shouldBe TestDataObject(id = "tdo2", arg1 = "bar", args = List.empty)
   }
 
   it must "correctly parse an Action map with multiple elements" in {
@@ -659,7 +660,7 @@ class ConfigParsingTest extends FlatSpec with Matchers {
         |}""".stripMargin
     )
 
-    val refinedConfig = Environment.configPathsForLocalSubstitution.foldLeft(config){
+    val refinedConfig = Environment.configPathsForLocalSubstitution.foldLeft(config) {
       case (config, path) => localSubstitution(config, path)
     }
     refinedConfig.getString("path") shouldEqual "test10/abc"
@@ -670,10 +671,10 @@ class ConfigParsingTest extends FlatSpec with Matchers {
 }
 
 
-case class MyTestDataObject( id: DataObjectId,
-                             schemaMin: Option[StructType] = None,
-                           arg1: String,
-                           args: Seq[String],
-                           connectionId: Option[ConnectionId] = None,
-                           metadata: Option[DataObjectMetadata] = None)
-                         ( implicit val instanceRegistry: InstanceRegistry)
+case class MyTestDataObject(id: DataObjectId,
+                            schemaMin: Option[StructType] = None,
+                            arg1: String,
+                            args: Seq[String],
+                            connectionId: Option[ConnectionId] = None,
+                            metadata: Option[DataObjectMetadata] = None)
+                           (implicit val instanceRegistry: InstanceRegistry)

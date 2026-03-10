@@ -21,9 +21,9 @@ package io.smartdatalake.workflow.snowflake
 
 import io.smartdatalake.workflow.dataframe.snowflake.SnowparkDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class SnowflakeSubFeedTest extends FunSuite {
+class SnowflakeSubFeedTest extends AnyFunSuite {
 
   test("unsupported subFeedType exception message contains proper function name") {
     val ex = intercept[IllegalStateException](SnowparkDataFrame(null).unionByName(SparkDataFrame(null)))

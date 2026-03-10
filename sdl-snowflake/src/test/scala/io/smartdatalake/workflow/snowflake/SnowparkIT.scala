@@ -23,7 +23,7 @@ import com.snowflake.snowpark.types._
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
-import org.scalatest.Matchers.intercept
+import org.scalatest.matchers.should.Matchers.intercept
 
 
 /**

@@ -9,10 +9,10 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.DataFrameUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -69,9 +69,11 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val filenameColumn: Option[String] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
+                                    override val constraints: Seq[Constraint] = Seq(),
+                                    override val expectations: Seq[Expectation] = Seq(),
                                     override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject {
+  extends SparkFileDataObject  with io.smartdatalake.util.spark.dataset.Transform {
 
   assert(schema.isDefined, "RelaxedCsvFileDataObject needs schema defined")
   private val parserSchema = {
@@ -173,7 +175,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
     // standardize date column types
     dateColumnType match {
       case DateColumnType.String =>
-        dfSuper.castDfColumnTyp(DateType, StringType)
+        dfSuper.castColumnsOfTypeTo(DateType)( StringType)
       case DateColumnType.Date => dfSuper.castAllDate2Timestamp
     }
   }

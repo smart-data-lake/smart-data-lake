@@ -26,7 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer, SdlbDebeziumChangeConsumerState}
 import io.smartdatalake.util.concurrent.Await
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DataFrameUtil
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -229,7 +229,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
           }
         }
 
-      DataFrameUtil.getEmptyDataFrame(schema)
+      getEmptyDataFrame(schema)
 
     }
 

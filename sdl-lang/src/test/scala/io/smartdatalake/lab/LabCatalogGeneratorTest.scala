@@ -20,13 +20,13 @@
 package io.smartdatalake.lab
 
 import io.smartdatalake.util.misc.{CustomCodeUtil, ScalaUtil}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Paths}
 import scala.io.Source
 import scala.util.Using
 
-class LabCatalogGeneratorTest extends FunSuite {
+class LabCatalogGeneratorTest extends AnyFunSuite {
   test("generate catalog") {
     val srcDir = "target/generatedSrc"
     val packageName = "ch.smartdatalake.generated"

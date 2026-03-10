@@ -25,13 +25,13 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import org.apache.spark.sql.{SparkSession, Row}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import org.apache.spark.sql.types.{StructType, IntegerType, StringType, ArrayType}
 import java.util.ArrayList
 
 
 
-class SparkFlattenDFTransformerTest extends FunSuite {
+class SparkFlattenDFTransformerTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._

@@ -243,6 +243,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case input: SparkFileDataObject if input.getSchema.isDefined => input.getSchema
       case input: UserDefinedSchema if input.schema.isDefined => input.schema
       case input: SchemaValidation if input.schemaMin.isDefined => input.schemaMin
+      case _ if context.globalConfig.dataObjectsSchemaSource.isDefined && !context.isExecPhase =>
+        context.globalConfig.getSchemaFromSource(dataObject.id)(context.hadoopConf)
       case _ => None
     }
     val readSchema = schema.map(dataObject.createReadSchema)
@@ -296,7 +298,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
           val (dfExpectations, observations) = evDataObject.setupConstraintsAndJobExpectations(df, defaultExpectationsOnly = !validateOnRead, pushDownTolerant = true,
             additionalJobAggExpressionColumns = specificInputJobAggExpressionColumns ++ mainInputJobAggExpressionColumns, forceGenericObservation
           )
-          preparedSubFeed = preparedSubFeed.withDataFrame(Some(dfExpectations)).withObservation(Some(CombinedObservation.create(observations)))
+          preparedSubFeed = preparedSubFeed.withDataFrame(Some(dfExpectations))
+          if (observations.nonEmpty) preparedSubFeed = preparedSubFeed.withObservation(Some(CombinedObservation.create(observations)))
         }
         case _ => ()
       }
@@ -338,11 +341,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             case None => None
           }
         }
-        val combinedObservation = CombinedObservation.create(inputObservationsToCombine ++ outputObservations)
         // add updated dataframe and observation to SubFeed
-        subFeed
-          .withDataFrame(Some(dfExpectations))
-          .withObservation(Some(combinedObservation))
+        var postSubFeed = subFeed.withDataFrame(Some(dfExpectations))
+        val observations = inputObservationsToCombine ++ outputObservations
+        if (observations.nonEmpty) postSubFeed = postSubFeed.withObservation(Some(CombinedObservation.create(inputObservationsToCombine ++ outputObservations)))
+        postSubFeed
       case _ => subFeed
     }
   }

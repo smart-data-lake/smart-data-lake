@@ -242,7 +242,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     /**
     val dfRead = dataObject.getSparkDataFrame()
     val result = df.isEqual(dfRead)
-    if (!result) TestUtil.printFailedTestResult("")(dfRead)(df)
+    if (!result) printFailedTestResult("")(dfRead)(df)
     assert(result)
     **/
   }

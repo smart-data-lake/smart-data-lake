@@ -18,16 +18,17 @@
  */
 package io.smartdatalake.util.misc
 
-import java.nio.file.{Files, Paths}
-
 import io.smartdatalake.definitions.Environment
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
+import org.scalatest.BeforeAndAfter
 import org.scalatest.OptionValues._
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.funsuite.AnyFunSuite
 
-class AclUtilTest extends FunSuite with BeforeAndAfter {
+import java.nio.file.{Files, Paths}
+
+class AclUtilTest extends AnyFunSuite with BeforeAndAfter {
 
   protected val fs: FileSystem = FileSystem.get(new Configuration())
 
@@ -99,7 +100,7 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
     assert(rootParentPath.isEmpty)
   }
 
-  def noOpAclSetter(p:Path): Unit = ()
+  def noOpAclSetter(p: Path): Unit = ()
 
   test("Traverse directoryUp some existing directory (user home)") {
     val path = new Path("/user/app_dir/integration/someapp")
@@ -246,10 +247,10 @@ class AclUtilTest extends FunSuite with BeforeAndAfter {
   }
 
   test("extract user home") {
-    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
-    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
-    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/test/abc"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
-    intercept[IllegalArgumentException](AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/"),Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir"), Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/"), Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    assert(AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/app_dir/test/abc"), Environment.hdfsAclsUserHomeLevel) == "app_dir")
+    intercept[IllegalArgumentException](AclUtil.extractPathLevel(new Path("hdfs://dfs.nameservices/user/"), Environment.hdfsAclsUserHomeLevel) == "app_dir")
   }
 
   test("check hdfsAclsLimitToBasedir") {

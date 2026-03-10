@@ -27,9 +27,9 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.internal.SQLConf
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class WhitelistTransformerTest extends FunSuite {
+class WhitelistTransformerTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._

@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
       - name: Set up JDK 17
@@ -66,9 +66,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          # PAT token needed to trigger documentation deploy workflow (GITHUB_TOKEN wont trigger other workflows to avoid loops)
+          token: ${{ secrets.PAT_ACTIONS }}          
       - name: Git Config
         run: |
           git config --local user.email "action@github.com"

@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject.expectations
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.misc.LogUtil.getRootCause
 import io.smartdatalake.workflow.action.CopyAction
@@ -29,11 +29,13 @@ import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.Expecta
 import io.smartdatalake.workflow.dataobject.expectation.{ExpectationScope, ExpectationValidationException, SQLExpectation}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
-class ValidateOnReadTest extends FunSuite with BeforeAndAfter {
+class ValidateOnReadTest extends AnyFunSuite with BeforeAndAfter {
 
   protected implicit val session: SparkSession = TestUtil.session
+
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -54,11 +56,11 @@ class ValidateOnReadTest extends FunSuite with BeforeAndAfter {
 
   def testDontValidateExpectationOnReadIfThereIsADataFrameActionHavingThisDataObjectAsOutput(scope: ExpectationScope): Unit = {
     // setup DataObjects
-    val srcDO = MockDataObject("src1").register
-    val tgt1DO = MockDataObject("tgt1",
-      expectations = Seq(SQLExpectation("countTest", scope=scope, aggExpression = "count(lastname)", expectation = Some("> 5")))
+    val srcDO = MockSparkDataObject("src1").register
+    val tgt1DO = MockSparkDataObject("tgt1",
+      expectations = Seq(SQLExpectation("countTest", scope = scope, aggExpression = "count(lastname)", expectation = Some("> 5")))
     ).register
-    val tgt2DO = MockDataObject("tgt2").register
+    val tgt2DO = MockSparkDataObject("tgt2").register
 
     // prepare simple DAG
     val action1 = CopyAction("ca1", srcDO.id, tgt1DO.id)
@@ -71,7 +73,7 @@ class ValidateOnReadTest extends FunSuite with BeforeAndAfter {
     assert(instanceRegistry.shouldValidateDataObjectOnRead(srcDO.id))
     assert(!instanceRegistry.shouldValidateDataObjectOnRead(tgt1DO.id))
 
-    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
 
     // action2 should succeed, because tgt1 expectations is not validated on read
     tgt1DO.writeSparkDataFrame(l1)
@@ -89,10 +91,10 @@ class ValidateOnReadTest extends FunSuite with BeforeAndAfter {
 
   def testValidateExpectationsOnReadIfThereIsNoDataFrameActionHavingThisDataObjectAsOutput(scope: ExpectationScope): Unit = {
     // setup DataObjects
-    val srcDO = MockDataObject("src1",
-      expectations = Seq(SQLExpectation("countTest", scope=scope, aggExpression = "count(lastname)", expectation = Some("> 5")))
+    val srcDO = MockSparkDataObject("src1",
+      expectations = Seq(SQLExpectation("countTest", scope = scope, aggExpression = "count(lastname)", expectation = Some("> 5")))
     ).register
-    val tgt1DO = MockDataObject("tgt1").register
+    val tgt1DO = MockSparkDataObject("tgt1").register
 
     // prepare simple DAG
     val action1 = CopyAction("ca1", srcDO.id, tgt1DO.id)
@@ -103,7 +105,7 @@ class ValidateOnReadTest extends FunSuite with BeforeAndAfter {
     assert(instanceRegistry.shouldValidateDataObjectOnRead(srcDO.id))
     assert(!instanceRegistry.shouldValidateDataObjectOnRead(tgt1DO.id))
 
-    val l1 = Seq(("jonson","rob",5),("doe","bob",3)).toDF("lastname", "firstname", "rating")
+    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
 
     // action1 will fail, because src1 expectations is validated on read
     srcDO.writeSparkDataFrame(l1)

@@ -29,9 +29,9 @@ import io.smartdatalake.workflow.dataobject._
  * @param arg1 some dummy argument
  */
 case class TestHousekeepingMode(arg1: Option[String]) extends HousekeepingMode {
-  override private[smartdatalake] def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = None
+  override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = None
 
-  override private[smartdatalake] def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = None
+  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = None
 
   override def factory: FromConfigFactory[HousekeepingMode] = TestHousekeepingMode
 }

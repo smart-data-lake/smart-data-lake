@@ -20,9 +20,9 @@
 package io.smartdatalake.workflow.connection.authMode
 
 import io.smartdatalake.util.secrets.StringOrSecret
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class OAuthModeIT extends FunSuite {
+class OAuthModeIT extends AnyFunSuite {
 
   // Check request to open OAuth2 server: https://oauth.tools/collection/1599045253169-GHF
   test("sample client_credentials flow") {
