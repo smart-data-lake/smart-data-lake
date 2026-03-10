@@ -19,11 +19,14 @@
 
 package io.smartdatalake.workflow.dataframe.plainScala
 
+import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import org.scalatest.funsuite.AnyFunSuite
 
 class ScalaDataFrameTest extends AnyFunSuite {
 
   import ScalaDataFrame.implicits._
+  private val functions = ScalaSubFeed.asInstanceOf[DataFrameFunctions]
+  import functions._
 
   //implementation was overriden, thus test needed
   // symmetric difference part of isEqual operator (part of further tests)
@@ -76,12 +79,77 @@ class ScalaDataFrameTest extends AnyFunSuite {
     assert(df.collect.map(_.toSeq) == expected)
   }
 
+  test("left join other DataFrame using column name") {
+    val data1 = Seq(Seq(1, "A"), Seq(2, "B"))
+    val data2 = Seq(Seq(1, "X"), Seq(3, "Y"))
+    val expected = Seq(Seq(1, "A", "X"), Seq(2, "B", null))
+    val df = data1.toDF("a", "b")
+      .join(data2.toDF("a", "c"), Seq("a"), "left")
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
+  test("right join other DataFrame using column name") {
+    val data1 = Seq(Seq(1, "A"), Seq(2, "B"))
+    val data2 = Seq(Seq(1, "X"), Seq(3, "Y"))
+    val expected = Seq(Seq(1, "A", "X"), Seq(3, null, "Y"))
+    val df = data1.toDF("a", "b")
+      .join(data2.toDF("a", "c"), Seq("a"), "right")
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
+  test("full join other DataFrame using column name") {
+    val data1 = Seq(Seq(1, "A"), Seq(2, "B"))
+    val data2 = Seq(Seq(1, "X"), Seq(3, "Y"))
+    val expected = Seq(Seq(1, "A", "X"), Seq(2, "B", null), Seq(3, null, "Y"))
+    val df = data1.toDF("a", "b")
+      .join(data2.toDF("a", "c"), Seq("a"), "full")
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
+
+  test("left join other DataFrame using condition") {
+    val data1 = Seq(Seq(1, "A"), Seq(2, "B"))
+    val data2 = Seq(Seq(1, "X"), Seq(3, "Y"))
+    val expected = Seq(Seq(1, "A", 1, "X"), Seq(2, "B", null, null))
+    val df = data1.toDF("a", "b").as("df1")
+      .join(data2.toDF("a", "c").as("df2"), col("df1.a") === col("df2.a"), "left")
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
+  test("right join other DataFrame using condition") {
+    val data1 = Seq(Seq(1, "A"), Seq(2, "B"))
+    val data2 = Seq(Seq(1, "X"), Seq(3, "Y"))
+    val expected = Seq(Seq(1, "A", 1, "X"), Seq(null, null, 3, "Y"))
+    val df = data1.toDF("a", "b").as("df1")
+      .join(data2.toDF("a", "c").as("df2"), col("df1.a") === col("df2.a"), "right")
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
+  test("full join other DataFrame using condition") {
+    val data1 = Seq(Seq(1, "A"), Seq(2, "B"))
+    val data2 = Seq(Seq(1, "X"), Seq(3, "Y"))
+    val expected = Seq(Seq(1, "A", 1, "X"), Seq(2, "B", null, null), Seq(null, null, 3, "Y"))
+    val df = data1.toDF("a", "b").as("df1")
+      .join(data2.toDF("a", "c").as("df2"), col("df1.a") === col("df2.a"), "full")
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
   test("add literal column") {
     import ScalaSubFeed._
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
     val expected = Seq(Seq(1, "A", -1), Seq(2, "B", -1))
     val df = data.toDF("a", "b")
       .withColumn("c", lit(-1))
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
+  test("select column with DataFrame alias") {
+    import ScalaSubFeed._
+    val data = Seq(Seq(1, "A"), Seq(2, "B"))
+    val expected = Seq(Seq(1, "A"), Seq(2, "B"))
+    val df = data.toDF("a", "b")
+      .as("test")
+      .select(Seq(col("test.a"), col("test.b")))
     assert(df.collect.map(_.toSeq) == expected)
   }
 
@@ -92,6 +160,16 @@ class ScalaDataFrameTest extends AnyFunSuite {
     val df = data.toDF("a", "b")
     val df1 = df
       .withColumn("c", df("a") * lit(-1))
+    assert(df1.collect.map(_.toSeq) == expected)
+  }
+
+  test("when expression with literal") {
+    import ScalaSubFeed._
+    val data = Seq(Seq(1, "A"), Seq(2, "B"), Seq(3, "B"))
+    val expected = Seq(Seq(1, "A", -1), Seq(2, "B", 0), Seq(3, "B", 3))
+    val df = data.toDF("a", "b")
+    val df1 = df
+      .withColumn("c", when(df("a") === lit(1), lit(-1)).when(lit(2) === col("a"), lit(0)).otherwise(col("a")))
     assert(df1.collect.map(_.toSeq) == expected)
   }
 
@@ -111,9 +189,12 @@ class ScalaDataFrameTest extends AnyFunSuite {
     assertThrows[IllegalArgumentException](df.select("col_non_existent"))
   }
 
-  test("groupby is not implemented yet") {
+  test("select star expand correctly") {
     val df = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
-    assertThrows[NotImplementedError](df.groupBy(df.cols))
+    val df1 = df.select("*")
+    assert(df1.isEqual(df))
+    val df2 = df.as("df2").select("*")
+    assert(df2.symmetricDifference(df).isEmpty)
   }
 
   test("unionByName works as expected") {
@@ -147,20 +228,43 @@ class ScalaDataFrameTest extends AnyFunSuite {
   }
 
   test("ScalaSequenceDataType stores Sequences in its cell values") {
-    val df = ScalaDataFrame.apply(Seq(Seq(Seq(1,2,3,4)), Seq(Seq(5,6,7)), Seq(Seq(8,9,10))))
-    val hasCorrectType = df.schema("col0").dataType == ScalaSeqDataType
+    val df = ScalaDataFrame(Seq(Seq(Seq(1,2,3,4)), Seq(Seq(5,6,7)), Seq(Seq(8,9,10))))
+    val hasCorrectType = df.schema("col0").dataType == ScalaArrayDataType
     val storesCorrectData = Seq(0,1,2).forall(ix => df(ix)(0).isInstanceOf[Seq[Int]])
     assert(hasCorrectType && storesCorrectData)
   }
 
 
   test("Exploding a column with simple data types") {
-    val df = ScalaDataFrame.apply(Seq(Seq("row1", Seq(1,2,3)), Seq("row2", Seq(4,5,6))))
-    val exploded_df = df.withColumn("values", ScalaSubFeed.explode(df("col1")))
+    val df = ScalaDataFrame(Seq(Seq("row1", Seq(1,2,3)), Seq("row2", Seq(4,5,6))))
+    val exploded_df = df.withColumn("values", explode(df("col1")))
     val expected_pairs = Seq(("row1", 1), ("row1", 2), ("row1", 3),("row2", 4), ("row2", 5), ("row2", 6))
     assert(exploded_df.drop("col1").rows.map(row => (row.values(0), row.values(1))) == expected_pairs)
   }
 
+  test("Aggregate DataFrame") {
+    val df1 = ScalaDataFrame(Seq(Seq(1, "a", "test", 4), Seq(1, "a", "test1", 5), Seq(2, "b", "test1", 6), Seq(3, "b", "test2", 7)), Seq("k1", "k2", "str", "num"))
+    val dfAgg = df1
+      .agg(Seq(count(col("str")), max(col("num"))))
+    val expected = Seq(Seq(4, 7))
+    assert(dfAgg.collect.map(_.toSeq) == expected)
+  }
+
+  test("GroupBy aggregate DataFrame") {
+    val df1 = ScalaDataFrame(Seq(Seq(1, "a", "test", 4), Seq(1, "a", "test1", 5), Seq(2, "b", "test1", 6), Seq(3, "b", "test2", 7)), Seq("k1", "k2", "str", "num"))
+    val dfAgg = df1
+      .groupBy(Seq(col("k1"), col("k2")))
+      .agg(Seq(count(col("str")).as("cnt"), max(col("num")).as("max_num")))
+    val expected = Set(Seq(1, "a", 2, 5), Seq(2, "b", 1, 6), Seq(3, "b", 1, 7))
+    assert(dfAgg.collect.map(_.toSeq).toSet == expected)
+  }
+
+  test("Compare computed column against literal") {
+    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val computedCol = (df1.cols.head === lit(2)).toScalaColumn(df1)
+    val expected = Seq(false, true, false, false, false, true)
+    assert(computedCol.data == expected)
+  }
 
   // TODO: check null values handling
 

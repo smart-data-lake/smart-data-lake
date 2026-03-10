@@ -89,8 +89,8 @@ object Historization extends SmartDataLakeLogger {
 
     // add hash-column to easily compare changed records
     val colsToCompare = getCompareColumns(dfNew.columns, historizeWhitelist, historizeBlacklist, Environment.caseSensitive)
-    val dfNewHashed = dfNew.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare))
-    val dfLastHistHashed = dfLastHist.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare))
+    val dfNewHashed = dfNew.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare.map(col)))
+    val dfLastHistHashed = dfLastHist.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare.map(col)))
     val hashColEqualsExpr = col(s"newFeed.$historizeHashColName") === col(s"lastHist.$historizeHashColName")
 
     val joined = dfNewHashed.as("newFeed")
@@ -207,6 +207,7 @@ object Historization extends SmartDataLakeLogger {
     val dfOperations = dfExistingHashed.as("existing")
       .where(existingDelimitedCol === lit(Environment.historizationUpperHorizonTimestamp)) // only current records needed
       .select((primaryKey :+ Environment.capturedColumnName :+ Environment.delimitedColumnName :+ historizeHashColName).map(col))
+      .as("existing")
       .join(dfNewHashed.as("new"), primaryKey, "full")
       .withColumn("_operations",
         // 1. primary key matched and attributes have changed -> update record to close existing version, insert record to create new version
@@ -374,18 +375,10 @@ object Historization extends SmartDataLakeLogger {
     colsToCompare.toSeq.sorted
   }
 
-  // Generic column expression to compare a list of columns
-  private[smartdatalake] def colsComparisionExpr(cols: Seq[String], useHash: Boolean = false)(implicit functions: DataFrameFunctions): GenericColumn = {
-    import functions._
-    logger.debug(s"using hash columns ${cols.sorted.mkString(",")}")
-    if (useHash) hash(struct(cols.sorted.map(col): _*))
-    else struct(cols.sorted.map(col): _*)
-  }
-
   private[smartdatalake] def addHashCol(df: GenericDataFrame, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]], useHash: Boolean, colsToIgnore: Seq[String] = Seq()): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     val colsToCompare = getCompareColumns(df.columns.diff(colsToIgnore), historizeWhitelist, historizeBlacklist)
-    df.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare, useHash))
+    df.withColumn(historizeHashColName, functions.colsComparisionExpr(colsToCompare.map(functions.col), useHash))
   }
 
   private def getPreviousTimeAxisEntry(ts: Timestamp, unit: Duration) = Timestamp.from(ts.toInstant.minus(unit))

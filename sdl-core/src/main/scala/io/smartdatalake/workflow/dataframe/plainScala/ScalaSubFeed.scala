@@ -22,6 +22,7 @@ package io.smartdatalake.workflow.dataframe.plainScala
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.DataFrameSubFeed.assertCorrectSubFeedType
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
@@ -135,19 +136,27 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   private def throwNotImplementedError = throw new NotImplementedError("This Spark-like Dataframe function is not implemented for the plainScala version")
 
-  def approxCountDistinct(column: GenericColumn, rsd: Option[Double]): GenericColumn = throwNotImplementedError
+  def approxCountDistinct(column: GenericColumn, rsd: Option[Double]): ScalaAbstractColumn = throwNotImplementedError
 
-  def array(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def array(columns: GenericColumn*): ScalaAbstractColumn = {
+    val scalaColumns = columns.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+    val dataTypes = scalaColumns.map(_.dataType).distinct
+    assert(dataTypes.size == 1, "All columns in array function must have the same data type, but found: " + dataTypes.mkString(", "))
+    ScalaManyExpr(scalaColumns, "array", dataType => v => v, Some(ScalaArrayDataType))
+  }
 
   def arrayType(dataType: GenericDataType): GenericDataType with GenericArrayDataType = throwNotImplementedError
 
-  def array_construct_compact(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def array_construct_compact(columns: GenericColumn*): ScalaAbstractColumn = throwNotImplementedError
 
-  def coalesce(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def coalesce(columns: GenericColumn*): ScalaAbstractColumn = throwNotImplementedError
 
-  def col(colName: String): GenericColumn = ScalaColumnReference(colName)
+  def col(colName: String): ScalaAbstractColumn = ScalaColumnReference(colName)
 
-  def concat(exprs: GenericColumn*): GenericColumn = {
+  def concat(exprs: GenericColumn*): ScalaAbstractColumn = {
     require(exprs.nonEmpty, "concat requires at least one argument")
     val scalaExprs = exprs.map {
       case c: ScalaAbstractColumn => c
@@ -158,55 +167,68 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
-  def count(column: GenericColumn): GenericColumn = column match {
+  def count(column: GenericColumn): ScalaAbstractColumn = column match {
     case c: ScalaAbstractColumn if c == ScalaColumnReference("*") => ScalaAggregateExpr(c, "count", _.size, ScalaIntDataType)
     case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "count", _.count(v => v != null && v != None), ScalaIntDataType)
     case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
-  def countDistinct(column: GenericColumn): GenericColumn = column match {
+  def countDistinct(column: GenericColumn): ScalaAbstractColumn = column match {
     case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "count", _.distinct.size, ScalaIntDataType)
     case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
-  def explode(column: GenericColumn): GenericColumn = {
+  def explode(column: GenericColumn): ScalaAbstractColumn = {
     column match {
-      case col: ScalaColumn[Iterable[_]] if col.dataType == ScalaSeqDataType  => {
-        val zipped = col.data.zipWithIndex
-        val pairs = zipped.flatMap(pair => for (element <- pair._1.asInstanceOf[Seq[_]]) yield (element, pair._2)).toIndexedSeq
-
-        // infer datatype based on first value (same as the ScalaDataFrame)
-        val dataType = ScalaDataType.getFor(pairs.head._1.getClass)
-        val definition = dataType.createColumnDefinition(name = col.definition.name + "_exploded", nullable = col.definition.nullable, comment = col.definition.comment)
-        definition match {
-          case d: ScalaColumnDefinition[Any] => ScalaExplodingColumn[Any](definition =  d, data = pairs)
-          case _ => throw new IllegalStateException("ScalaExplodingColumn was initialized with a dataType that was not a subtype of Any!")
-        }
-      }
+      case col: ScalaAbstractColumn => ScalaExplodeExpr(col)
       case _ => throw new IllegalArgumentException("The 'explode' function can only be used with a Sequence data type (ScalaSeqDataType)")
     }
   }
 
-  def expr(sqlExpr: String): GenericColumn = {
-    ExpressionParser.parse(sqlExpr)(this)
-  }
+  def expr(sqlExpr: String): GenericColumn = ExpressionParser.parse(sqlExpr)(this)
 
   def field(name: String, dataType: GenericDataType, nullable: Boolean): GenericField = throwNotImplementedError
 
-  def hash(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def hash(column: GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  def lit(value: Any): ScalaAbstractColumn = ScalaDataType.getFor(value.getClass).createLiteral(value)
+  override def colsComparisionExpr(cols: Seq[GenericColumn], useHash: Boolean): ScalaAbstractColumn = {
+    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colsComparisionExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+    val scalaCols = cols.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }.sortBy(_.getName.get)
+    if (useHash) ScalaManyExpr(scalaCols, "hash_comparison", dataType => data => data.hashCode(), Some(ScalaIntDataType))
+    else ScalaManyExpr(scalaCols, "concat_comparison", dataType => data => data.map(d => Option(d).map(_.toString).getOrElse("<null>")).mkString(","), Some(ScalaIntDataType))
+  }
+
+  def lit(value: Any): ScalaAbstractColumn = ScalaDataType.getFor(Option(value).map(_.getClass).getOrElse(classOf[Null])).createLiteral(value)
 
   def mapType(keyType: GenericDataType, valueType: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 
-  def max(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def max(column: GenericColumn): ScalaAbstractColumn = column match {
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "max", d => d.maxOption(c.dataType.ordering.asInstanceOf[Ordering[Any]]).orNull, ScalaIntDataType)
+    case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
 
-  def min(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def min(column: GenericColumn): ScalaAbstractColumn = column match {
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "min", d => d.minOption(c.dataType.ordering.asInstanceOf[Ordering[Any]]).orNull, ScalaIntDataType)
+    case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
 
-  def abs(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def first(column: GenericColumn): ScalaAbstractColumn = column match {
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "first", d => d.headOption.orNull, c.dataType)
+    case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
 
-  def least(columns: GenericColumn*): GenericColumn = {
-    require(columns.nonEmpty, "least requires at least one argument")
+  def abs(column: GenericColumn): ScalaAbstractColumn = {
+    column match {
+      case c: ScalaAbstractColumn if c.dataType.isNumeric => ScalaUnaryExpr(c, "abs", v => if (v == null) null else c.dataType.numeric.abs(v.asInstanceOf[Nothing]), Some(ScalaBooleanDataType))
+      case c: ScalaAbstractColumn => throw new IllegalStateException(s"Invalid data type for 'not' function: ${c.dataType.getClass.getSimpleName}. Only Boolean data type is supported.")
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  def least(columns: GenericColumn*): ScalaAbstractColumn = {
     val scalaColumns = columns.map {
       case c: ScalaAbstractColumn => c
       case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
@@ -218,8 +240,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
-  def greatest(columns: GenericColumn*): GenericColumn = {
-    require(columns.nonEmpty, "greatest requires at least one argument")
+  def greatest(columns: GenericColumn*): ScalaAbstractColumn = {
     val scalaColumns = columns.map {
       case c: ScalaAbstractColumn => c
       case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
@@ -231,41 +252,59 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
-  def not(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def not(column: GenericColumn): ScalaAbstractColumn = {
+    column match {
+      case c: ScalaAbstractColumn if c.dataType == ScalaBooleanDataType => ScalaUnaryExpr(c, "not", v => if (v == null) null else !v.asInstanceOf[Boolean], Some(ScalaBooleanDataType))
+      case c: ScalaAbstractColumn => throw new IllegalStateException(s"Invalid data type for 'not' function: ${c.dataType.getClass.getSimpleName}. Only Boolean data type is supported.")
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
 
-  def raise_error(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def raise_error(column: GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  def regexp_extract(e: GenericColumn, regexp: String, groupIdx: Int): GenericColumn = throwNotImplementedError
+  def regexp_extract(e: GenericColumn, regexp: String, groupIdx: Int): ScalaAbstractColumn = throwNotImplementedError
 
   def rowFromSeq(values: Seq[Any]): GenericRow = throwNotImplementedError
 
-  def row_number: GenericColumn = throwNotImplementedError
+  def row_number: ScalaAbstractColumn = throwNotImplementedError
 
   def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = throwNotImplementedError
 
-  def size(column: GenericColumn): GenericColumn = throwNotImplementedError
+  def size(column: GenericColumn): ScalaAbstractColumn = {
+    column match {
+      case c: ScalaAbstractColumn if c.dataType == ScalaArrayDataType => ScalaUnaryExpr(c, "size", v => if (v == null) 0 else v.asInstanceOf[Seq[_]].size, Some(ScalaIntDataType))
+      case c: ScalaAbstractColumn if c.dataType == ScalaStringDataType => ScalaUnaryExpr(c, "size", v => if (v == null) 0 else v.asInstanceOf[String].length, Some(ScalaIntDataType))
+      case c: ScalaAbstractColumn => throw new IllegalStateException(s"Invalid data type for 'size' function: ${c.dataType.getClass.getSimpleName}. Only String or Seq data type is supported.")
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
 
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = throwNotImplementedError
 
   def stringType: GenericDataType = throwNotImplementedError
 
-  def struct(columns: GenericColumn*): GenericColumn = throwNotImplementedError
+  def struct(columns: GenericColumn*): ScalaAbstractColumn = throwNotImplementedError
 
   def structType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = throwNotImplementedError
 
   def structType(colTypes: Map[String, GenericDataType]): GenericDataType with GenericStructDataType = throwNotImplementedError
 
-  def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn = throwNotImplementedError
+  def transform(column: GenericColumn, func: GenericColumn => GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  def transform_keys(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): GenericColumn = throwNotImplementedError
+  def transform_keys(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  def transform_values(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): GenericColumn = throwNotImplementedError
+  def transform_values(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = throwNotImplementedError
+  def when(condition: GenericColumn, value: GenericColumn): ScalaAbstractColumn with GenericWhen = {
+    (condition, value) match {
+      case (scalaCondition: ScalaAbstractColumn, sparkValue: ScalaAbstractColumn) => ScalaWhenExpr(scalaCondition, sparkValue)
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${condition.subFeedType.typeSymbol.name}, ${value.subFeedType.typeSymbol.name} in method when")
+    }
+  }
 
-  def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = throwNotImplementedError
+  def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = throwNotImplementedError
+  override def from_json(column: GenericColumn, dataType: GenericDataType): ScalaAbstractColumn = throwNotImplementedError
 
   def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = throwNotImplementedError
 

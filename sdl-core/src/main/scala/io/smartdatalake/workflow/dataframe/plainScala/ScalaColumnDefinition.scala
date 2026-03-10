@@ -25,12 +25,13 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 case class ScalaColumnDefinition[A: ClassTag](name: String,
+                                              dataFrameAlias: Option[String] = None,
                                               nullable: Boolean = false,
-                                              comment: Option[String] = None,
-                                             _dataType: Option[ScalaDataType[A]] = None) extends GenericField {
+                                              comment: Option[String] = None
+                                             ) extends GenericField {
 
   // datatype is deduced from generic type A if not explicitly provided
-  val dataType: ScalaDataType[A] = _dataType.getOrElse(ScalaDataType.getFor[A])
+  val dataType: ScalaDataType[A] = ScalaDataType.getFor[A]
 
   def makeNullable: ScalaColumnDefinition[A] = copy(nullable = true)
 
@@ -41,6 +42,10 @@ case class ScalaColumnDefinition[A: ClassTag](name: String,
   def createColumn(data: IndexedSeq[_]): ScalaColumn[A] = {
     ScalaColumn(this, data.asInstanceOf[IndexedSeq[A]])
   }
+
+  def withDataFrameAlias(alias: Option[String]): ScalaColumnDefinition[A] = copy(dataFrameAlias = alias)
+
+  def getFullName() = dataFrameAlias.map(a => s"$a.$name").getOrElse(name)
 
   override def subFeedType: Type = typeOf[ScalaSubFeed]
 }

@@ -50,12 +50,20 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: 
 
   def length: Int = data.length
 
+  def withDataFrameAlias(alias: Option[String]): ScalaColumn[A] = copy(definition = definition.withDataFrameAlias(alias))
+
 }
 
 
 object ScalaColumn {
 
-  def apply[A: ClassTag](name: String, data: Seq[A]): ScalaColumn[A] = new ScalaColumn[A](ScalaColumnDefinition[A](name = name), data = data.toIndexedSeq)
+  def apply[A: ClassTag](name: String, data: Seq[A]): ScalaColumn[A] = {
+    val (alias, colName) = name.split('.') match {
+      case Array(a, c) => (Some(a), c)
+      case Array(c) => (None, c)
+    }
+    new ScalaColumn[A](ScalaColumnDefinition[A](name = colName, dataFrameAlias = alias), data = data.toIndexedSeq)
+  }
 
   private val colCounter = new java.util.concurrent.atomic.AtomicLong(0)
 

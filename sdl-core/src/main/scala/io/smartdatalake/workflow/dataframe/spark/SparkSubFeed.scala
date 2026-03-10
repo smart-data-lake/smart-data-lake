@@ -142,6 +142,12 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def first(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.first(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def abs(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.abs(sparkColumn.inner))

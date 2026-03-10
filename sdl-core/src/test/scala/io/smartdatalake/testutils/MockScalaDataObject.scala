@@ -176,10 +176,10 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     val joinCondition = pkCols.map(colName => col(s"new.$colName") === col(s"existing.$colName")).reduce(_ and _)
       .and(saveModeExpr.additionalMergePredicateExpr.getOrElse(lit(true)))
     val dfJoined = dfExisting.join(dfNew.as("new"), joinCondition, "full")
-    var dfMatched = dfJoined.where(col("new.${pkCols.head}").isNotNull and col("existing.${table.primaryKey.get.head}").isNotNull)
-    val dfNewNotMatched = dfJoined.where(col("new.${pkCols.head}").isNotNull and col("existing.${table.primaryKey.get.head}").isNull)
+    var dfMatched = dfJoined.where(col(s"new.${pkCols.head}").isNotNull and col(s"existing.${table.primaryKey.get.head}").isNotNull)
+    val dfNewNotMatched = dfJoined.where(col(s"new.${pkCols.head}").isNotNull and col(s"existing.${table.primaryKey.get.head}").isNull)
       .select(col("new.*"))
-    val dfExistingNotMatched = dfJoined.where(col("new.${pkCols.head}").isNull and col("existing.${table.primaryKey.get.head}").isNotNull)
+    val dfExistingNotMatched = dfJoined.where(col(s"new.${pkCols.head}").isNull and col(s"existing.${table.primaryKey.get.head}").isNotNull)
       .select(col("existing.*"))
 
     // remove records from dfMatched if deleteCondition is defined

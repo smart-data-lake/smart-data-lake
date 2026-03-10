@@ -24,6 +24,7 @@ import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericSimpleDataTy
 import io.smartdatalake.util.misc.MetricsLog
 import org.json4s.{JString, JValue}
 
+import java.sql.Timestamp
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
@@ -40,6 +41,7 @@ object ScalaStringDataType extends ScalaDataType[String] {
       case ScalaIntDataType => (x => x.asInstanceOf[Int].toString)
       case ScalaDoubleDataType => (x => x.asInstanceOf[Double].toString)
       case ScalaBooleanDataType => (x => x.asInstanceOf[Boolean].toString)
+      case ScalaNullDataType => (_ => null)
     }
   }
 
@@ -134,9 +136,43 @@ object ScalaBooleanDataType extends ScalaDataType[Boolean] {
   }
 }
 
-object ScalaSeqDataType extends ScalaDataType[Seq[_]] {
+
+object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
+  override def isNumeric: Boolean = false
+
+  override def isImpreciseNumeric: Boolean = false
+
+  def ordering: Ordering[Timestamp] = Ordering[Timestamp]
+
+  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Timestamp) = {
+    fromDataType match {
+      case ScalaNullDataType => (_ => null)
+    }
+  }
+
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = this
+}
+
+object ScalaNullDataType extends ScalaDataType[Null] {
+  override def isNumeric: Boolean = false
+
+  override def isImpreciseNumeric: Boolean = false
+
+  def ordering: Ordering[Null] = Ordering[Null]
+
+  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Null) = {
+    throw new UnsupportedOperationException("A ScalaTimestampDataType cannot be cast from other types supported in ScalaDataFrame")
+  }
+
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = other
+}
+
+object ScalaArrayDataType extends ScalaDataType[Seq[_]] {
+
+  override def typeName: String = "array"
 
   private object SeqOrdering extends Ordering[Seq[_]] {
+    // TODO: this is a simplistic implementation, we should implement a more complete one if we want to support ordering on Seq types
     def compare(x: Seq[_], y: Seq[_]): Int = if (x.head == y.head) 0 else 1
   }
 
@@ -144,10 +180,7 @@ object ScalaSeqDataType extends ScalaDataType[Seq[_]] {
 
   def getCastFunction(fromDataType: ScalaDataType[_]): Any => Seq[_] = {
     fromDataType match {
-      case ScalaIntDataType => (x => Seq(x.asInstanceOf[Int]))
-      case ScalaStringDataType => (x => Seq(x.asInstanceOf[String].toInt))
-      case ScalaDoubleDataType => (x => Seq(x.asInstanceOf[Double].toInt))
-      case ScalaBooleanDataType => (x => Seq(x.asInstanceOf[Boolean]))
+      case ScalaNullDataType => (_ => null)
     }
   }
 
@@ -160,31 +193,6 @@ object ScalaSeqDataType extends ScalaDataType[Seq[_]] {
   override def isSimpleType: Boolean = false
 }
 
-// TODO: who uses this?
-object ScalaMetricsLogDataType extends ScalaDataType[MetricsLog] {
-
-  private object MetricsLogOrdering extends Ordering[MetricsLog] {
-    def compare(x: MetricsLog, y: MetricsLog): Int = x.start_tstmp.compareTo(y.start_tstmp)
-  }
-
-  def ordering: Ordering[MetricsLog] = MetricsLogOrdering
-
-  def getCastFunction(fromDataType: ScalaDataType[_]): Any => MetricsLog = throw new UnsupportedOperationException("A MetricLog object cannot be cast from the types supported in ScalaDataFrame")
-
-  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = {
-      other match {
-        case ScalaStringDataType => other
-        case _ => this
-      }
-  }
-
-  override def isNumeric: Boolean = false
-
-  override def isImpreciseNumeric: Boolean = false
-
-  override def isSimpleType: Boolean = false
-
-}
 
 abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSimpleDataType {
 
@@ -226,7 +234,7 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
   def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_]
 
   def createColumnDefinition(name: String, nullable: Boolean = false, comment: Option[String] = None): ScalaColumnDefinition[A] = {
-    ScalaColumnDefinition[A](name, nullable, comment)
+    ScalaColumnDefinition[A](name, None, nullable, comment)
   }
 
   def createLiteral(value: Any): ScalaLiteral[A] = {
@@ -234,7 +242,7 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
   }
 
   def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
-    ScalaColumnDefinition[A](fromColumnDefinition.name, fromColumnDefinition.nullable, fromColumnDefinition.comment)
+    ScalaColumnDefinition[A](fromColumnDefinition.name, None, fromColumnDefinition.nullable, fromColumnDefinition.comment)
   }
 
   def castColumn(fromColumn: ScalaColumn[_]): ScalaColumn[A] = {
@@ -254,14 +262,16 @@ object ScalaDataType {
 
   def getFor(cls: Class[_]): ScalaDataType[_] = {
     cls match {
+      case cls if cls == classOf[Null] || cls == null => ScalaNullDataType
       case cls if cls == classOf[String] => ScalaStringDataType
       case cls if cls == classOf[Int] || cls == classOf[java.lang.Integer] => ScalaIntDataType
       case cls if cls == classOf[Double] => ScalaDoubleDataType
       case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
-      case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaSeqDataType
+      case cls if cls == classOf[Timestamp] => ScalaTimestampDataType
+      case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaArrayDataType
       case _ =>
         println(cls.getName)
-        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String or Boolean. Could not match with class ${cls.getSimpleName}")
+        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp and Array. Could not match with class ${cls.getSimpleName}")
     }
   }
 }

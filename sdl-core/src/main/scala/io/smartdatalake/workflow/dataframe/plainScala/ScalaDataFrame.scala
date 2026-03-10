@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.DataFrameSubFeed.assertCorrectSubFeedType
 import io.smartdatalake.workflow.dataframe._
 
 import scala.collection.immutable.Queue
@@ -34,9 +35,9 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 
   //Util functions
   def checkColumnsExist(df: ScalaDataFrame, colNames: Seq[String]): Unit = {
-    assert(!colNames.isEmpty, "No Columns provided for operation")
-    val dfCols: Seq[String] = df.cols.seq.map(_.definition.name)
-    val firstMismatch: Option[String] = colNames.find(!dfCols.contains(_))
+    assert(colNames.nonEmpty, "No Columns provided for operation")
+    val dfColumns = df.columns.toSet
+    val firstMismatch: Option[String] = colNames.find(c => !dfColumns.contains(c) && !c.endsWith("*") )
     require(firstMismatch.isEmpty, f"The dataframe does not contain the column ${firstMismatch.get}")
   }
 
@@ -70,32 +71,120 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 
   override def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String = "inner"): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame => {
-      require(joinType == "inner", "As of now, only an inner join is supported for ScalaDataFrames")
       checkColumnsExist(this, joinCols)
       checkColumnsExist(otherScala, joinCols)
 
       def joinColumnIndices(df: ScalaDataFrame) = joinCols.map(name => df.cols.indexWhere(_.definition.name == name))
 
-      val indexThisCol = joinColumnIndices(this)
-      val indexThatCol = joinColumnIndices(otherScala)
-      val relevantIndices = (0 until otherScala.cols.size).toSet -- indexThatCol.toSet
+      val indicesThisJoinCol = joinColumnIndices(this)
+      val indicesThatJoinCol = joinColumnIndices(otherScala)
+      val indicesThisNonJoinCol = this.cols.indices.toSet -- indicesThisJoinCol.toSet
+      val indicesThatNonJoinCol = otherScala.cols.indices.toSet -- indicesThatJoinCol.toSet
+      def filterRow(row: ScalaRow, indices: Iterable[Int]) = indices.map(row.values)
 
-      def nonJoinColumns(row: ScalaRow) = for (ix <- relevantIndices) yield row.values(ix)
+      val newSchema = ScalaSchema(indicesThisJoinCol.map(this.schema.fields) ++ indicesThisNonJoinCol.map(this.schema.fields) ++ indicesThatNonJoinCol.map(otherScala.schema.fields))
 
-      val ixZip = indexThisCol zip indexThatCol
+      lazy val leftGrouped = this.rows.groupBy(filterRow(_, indicesThisJoinCol))
+      lazy val rightGrouped = otherScala.rows.groupBy(filterRow(_, indicesThatJoinCol))
 
-      def joinCondition(thisRow: ScalaRow, thatRow: ScalaRow) = ixZip.forall(pair => thisRow(pair._1) == thatRow(pair._2))
-
-      val rows: Seq[ScalaRow] = for (thisRow <- this.rows; thatRow <- otherScala.rows if joinCondition(thisRow, thatRow)) yield ScalaRow(thisRow.values ++ nonJoinColumns(thatRow))
-      val newSchema: Option[ScalaSchema] =
-        if (this.schema.isInferred || otherScala.schema.isInferred) None
-        else Some(ScalaSchema(this.schema.fields ++ otherScala.schema.fields.filterNot(field => joinCols.contains(field.name))))
-      ScalaDataFrame.fromScalaRows(rows = rows, schemaIn = newSchema)
+      val rows = joinType.toLowerCase match {
+        case "inner" =>
+          this.rows.flatMap(thisRow =>
+            rightGrouped.get(filterRow(thisRow, indicesThisJoinCol)) match {
+              case Some(matchingRows) => matchingRows.map(thatRow => ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case None => Seq()
+            }
+          )
+        case "left" =>
+          this.rows.flatMap(thisRow =>
+            rightGrouped.get(filterRow(thisRow, indicesThisJoinCol)) match {
+              case Some(matchingRows) => matchingRows.map(thatRow => ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(null)).toIndexedSeq))
+            }
+          )
+        case "right" =>
+          otherScala.rows.flatMap(thatRow =>
+            leftGrouped.get(filterRow(thatRow, indicesThatJoinCol)) match {
+              case Some(matchingRows) => matchingRows.map(thisRow => ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ Seq.fill(indicesThisNonJoinCol.size)(null) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+            }
+          )
+        case "full" =>
+          this.rows.flatMap(thisRow =>
+            rightGrouped.get(filterRow(thisRow, indicesThisJoinCol)) match {
+              case Some(matchingRows) => matchingRows.map(thatRow => ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(null)).toIndexedSeq))
+            }
+          ) ++ otherScala.rows.flatMap(thatRow =>
+            leftGrouped.get(filterRow(thatRow, indicesThatJoinCol)) match {
+              case Some(_) => Seq() //already included in the left join part
+              case None => Seq(ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ Seq.fill(indicesThisNonJoinCol.size)(null) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+            }
+          )
+        case _ => throw new IllegalArgumentException(s"Join type $joinType is not supported. Supported join types are: inner, left, right, full")
+      }
+      ScalaDataFrame.fromScalaRows(rows = rows, schemaIn = Some(newSchema))
     }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
-  override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): GenericDataFrame = throw new NotImplementedError("Joining using a ScalaColumn[A] expression is not supported at the moment")
+  /**
+   * Joining with condition
+   * This needs a cross join and then filtering, which is not very efficient...
+   */
+  override def join(other: GenericDataFrame, condition: GenericColumn, joinType: String): ScalaDataFrame = (other, condition) match {
+    case (that: ScalaDataFrame, scalaCondition: ScalaAbstractColumn) =>
+      val newSchema = ScalaSchema(this.schema.fields ++ that.schema.fields)
+      val emptyDf = ScalaDataFrame.returnEmpty(newSchema)
+
+      def joinRowWithThat(thisRow: ScalaRow, thatRows: Seq[ScalaRow], joinType: String): ScalaDataFrame = {
+        val combinedRows = thatRows.map(thatRow => ScalaRow(thisRow.values ++ thatRow.values))
+        val df = ScalaDataFrame.fromScalaRows(combinedRows, Some(newSchema))
+          .filter(scalaCondition)
+        joinType match {
+          case "inner" => df
+          case "left"  =>
+            if (df.isEmpty) ScalaDataFrame(Seq(thisRow.values ++ Seq.fill(that.schema.fields.size)(null)), Some(newSchema))
+            else df
+          case "anti"  =>
+            if (df.isEmpty) ScalaDataFrame(Seq(thisRow.values ++ Seq.fill(that.schema.fields.size)(null)), Some(newSchema))
+            else emptyDf
+        }
+      }
+
+      def joinRowWithThis(thatRow: ScalaRow, thisRows: Seq[ScalaRow], joinType: String): ScalaDataFrame = {
+        val combinedRows = thisRows.map(thisRow => ScalaRow(thisRow.values ++ thatRow.values))
+        val df = ScalaDataFrame.fromScalaRows(combinedRows, Some(newSchema))
+          .filter(scalaCondition)
+        joinType match {
+          case "inner" => df
+          case "right" =>
+            if (df.isEmpty) ScalaDataFrame(Seq(Seq.fill(this.schema.fields.size)(null) ++ thatRow.values), Some(newSchema))
+            else df
+          case "anti" =>
+            if (df.isEmpty) ScalaDataFrame(Seq(Seq.fill(this.schema.fields.size)(null) ++ thatRow.values), Some(newSchema))
+            else emptyDf
+        }
+      }
+
+      joinType.toLowerCase match {
+        case "inner" | "left" =>
+          this.rows.map(thisRow => joinRowWithThat(thisRow, that.rows, joinType))
+            .reduceOption(_.unionAll(_)).getOrElse(emptyDf)
+        case "right" =>
+          that.rows.map(thatRow => joinRowWithThis(thatRow, this.rows, joinType))
+            .reduceOption(_.unionAll(_)).getOrElse(emptyDf)
+        case "full" =>
+          val leftJoined = this.rows.map(thisRow => joinRowWithThat(thisRow, that.rows, "left"))
+            .reduceOption(_.unionAll(_)).getOrElse(emptyDf)
+          val rightAntiJoined = that.rows.map(thatRow => joinRowWithThis(thatRow, this.rows, "anti"))
+            .reduceOption(_.unionAll(_)).getOrElse(emptyDf)
+          leftJoined.unionAll(rightAntiJoined)
+        case _ => throw new IllegalArgumentException(s"Join type $joinType is not supported. Supported join types are: inner, left, right, full")
+      }
+
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
 
   private def reorderColumns(newOrder: Seq[String]): ScalaDataFrame = {
     require(newOrder.toSet == schema.columns.toSet, "Some of the provided columns either don't exist, or there are columns missing for reordering")
@@ -118,43 +207,87 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
     }
   }
 
-  def select(columnNames: List[String]): ScalaDataFrame = {
-    checkColumnsExist(this, colNames = columnNames)
-    ScalaDataFrame(cols.filter(c => columnNames.contains(c.definition.name)))
-  }
-
   def select(columnName: String): ScalaDataFrame = {
     select(List(columnName))
   }
 
-  override def select(columns: Seq[GenericColumn]): ScalaDataFrame = {
-    require(columns.nonEmpty && columns.forall(_.isInstanceOf[ScalaColumn[_]]), "The 'select' operation requires at least one column, which must be of type ScalaColumn")
-    select(columns.map(_.asInstanceOf[ScalaColumn[_]].definition.name).toList)
+  def select(selectColumnNames: List[String]): ScalaDataFrame = {
+    checkColumnsExist(this, colNames = selectColumnNames)
+    // star expand
+    val expandedCols = selectColumnNames.flatMap( _.split('.') match {
+      case Array(alias,name) if name == "*" => this.cols.filter(_.definition.dataFrameAlias.contains(alias))
+      case Array(alias,name) => this.cols.filter(c => c.definition.name == name && c.definition.dataFrameAlias.contains(alias))
+      case Array(name) if name == "*" => this.cols
+      case Array(name) => this.cols.filter(c => c.definition.name == name)
+    })
+    ScalaDataFrame(expandedCols)
   }
 
-  //TODO
-  override def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame = ???
+  override def select(selectColumns: Seq[GenericColumn]): ScalaDataFrame = {
+    assertCorrectSubFeedType(subFeedType, selectColumns)
+    // star expand
+    val expandedCols = selectColumns.map(_.asInstanceOf[ScalaAbstractColumn].toScalaColumn(this)).flatMap {
+      case c: ScalaColumn[_] if c.definition.name == "*" && c.definition.dataFrameAlias.isDefined => this.cols.filter(_.definition.dataFrameAlias.contains(c.definition.dataFrameAlias.get))
+      case c: ScalaColumn[_] if c.definition.name == "*" => this.cols
+      case c => Seq(c)
+    }
+    ScalaDataFrame(expandedCols)
+  }
 
-  override def agg(columns: Seq[GenericColumn]): ScalaDataFrame = throw new NotImplementedError("Aggregations using the agg-expression are not supported at the moment")
+  override def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    ScalaGroupedDataFrame(columns.map(_.asInstanceOf[ScalaAbstractColumn]), this)
+  }
+
+  override def agg(columns: Seq[GenericColumn]): ScalaDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    val aggCols = columns.map {
+      case c: ScalaAbstractColumn =>
+        val scalaCol = c.toScalaColumn(this)
+        assert(scalaCol.length == 1, s"Aggregate columns must have exactly one value, ${scalaCol.definition.name} has ${scalaCol.length} values. Make sure to use an aggregate function.")
+        scalaCol
+      case c => DataFrameSubFeed.throwIllegalSubFeedTypeException(c)
+    }
+    ScalaDataFrame(aggCols)
+  }
 
   override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame => {
+      assert(this.columns.groupBy(c => c).mapValues(_.size).values.forall(_ == 1), "Duplicate column names found in this dataframe, cannot perform unionByName. Make sure all column names are unique (case-insensitive) for this operation.")
+      assert(this.columns.groupBy(c => c).mapValues(_.size).values.forall(_ == 1), "Duplicate column names found in other dataframe, cannot perform unionByName. Make sure all column names are unique (case-insensitive) for this operation.")
       if (!allowMissingColumns) checkColumnsExist(otherScala, columns)
       val thisCols = this.cols.map(c => c.definition.name -> c).toMap
       val otherCols = otherScala.cols.map(c => c.definition.name -> c).toMap
       val allColNames = columns ++ otherScala.columns.diff(columns)
       val unionData = allColNames.map { colName =>
-        thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(null)))
-          .unsafeAppend(otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(null))))
+        val thisCol = thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(null)))
+        val otherCol = otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(null)))
+        assert(thisCol.definition.dataType == otherCol.definition.dataType || thisCol.definition.dataType == ScalaNullDataType || otherCol.definition.dataType == ScalaNullDataType, s"Data types for column $colName do not match between the two dataframes (${thisCol.definition.dataType.getClass.getSimpleName} != ${otherCol.definition.dataType.getClass.getSimpleName}")
+        if (thisCol.definition.dataType == ScalaNullDataType) otherCol.unsafeAppend(thisCol)
+        else thisCol.unsafeAppend(otherCol)
       }
       ScalaDataFrame(unionData)
     }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
-  override def except(other: GenericDataFrame): GenericDataFrame = other match {
+
+  def unionAll(other: GenericDataFrame): ScalaDataFrame = other match {
+    case otherScala: ScalaDataFrame =>
+      // assert schema has same dataTypes in same order, otherwise union is not possible
+      assert(columns.size == otherScala.columns.size, "The two dataframes must have the same number of columns for unionAll")
+      val newFields = schema.fields.zip(otherScala.schema.fields).map{
+        case (f1, f2) =>
+          assert(f1.dataType == f2.dataType || f1.dataType == ScalaNullDataType || f2.dataType == ScalaNullDataType, s"Data types for column ${f1.name} do not match between the two dataframes (${f1.dataType} != ${f2.dataType})")
+          if (f1.dataType == ScalaNullDataType) f2 else f1
+      }
+      ScalaDataFrame(this.rows.map(_.values) ++ otherScala.rows.map(_.values), Some(ScalaSchema(newFields)))
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+  }
+
+  override def except(other: GenericDataFrame): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame => {
-      require(schema == otherScala.schema, "The except operation can only be carried out with two dataframes with the same schema")
+      require(schema.columns == otherScala.columns, "The except operation can only be carried out with two dataframes with the same columns")
       ScalaDataFrame.fromScalaRows(rows = (rows.toSet -- otherScala.rows.toSet).toSeq, schemaIn = Some(schema))
     }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
@@ -186,12 +319,12 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   override def distinct: ScalaDataFrame = ScalaDataFrame.fromScalaRows(rows = rows.distinct, schemaIn = Some(schema))
 
   //In order for "filter" to work, the new column must be written at the last index
-  def withColumnScala[_](colName: String, expression: ScalaAbstractColumn): ScalaDataFrame = {
-    ScalaDataFrame(cols = this.cols :+ expression.as(colName).toScalaColumn(this))
+  def withColumnScala[_](colName: String, expression: ScalaColumn[_]): ScalaDataFrame = {
+    ScalaDataFrame(cols = cols :+ expression.as(colName).toScalaColumn(this))
   }
 
   override def withColumn(colName: String, expression: GenericColumn): ScalaDataFrame = expression match {
-    case exploding: ScalaExplodingColumn[Any] => exploding.changeColumnName(colName).mergeWithScalaDataFrame(this)
+    case exploding: ScalaExplodeExpr => exploding.explodeDataFrame(colName, this)
     case sc: ScalaAbstractColumn => withColumnScala(colName, sc.toScalaColumn(this))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
   }
@@ -202,10 +335,16 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
     ScalaDataFrame(newCols)
   }
 
-  override def drop(colName: String): ScalaDataFrame = ScalaDataFrame(cols.filterNot(_.definition.name == colName))
+  override def drop(colName: String): ScalaDataFrame = {
+    colName.split('.') match {
+      case Array(alias, name) => ScalaDataFrame(cols.filterNot(c => c.definition.dataFrameAlias.contains(alias) && c.definition.name == name))
+      case Array(name) => ScalaDataFrame(cols.filterNot(c => c.definition.name == name))
+    }
+  }
 
   override def drop(col: GenericColumn): ScalaDataFrame = col match {
-    case sc: ScalaColumn[_] => drop(sc.definition.name)
+    case sc: ScalaColumn[_] => drop(sc.definition.getFullName())
+    case sc: ScalaAbstractColumn => drop(sc.getName.getOrElse(throw new IllegalArgumentException(s"Cannot drop column ${sc}, because it does not have a name. Make sure to use a column reference with a name.")))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(col)
   }
 
@@ -229,8 +368,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   override def uncache: ScalaDataFrame = this
 
   override def as(alias: String): ScalaDataFrame = {
-    logger.warn("The 'as' operation is not avaiable in ScalaDataFrames and will just return the same df")
-    this
+    ScalaDataFrame(cols.map(_.withDataFrameAlias(Option(alias))))
   }
   override def showString(options: Map[String, String]): String = {
     logger.info("showString for ScalaDataframe will ignore the provided options")
@@ -248,7 +386,11 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
    * @param aggregateColumns aggregate columns to observe on the DataFrame
    * @return an Observation object which can return observed metrics after execution
    */
-  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (GenericDataFrame, DataFrameObservation) = ???
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (GenericDataFrame, DataFrameObservation) = {
+    val observation = GenericCalculatedObservation(this, aggregateColumns: _*)
+    // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
+    (this, observation)
+  }
 
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): ScalaDataFrame = {
     logger.info("The 'observe' method in ScalaDataFrames will not change the dataframe")
@@ -289,9 +431,12 @@ object ScalaDataFrame {
 
     def inferSchema: ScalaSchema = {
       val colDefs = if (rows.isEmpty) throw new IllegalStateException("Cannot infer schema without data")
-      else rows.head.zip(colNames).map { case (v, name) =>
-        val dataType = ScalaDataType.getFor(v.getClass)
-        dataType.createColumnDefinition(name)
+      else {
+        colNames.map { c =>
+          val sample = rows.find(_ != null)
+          val dataType = ScalaDataType.getFor(sample.map(_.getClass).getOrElse(classOf[Null]))
+          dataType.createColumnDefinition(c)
+        }
       }
       ScalaSchema(colDefs)
     }

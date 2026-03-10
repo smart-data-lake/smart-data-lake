@@ -172,7 +172,9 @@ object ExpressionParser {
         index += 1
         ParsedColumn(functions.col("*"))
       } else {
-        fail(s"Column references are not supported ('$identifierText')")
+        // interpret bare identifiers as column references
+        index += 1
+        ParsedColumn(functions.col(identifierText))
       }
     }
 
@@ -354,6 +356,9 @@ object ExpressionParser {
         case '/' =>
           add(TokenType.Divide, "/", index)
           index += 1
+        case '=' if index + 1 < expression.length && expression.charAt(index + 1) == '=' =>
+          add(TokenType.Equal, "==", index)
+          index += 2
         case '=' =>
           add(TokenType.Equal, "=", index)
           index += 1
@@ -411,10 +416,14 @@ object ExpressionParser {
 
         case c if c.isLetter || c == '_' =>
           val start = index
+          var seenDot = false
           while (index < expression.length && {
             val ch = expression.charAt(index)
-            ch.isLetterOrDigit || ch == '_'
+            ch.isLetterOrDigit || ch == '_' || (!seenDot && ch == '.')
           }) {
+            if (expression.charAt(index) == '.') {
+              seenDot = true
+            }
             index += 1
           }
           val text = expression.substring(start, index)

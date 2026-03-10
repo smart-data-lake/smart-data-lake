@@ -27,8 +27,9 @@ class ExpressionParserTest extends AnyFunSuite {
   private implicit val functions: DataFrameFunctions = ScalaSubFeed
 
   private def evaluate(expression: String): Any = {
+    val inputCols = Seq(ScalaColumn("dummy", IndexedSeq(42)), ScalaColumn("test.a", IndexedSeq(42)))
     val column = ExpressionParser.parse(expression).asInstanceOf[ScalaAbstractColumn]
-      .toScalaColumn(Map("dummy" -> IndexedSeq(42), "a" -> IndexedSeq(42)))
+      .toScalaColumn(ScalaDataFrame(inputCols))
     column.data.head
   }
 
@@ -62,10 +63,6 @@ class ExpressionParserTest extends AnyFunSuite {
     assert(evaluate("true != false") == true)
   }
 
-  test("reject unsupported identifiers") {
-    assertThrows[IllegalArgumentException](ExpressionParser.parse("someColumn + 1"))
-  }
-
   test("reject unbalanced parentheses") {
     assertThrows[IllegalArgumentException](ExpressionParser.parse("(1 + 2"))
   }
@@ -90,9 +87,15 @@ class ExpressionParserTest extends AnyFunSuite {
     assertThrows[IllegalArgumentException](ExpressionParser.parse("does_not_exist(1)"))
   }
 
-  test("map count(*) to count(col(*))") {
-    val ex = intercept[Throwable](ExpressionParser.parse("count(*)"))
-    val rootCause = Option(ex.getCause).getOrElse(ex)
-    assert(rootCause.isInstanceOf[NotImplementedError])
+  test("support count(*)") {
+    assert(evaluate("count(*)") == 1)
+  }
+
+  test("column reference") {
+    assert(evaluate("a = 42") == true)
+  }
+
+  test("column reference with alias") {
+    assert(evaluate("test.a = 42") == true)
   }
 }
