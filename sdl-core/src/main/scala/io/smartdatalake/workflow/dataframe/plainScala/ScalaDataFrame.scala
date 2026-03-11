@@ -42,8 +42,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   }
 
   def apply(i: Int): ScalaRow = {
-    val row = for (c <- cols) yield c.data(i)
-    ScalaRow(row.toIndexedSeq)
+    ScalaRow(cols.map(c => c.data(i)).toIndexedSeq)
   }
 
   def apply(columnName: String): ScalaColumn[_] = cols.find(_.definition.name == columnName)
@@ -58,14 +57,20 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   def dim: (Int, Int) = (nrRows, nrCols)
 
   override def toString: String = {
-    val headerStr = cols.map(col => f"${col.definition.name} (${col.definition.dataType.typeName})").mkString("  |  ");
-    val rowsStr = rows.map(_.values.mkString("    |    ")).mkString("\n");
-    headerStr + "\n" + ("---------------" * nrCols) + "\n" + rowsStr
+    s"$dim: ${cols.map(_.definition.name).mkString(" | ")}"
   }
-  def show: Unit = println(this)
 
+  def showString: String = {
+    def vToString(v: Any) = Option(v).map(_.toString).getOrElse("<null>")
+    val colSizes = cols.map(c => (c.definition.name +: c.data.map(vToString)).map(_.length).max)
+    val headerStr = cols.zip(colSizes).map{ case (c,s) => c.definition.name.padTo(s, " ").mkString}.mkString(" | ")
+    val rowsStr = rows.map(_.values.zip(colSizes).map{ case (v,s) => vToString(v).padTo(s, " ").mkString}.mkString(" | ")).mkString(System.lineSeparator())
+    val separatorLine = Seq.fill(headerStr.length)("-").mkString
+    separatorLine + System.lineSeparator() + headerStr + System.lineSeparator() + separatorLine + System.lineSeparator() + rowsStr
+  }
 
-  //trait implementation
+  def show: Unit = println(showString)
+
 
   override def schema: ScalaSchema = ScalaSchema(cols.map(_.definition))
 
@@ -78,8 +83,8 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
 
       val indicesThisJoinCol = joinColumnIndices(this)
       val indicesThatJoinCol = joinColumnIndices(otherScala)
-      val indicesThisNonJoinCol = this.cols.indices.toSet -- indicesThisJoinCol.toSet
-      val indicesThatNonJoinCol = otherScala.cols.indices.toSet -- indicesThatJoinCol.toSet
+      val indicesThisNonJoinCol = (this.cols.indices.toSet -- indicesThisJoinCol.toSet).toSeq
+      val indicesThatNonJoinCol = (otherScala.cols.indices.toSet -- indicesThatJoinCol.toSet).toSeq
       def filterRow(row: ScalaRow, indices: Iterable[Int]) = indices.map(row.values)
 
       val newSchema = ScalaSchema(indicesThisJoinCol.map(this.schema.fields) ++ indicesThisNonJoinCol.map(this.schema.fields) ++ indicesThatNonJoinCol.map(otherScala.schema.fields))
@@ -112,7 +117,10 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
         case "full" =>
           this.rows.flatMap(thisRow =>
             rightGrouped.get(filterRow(thisRow, indicesThisJoinCol)) match {
-              case Some(matchingRows) => matchingRows.map(thatRow => ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case Some(matchingRows) => matchingRows.map{
+                thatRow =>
+                  ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq)
+              }
               case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(null)).toIndexedSeq))
             }
           ) ++ otherScala.rows.flatMap(thatRow =>
@@ -303,15 +311,16 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
   }
 
   override def orderBy(columns: Seq[GenericColumn]): ScalaDataFrame = {
-    require(columns.nonEmpty && columns.forall(_.isInstanceOf[ScalaColumn[_]]), "The 'orderBy' operation requires at least one column, which must be of type ScalaColumn")
-    val sortColDef = columns.map(_.asInstanceOf[ScalaColumn[_]].definition)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    require(columns.nonEmpty, "The 'orderBy' operation requires at least one column")
+    val sortColDef = columns.map(_.asInstanceOf[ScalaAbstractColumn].toScalaColumn(this).definition)
     val combinedOrdering = sortColDef.map { c =>
       val ordering = c.dataType.ordering.asInstanceOf[Ordering[Any]]
       val idx = cols.indexWhere(_.definition.name == c.name)
       Ordering.by[ScalaRow, Any](row => row.values(idx))(ordering)
     }.reduceLeft(_ orElse _)
     val sortedRows = rows.sorted(combinedOrdering)
-    ScalaDataFrame(sortedRows)
+    ScalaDataFrame.fromScalaRows(sortedRows, Some(schema))
   }
 
   override def collect: Seq[GenericRow] = rows
@@ -371,11 +380,11 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]]) extends GenericDataFrame wi
     ScalaDataFrame(cols.map(_.withDataFrameAlias(Option(alias))))
   }
   override def showString(options: Map[String, String]): String = {
-    logger.info("showString for ScalaDataframe will ignore the provided options")
-    toString
+    if (options.nonEmpty) logger.debug("showString for ScalaDataframe will ignore the provided options")
+    showString
   }
   override def explainString(options: Map[String, String]): String = {
-    logger.info("explain for ScalaDataframe will ignore the provided options and just return the dataframe as String")
+    if (options.nonEmpty) logger.debug("explain for ScalaDataframe will ignore the provided options and just return the dataframe as String")
     toString
   }
 
@@ -432,8 +441,8 @@ object ScalaDataFrame {
     def inferSchema: ScalaSchema = {
       val colDefs = if (rows.isEmpty) throw new IllegalStateException("Cannot infer schema without data")
       else {
-        colNames.map { c =>
-          val sample = rows.find(_ != null)
+        colNames.zipWithIndex.map { case (c,idx) =>
+          val sample = rows.find(row => row(idx) != null).map(row => row(idx))
           val dataType = ScalaDataType.getFor(sample.map(_.getClass).getOrElse(classOf[Null]))
           dataType.createColumnDefinition(c)
         }

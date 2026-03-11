@@ -247,9 +247,11 @@ case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn
   lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
     left.dataType.getGreaterType(right.dataType)
   )
-  lazy val func: (Any, Any) => Any = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
+
   override def data: Seq[_] = {
     assert(left.data.size == right.data.size, s"Size of left data (${left.data.size}) must be equal to size of right data (${right.data.size})")
+    val funcDataType = left.dataType.getGreaterType(right.dataType)
+    val func: (Any, Any) => Any = funcCreator(funcDataType.asInstanceOf[ScalaDataType[Any]])
     val castLeft = if (dataType != left.dataType && fixedDataType.isEmpty) dataType.getCastFunction(left.dataType) else (x: Any) => x
     val castRight = if (dataType != right.dataType && fixedDataType.isEmpty) dataType.getCastFunction(right.dataType) else (x: Any) => x
     (left.data zip right.data).map(pair => func(castLeft(pair._1), castRight(pair._2)))

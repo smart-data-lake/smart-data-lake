@@ -145,7 +145,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
     val dataTypes = scalaColumns.map(_.dataType).distinct
     assert(dataTypes.size == 1, "All columns in array function must have the same data type, but found: " + dataTypes.mkString(", "))
-    ScalaManyExpr(scalaColumns, "array", dataType => v => v, Some(ScalaArrayDataType))
+    ScalaManyExpr(scalaColumns, "array", dataType => v => v, Some(ScalaArrayDataType(Some(dataTypes.head))))
   }
 
   def arrayType(dataType: GenericDataType): GenericDataType with GenericArrayDataType = throwNotImplementedError

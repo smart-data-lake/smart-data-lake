@@ -70,7 +70,11 @@ case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInf
     null
   }
 
-  override def treeString(level: Int): String = fields.map(f => f"${f.name} (${f.dataType})").mkString("  |  "); //only flat structure as of now
+  override def treeString(level: Int): String = {
+    fields.map(f => f" - ${f.name}: ${f.dataType.sql}${if (!f.nullable) " not null" else ""}").mkString(System.lineSeparator())
+  }
+
+  override def toString: String = fields.map(f => s"${f.name}: ${f.dataType.sql}").mkString(", ")
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
 

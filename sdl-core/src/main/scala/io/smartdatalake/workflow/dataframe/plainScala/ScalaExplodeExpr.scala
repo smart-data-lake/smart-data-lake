@@ -38,9 +38,11 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
 
   def explodeDataFrame(colName: String, df: ScalaDataFrame): ScalaDataFrame = {
     val inResolved = in.toScalaColumn(df)
-    assert(inResolved.dataType == ScalaArrayDataType, s"Input column for explode() must be of type array, but is ${in.dataType}")
+    assert(inResolved.dataType.isInstanceOf[ScalaArrayDataType], s"Input column for explode() must be of type array, but is ${in.dataType}")
     val inData = inResolved.data.asInstanceOf[Seq[Seq[_]]]
-    val dataType = fixedDataType.getOrElse{
+    val dataType = fixedDataType
+      .orElse(inResolved.dataType.asInstanceOf[ScalaArrayDataType].elementType)
+      .getOrElse{
       // infer the data type by looking at the first non-null value in the input column
       ScalaDataType.getFor(inData.flatten.find(_ != null).getOrElse(throw new RuntimeException("Cannot infer data type for explode() column, because all values are null. Use fixedDataType.")).getClass)
     }

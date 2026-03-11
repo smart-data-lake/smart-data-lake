@@ -25,6 +25,7 @@ import io.smartdatalake.util.misc.MetricsLog
 import org.json4s.{JString, JValue}
 
 import java.sql.Timestamp
+import scala.math.Ordering
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
@@ -33,7 +34,9 @@ object ScalaStringDataType extends ScalaDataType[String] {
 
   override def isImpreciseNumeric: Boolean = false
 
-  def ordering: Ordering[String] = Ordering[String]
+  def ordering: Ordering[String] = new Ordering[String] {
+    def compare(x: String, y: String): Int = if (x == null) -1 else if (y == null) 1 else  x.compareTo(y)
+  }
 
   def getCastFunction(fromDataType: ScalaDataType[_]): (Any => String) = {
     fromDataType match {
@@ -144,6 +147,21 @@ object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
 
   def ordering: Ordering[Timestamp] = Ordering[Timestamp]
 
+  override def numeric: Numeric[Timestamp] = new Numeric[Timestamp] {
+    def compare(x: Timestamp, y: Timestamp): Int = ordering.compare(x,y) // this allows for comparision in ScalaBinaryExpr
+    // Timestamp arithmetic is intentionally unsupported.
+    def plus(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp plus is not supported")
+    def minus(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp minus is not supported")
+    def times(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp times is not supported")
+    def negate(x: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp negate is not supported")
+    def fromInt(x: Int): Timestamp = throw new UnsupportedOperationException("Timestamp fromInt is not supported")
+    def parseString(str: String): Option[Timestamp] = throw new UnsupportedOperationException("Timestamp parseString is not supported")
+    def toInt(x: Timestamp): Int = throw new UnsupportedOperationException("Timestamp toInt is not supported")
+    def toLong(x: Timestamp): Long = throw new UnsupportedOperationException("Timestamp toLong is not supported")
+    def toFloat(x: Timestamp): Float = throw new UnsupportedOperationException("Timestamp toFloat is not supported")
+    def toDouble(x: Timestamp): Double = throw new UnsupportedOperationException("Timestamp toDouble is not supported")
+  }
+
   override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Timestamp) = {
     fromDataType match {
       case ScalaNullDataType => (_ => null)
@@ -167,7 +185,7 @@ object ScalaNullDataType extends ScalaDataType[Null] {
   override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = other
 }
 
-object ScalaArrayDataType extends ScalaDataType[Seq[_]] {
+case class ScalaArrayDataType(elementType: Option[ScalaDataType[_]]) extends ScalaDataType[Seq[_]] {
 
   override def typeName: String = "array"
 
@@ -233,8 +251,8 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_]
 
-  def createColumnDefinition(name: String, nullable: Boolean = false, comment: Option[String] = None): ScalaColumnDefinition[A] = {
-    ScalaColumnDefinition[A](name, None, nullable, comment)
+  def createColumnDefinition(name: String, nullable: Boolean = true, comment: Option[String] = None): ScalaColumnDefinition[A] = {
+    ScalaColumnDefinition[A](name, None, nullable, comment, Some(this))
   }
 
   def createLiteral(value: Any): ScalaLiteral[A] = {
@@ -268,7 +286,7 @@ object ScalaDataType {
       case cls if cls == classOf[Double] => ScalaDoubleDataType
       case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
       case cls if cls == classOf[Timestamp] => ScalaTimestampDataType
-      case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaArrayDataType
+      case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaArrayDataType(None)
       case _ =>
         println(cls.getName)
         throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp and Array. Could not match with class ${cls.getSimpleName}")

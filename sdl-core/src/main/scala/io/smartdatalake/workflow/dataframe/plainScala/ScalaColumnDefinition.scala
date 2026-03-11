@@ -26,12 +26,13 @@ import scala.reflect.runtime.universe._
 
 case class ScalaColumnDefinition[A: ClassTag](name: String,
                                               dataFrameAlias: Option[String] = None,
-                                              nullable: Boolean = false,
-                                              comment: Option[String] = None
+                                              nullable: Boolean = true,
+                                              comment: Option[String] = None,
+                                              dataTypeOverride: Option[ScalaDataType[A]] = None
                                              ) extends GenericField {
 
   // datatype is deduced from generic type A if not explicitly provided
-  val dataType: ScalaDataType[A] = ScalaDataType.getFor[A]
+  val dataType: ScalaDataType[A] = dataTypeOverride.getOrElse(ScalaDataType.getFor[A])
 
   def makeNullable: ScalaColumnDefinition[A] = copy(nullable = true)
 

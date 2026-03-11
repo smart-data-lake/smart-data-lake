@@ -30,24 +30,23 @@ object GenericTestTool {
                               (implicit logger: Logger): Unit = {
     val functions = DataFrameSubFeed.getFunctions(actual.subFeedType)
     def printDf(df: GenericDataFrame): String = {
-      df.schema.treeString() +
+      df.schema.treeString() + System.lineSeparator() +
         df.orderBy(df.columns.map(functions.col)).showString(Map("truncate" -> "0"))
     }
 
-    logger.error(
+    logger.error(System.lineSeparator() +
       s"""
-         |!!!! Test $testName Failed !!!")
-         |   Arguments:
-         |${arguments.map(printDf).mkString(System.lineSeparator())}
-         |   Actual:
-         |${printDf(actual)}
-         |   Expected;
-         |${printDf(expected)}
-         |   Do schemata equal? ${actual.schema.equalsSchema(expected.schema)}")
-         |   Do cardinalities equal? ${actual.count == expected.count}")
-         |   symmetric Difference:
-         |${actual.symmetricDifference(expected).showString(Map("truncate" -> "0"))}
-      """.stripMargin
+      |!!!! Test $testName Failed !!!"
+      |${if (arguments.nonEmpty) "Arguments:"+System.lineSeparator()+arguments.map(printDf).mkString(System.lineSeparator()) else "" }
+      |Actual:
+      |${printDf(actual)}
+      |Expected:
+      |${printDf(expected)}
+      |Do schemata equal? ${actual.schema.equalsSchema(expected.schema)}
+      |Do cardinalities equal? ${actual.count == expected.count}
+      |Symmetric difference:
+      |${actual.symmetricDifference(expected).showString(Map("truncate" -> "0"))}
+      |""".stripMargin.linesIterator.filter(_.nonEmpty).mkString(System.lineSeparator())
     )
   }
 

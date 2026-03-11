@@ -21,6 +21,9 @@ package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 
+import java.sql.Timestamp
+import java.time.LocalDate
+
 object ExpressionParser {
 
   def parse(expression: String)(implicit functions: DataFrameFunctions): GenericColumn = {
@@ -51,6 +54,9 @@ object ExpressionParser {
     case object LeftParen extends TokenType
     case object RightParen extends TokenType
     case object Comma extends TokenType
+    case object Between extends TokenType
+    case object And extends TokenType
+    case object Or extends TokenType
     case object End extends TokenType
   }
 
@@ -70,13 +76,13 @@ object ExpressionParser {
 
   /**
    * Recursive-descent parser with explicit precedence levels:
-   * comparison < additive < multiplicative < unary < primary.
+   * or < and < comparison < additive < multiplicative < unary < primary.
    */
   private class Parser(tokens: Vector[Token], functions: DataFrameFunctions) {
     private var index: Int = 0
 
     /** Parse the full expression starting at the lowest precedence level. */
-    def parseExpression(): GenericColumn = parseComparison().toColumn(functions)
+    def parseExpression(): GenericColumn = parseOr().toColumn(functions)
 
     /**
      * Consume one token of the expected type or fail with a position-aware error.
@@ -88,14 +94,48 @@ object ExpressionParser {
       index += 1
     }
 
-    private def parseComparison(): ParsedValue = {
-      var left = parseAdditive()
-      while (current.tokenType == TokenType.Equal || current.tokenType == TokenType.NotEqual
-        || current.tokenType == TokenType.LessThan || current.tokenType == TokenType.GreaterThan) {
+    private def parseOr(): ParsedValue = {
+      var left = parseAnd()
+      while (current.tokenType == TokenType.Or) {
         val operator = current
         index += 1
-        val right = parseAdditive()
+        val right = parseAnd()
         left = buildBinary(left, operator, right)
+      }
+      left
+    }
+
+    private def parseAnd(): ParsedValue = {
+      var left = parseComparison()
+      while (current.tokenType == TokenType.And) {
+        val operator = current
+        index += 1
+        val right = parseComparison()
+        left = buildBinary(left, operator, right)
+      }
+      left
+    }
+
+    private def parseComparison(): ParsedValue = {
+      var left = parseAdditive()
+      var continue = true
+      while (continue) {
+        current.tokenType match {
+          case TokenType.Equal | TokenType.NotEqual | TokenType.LessThan | TokenType.GreaterThan =>
+            val operator = current
+            index += 1
+            val right = parseAdditive()
+            left = buildBinary(left, operator, right)
+          case TokenType.Between =>
+            index += 1
+            val lower = parseAdditive()
+            expect(TokenType.And, "AND")
+            val upper = parseAdditive()
+            val valueCol = left.toColumn(functions)
+            left = ParsedColumn(valueCol >= lower.toColumn(functions) and valueCol <= upper.toColumn(functions))
+          case _ =>
+            continue = false
+        }
       }
       left
     }
@@ -155,7 +195,7 @@ object ExpressionParser {
           ParsedColumn(functions.col("*"))
         case TokenType.LeftParen =>
           index += 1
-          val nestedExpr = parseComparison()
+          val nestedExpr = parseOr()
           expect(TokenType.RightParen, ")")
           nestedExpr
         case _ =>
@@ -168,6 +208,11 @@ object ExpressionParser {
       val identifierText = identifierToken.text
       if (index + 1 < tokens.length && tokens(index + 1).tokenType == TokenType.LeftParen) {
         parseIdentifier()
+      } else if ((identifierText.equalsIgnoreCase("timestamp") || identifierText.equalsIgnoreCase("date"))
+        && index + 1 < tokens.length && tokens(index + 1).tokenType == TokenType.StringLiteral) {
+        val literalToken = tokens(index + 1)
+        index += 2
+        parseTypedLiteral(identifierToken, literalToken)
       } else if (identifierText == "*") {
         index += 1
         ParsedColumn(functions.col("*"))
@@ -176,6 +221,22 @@ object ExpressionParser {
         index += 1
         ParsedColumn(functions.col(identifierText))
       }
+    }
+
+    private def parseTypedLiteral(typeToken: Token, literalToken: Token): ParsedValue = {
+      if (typeToken.text.equalsIgnoreCase("timestamp")) {
+        try {
+          ParsedLiteral(Timestamp.valueOf(literalToken.text))
+        } catch {
+          case _: IllegalArgumentException => throw ExpressionParserException(s"Invalid timestamp literal '${literalToken.text}'", typeToken.position)
+        }
+      } else if (typeToken.text.equalsIgnoreCase("date")) {
+        try {
+          ParsedLiteral(Timestamp.valueOf(LocalDate.parse(literalToken.text).atStartOfDay()))
+        } catch {
+          case _: Exception => throw ExpressionParserException(s"Invalid date literal '${literalToken.text}'", typeToken.position)
+        }
+      } else throw ExpressionParserException(s"Unknown literal type '${typeToken.text}'", typeToken.position)
     }
 
     private def parseIdentifier(): ParsedValue = {
@@ -188,10 +249,10 @@ object ExpressionParser {
       index += 1 // consume '('
       val arguments = collection.mutable.ArrayBuffer.empty[ParsedValue]
       if (current.tokenType != TokenType.RightParen) {
-        arguments += parseComparison()
+        arguments += parseOr()
         while (current.tokenType == TokenType.Comma) {
           index += 1
-          arguments += parseComparison()
+          arguments += parseOr()
         }
       }
       expect(TokenType.RightParen, ")")
@@ -311,6 +372,8 @@ object ExpressionParser {
         case TokenType.NotEqual => leftCol =!= rightCol
         case TokenType.LessThan => leftCol < rightCol
         case TokenType.GreaterThan => leftCol > rightCol
+        case TokenType.And => leftCol.and(rightCol)
+        case TokenType.Or => leftCol.or(rightCol)
         case _ => fail(s"Unsupported operator '${operator.text}'")
       }
       ParsedColumn(result)
@@ -429,6 +492,12 @@ object ExpressionParser {
           val text = expression.substring(start, index)
           if (text.equalsIgnoreCase("true") || text.equalsIgnoreCase("false")) {
             add(TokenType.BooleanLiteral, text.toLowerCase, start)
+          } else if (text.equalsIgnoreCase("between")) {
+            add(TokenType.Between, text, start)
+          } else if (text.equalsIgnoreCase("and")) {
+            add(TokenType.And, text, start)
+          } else if (text.equalsIgnoreCase("or")) {
+            add(TokenType.Or, text, start)
           } else {
             add(TokenType.Identifier, text, start)
           }
