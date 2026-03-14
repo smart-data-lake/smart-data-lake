@@ -248,7 +248,7 @@ trait HistorizeActionBehaviour {
 
       // prepare & start 1st load without merge mode
       val refTimestamp1 = LocalDateTime.now()
-      val action1 = HistorizeAction("ha", inputId = srcDO.id, outputId = tgtDO.id)
+      val action1 = HistorizeAction("ha1", inputId = srcDO.id, outputId = tgtDO.id)
       val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
 
       val l1 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
@@ -264,7 +264,7 @@ trait HistorizeActionBehaviour {
 
       // prepare & start 2st load
       val refTimestamp2 = LocalDateTime.now()
-      val action2 = HistorizeAction("ha", inputId = srcDO.id, outputId = tgtDO.id, mergeModeEnable = true)
+      val action2 = HistorizeAction("ha2", inputId = srcDO.id, outputId = tgtDO.id, mergeModeEnable = true)
       val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
 
       val l2 = Seq((1, "doe", "john", 4)).toDF("id", "lastname", "firstname", "rating")
@@ -295,7 +295,7 @@ trait HistorizeActionBehaviour {
 
       // prepare & start 1st load with merge mode
       val refTimestamp1 = LocalDateTime.now()
-      val action1 = HistorizeAction("ha", inputId = srcDO.id, outputId = tgtDO.id)
+      val action1 = HistorizeAction("ha1", inputId = srcDO.id, outputId = tgtDO.id)
       val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
 
       val l1 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
@@ -308,7 +308,7 @@ trait HistorizeActionBehaviour {
 
       // prepare & start 2st load
       val refTimestamp2 = LocalDateTime.now()
-      val action2 = HistorizeAction("ha", inputId = srcDO.id, outputId = tgtDO.id, mergeModeEnable = true)
+      val action2 = HistorizeAction("ha2", inputId = srcDO.id, outputId = tgtDO.id, mergeModeEnable = true)
       val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
 
       val l2 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")

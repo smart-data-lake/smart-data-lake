@@ -74,7 +74,7 @@ case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInf
     fields.map(f => f" - ${f.name}: ${f.dataType.sql}${if (!f.nullable) " not null" else ""}").mkString(System.lineSeparator())
   }
 
-  override def toString: String = fields.map(f => s"${f.name}: ${f.dataType.sql}").mkString(", ")
+  override def toString: String = "ScalaSchema: " + fields.map(f => s"${f.name}: ${f.dataType.sql}").mkString(", ")
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
 

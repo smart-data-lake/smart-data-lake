@@ -212,7 +212,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     val insertSelectCols = targetColumns
       .map(c => saveModeOptions.insertValuesOverride.get(c).map(expr).getOrElse(if (insertCols.contains(c)) col(s"new.$c").as(c) else lit(null)).as(c))
     val dfInsert = dfNewNotMatched.where(saveModeExpr.insertConditionExpr.getOrElse(lit(true))).select(insertSelectCols)
-    dfMerged = dfMerged
+    val dfMerged2 = dfMerged
       .unionByName(dfInsert)
       .unionByName(dfExistingNotMatched, allowMissingColumns = true)
     logger.info(s"($id) created merged DataFrame with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
@@ -227,7 +227,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
       // TODO
       //"records_deleted" -> (if (saveModeOptions.deleteConditionExpr.isDefined) dfMatched.where(saveModeOptions.deleteConditionExpr.get).count else 0L)
     )
-    (dfMerged.asInstanceOf[ScalaDataFrame], metrics)
+    (dfMerged2.asInstanceOf[ScalaDataFrame], metrics)
   }
 
   def register(implicit instanceRegistry: InstanceRegistry): MockScalaDataObject = {

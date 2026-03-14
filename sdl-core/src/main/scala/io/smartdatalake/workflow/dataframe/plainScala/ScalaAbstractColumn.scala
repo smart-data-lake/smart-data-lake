@@ -39,6 +39,8 @@ abstract class ScalaAbstractColumn extends GenericColumn {
 
   def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = ()
 
+  def markForDataReset(): Unit = ()
+
   def visit[X](func: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = func(this)
 
   override def subFeedType: universe.Type = typeOf[ScalaSubFeed]

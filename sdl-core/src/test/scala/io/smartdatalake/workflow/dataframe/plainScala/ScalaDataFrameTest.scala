@@ -31,18 +31,18 @@ class ScalaDataFrameTest extends AnyFunSuite {
   //implementation was overriden, thus test needed
   // symmetric difference part of isEqual operator (part of further tests)
   test("test symmetric difference") {
-    val df = ScalaDataFrame.apply(Seq(Seq(1,2,3,"a","b","c",true), Seq(4,5,6,"gf","dgd","gsg",false)))
-    val df2 = ScalaDataFrame(Seq(Seq(1,2,3,"a","b","c",false), Seq(4,5,6,"gf","dgd","gsg",true))) //last value switch
+    val df = ScalaDataFrame.fromData(Seq(Seq(1,2,3,"a","b","c",true), Seq(4,5,6,"gf","dgd","gsg",false)))
+    val df2 = ScalaDataFrame.fromData(Seq(Seq(1,2,3,"a","b","c",false), Seq(4,5,6,"gf","dgd","gsg",true))) //last value switch
     assert(df.symmetricDifference(df).isEmpty && !df.symmetricDifference(df2).isEmpty)
   }
 
   test("create from Seq and rename columns") {
-    val df = ScalaDataFrame.apply(Seq(Seq(1, "A"), Seq(2, "B")))
+    val df = ScalaDataFrame.fromData(Seq(Seq(1, "A"), Seq(2, "B")))
       .withColumnRenamed("col0", "a")
       .withColumnRenamed("col1", "b")
     val df1 = df
       .withColumn("c", df("a") * df("a"))
-    val df2 = ScalaDataFrame.apply(Seq(Seq(1, "A", 1), Seq(2, "B", 4)), Seq("a", "b", "c"))
+    val df2 = ScalaDataFrame.fromData(Seq(Seq(1, "A", 1), Seq(2, "B", 4)), Seq("a", "b", "c"))
     assert(df1.isEqual(df2))
   }
 
@@ -143,6 +143,15 @@ class ScalaDataFrameTest extends AnyFunSuite {
     assert(df.collect.map(_.toSeq) == expected)
   }
 
+  test("replace column") {
+    import ScalaSubFeed._
+    val data = Seq(Seq(1, "A"), Seq(2, "B"))
+    val expected = Seq(Seq(1, "C"), Seq(2, "C"))
+    val df = data.toDF("a", "b")
+      .withColumn("b", lit("C"))
+    assert(df.collect.map(_.toSeq) == expected)
+  }
+
   test("select column with DataFrame alias") {
     import ScalaSubFeed._
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
@@ -184,13 +193,13 @@ class ScalaDataFrameTest extends AnyFunSuite {
   }
 
   test("select works correctly") {
-    val df = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
-    assert(df.select("col2").isEqual(ScalaDataFrame(Seq(Seq("a"), Seq("b")), Seq("col2"))))
+    val df = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    assert(df.select("col2").isEqual(ScalaDataFrame.fromData(Seq(Seq("a"), Seq("b")), Seq("col2"))))
     assertThrows[IllegalArgumentException](df.select("col_non_existent"))
   }
 
   test("select star expand correctly") {
-    val df = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val df = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
     val df1 = df.select("*")
     assert(df1.isEqual(df))
     val df2 = df.as("df2").select("*")
@@ -205,45 +214,44 @@ class ScalaDataFrameTest extends AnyFunSuite {
         case _ => throw new IllegalArgumentException
       }
     }
-    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
-    val df2 = ScalaDataFrame(Seq(Seq("c", 3), Seq("d", 4)), Seq("col2", "col1"))
-    val df3 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col3", "col4"))
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val df2 = ScalaDataFrame.fromData(Seq(Seq("c", 3), Seq("d", 4)), Seq("col2", "col1"))
+    val df3 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col3", "col4"))
     val df_union = df1.unionByName(df2)
     assert(df_union.cols.map(_.data.reduce(combine)) == Seq(10, "abcd"))
-    assertThrows[IllegalArgumentException](df1.unionByName(df3))
+    assertThrows[AssertionError](df1.unionByName(df3))
   }
 
   test ("except works as planned") {
-    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(4, "c")), Seq("col1", "col2"))
-    val df2 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
-    val df3 = ScalaDataFrame(Seq(Seq(3, "a"), Seq(4, "c")), Seq("col1", "col2"))
-    val df_err = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col_error", "col2"))
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(4, "c")), Seq("col1", "col2"))
+    val df2 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val df3 = ScalaDataFrame.fromData(Seq(Seq(3, "a"), Seq(4, "c")), Seq("col1", "col2"))
+    val df_err = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col_error", "col2"))
     assert(df1.except(df2).isEqual(df3))
     assertThrows[IllegalArgumentException](df1.except(df_err))
   }
 
   test ("distinct works as expected") {
-    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")))
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")))
     assert(df1.distinct.dim == (3,2)) //3 rows 2 cols
   }
 
-  test("ScalaSequenceDataType stores Sequences in its cell values") {
-    val df = ScalaDataFrame(Seq(Seq(Seq(1,2,3,4)), Seq(Seq(5,6,7)), Seq(Seq(8,9,10))))
-    val hasCorrectType = df.schema("col0").dataType == ScalaArrayDataType
+  test("ScalaArrayDataType stores Sequences in its cell values") {
+    val df = ScalaDataFrame.fromData(Seq(Seq(Seq(1,2,3,4)), Seq(Seq(5,6,7)), Seq(Seq(8,9,10))))
+    val hasCorrectType = df.schema("col0").dataType == ScalaArrayDataType(None)
     val storesCorrectData = Seq(0,1,2).forall(ix => df(ix)(0).isInstanceOf[Seq[Int]])
     assert(hasCorrectType && storesCorrectData)
   }
 
-
   test("Exploding a column with simple data types") {
-    val df = ScalaDataFrame(Seq(Seq("row1", Seq(1,2,3)), Seq("row2", Seq(4,5,6))))
+    val df = ScalaDataFrame.fromData(Seq(Seq("row1", Seq(1,2,3)), Seq("row2", Seq(4,5,6))))
     val exploded_df = df.withColumn("values", explode(df("col1")))
     val expected_pairs = Seq(("row1", 1), ("row1", 2), ("row1", 3),("row2", 4), ("row2", 5), ("row2", 6))
     assert(exploded_df.drop("col1").rows.map(row => (row.values(0), row.values(1))) == expected_pairs)
   }
 
   test("Aggregate DataFrame") {
-    val df1 = ScalaDataFrame(Seq(Seq(1, "a", "test", 4), Seq(1, "a", "test1", 5), Seq(2, "b", "test1", 6), Seq(3, "b", "test2", 7)), Seq("k1", "k2", "str", "num"))
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a", "test", 4), Seq(1, "a", "test1", 5), Seq(2, "b", "test1", 6), Seq(3, "b", "test2", 7)), Seq("k1", "k2", "str", "num"))
     val dfAgg = df1
       .agg(Seq(count(col("str")), max(col("num"))))
     val expected = Seq(Seq(4, 7))
@@ -251,7 +259,7 @@ class ScalaDataFrameTest extends AnyFunSuite {
   }
 
   test("GroupBy aggregate DataFrame") {
-    val df1 = ScalaDataFrame(Seq(Seq(1, "a", "test", 4), Seq(1, "a", "test1", 5), Seq(2, "b", "test1", 6), Seq(3, "b", "test2", 7)), Seq("k1", "k2", "str", "num"))
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a", "test", 4), Seq(1, "a", "test1", 5), Seq(2, "b", "test1", 6), Seq(3, "b", "test2", 7)), Seq("k1", "k2", "str", "num"))
     val dfAgg = df1
       .groupBy(Seq(col("k1"), col("k2")))
       .agg(Seq(count(col("str")).as("cnt"), max(col("num")).as("max_num")))
@@ -260,10 +268,25 @@ class ScalaDataFrameTest extends AnyFunSuite {
   }
 
   test("Compare computed column against literal") {
-    val df1 = ScalaDataFrame(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
     val computedCol = (df1.cols.head === lit(2)).toScalaColumn(df1)
     val expected = Seq(false, true, false, false, false, true)
     assert(computedCol.data == expected)
+  }
+
+  test("Condition on empty DataFrame should not fail") {
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b"), Seq(3, "a"), Seq(1, "a"), Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+    val dfEmpty = df1.where(lit(false))
+    val dfTest = dfEmpty.where(lit(2) === col("col1"))
+    assert(dfTest.isEmpty)
+  }
+
+  test("Join DataFrame with resolved columns should not fail") {
+    val df1 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col1", "col2"))
+      .as("df1")
+    val dfEmpty = df1.where(lit(false))
+      .as("dfEmpty")
+    val dfTest = df1.join(dfEmpty, df1("col1") === dfEmpty("col1"), "inner")
   }
 
   // TODO: check null values handling

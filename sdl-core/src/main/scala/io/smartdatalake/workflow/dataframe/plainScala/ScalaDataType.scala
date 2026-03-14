@@ -34,9 +34,9 @@ object ScalaStringDataType extends ScalaDataType[String] {
 
   override def isImpreciseNumeric: Boolean = false
 
-  def ordering: Ordering[String] = new Ordering[String] {
+  def ordering: Ordering[Option[String]] = Ordering.Option(new Ordering[String] {
     def compare(x: String, y: String): Int = if (x == null) -1 else if (y == null) 1 else  x.compareTo(y)
-  }
+  })
 
   def getCastFunction(fromDataType: ScalaDataType[_]): (Any => String) = {
     fromDataType match {
@@ -66,7 +66,7 @@ object ScalaDoubleDataType extends ScalaDataType[Double] {
 
   override def numericDiv: ((Double, Double) => Double) = fractional.div
 
-  def ordering: Ordering[Double] = Ordering[Double]
+  def ordering: Ordering[Option[Double]] = Ordering.Option(Ordering[Double])
 
   override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Double) = {
     fromDataType match {
@@ -96,7 +96,7 @@ object ScalaIntDataType extends ScalaDataType[Int] {
 
   override def numericDiv: ((Int, Int) => Int) = integral.quot
 
-  def ordering: Ordering[Int] = Ordering[Int]
+  def ordering: Ordering[Option[Int]] = Ordering.Option(Ordering[Int])
 
   override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Int) = {
     fromDataType match {
@@ -120,7 +120,7 @@ object ScalaBooleanDataType extends ScalaDataType[Boolean] {
 
   override def isImpreciseNumeric: Boolean = false
 
-  def ordering: Ordering[Boolean] = Ordering[Boolean]
+  def ordering: Ordering[Option[Boolean]] = Ordering.Option(Ordering[Boolean])
 
   override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Boolean) = {
     fromDataType match {
@@ -145,10 +145,10 @@ object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
 
   override def isImpreciseNumeric: Boolean = false
 
-  def ordering: Ordering[Timestamp] = Ordering[Timestamp]
+  def ordering: Ordering[Option[Timestamp]] = Ordering.Option(Ordering[Timestamp])
 
   override def numeric: Numeric[Timestamp] = new Numeric[Timestamp] {
-    def compare(x: Timestamp, y: Timestamp): Int = ordering.compare(x,y) // this allows for comparision in ScalaBinaryExpr
+    def compare(x: Timestamp, y: Timestamp): Int = ordering.compare(Option(x),Option(y)) // this allows for comparision in ScalaBinaryExpr
     // Timestamp arithmetic is intentionally unsupported.
     def plus(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp plus is not supported")
     def minus(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp minus is not supported")
@@ -176,7 +176,7 @@ object ScalaNullDataType extends ScalaDataType[Null] {
 
   override def isImpreciseNumeric: Boolean = false
 
-  def ordering: Ordering[Null] = Ordering[Null]
+  def ordering: Ordering[Option[Null]] = Ordering.Option(Ordering[Null])
 
   override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Null) = {
     throw new UnsupportedOperationException("A ScalaTimestampDataType cannot be cast from other types supported in ScalaDataFrame")
@@ -194,7 +194,7 @@ case class ScalaArrayDataType(elementType: Option[ScalaDataType[_]]) extends Sca
     def compare(x: Seq[_], y: Seq[_]): Int = if (x.head == y.head) 0 else 1
   }
 
-  def ordering: Ordering[Seq[_]] = SeqOrdering
+  def ordering: Ordering[Option[Seq[_]]] = Ordering.Option(SeqOrdering)
 
   def getCastFunction(fromDataType: ScalaDataType[_]): Any => Seq[_] = {
     fromDataType match {
@@ -220,7 +220,7 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   def isSortable: Boolean = true
 
-  def ordering: Ordering[A]
+  def ordering: Ordering[Option[A]]
 
   def numeric: Numeric[A] = throw new IllegalStateException("'numeric' not implemented for this DataType")
 

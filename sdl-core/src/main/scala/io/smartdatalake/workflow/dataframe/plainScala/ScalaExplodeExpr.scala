@@ -50,7 +50,7 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
     val explodedRows = df.rows.zip(inData).flatMap {
       case (row, seq) => seq.map(x => (row.values :+ x))
     }
-    ScalaDataFrame(explodedRows, Some(ScalaSchema(df.cols.map(_.definition) :+ dataType.createColumnDefinition(colName))))
+    ScalaDataFrame.fromData(explodedRows, Some(ScalaSchema(df.cols.map(_.definition) :+ dataType.createColumnDefinition(colName))))
   }
 
 }

@@ -31,7 +31,7 @@ import scala.reflect.ClassTag
  * @param data       the actual data of the column
  * @tparam A the Scala type of the column
  */
-case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: IndexedSeq[A]) extends ScalaAbstractColumn with SmartDataLakeLogger {
+case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var data: IndexedSeq[A]) extends ScalaAbstractColumn with SmartDataLakeLogger {
 
   override def dataType: ScalaDataType[A] = definition.dataType
 
@@ -44,13 +44,29 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: 
   // Support methods for DataFrame operations
   def append(other: ScalaColumn[A]): ScalaColumn[A] = copy(data = data ++ other.data)
 
-  def unsafeAppend(other: ScalaColumn[_]): ScalaColumn[A] = append(other.asInstanceOf[ScalaColumn[A]])
-
   def limit(n: Int): ScalaColumn[A] = copy(data = data.take(n))
 
   def length: Int = data.length
 
   def withDataFrameAlias(alias: Option[String]): ScalaColumn[A] = copy(definition = definition.withDataFrameAlias(alias))
+
+  override def markForDataReset(): Unit = needsDataReset = true
+  private var needsDataReset: Boolean = false
+
+  override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
+    // reset input data if we get new data for this column - this might be needed in joins where we have to update the input data for the resolved columns after left/right data have been combined.
+    // note that data delivery is triggered through markForDataReset() and inputColumns method.
+    // if we get no data, we dont need to update.
+    inputData.get(definition.getFullName())
+      .foreach(col => data = col.data.asInstanceOf[IndexedSeq[A]])
+  }
+
+  override def inputColumns: Set[String] = {
+    if (needsDataReset) {
+      needsDataReset = false
+      Set(definition.getFullName())
+    } else Set()
+  }
 
 }
 

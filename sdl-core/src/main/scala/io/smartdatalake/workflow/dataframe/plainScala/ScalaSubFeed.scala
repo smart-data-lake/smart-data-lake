@@ -32,6 +32,13 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.{Type, typeOf}
 import scala.reflect.runtime.universe.TypeTag
 
+/**
+ * A pure Scala implementation of DataFrames and related classes for testing purposes without Spark dependencies.
+ * There are many limitations -> dont use for production!
+ * - column names are normally handled case sensitive. It is not configurable.
+ * - Null values support in DataFrame data is not fully tests
+ * - Performance might be limited for large DataFrames, as algorithms are not optimized
+ */
 case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues] = Seq(),
@@ -100,7 +107,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
     if (fields.isEmpty) throw new IllegalArgumentException("Please provide at least one field to create a schema")
     fields.head match {
-      case scalaField: ScalaColumnDefinition[_] => ScalaSchema(fields.map(_.asInstanceOf[ScalaColumnDefinition[_]]).toList)
+      case _: ScalaColumnDefinition[_] => ScalaSchema(fields.map(_.asInstanceOf[ScalaColumnDefinition[_]]).toList)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(fields.head)
     }
   }
@@ -134,7 +141,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
    */
 
 
-  private def throwNotImplementedError = throw new NotImplementedError("This Spark-like Dataframe function is not implemented for the plainScala version")
+  private def throwNotImplementedError: Nothing = throw new NotImplementedError("This Spark-like Dataframe function is not implemented for the plainScala version")
 
   def approxCountDistinct(column: GenericColumn, rsd: Option[Double]): ScalaAbstractColumn = throwNotImplementedError
 
@@ -145,7 +152,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
     val dataTypes = scalaColumns.map(_.dataType).distinct
     assert(dataTypes.size == 1, "All columns in array function must have the same data type, but found: " + dataTypes.mkString(", "))
-    ScalaManyExpr(scalaColumns, "array", dataType => v => v, Some(ScalaArrayDataType(Some(dataTypes.head))))
+    ScalaManyExpr(scalaColumns, "array", _ => v => v, Some(ScalaArrayDataType(Some(dataTypes.head))))
   }
 
   def arrayType(dataType: GenericDataType): GenericDataType with GenericArrayDataType = throwNotImplementedError
@@ -193,12 +200,13 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   override def colsComparisionExpr(cols: Seq[GenericColumn], useHash: Boolean): ScalaAbstractColumn = {
     assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colsComparisionExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+    val colNamesStr = cols.map(_.getName.get).mkString(",")
     val scalaCols = cols.map {
       case c: ScalaAbstractColumn => c
       case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }.sortBy(_.getName.get)
-    if (useHash) ScalaManyExpr(scalaCols, "hash_comparison", dataType => data => data.hashCode(), Some(ScalaIntDataType))
-    else ScalaManyExpr(scalaCols, "concat_comparison", dataType => data => data.map(d => Option(d).map(_.toString).getOrElse("<null>")).mkString(","), Some(ScalaIntDataType))
+    if (useHash) ScalaManyExpr(scalaCols, "hash_comparison", dataType => data => (colNamesStr, data).hashCode(), Some(ScalaIntDataType))
+    else ScalaManyExpr(scalaCols, "concat_comparison", dataType => data => (colNamesStr, data.map(d => Option(d).map(_.toString).getOrElse("<null>")).mkString(",")).hashCode, Some(ScalaIntDataType))
   }
 
   def lit(value: Any): ScalaAbstractColumn = ScalaDataType.getFor(Option(value).map(_.getClass).getOrElse(classOf[Null])).createLiteral(value)
@@ -206,12 +214,12 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   def mapType(keyType: GenericDataType, valueType: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 
   def max(column: GenericColumn): ScalaAbstractColumn = column match {
-    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "max", d => d.maxOption(c.dataType.ordering.asInstanceOf[Ordering[Any]]).orNull, ScalaIntDataType)
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "max", d => d.map(Option(_)).maxOption(c.dataType.ordering.asInstanceOf[Ordering[Option[Any]]]).flatten.orNull, ScalaIntDataType)
     case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
   def min(column: GenericColumn): ScalaAbstractColumn = column match {
-    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "min", d => d.minOption(c.dataType.ordering.asInstanceOf[Ordering[Any]]).orNull, ScalaIntDataType)
+    case c: ScalaAbstractColumn => ScalaAggregateExpr(c, "min", d => d.map(Option(_)).minOption(c.dataType.ordering.asInstanceOf[Ordering[Option[Any]]]).flatten.orNull, ScalaIntDataType)
     case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
@@ -222,7 +230,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def abs(column: GenericColumn): ScalaAbstractColumn = {
     column match {
-      case c: ScalaAbstractColumn if c.dataType.isNumeric => ScalaUnaryExpr(c, "abs", v => if (v == null) null else c.dataType.numeric.abs(v.asInstanceOf[Nothing]), Some(ScalaBooleanDataType))
+      case c: ScalaAbstractColumn if c.dataType.isNumeric => ScalaUnaryExpr(c, "abs", v => Option(v).map(v => c.dataType.numeric.abs(v.asInstanceOf[Nothing])), Some(ScalaBooleanDataType))
       case c: ScalaAbstractColumn => throw new IllegalStateException(s"Invalid data type for 'not' function: ${c.dataType.getClass.getSimpleName}. Only Boolean data type is supported.")
       case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
@@ -235,7 +243,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
     scalaColumns.reduce { (left, right) =>
       ScalaBinaryExpr(left, right, "least", dataType => {
-        (a, b) => if (dataType.ordering.lteq(a, b)) a else b
+        (a, b) => if (dataType.ordering.lteq(Option(a), Option(b))) a else b
       })
     }
   }
@@ -247,7 +255,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
     scalaColumns.reduce { (left, right) =>
       ScalaBinaryExpr(left, right, "greatest", dataType => {
-        (a, b) => if (dataType.ordering.gteq(a, b)) a else b
+        (a, b) => if (dataType.ordering.gteq(Option(a), Option(b))) a else b
       })
     }
   }
@@ -272,7 +280,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def size(column: GenericColumn): ScalaAbstractColumn = {
     column match {
-      case c: ScalaAbstractColumn if c.dataType == ScalaArrayDataType => ScalaUnaryExpr(c, "size", v => if (v == null) 0 else v.asInstanceOf[Seq[_]].size, Some(ScalaIntDataType))
+      case c: ScalaAbstractColumn if c.dataType.isInstanceOf[ScalaArrayDataType] => ScalaUnaryExpr(c, "size", v => if (v == null) 0 else v.asInstanceOf[Seq[_]].size, Some(ScalaIntDataType))
       case c: ScalaAbstractColumn if c.dataType == ScalaStringDataType => ScalaUnaryExpr(c, "size", v => if (v == null) 0 else v.asInstanceOf[String].length, Some(ScalaIntDataType))
       case c: ScalaAbstractColumn => throw new IllegalStateException(s"Invalid data type for 'size' function: ${c.dataType.getClass.getSimpleName}. Only String or Seq data type is supported.")
       case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
@@ -317,11 +325,11 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    ScalaDataFrame(rows)
+    ScalaDataFrame.fromData(rows)
   }
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    ScalaDataFrame(rows.map(_.productIterator.toSeq), colNames)
+    ScalaDataFrame.fromData(rows.map(_.productIterator.toSeq), colNames)
   }
 }
 

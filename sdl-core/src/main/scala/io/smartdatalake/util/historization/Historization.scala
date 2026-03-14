@@ -97,27 +97,27 @@ object Historization extends SmartDataLakeLogger {
       .join(dfLastHistHashed.as("lastHist"), joinCols(dfNewHashed, dfLastHistHashed, primaryKeyColumns), "full")
 
     val newRows = joined.where(col(expiryDateCol).isNull)
-      .select(dfNew("*"))
+      .select(col("newFeed.*"))
       .withColumn(lastUpdateCol, timestampNew)
       .withColumn(expiryDateCol, doomsday)
 
     val notInFeedAnymore = joined.where(nullTableCols("newFeed", primaryKeyColumns))
-      .select(dfLastHist("*"))
+      .select(col("lastHist.*"))
       .withColumn(expiryDateCol, timestampOld)
 
     val noUpdates = joined
       .where(hashColEqualsExpr)
-      .select(dfLastHist("*"))
+      .select(col("lastHist.*"))
 
     val updated = joined
       .where(nonNullTableCols("newFeed", primaryKeyColumns))
       .where(not(hashColEqualsExpr))
 
-    val updatedNew = updated.select(dfNew("*"))
+    val updatedNew = updated.select(col("newFeed.*"))
       .withColumn(lastUpdateCol, timestampNew)
       .withColumn(expiryDateCol, doomsday)
 
-    val updatedOld = updated.select(dfLastHist("*"))
+    val updatedOld = updated.select(col("lastHist.*"))
       .withColumn(expiryDateCol, timestampOld)
 
     // column order is used here!
