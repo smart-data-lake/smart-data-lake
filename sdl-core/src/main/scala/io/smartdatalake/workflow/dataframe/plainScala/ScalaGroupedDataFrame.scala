@@ -24,6 +24,10 @@ import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, G
 
 import scala.reflect.runtime.universe
 
+/**
+ * A grouped DataFrame in plain Scala implementation.
+ * It is created by calling groupBy() on a ScalaDataFrame.
+ */
 case class ScalaGroupedDataFrame(keyCols: Seq[ScalaAbstractColumn], df: ScalaDataFrame) extends GenericGroupedDataFrame {
   private val functions = ScalaSubFeed.asInstanceOf[DataFrameFunctions]
   import functions._

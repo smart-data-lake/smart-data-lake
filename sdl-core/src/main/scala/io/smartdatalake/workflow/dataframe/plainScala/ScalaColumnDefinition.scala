@@ -24,6 +24,10 @@ import io.smartdatalake.workflow.dataframe.GenericField
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
+/**
+ * Definition of a column in a ScalaDataFrame
+ * The data type is deduced from the generic type A if not explicitly provided through dataType
+ */
 case class ScalaColumnDefinition[A: ClassTag](name: String,
                                               dataFrameAlias: Option[String] = None,
                                               nullable: Boolean = true,

@@ -29,6 +29,74 @@ import scala.math.Ordering
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
+/**
+ * Base type for DataTypes of ScalaDataFrame columns.
+ * The supported types are Int, Double, String, Boolean, Timestamp and Array.
+ * Additionally, there is Null type for special cases where expressions have no type, e.g. lit(null).
+ */
+abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSimpleDataType {
+
+  val scalaClass: Class[_] = implicitly[ClassTag[A]].runtimeClass
+
+  def typeName: String = scalaClass.getSimpleName.toLowerCase
+
+  def isSortable: Boolean = true
+
+  def ordering: Ordering[Option[A]]
+
+  def numeric: Numeric[A] = throw new IllegalStateException("'numeric' not implemented for this DataType")
+
+  def numericDiv: ((A, A) => A) = throw new IllegalStateException("'numericDiv' not implemented for this DataType")
+
+  def getDecimalSpec: Option[(Int, Int)] = None; //not relevant as java.math.BigDecimal is not accepted as input
+
+  override def isSimpleType: Boolean = true;
+
+  def sql: String = typeName
+
+  def makeNullable: ScalaDataType[A] = this // this is only for non-simple types
+
+  def toLowerCase: ScalaDataType[A] = this // this is only for non-simple types
+
+  def removeMetadata: ScalaDataType[A] = this // this is only for non-simple types
+
+  def toJson: JValue = JString(typeName)
+
+  override def isSameType(other: GenericDataType): Boolean = {
+    other match {
+      case scalaOther: ScalaDataType[A] => this == scalaOther // this works as trait implementations are case objects
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  def getCastFunction(fromDataType: ScalaDataType[_]): (Any => A)
+
+  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_]
+
+  def createColumnDefinition(name: String, nullable: Boolean = true, comment: Option[String] = None): ScalaColumnDefinition[A] = {
+    ScalaColumnDefinition[A](name, None, nullable, comment, Some(this))
+  }
+
+  def createLiteral(value: Any): ScalaLiteral[A] = {
+    ScalaLiteral(value.asInstanceOf[A])
+  }
+
+  def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
+    ScalaColumnDefinition[A](fromColumnDefinition.name, None, fromColumnDefinition.nullable, fromColumnDefinition.comment)
+  }
+
+  def castColumn(fromColumn: ScalaColumn[_]): ScalaColumn[A] = {
+    if (fromColumn.definition.dataType.scalaClass == this.scalaClass) fromColumn.asInstanceOf[ScalaColumn[A]]
+    else {
+      val castFun = getCastFunction(fromColumn.definition.dataType)
+      castColumnDefinition(fromColumn.definition)
+        .createColumn(fromColumn.data.map(x => castFun(x)))
+    }
+  }
+
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
+}
+
 object ScalaStringDataType extends ScalaDataType[String] {
   def isNumeric: Boolean = false
 
@@ -171,20 +239,6 @@ object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
   override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = this
 }
 
-object ScalaNullDataType extends ScalaDataType[Null] {
-  override def isNumeric: Boolean = false
-
-  override def isImpreciseNumeric: Boolean = false
-
-  def ordering: Ordering[Option[Null]] = Ordering.Option(Ordering[Null])
-
-  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Null) = {
-    throw new UnsupportedOperationException("A ScalaTimestampDataType cannot be cast from other types supported in ScalaDataFrame")
-  }
-
-  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = other
-}
-
 case class ScalaArrayDataType(elementType: Option[ScalaDataType[_]]) extends ScalaDataType[Seq[_]] {
 
   override def typeName: String = "array"
@@ -211,68 +265,23 @@ case class ScalaArrayDataType(elementType: Option[ScalaDataType[_]]) extends Sca
   override def isSimpleType: Boolean = false
 }
 
+/**
+ * This is a special DataType for the case where expressions have no type, e.g. lit(null).
+ * It is not intended to be used as a column data type, but only as a placeholder for null literals in expressions.
+ * It can be cast to any other DataType and is considered smaller than all other DataTypes when comparing types.
+ */
+object ScalaNullDataType extends ScalaDataType[Null] {
+  override def isNumeric: Boolean = false
 
-abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSimpleDataType {
+  override def isImpreciseNumeric: Boolean = false
 
-  val scalaClass: Class[_] = implicitly[ClassTag[A]].runtimeClass
+  def ordering: Ordering[Option[Null]] = Ordering.Option(Ordering[Null])
 
-  def typeName: String = scalaClass.getSimpleName.toLowerCase
-
-  def isSortable: Boolean = true
-
-  def ordering: Ordering[Option[A]]
-
-  def numeric: Numeric[A] = throw new IllegalStateException("'numeric' not implemented for this DataType")
-
-  def numericDiv: ((A, A) => A) = throw new IllegalStateException("'numericDiv' not implemented for this DataType")
-
-  def getDecimalSpec: Option[(Int, Int)] = None; //not relevant as java.math.BigDecimal is not accepted as input
-
-  override def isSimpleType: Boolean = true;
-
-  def sql: String = typeName
-
-  def makeNullable: ScalaDataType[A] = this // this is only for non-simple types
-
-  def toLowerCase: ScalaDataType[A] = this // this is only for non-simple types
-
-  def removeMetadata: ScalaDataType[A] = this // this is only for non-simple types
-
-  def toJson: JValue = JString(typeName)
-
-  override def isSameType(other: GenericDataType): Boolean = {
-    other match {
-      case scalaOther: ScalaDataType[A] => this == scalaOther // this works as trait implementations are case objects
-      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
-    }
+  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Null) = {
+    throw new UnsupportedOperationException("A ScalaTimestampDataType cannot be cast from other types supported in ScalaDataFrame")
   }
 
-  def getCastFunction(fromDataType: ScalaDataType[_]): (Any => A)
-
-  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_]
-
-  def createColumnDefinition(name: String, nullable: Boolean = true, comment: Option[String] = None): ScalaColumnDefinition[A] = {
-    ScalaColumnDefinition[A](name, None, nullable, comment, Some(this))
-  }
-
-  def createLiteral(value: Any): ScalaLiteral[A] = {
-    ScalaLiteral(value.asInstanceOf[A])
-  }
-
-  def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
-    ScalaColumnDefinition[A](fromColumnDefinition.name, None, fromColumnDefinition.nullable, fromColumnDefinition.comment)
-  }
-
-  def castColumn(fromColumn: ScalaColumn[_]): ScalaColumn[A] = {
-    if (fromColumn.definition.dataType.scalaClass == this.scalaClass) fromColumn.asInstanceOf[ScalaColumn[A]]
-    else {
-      val castFun = getCastFunction(fromColumn.definition.dataType)
-      castColumnDefinition(fromColumn.definition)
-        .createColumn(fromColumn.data.map(x => castFun(x)))
-    }
-  }
-
-  override def subFeedType: Type = typeOf[ScalaSubFeed]
+  override def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = other
 }
 
 object ScalaDataType {

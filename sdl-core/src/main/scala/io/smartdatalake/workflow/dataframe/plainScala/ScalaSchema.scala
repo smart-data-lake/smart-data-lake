@@ -25,6 +25,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
 
+/**
+ * Schema of a ScalaDataFrame.
+ */
 case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInferred: Boolean = false) extends GenericSchema {
 
   //only ignores upper / lower case difference

@@ -23,6 +23,10 @@ import io.smartdatalake.workflow.dataframe.GenericRow
 
 import scala.reflect.runtime.universe
 
+/**
+ * A row in a ScalaDataFrame.
+ * The data is stored as an IndexedSeq.
+ */
 case class ScalaRow(values: IndexedSeq[Any]) extends GenericRow {
   def apply(ix: Int) = values(ix)
 
