@@ -33,7 +33,7 @@ import io.smartdatalake.util.spark.SparkQueryUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
-import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericSchema}
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
@@ -46,6 +46,7 @@ import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 
 import java.sql.{SQLException, Timestamp}
 import java.time.{Duration, LocalDateTime}
+import scala.language.implicitConversions
 import scala.util.Try
 
 /**
@@ -431,6 +432,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = context.sparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
+    val saveModeExpr = saveModeOptions.getExpressions(SparkSubFeed.subFeedType)
+    def toSpark(expr: GenericColumn): Column = expr.asInstanceOf[SparkColumn].inner
 
     // set schema evolution support
     // this is done in a synchronized block because DataObjects with or without autoMerge enabled can be mixed and executed in parallel in a DAG
@@ -449,31 +452,31 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       val existingDeltaTable = deltaTable.as("existing")
       // prepare join condition
       val joinCondition = table.primaryKey.get.map(colName => col(s"new.$colName") === col(s"existing.$colName")).reduce(_ and _)
-      var mergeStmt = existingDeltaTable.merge(df.as("new"), joinCondition and saveModeOptions.additionalMergePredicateExpr.getOrElse(lit(true)))
+      var mergeStmt = existingDeltaTable.merge(df.as("new"), joinCondition and saveModeExpr.additionalMergePredicateExpr.map(toSpark).getOrElse(lit(true)))
       // add delete clause if configured
-      saveModeOptions.deleteConditionExpr.foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
+      saveModeExpr.deleteConditionExpr.map(toSpark).foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
       // add update clause - updateExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and updateAll otherwise
       // see also https://github.com/delta-io/delta/issues/2300
       mergeStmt = if (saveModeOptions.updateColumnsOpt.isDefined) {
         val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
-        mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
+        mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
       } else {
-        mergeStmt.whenMatched(saveModeOptions.updateConditionExpr.getOrElse(lit(true))).updateAll()
+        mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).updateAll()
       }
 
       mergeStmt = if(saveModeOptions.updateExistingCondition.isDefined) {
         val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName))
-        mergeStmt.whenMatched(saveModeOptions.updateExistingConditionExpr.getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
+        mergeStmt.whenMatched(saveModeExpr.updateExistingConditionExpr.map(toSpark).getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
       }
         else mergeStmt
 
       // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
       mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
         // create merge statement
-        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true)))
+        mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true)))
           .insertExpr(insertCols.map(c => c -> saveModeOptions.insertValuesOverride.getOrElse(c, s"new.$c")).toMap)
       } else {
-        mergeStmt.whenNotMatched(saveModeOptions.insertConditionExpr.getOrElse(lit(true))).insertAll()
+        mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true))).insertAll()
       }
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
       // execute delta lake statement
@@ -492,7 +495,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       timePassed.compareTo(Duration.parse(minVacuumInterval.get)) > 0 //the time passed is greater than the set minInterval
     }
 
-    lazy val lastVacuum = deltaTable(session).history.filter(col("operation").contains("VACUUM END")).select(max("timestamp")).collect
+    lazy val lastVacuum = deltaTable(session).history().filter(col("operation").contains("VACUUM END")).select(max("timestamp")).collect()
 
     //execute vacuum if either no interval is set, there has never been a vacuum operation, or the set interval has passed
     if (minVacuumInterval.isEmpty || lastVacuum.isEmpty || intervalHasPassed(lastVacuum(0).getTimestamp(0))) {
@@ -694,7 +697,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
     val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
     val df = context.sparkSession.sql(query)
-    val (primaryKeyCols, primaryKeyName) = df.collect.foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
+    val (primaryKeyCols, primaryKeyName) = df.collect().foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
     (primaryKeyCols.toList, primaryKeyName.toList) match {
       case (List(), _) => None
       case (cols, List()) => Some(PrimaryKeyDefinition(cols))
