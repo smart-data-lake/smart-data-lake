@@ -96,28 +96,32 @@ object Historization extends SmartDataLakeLogger {
     val joined = dfNewHashed.as("newFeed")
       .join(dfLastHistHashed.as("lastHist"), joinCols(dfNewHashed, dfLastHistHashed, primaryKeyColumns), "full")
 
-    val newRows = joined.where(col(expiryDateCol).isNull)
-      .select(col("newFeed.*"))
+    val newRows = joined
+      .where(col(expiryDateCol).isNull)
+      .select(col("newFeed.*")).drop(historizeHashColName)
       .withColumn(lastUpdateCol, timestampNew)
       .withColumn(expiryDateCol, doomsday)
 
-    val notInFeedAnymore = joined.where(nullTableCols("newFeed", primaryKeyColumns))
-      .select(col("lastHist.*"))
+    val notInFeedAnymore = joined
+      .where(nullTableCols("newFeed", primaryKeyColumns))
+      .select(col("lastHist.*")).drop(historizeHashColName)
       .withColumn(expiryDateCol, timestampOld)
 
     val noUpdates = joined
       .where(hashColEqualsExpr)
-      .select(col("lastHist.*"))
+      .select(col("lastHist.*")).drop(historizeHashColName)
 
     val updated = joined
       .where(nonNullTableCols("newFeed", primaryKeyColumns))
       .where(not(hashColEqualsExpr))
 
-    val updatedNew = updated.select(col("newFeed.*"))
+    val updatedNew = updated
+      .select(col("newFeed.*")).drop(historizeHashColName)
       .withColumn(lastUpdateCol, timestampNew)
       .withColumn(expiryDateCol, doomsday)
 
-    val updatedOld = updated.select(col("lastHist.*"))
+    val updatedOld = updated
+      .select(col("lastHist.*")).drop(historizeHashColName)
       .withColumn(expiryDateCol, timestampOld)
 
     // column order is used here!
@@ -199,10 +203,8 @@ object Historization extends SmartDataLakeLogger {
     // add hash column
     val dfNewHashed = addHashCol(dfNew, historizeWhitelist, historizeBlacklist, useHash = true)
     val dfExistingHashed = if (addExistingDfHashColumn) {
-      dfExisting
-    } else {
       addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
-    }
+    } else dfExisting
     // join existing with new and determine operations needed
     val dfOperations = dfExistingHashed.as("existing")
       .where(existingDelimitedCol === lit(Environment.historizationUpperHorizonTimestamp)) // only current records needed

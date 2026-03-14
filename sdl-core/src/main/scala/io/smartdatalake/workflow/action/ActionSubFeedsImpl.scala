@@ -208,6 +208,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
     // update partition values to output's partition columns and update dataObjectId
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
+      .map(convertToOutputSubFeed) // replay transformations that will be done in exec phase writeOutputSubFeeds
     // return
     outputSubFeeds
   } catch {

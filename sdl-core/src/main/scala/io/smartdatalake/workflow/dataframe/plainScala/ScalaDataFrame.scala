@@ -275,10 +275,11 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       def getDuplicatedCols(cols: Seq[ScalaColumn[_]]): Seq[String] = cols.groupBy(_.definition.name.toLowerCase).view.mapValues(_.size).filter(_._2 > 1).keys.toSeq.sorted
       assert(getDuplicatedCols(this.cols).isEmpty, s"Duplicate column names '${getDuplicatedCols(this.cols).mkString(", ")}' found in this dataframe, cannot perform unionByName. Make sure all column names are unique for this operation.")
       assert(getDuplicatedCols(otherScala.cols).isEmpty, s"Duplicate column names '${getDuplicatedCols(otherScala.cols).mkString(", ")}' found in other dataframe, cannot perform unionByName. Make sure all column names are unique for this operation.")
+      if (!allowMissingColumns) checkColumnsExist(otherScala, this.columns)
       val thisCols = this.cols.map(c => c.definition.name -> c).toMap
       val otherCols = otherScala.cols.map(c => c.definition.name -> c).toMap
       val finalColNames = if (allowMissingColumns) columns ++ otherScala.columns.diff(columns)
-      else columns.intersect(otherScala.columns)
+      else columns
       assert(finalColNames.nonEmpty, "No common columns found between the two dataframes for unionByName. Make sure to have at least one column with the same name in both dataframes or set allowMissingColumns=true.")
       val unionData = finalColNames.map { colName =>
         val thisCol = thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(null)))

@@ -25,6 +25,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.{Historization, HistorizationRecordOperations}
+import io.smartdatalake.util.misc.GenericSchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
@@ -313,9 +314,9 @@ case class HistorizeAction(
     }
     val newFeedDf = if (!checkInputUnique) newDf.dropDuplicates(pks) else newDf
 
-    // if context is init check if column needs to be added -> save in needsHashColumn
+    // if context is init, check if column needs to be added -> save in needsHashColumn
     if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
-      case Some(df) => Some(df.columns.contains(Historization.historizeHashColName))
+      case Some(df) => Some(!GenericSchemaUtil.columnExists(df.schema, Historization.historizeHashColName))
       case _ => Some(false)
     }
 

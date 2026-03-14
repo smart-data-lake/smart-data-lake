@@ -39,7 +39,20 @@ class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with Sm
     (id, registry) => MockSparkDataObject(id),
     (id, pks, registry) => {
       val tgtTable = Table(Some("public"), id.replaceAll("-", "_"), None, pks)
-      JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, allowSchemaEvolution = true)(registry)
+      val dataObject = JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, allowSchemaEvolution = true)(registry)
+      dataObject.dropTable(TestUtil.getDefaultActionPipelineContext(registry))
+      dataObject
+    },
+    tgtConnection = Some(jdbcConnection)
+  ))
+
+  testsFor(historizeIncrementalPipeline(
+    (id, registry) => MockSparkDataObject(id),
+    (id, pks, registry) => {
+      val tgtTable = Table(Some("public"), id.replaceAll("-", "_"), None, pks)
+      val dataObject = JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, allowSchemaEvolution = true)(registry)
+      dataObject.dropTable(TestUtil.getDefaultActionPipelineContext(registry))
+      dataObject
     },
     tgtConnection = Some(jdbcConnection)
   ))

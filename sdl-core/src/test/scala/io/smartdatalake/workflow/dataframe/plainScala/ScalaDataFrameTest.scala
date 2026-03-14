@@ -219,7 +219,7 @@ class ScalaDataFrameTest extends AnyFunSuite {
     val df3 = ScalaDataFrame.fromData(Seq(Seq(1, "a"), Seq(2, "b")), Seq("col3", "col4"))
     val df_union = df1.unionByName(df2)
     assert(df_union.cols.map(_.data.reduce(combine)) == Seq(10, "abcd"))
-    assertThrows[AssertionError](df1.unionByName(df3))
+    assertThrows[IllegalArgumentException](df1.unionByName(df3))
   }
 
   test ("except works as planned") {
