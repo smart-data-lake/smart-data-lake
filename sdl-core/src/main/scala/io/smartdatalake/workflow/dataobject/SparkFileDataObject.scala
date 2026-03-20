@@ -233,9 +233,9 @@ trait SparkFileDataObject extends HadoopFileDataObject
       if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
       else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
     } catch {
-      case e: AnalysisException if context.isExecPhase && incrementalOutputOptions.nonEmpty && e.getMessage.contains("[UNABLE_TO_INFER_SCHEMA]") =>
+      case e: AnalysisException if context.isExecPhase && e.getMessage.contains("[UNABLE_TO_INFER_SCHEMA]") =>
         // handle case where path does not exist, which can happen in incremental processing when no new files are found
-        throw NoDataToProcessWarning(id.id, s"($id) No files to process found by incremental output options. Original error: ${e.getMessage}")
+        throw NoDataToProcessWarning(id.id, s"($id) No files to process found (detected by unability to infer schema). Original error: ${e.getMessage}")
     }
     df = customizeContent(df)
 

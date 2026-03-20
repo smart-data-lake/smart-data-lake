@@ -122,6 +122,18 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)
   }
 
+  test("read parquet files mixed with other files in same directory") {
+    val parquetDO = ParquetFileDataObject(id = "src1", path = escapedFilePath(tempPath), filenameColumn = Some("_filename"))
+    val jsonDO = JsonFileDataObject(id = "src2", path = escapedFilePath(tempPath), filenameColumn = Some("_filename"), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiline" -> "false")))
+    parquetDO.writeSparkDataFrame(testDf, Seq())
+    jsonDO.writeSparkDataFrame(testDf, Seq())
+    val resultParquet = parquetDO.getSparkDataFrame()(contextExec)
+    resultParquet.show(false)
+    assert(resultParquet.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("parquet", "parquet", "parquet"))
+    val resultJson = jsonDO.getSparkDataFrame()(contextExec)
+    resultJson.show(false)
+    assert(resultJson.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+  }
 
   test("incremental output mode") {
 
