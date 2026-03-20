@@ -229,8 +229,14 @@ trait SparkFileDataObject extends HadoopFileDataObject
     val doCreateEmptyDataFrame = (!context.isExecPhase || !filesExisting) && schema.isDefined && format == readFormat
     var df = if (doCreateEmptyDataFrame) createEmptyDataFrame(schema.get)
     else if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
-    else if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
-    else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    else try {
+      if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+      else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    } catch {
+      case e: AnalysisException if context.isExecPhase && incrementalOutputOptions.nonEmpty && e.getMessage.contains("[UNABLE_TO_INFER_SCHEMA]") =>
+        // handle case where path does not exist, which can happen in incremental processing when no new files are found
+        throw NoDataToProcessWarning(id.id, s"($id) No files to process found by incremental output options. Original error: ${e.getMessage}")
+    }
     df = customizeContent(df)
 
     // early check for no data to process.
@@ -367,6 +373,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
+    assert(incrementalOutputOptions.isEmpty || schema.isDefined, "Incremental output without Schema is not supported for DataSources reading files one by one. Specify a schema for the DataObject to use incremental output.")
+
     // search files to be read
     val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((PartitionValues(Map()),hadoopPath))
     else  if (partitions.isEmpty) {
@@ -376,6 +384,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       val pvs = if (partitionValues.isEmpty) listPartitions else partitionValues
       pvs.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
     }
+
     // get and union DataFrames per File
     val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
     val reader = session.read
