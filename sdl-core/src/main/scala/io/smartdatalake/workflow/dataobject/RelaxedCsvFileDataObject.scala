@@ -91,8 +91,6 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   override val ignoreSchemaForReader = true // schema will be applied in customizeContent and not by SparkFileDataObject
   override val customizeBeforeFilename = false // filename column should be added by SparkFileDataObject before calling customizeContent
 
-  override val readOptions: Map[String, String] = Map("wholetext" -> "true") // options for Spark text DataSource
-
   // this is only needed for FileRef actions
   override val fileName: String = "*.csv*"
 
@@ -108,6 +106,8 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
   )
 
   override val options: Map[String, String] = formatOptionsDefault ++ csvOptions ++ formatOptionsOverride
+
+  override val readOptions: Map[String, String] = options ++ Map("wholetext" -> "true") // read whole files using Spark text DataSource!
 
   // validate parser options
   private val defaultNameOfCorruptRecord = SQLConf.get.getConf(SQLConf.COLUMN_NAME_OF_CORRUPT_RECORD)
