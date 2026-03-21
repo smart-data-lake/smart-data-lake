@@ -199,7 +199,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   /**
    * Hook to use different options for reading
    */
-  protected def readOptions: Map[String, String] = options // hook to use different provider for reading
+  protected def readOptions: Map[String, String] = options // hook to use by different provider for reading
 
   override def checkFilesExisting(recursive: Boolean = recursiveFileLookup)(implicit context: ActionPipelineContext): Boolean = {
     super.checkFilesExisting(recursive)
