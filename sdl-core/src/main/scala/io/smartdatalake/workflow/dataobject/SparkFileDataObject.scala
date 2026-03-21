@@ -235,8 +235,14 @@ trait SparkFileDataObject extends HadoopFileDataObject
     val doCreateEmptyDataFrame = (!context.isExecPhase || !filesExisting) && schema.isDefined && format == readFormat
     var df = if (doCreateEmptyDataFrame) createEmptyDataFrame(schema.get)
     else if (handleFilesOneByOne) getContentFilesOneByOne(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
-    else if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
-    else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    else try {
+      if (isV2ReadDataSource) getContentV2(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+      else getContentV1(partitionValues, schemaOpt.filter(_ => !ignoreSchemaForReader), incrementalOutputOptions)
+    } catch {
+      case e: AnalysisException if context.isExecPhase && e.getMessage.contains("[UNABLE_TO_INFER_SCHEMA]") =>
+        // handle case where path does not exist, which can happen in incremental processing when no new files are found
+        throw NoDataToProcessWarning(id.id, s"($id) No files to process found (detected by unability to infer schema). Original error: ${e.getMessage}")
+    }
     if (customizeBeforeFilename) df = customizeContent(df)
 
     // early check for no data to process.
@@ -273,12 +279,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
       // Comparison of modifiedAfter and modifiedBefore are both exclusive on Microsecond level, but file timestamps maximum detail is milliseconds.
       // Actually comparison of one operator should be inclusive to avoid reading files in edge cases.
       // Current timestamp is also at millisecond level. If we subtract one microsecond from current timestamp we can avoid the problems because of exclusive comparison.
-      incrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
+      nextIncrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
       val dateFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS")
-      logger.info(s"($id) incremental output selected files with modification date greater than ${dateFormatter.format(previousOutputState)} and smaller than ${dateFormatter.format(incrementalOutputState.get)}")
+      logger.info(s"($id) incremental output selected files with modification date greater than ${dateFormatter.format(previousOutputState)} and smaller than ${dateFormatter.format(nextIncrementalOutputState.get)}")
       Map(
         "modifiedAfter" -> dateFormatter.format(fixWindowsTimezone(previousOutputState)),
-        "modifiedBefore" -> dateFormatter.format(fixWindowsTimezone(incrementalOutputState.get))
+        "modifiedBefore" -> dateFormatter.format(fixWindowsTimezone(nextIncrementalOutputState.get))
       )
     }.getOrElse(Map[String, String]())
   }
@@ -375,6 +381,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = context.sparkSession
+    assert(incrementalOutputOptions.isEmpty || schema.isDefined, "Incremental output without Schema is not supported for DataSources reading files one by one. Specify a schema for the DataObject to use incremental output.")
+
     // search files to be read
     val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((PartitionValues(Map()),hadoopPath))
     else  if (partitions.isEmpty) {
@@ -384,6 +392,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
       val pvs = if (partitionValues.isEmpty) listPartitions else partitionValues
       pvs.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
     }
+
     // get and union DataFrames per File
     val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
     val reader = session.read
@@ -443,6 +452,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
   // Store incremental output state. It is stored as LocalDateTime because Spark options need local timezone.
   private var incrementalOutputState: Option[LocalDateTime] = None
+  private var nextIncrementalOutputState: Option[LocalDateTime] = None
 
   /**
    * Set timestamp for incremental output
@@ -456,6 +466,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * Get timestamp of incremental output for saving to state
    */
   override def getState: Option[String] = {
+    incrementalOutputState = nextIncrementalOutputState
     incrementalOutputState.map(_.toString)
   }
 
