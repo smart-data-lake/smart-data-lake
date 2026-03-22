@@ -34,7 +34,6 @@ import java.time.Duration
 
 /**
  * Unit tests for historization
- *
  */
 class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
   with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
@@ -85,7 +84,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     // nothing to do if unchanged
@@ -101,7 +100,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed).select(Seq(col("age"), col("health_state"), col("id"), col("name")))
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     // nothing to do if unchanged
@@ -118,7 +117,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
@@ -142,7 +141,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
@@ -163,7 +162,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
@@ -189,7 +188,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, defaultTimeAxisUnit, None, None, addExistingDfHashColumn = false)
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
@@ -231,7 +230,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfNewFeed = toDataDf(baseColumnsNewFeed)
     if (logger.isDebugEnabled) logger.debug(s"New feed:\n${dfNewFeed.showString()}")
 
-    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, timeAxisUnitNone, None, None, addExistingDfHashColumn = true)
+    val dfHistorized = Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, timeAxisUnitNone, None, None, addExistingDfHashColumn = false)
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 

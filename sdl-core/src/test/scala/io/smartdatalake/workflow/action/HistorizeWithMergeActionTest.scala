@@ -263,7 +263,7 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     // prepare & start 1st load without merge mode
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
-    val action1 = HistorizeAction("ha",
+    val action1 = HistorizeAction("ha1",
       inputId = srcDO.id,
       outputId = tgtDO.id
     )
@@ -276,13 +276,13 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
     action1.exec(Seq(srcSubFeed))(context1)
 
-    // 1. expectation schema should not have dl_hash column
+    // 1. expectation: schema should not have dl_hash column
     assert(!tgtDO.getSparkDataFrame()(context1).columns.contains("dl_hash"))
 
     // prepare & start 2st load
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-    val action2 = HistorizeAction("ha",
+    val action2 = HistorizeAction("ha2",
       inputId = srcDO.id,
       outputId = tgtDO.id,
       mergeModeEnable = true
@@ -296,10 +296,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
     action2.exec(Seq(srcSubFeed2))(context2)
 
-    // expectation dl_hash should not have null values
+    // 2. expectation: dl_hash should not have null values
     assert(tgtDO.getSparkDataFrame()(context2).where($"dl_hash".isNull).count() == 0)
-
-
   }
 
   test("update hash on existing non updated rows") {
@@ -350,9 +348,7 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
     action2.exec(Seq(srcSubFeed2))(context2)
 
-    // expectation dl_hash should not have null values
+    // 2. expectation: dl_hash should not have null values
     assert(tgtDO.getSparkDataFrame()(context2).where($"dl_hash".isNull).count() == 0)
-
-
   }
 }
