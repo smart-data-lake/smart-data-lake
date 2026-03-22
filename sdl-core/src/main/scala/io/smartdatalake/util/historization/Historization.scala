@@ -198,7 +198,7 @@ object Historization extends SmartDataLakeLogger {
     val hashColEqualsExpr = existingHashCol === newHashCol
     // add hash column
     val dfNewHashed = addHashCol(dfNew, historizeWhitelist, historizeBlacklist, useHash = true)
-    val dfExistingHashed = if (addExistingDfHashColumn) {
+    val dfExistingHashed = if (!addExistingDfHashColumn) {
       dfExisting
     } else {
       addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
@@ -383,6 +383,7 @@ object Historization extends SmartDataLakeLogger {
   }
 
   private[smartdatalake] def addHashCol(df: GenericDataFrame, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]], useHash: Boolean, colsToIgnore: Seq[String] = Seq()): GenericDataFrame = {
+    assert(!df.columns.contains(historizeHashColName), s"DataFrame must not contain column with name $historizeHashColName if addHashCol is called")
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     val colsToCompare = getCompareColumns(df.columns.diff(colsToIgnore), historizeWhitelist, historizeBlacklist)
     df.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare, useHash))

@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataframe.spark
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
-import io.smartdatalake.util.spark.{dataset, DummyStreamProvider}
+import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, dataset}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
@@ -270,9 +270,18 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  /**
+   * Spark Hash Functions ignores null values, e.g. adding a null column to a row does not change the hash value of the row.
+   * This method will treat null values as regular values, which influence hash value of the row.
+   */
+  def nullAwareHash(cols: Column*): Column = {
+    val expr = new NullAwareMurmur3HashExpr(cols.map(_.expr))
+    new Column(expr)
+  }
+
   override def hash(column: GenericColumn): GenericColumn = {
     column match {
-      case sparkColumn: SparkColumn => SparkColumn(functions.hash(sparkColumn.inner))
+      case sparkColumn: SparkColumn => SparkColumn(nullAwareHash(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
