@@ -315,7 +315,7 @@ case class HistorizeAction(
 
     // if context is init check if column needs to be added -> save in needsHashColumn
     if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
-      case Some(df) => Some(df.columns.contains(Historization.historizeHashColName))
+      case Some(df) => Some(!df.columns.map(_.toLowerCase).contains(Historization.historizeHashColName))
       case _ => Some(false)
     }
 
