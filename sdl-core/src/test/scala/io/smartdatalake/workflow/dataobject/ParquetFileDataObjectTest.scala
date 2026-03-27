@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
@@ -119,6 +120,66 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     val metrics = observation.waitFor()
     assert(metrics("count") == 0) // this is the final count
     assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)
+  }
+
+  test("read parquet files mixed with other files in same directory") {
+    val parquetDO = ParquetFileDataObject(id = "src1", path = escapedFilePath(tempPath), filenameColumn = Some("_filename"))
+    val jsonDO = JsonFileDataObject(id = "src2", path = escapedFilePath(tempPath), filenameColumn = Some("_filename"), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiline" -> "false")))
+    parquetDO.writeSparkDataFrame(testDf, Seq())
+    jsonDO.writeSparkDataFrame(testDf, Seq())
+    val resultParquet = parquetDO.getSparkDataFrame()(contextExec)
+    resultParquet.show(false)
+    assert(resultParquet.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("parquet", "parquet", "parquet"))
+    val resultJson = jsonDO.getSparkDataFrame()(contextExec)
+    resultJson.show(false)
+    assert(resultJson.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+  }
+
+  test("incremental output mode") {
+
+    // create data object
+    val dataObject1 = ParquetFileDataObject( "incDO1", path = tempPath+"/incremental1", saveMode = SDLSaveMode.Append)
+
+    // write test data 1
+    val df1 = Seq((1,"A",1),(2,"A",2),(3,"B",3),(4,"B",4)).toDF("id", "p", "value")
+    dataObject1.prepare
+    dataObject1.initSparkDataFrame(df1, Seq())
+    dataObject1.writeSparkDataFrame(df1)
+
+    // test 1
+    dataObject1.setState(None) // initialize incremental output with empty state
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 4
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 4 // can be queried multiple times with same state
+    val newState1 = dataObject1.getState // triggers moving forward incremental state to the latest, so that next query only returns new data
+
+    // append test data 2
+    val df2 = Seq((5,"B",5)).toDF("id", "p", "value")
+    dataObject1.writeSparkDataFrame(df2)
+
+    // test 2
+    dataObject1.setState(newState1)
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 1
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 1 // can be queried multiple times with same state
+    val newState2 = dataObject1.getState
+    assert(newState1.get < newState2.get)
+    intercept[NoDataToProcessWarning](dataObject1.getSparkDataFrame()(contextExec)) // no new data since last state
+
+    // append test data 3
+    val df3 = Seq((6,"B",6)).toDF("id", "p", "value")
+    dataObject1.writeSparkDataFrame(df2)
+
+    // test 3
+    //dataObject1.setState(newState1) // setting state not necessary, as state is should move forward automatically through getState called above
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 1
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 1 // can be queried multiple times with same state
+    val newState3 = dataObject1.getState
+    assert(newState2.get < newState3.get)
+    intercept[NoDataToProcessWarning](dataObject1.getSparkDataFrame()(contextExec)) // no new data since last state
+
+    // disable incremental output and query all data
+    dataObject1.setState(None)
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 6
+    dataObject1.getSparkDataFrame()(contextExec).count() shouldEqual 6 // can be queried multiple times with same state
   }
 
   testsFor(readNonExistingSources(createDataObject, fileExtension = ".parquet"))

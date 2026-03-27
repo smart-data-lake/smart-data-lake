@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.{DataObjectTestSuite, MockSparkDataObject}
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
@@ -28,9 +29,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
-class JdbcTableDataObjectTest extends DataObjectTestSuite
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
-  with io.smartdatalake.util.spark.dataset.Equality {
+class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   import session.implicits._
@@ -104,8 +103,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite
     assert(srcDO.getSparkDataFrame()(contextExec).getSymmetricDifference(dfSrcExpected).isEmpty)
   }
 
-  // query parameter doesn't work with hsqldb
-  ignore("read jdbc table with query") {
+  test("read jdbc table with query") {
     instanceRegistry.register(jdbcConnection)
 
     // prepare data
@@ -113,17 +111,49 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite
     val dataObject1 = JdbcTableDataObject( "jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject1.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
-    dataObject1.initSparkDataFrame(df, Seq())
-    dataObject1.writeSparkDataFrame(df, Seq())
+    dataObject1.initSparkDataFrame(df, Seq())(contextInit)
+    dataObject1.writeSparkDataFrame(df, Seq())(contextExec)
 
     // read prepared data
-    val table2 = Table(Some("public"), "table1", query = Some("select lastname, firstname from public.table1"))
+    val table2 = Table(Some("public"), "table2", query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
     val dataObject2 = JdbcTableDataObject( "jdbcDO2", table = table2, connectionId = "jdbcCon1")
-    val dfRead = dataObject2.getSparkDataFrame(Seq())
-    assert(dfRead.getSymmetricDifference(df.select($"lastname", $"firstname")).isEmpty)
+    val actual = dataObject2.getSparkDataFrame(Seq())(contextExec)
+    val expected = df.select($"lastname", $"firstname").where($"type" === "ext")
+    val resultat = actual.equal(expected)
+    assert(resultat)
 
     // assert cannot write to DataObject with query defined
-    intercept[IllegalArgumentException](dataObject2.writeSparkDataFrame(df, Seq()))
+    intercept[IllegalArgumentException](dataObject2.writeSparkDataFrame(df, Seq())(contextExec))
+  }
+
+  // query parameter doesn't work with hsqldb
+  test("copy from jdbc table with query and where clause") {
+    instanceRegistry.register(jdbcConnection)
+
+    // prepare data
+    val table1 = Table(Some("public"), "table1")
+    val dataObject1 = JdbcTableDataObject( "jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    dataObject1.dropTable
+    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    dataObject1.initSparkDataFrame(df, Seq())(contextInit)
+    dataObject1.writeSparkDataFrame(df, Seq())(contextExec)
+
+    // prepare view dataObject
+    val table2 = Table(Some("public"), "table2", query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
+    val srcDO = JdbcTableDataObject( "jdbcDO2", table = table2, connectionId = "jdbcCon1")
+    instanceRegistry.register(srcDO)
+    val tgtDO = MockSparkDataObject("tgt").register
+    instanceRegistry.register(tgtDO)
+
+    val action = CopyAction("copy", srcDO.id, tgtDO.id)
+    val srcSubFeed = SparkSubFeed(None, srcDO.id, Seq())
+    action.init(Seq(srcSubFeed))(contextInit).head
+    action.exec(Seq(srcSubFeed))(contextExec).head
+
+    val actual = srcDO.getSparkDataFrame(Seq())(contextExec)
+    val expected = tgtDO.getSparkDataFrame(Seq())(contextExec)
+    val resultat = actual.equal(expected)
+    assert(resultat)
   }
 
   test("isTableExisting should return not only the table but also the view - read jdbc:hsqldb view and table") {

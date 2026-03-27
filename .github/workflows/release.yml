@@ -29,7 +29,7 @@ jobs:
         ref: ${{ github.base_ref }}
         fetch-depth: 0
         # PAT token needed to trigger documentation deploy workflow (GITHUB_TOKEN wont trigger other workflows to avoid loops)
-        token: ${{ secrets.PAT_ACTIONS }}         
+        token: ${{ secrets.PAT_ACTIONS }}
     - name: Git Config
       run: |
         git config --local user.email "action@github.com"
@@ -62,15 +62,16 @@ jobs:
       run: |
         mvn versions:set -B -DnewVersion=${MVN_RELEASE_VERSION} -f pom.xml
 
-    - name: Maven deploy to sonatype for Scala 2.12
-      run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+    - name: Maven deploy to sonatype for Scala 2.13
+      run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
       env:
         MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
         MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-    - name: Maven deploy to sonatype for Scala 2.13
-      run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+    - name: Maven deploy to sonatype for Scala 2.12
+      # exclude sdl-parent (!.) as it is already uploaded with previous deploy; it stays the same and cannot be replaced in remote repository
+      run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -pl '!.,!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
       env:
         MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
         MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -110,6 +111,8 @@ jobs:
       with:
         ref: ${{ github.head_ref }}
         fetch-depth: 0
+        # PAT token needed to trigger documentation deploy workflow (GITHUB_TOKEN wont trigger other workflows to avoid loops)
+        token: ${{ secrets.PAT_ACTIONS }}        
     - name: Git Config
       run: |
         git config --local user.email "action@github.com"
