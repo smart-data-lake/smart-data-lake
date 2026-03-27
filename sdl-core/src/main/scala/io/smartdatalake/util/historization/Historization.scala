@@ -247,6 +247,7 @@ object Historization extends SmartDataLakeLogger {
     val resultColOrder = dfExisting.columns.diff(techCols) ++ dfNew.columns.diff(dfExistingHashed.columns) ++ techCols
     val dfResult = dfOperationVersioned
       .select(resultColOrder.map(col))
+    dfResult
   }
 
   /**
