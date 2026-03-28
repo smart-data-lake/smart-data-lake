@@ -513,7 +513,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // action4 is skipped in init phase as data is not yet there, but should execute in exec phase
     val action4 = CustomDataFrameAction("d", Seq(tgt3DO.id, src2DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , executionMode = Some(DataFrameIncrementalMode("id"))
-      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select dt, type, lastname, firstname, udfAddX(rating) rating from tgt3")))
+      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select id, dt, type, lastname, firstname, udfAddX(rating) rating from tgt3")))
     )
     instanceRegistry.register(action4.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))

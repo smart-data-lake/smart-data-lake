@@ -405,6 +405,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     if (recordsWritten.contains(0) && count.nonEmpty) outputSubFeed = outputSubFeed.withMetrics(outputSubFeed.metrics.get - "records_written" - "bytes_written").asInstanceOf[DataFrameSubFeed]
     // add no_data metric
     if (count.contains(0) || (count.isEmpty && recordsWritten.contains(0))) outputSubFeed = outputSubFeed.appendMetrics(Map[String, Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
+    // throw NoDataToProcessWarning if there is no data to process for this output
+    if (outputSubFeed.metrics.flatMap(_.get("no_data")).contains(true)) throw NoDataToProcessWarning(id.id, s"($id) no data to process for ${output.id}", results = Some(Seq(outputSubFeed)))
     // return
     outputSubFeed
   }

@@ -69,6 +69,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
     if (partitions.nonEmpty) {
       partitionedDataFrameMock
         .map(_.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).values.reduce(_ unionAll _))
+        .orElse(dataFrameMock) // dataFrameMock can be initialized with an empty DataFrame for partitioned MockDataObject if no partitionValues are provided in initSparkDataFrame
         .orElse(schemaMin.map(subFeedCompanion.getEmptyDataFrame(_, id).asInstanceOf[SparkDataFrame].inner))
         .getOrElse(throw NoDataToProcessWarning("mock", s"($id) partitionedDataFrameMock not initialized"))
     } else {
@@ -85,7 +86,8 @@ case class MockSparkDataObject(override val id: DataObjectId,
     validateSchemaHasPrimaryKeyCols(df, "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     if (!isTableExisting) {
-      if (partitions.nonEmpty) partitionedDataFrameMock = Some(Map(partitionValues.head -> saveModeTargetDf.where(lit(false))))
+      // Note: it's possible that dataFrameMock is initialized with an empty DataFrame, if no partitionValues are provided for a partitioned MockDataObject
+      if (partitions.nonEmpty && partitionValues.nonEmpty) partitionedDataFrameMock = Some(Map(partitionValues.head -> saveModeTargetDf.where(lit(false))))
       else dataFrameMock = Some(saveModeTargetDf.where(lit(false)))
     }
   }

@@ -327,7 +327,7 @@ case class HistorizeAction(
 
       val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
       // note that schema evolution is done by output DataObject
-      Historization.incrementalHistorize(existingDf.get, newDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
+      Historization.incrementalHistorize(existingDf.get, newFeedDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
     } else Historization.getInitialHistoryWithHashCol(newFeedDf, refTimestamp, historizeWhitelist, historizeBlacklist)
   }
 
