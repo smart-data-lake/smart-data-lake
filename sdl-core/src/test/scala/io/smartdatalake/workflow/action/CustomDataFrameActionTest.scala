@@ -559,7 +559,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     srcDO1.writeSparkDataFrame(dfInput.where(lit(false)), Seq())
     srcDO2.writeSparkDataFrame(dfInput, Seq())
     val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
-    val tgtSubFeeds = action1.exec(srcSubFeeds)(contextExec)
+    val noDataWarn = intercept[NoDataToProcessWarning](action1.exec(srcSubFeeds)(contextExec))
+    val tgtSubFeeds = noDataWarn.results.get
     val tgtSubFeed1 = tgtSubFeeds.find(_.dataObjectId == tgtDO1.id).get
     val tgtSubFeed2 = tgtSubFeeds.find(_.dataObjectId == tgtDO2.id).get
 

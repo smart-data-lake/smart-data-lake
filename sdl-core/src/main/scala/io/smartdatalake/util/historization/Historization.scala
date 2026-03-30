@@ -189,6 +189,7 @@ object Historization extends SmartDataLakeLogger {
                            addExistingDfHashColumn: Boolean): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfExisting.subFeedType)
     import functions._
+    import io.smartdatalake.util.misc.SeqUtil.SeqExtension
 
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)
@@ -244,7 +245,7 @@ object Historization extends SmartDataLakeLogger {
       .drop(col(s"existing.${Environment.delimitedColumnName}"))
     // return
     val techCols = Seq(historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName, historizeHashColName)
-    val resultColOrder = dfExisting.columns.diff(techCols) ++ dfNew.columns.diff(dfExistingHashed.columns) ++ techCols
+    val resultColOrder = dfExisting.columns.caseSensitiveDiff(techCols :+ historizeDummyColName) ++ dfNew.columns.caseSensitiveDiff(dfExistingHashed.columns) ++ techCols
     val dfResult = dfOperationVersioned
       .select(resultColOrder.map(col))
     dfResult
