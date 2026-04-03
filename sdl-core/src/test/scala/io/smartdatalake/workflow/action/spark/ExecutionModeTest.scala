@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -54,21 +55,10 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   // setup some data objects
-  val srcTable = Table(Some("default"), "src1")
-  val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  instanceRegistry.register(srcDO)
-
-  val tgt1Table = Table(Some("default"), "tgt1", None, Some(Seq("lastname", "firstname")))
-  val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), table = tgt1Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  instanceRegistry.register(tgt1DO)
-
-  val tgt2Table = Table(Some("default"), "tgt2", None, Some(Seq("lastname", "firstname")))
-  val tgt2DO = HiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), table = tgt2Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  instanceRegistry.register(tgt2DO)
-
-  val tgt3Table = Table(Some("default"), "tgt3", None, Some(Seq("lastname", "firstname")))
-  val tgt3DO = HiveTableDataObject("tgt3", Some(tempPath + s"/${tgt3Table.fullName}"), table = tgt3Table, partitions = Seq("lastname"), numInitialHdfsPartitions = 1)
-  instanceRegistry.register(tgt3DO)
+  val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname")).register
+  val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+  val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
+  val tgt3DO = MockSparkDataObject("tgt3", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
   val fileSrcDO = CsvFileDataObject("fileSrcDO", tempPath + s"/fileTestSrc", partitions = Seq("lastname"))
   instanceRegistry.register(fileSrcDO)

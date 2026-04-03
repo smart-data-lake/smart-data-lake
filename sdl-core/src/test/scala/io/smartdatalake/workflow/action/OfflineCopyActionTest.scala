@@ -24,6 +24,7 @@ import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.HadoopExportWriter
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.spark.TestDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.ParquetFileDataObject

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,22 +16,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockScalaDataObject, MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-class ScalaHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
+class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
   with TestToolDataset with Equality with HistorizeActionBehaviour {
 
+  protected implicit val session: SparkSession = TestUtil.session
+
   testsFor(historizeWithMergeMode(
-    (id, registry) => MockScalaDataObject(id),
-    (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks),
+    (id, registry) => MockSparkDataObject(id),
+    (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks),
     tgtConnection = None
   ))
 
