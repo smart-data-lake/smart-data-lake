@@ -369,7 +369,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) KafkaTopicDataObject does not support writing using partition values: partitionValues=${partitionValues.mkString(",")}")
-    SparkStageMetricsListener.execWithMetrics(this.id,
+    var metrics = SparkStageMetricsListener.execWithMetrics(this.id,
       encodeKeyValue(df)
         .write
         .format("kafka")
@@ -377,6 +377,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         .option("topic", topicName)
         .save()
     )
+    // Kafka might return 0 for records_written even if the write was successful.
+    // Filter out this metric to avoid NoDataToProcessException and skipping this and subsequent actions.
+    if (metrics.get("records_written").contains(0)) {
+      metrics = metrics - "records_written"
+    }
+    metrics
   }
 
   override def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)

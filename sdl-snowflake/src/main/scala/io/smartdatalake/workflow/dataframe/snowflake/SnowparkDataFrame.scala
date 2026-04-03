@@ -68,9 +68,10 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
     SnowparkDataFrame(inner.agg(snowparkCols.head, snowparkCols.tail:_*))
   }
-  override def unionByName(other: GenericDataFrame): SnowparkDataFrame= {
+  override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): SnowparkDataFrame= {
+    assert(!allowMissingColumns, "unionByName with allowMissingColumns=true is not supported by Snowpark")
     other match {
-      case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.unionByName(snowparkOther.inner))
+      case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.unionAllByName(snowparkOther.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -89,6 +90,12 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
 
   override def limit(n: Int): SnowparkDataFrame = {
     SnowparkDataFrame(inner.limit(n))
+  }
+
+  override def orderBy(columns: Seq[GenericColumn]): SnowparkDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
+    SnowparkDataFrame(inner.sort(snowparkCols))
   }
 
   override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
@@ -197,7 +204,6 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     )
   }
 
-
   override def makeNullable: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.makeNullable.inner)))
   override def toLowerCase: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.toLowerCase.inner)))
   override def removeMetadata: SnowparkSchema = this // metadata not existing in Snowpark
@@ -219,6 +225,14 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
+
+  override def <=>(other: GenericColumn): SnowparkColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner <=> snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
   override def >(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner > snowparkColumn.inner)
@@ -231,6 +245,22 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
+
+
+  override def >=(other: GenericColumn): GenericColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner >= snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def <=(other: GenericColumn): SnowparkColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner <= snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
   override def +(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner + snowparkColumn.inner)
@@ -328,6 +358,8 @@ case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType with
   override def toLowerCase: SnowparkDataType = this
 
   override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
+
+  override def isImpreciseNumeric: Boolean = inner == FloatType || inner == DoubleType
 
   override def getDecimalSpec: Option[(Int, Int)] = inner match {
     case d: DecimalType => Some((d.precision, d.scale))

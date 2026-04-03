@@ -57,6 +57,10 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def agg(columns: Seq[GenericColumn]): GenericDataFrame
 
+  /**
+   * Note that unionByName does not deduplicate rows (according to Apache Spark). It is like UNION ALL in SQL, but resolving columns by name instead of position.
+   * @param allowMissingColumns if true, columns that are missing in one of the data frames will be filled with null values, otherwise an exception will be thrown if there are missing columns.
+   */
   def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): GenericDataFrame
 
   def except(other: GenericDataFrame): GenericDataFrame
