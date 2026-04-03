@@ -25,7 +25,6 @@ import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
 
-import scala.collection.MapView
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe.Type
 
@@ -162,6 +161,6 @@ case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType:
   val updateConditionExpr: Option[GenericColumn] = saveMode.updateCondition.map(expr)
   val updateExistingConditionExpr: Option[GenericColumn] = saveMode.updateExistingCondition.map(expr)
   val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(expr)
-  val insertValuesOverrideExpr: MapView[String, GenericColumn] = saveMode.insertValuesOverride.mapValues(expr)
+  val insertValuesOverrideExpr: Map[String, GenericColumn] = saveMode.insertValuesOverride.mapValues(expr)
   val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(expr)
 }

@@ -39,7 +39,7 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
   def explodeDataFrame(colName: String, df: ScalaDataFrame): ScalaDataFrame = {
     val inResolved = in.toScalaColumn(df)
     assert(inResolved.dataType.isInstanceOf[ScalaArrayDataType], s"Input column for explode() must be of type array, but is ${in.dataType}")
-    val inData = inResolved.data.asInstanceOf[Seq[Seq[_]]]
+    val inData = inResolved.data.asInstanceOf[Seq[Seq[Any]]]
     val dataType = fixedDataType
       .orElse(inResolved.dataType.asInstanceOf[ScalaArrayDataType].elementType)
       .getOrElse{

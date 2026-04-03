@@ -25,6 +25,7 @@ import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.DataFrameSubFeed.assertCorrectSubFeedType
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaDataFrameImplicits.OrderingOps
 
 import scala.collection.immutable.Queue
 import scala.reflect.ClassTag
@@ -272,12 +273,16 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
 
   override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame =>
-      def getDuplicatedCols(cols: Seq[ScalaColumn[_]]): Seq[String] = cols.groupBy(_.definition.name.toLowerCase).view.mapValues(_.size).filter(_._2 > 1).keys.toSeq.sorted
+      def getDuplicatedCols(cols: Seq[ScalaColumn[_]]): Seq[String] = cols.groupBy(_.definition.name.toLowerCase).mapValues(_.size).filter(_._2 > 1).keys.toSeq.sorted
       assert(getDuplicatedCols(this.cols).isEmpty, s"Duplicate column names '${getDuplicatedCols(this.cols).mkString(", ")}' found in this dataframe, cannot perform unionByName. Make sure all column names are unique for this operation.")
       assert(getDuplicatedCols(otherScala.cols).isEmpty, s"Duplicate column names '${getDuplicatedCols(otherScala.cols).mkString(", ")}' found in other dataframe, cannot perform unionByName. Make sure all column names are unique for this operation.")
       if (!allowMissingColumns) checkColumnsExist(otherScala, this.columns)
-      val thisCols = this.cols.map(c => c.definition.name -> c).toMap
-      val otherCols = otherScala.cols.map(c => c.definition.name -> c).toMap
+      val thisCols = this.cols.map(c =>
+        c.definition.name -> c.asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
+      ).toMap
+      val otherCols = otherScala.cols.map(c =>
+        c.definition.name -> c.asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
+      ).toMap
       val finalColNames = if (allowMissingColumns) columns ++ otherScala.columns.diff(columns)
       else columns
       assert(finalColNames.nonEmpty, "No common columns found between the two dataframes for unionByName. Make sure to have at least one column with the same name in both dataframes or set allowMissingColumns=true.")
@@ -510,4 +515,15 @@ object ScalaDataFrameImplicits {
   implicit class SeqToDataFrame(seq: Seq[Seq[Any]]) {
     def toDF(colNames: String*): ScalaDataFrame = ScalaDataFrame.fromData(seq, colNames)
   }
+
+  // This class can be removed once we are on Scala 2.13 and can use the built-in orElse method on Ordering
+  implicit class OrderingOps[T](val self: Ordering[T]) extends AnyVal {
+    def orElse(other: Ordering[T]): Ordering[T] =
+      Ordering.fromLessThan { (a, b) =>
+        val cmp = self.compare(a, b)
+        if (cmp != 0) cmp < 0
+        else other.compare(a, b) < 0
+      }
+  }
 }
+

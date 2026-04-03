@@ -52,10 +52,12 @@ abstract class ScalaAbstractColumn extends GenericColumn {
         case Array(alias, name) =>
           val dfCol = df.cols.find( c => (c.getName.contains(name) || name == "*") && c.definition.dataFrameAlias.contains(alias))
             .getOrElse(throw ColumnNotFoundException(s"$alias.$name", df.cols.map(_.definition.getFullName())))
+            .asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
           (s"$alias.$name", dfCol)
         case Array(name) =>
           val dfCol = df.cols.find(c => c.getName.contains(name) || name == "*")
             .getOrElse(throw ColumnNotFoundException(name, df.cols.map(_.definition.name)))
+            .asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
           (name, dfCol)
       }.toMap
     toScalaColumn(inputData, df.nrRows)

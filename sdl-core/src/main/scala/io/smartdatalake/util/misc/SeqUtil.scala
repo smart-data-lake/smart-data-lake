@@ -22,10 +22,32 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.definitions.Environment
 
 object SeqUtil {
-  implicit class SeqExtension(seq: Seq[String]) {
+  implicit class SeqStringExtension(seq: Seq[String]) {
     def caseSensitiveDiff(in: Seq[String]): Seq[String] = {
       if (Environment.caseSensitive) seq.diff(in)
       else seq.map(_.toLowerCase).diff(in.map(_.toLowerCase))
+    }
+  }
+  //TODO: can be removed when we switch to Scala 2.13, because it has maxOption and minOption built in
+  implicit class SeqWithOrderingExtension[T: Ordering](seq: Seq[T]) {
+    def maxOption(): Option[T] = {
+      if (seq.isEmpty) None
+      else Some(seq.max)
+    }
+    def minOption(): Option[T] = {
+      if (seq.isEmpty) None
+      else Some(seq.min)
+    }
+  }
+  //TODO: can be removed when we switch to Scala 2.13, because it has maxOption and minOption built in
+  implicit class SeqExtension[T](seq: Seq[T]) {
+    def maxOption(ordering: Ordering[T]): Option[T] = {
+      if (seq.isEmpty) None
+      else Some(seq.max(ordering))
+    }
+    def minOption(ordering: Ordering[T]): Option[T] = {
+      if (seq.isEmpty) None
+      else Some(seq.min(ordering))
     }
   }
 }

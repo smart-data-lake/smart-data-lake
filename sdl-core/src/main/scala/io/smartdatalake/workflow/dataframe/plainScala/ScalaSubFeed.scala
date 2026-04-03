@@ -31,6 +31,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataF
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.{Type, typeOf}
 import scala.reflect.runtime.universe.TypeTag
+import io.smartdatalake.util.misc.SeqUtil._
 
 /**
  * A pure Scala implementation of DataFrames and related classes for testing purposes without Spark dependencies.

@@ -189,7 +189,7 @@ object Historization extends SmartDataLakeLogger {
                            addExistingDfHashColumn: Boolean): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfExisting.subFeedType)
     import functions._
-    import io.smartdatalake.util.misc.SeqUtil.SeqExtension
+    import io.smartdatalake.util.misc.SeqUtil.SeqStringExtension
 
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)

@@ -213,6 +213,9 @@ object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
 
   override def isImpreciseNumeric: Boolean = false
 
+  // TODO: only needed in Scala 2.12, can be removed when we drop Scala 2.12.
+  implicit val timestampOrdering: Ordering[Timestamp] = Ordering.fromLessThan(_.compareTo(_) < 0)
+
   def ordering: Ordering[Option[Timestamp]] = Ordering.Option(Ordering[Timestamp])
 
   override def numeric: Numeric[Timestamp] = new Numeric[Timestamp] {
