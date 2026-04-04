@@ -25,7 +25,7 @@ import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode
-import io.smartdatalake.workflow.action.{CopyAction, HistorizeAction}
+import io.smartdatalake.workflow.action.{CopyAction, HistorizeAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
@@ -331,7 +331,12 @@ trait HistorizeActionBehaviour {
       action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
       action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
       action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
-      action2.exec(Seq(srcSubFeed))(context2)
+      try {
+        action2.exec(Seq(srcSubFeed))(context2)
+      } catch {
+        // some DataObjects might detect that there is no new data to process
+        case e: NoDataToProcessWarning => ()
+      }
 
       // 2. expectation schema should have dl_hash column
       assert(tgtDO.getDataFrame().columns.map(_.toLowerCase).contains("dl_hash"))

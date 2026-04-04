@@ -95,16 +95,16 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
 
   private[spark] def extractMetrics(): Map[String, _] = {
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
-    metrics.getOrElse(Map())
+    val filteredMetrics = metrics.getOrElse(Map())
       .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
-      .flatMap { case (metricName, r) =>
-        val namePostfix = if (metricName != name) {
-          Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
-        } else None
-        val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
-        logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
-        metricEntries
-      }
+    filteredMetrics.flatMap { case (metricName, r) =>
+      val namePostfix = if (metricName != name) {
+        Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
+      } else None
+      val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
+      logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
+      metricEntries
+    }
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {

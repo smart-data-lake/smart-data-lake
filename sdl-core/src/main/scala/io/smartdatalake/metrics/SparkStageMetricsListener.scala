@@ -143,7 +143,10 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
    */
   def waitForLastMetrics(timeoutSec: Int = 10): MetricsMap = {
     val sparkMetrics = waitForSparkMetrics(timeoutSec)
-    sparkMetrics.sortBy(_.jobInfo.id).lastOption.map(_.getMainInfos).getOrElse(Map())
+      .sortBy(_.jobInfo.id)
+    val lastSparkMetrics = sparkMetrics.filter(_.recordsWritten > 0).lastOption
+      .orElse(sparkMetrics.lastOption)
+    lastSparkMetrics.map(_.getMainInfos).getOrElse(Map())
   }
 }
 
