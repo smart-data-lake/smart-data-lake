@@ -31,6 +31,10 @@ class ExpressionParserTest extends AnyFunSuite {
 
   private def evaluate(expression: String): Any = {
     val inputCols = Seq(ScalaColumn("dummy", IndexedSeq(42)), ScalaColumn("test.a", IndexedSeq(42)))
+    evaluate(expression, inputCols)
+  }
+
+  private def evaluate(expression: String, inputCols: Seq[ScalaColumn[_]]): Any = {
     val column = ExpressionParser.parse(expression).asInstanceOf[ScalaAbstractColumn]
     val scalaColumn = column.toScalaColumn(ScalaDataFrame(inputCols))
     scalaColumn.data.head
@@ -51,6 +55,8 @@ class ExpressionParserTest extends AnyFunSuite {
   test("support comparison operators") {
     assert(evaluate("1 + 2 = 3") == true)
     assert(evaluate("4 != 5") == true)
+    assert(evaluate("2 <=> 2") == true)
+    assert(evaluate("2 <=> 3") == false)
 
     val lessExpr = ExpressionParser.parse("2 < 3")
     assert(lessExpr.isInstanceOf[ScalaBinaryExpr])
@@ -59,6 +65,33 @@ class ExpressionParserTest extends AnyFunSuite {
     val greaterExpr = ExpressionParser.parse("3 > 2")
     assert(greaterExpr.isInstanceOf[ScalaBinaryExpr])
     assert(greaterExpr.asInstanceOf[ScalaBinaryExpr].opName == "gt")
+
+    val nullSafeExpr = ExpressionParser.parse("2 <=> 2")
+    assert(nullSafeExpr.isInstanceOf[ScalaBinaryExpr])
+    assert(nullSafeExpr.asInstanceOf[ScalaBinaryExpr].opName == "equal null")
+  }
+
+  test("support null-safe equals null handling") {
+    val bothNullCols = Seq(ScalaColumn[String]("a", IndexedSeq(null)), ScalaColumn[String]("b", IndexedSeq(null)))
+    assert(evaluate("a <=> b", bothNullCols) == true)
+
+    val oneNullCols = Seq(ScalaColumn[String]("a", IndexedSeq(null)), ScalaColumn[String]("b", IndexedSeq("xyz")))
+    assert(evaluate("a <=> b", oneNullCols) == false)
+  }
+
+  test("support is null and is not null") {
+    val nullCols = Seq(ScalaColumn[String]("col1", IndexedSeq(null)))
+    val valueCols = Seq(ScalaColumn[String]("col1", IndexedSeq("xyz")))
+
+    assert(evaluate("col1 is null", nullCols) == true)
+    assert(evaluate("col1 is not null", nullCols) == false)
+    assert(evaluate("col1 is null", valueCols) == false)
+    assert(evaluate("col1 is not null", valueCols) == true)
+  }
+
+  test("support case-insensitive is null keywords") {
+    val valueCols = Seq(ScalaColumn[String]("col1", IndexedSeq("xyz")))
+    assert(evaluate("col1 Is NoT nUlL", valueCols) == true)
   }
 
   test("support logical and or") {
@@ -70,6 +103,10 @@ class ExpressionParserTest extends AnyFunSuite {
   test("respect logical precedence") {
     assert(evaluate("1 = 2 or 2 = 2 and 3 = 3") == true)
     assert(evaluate("1 = 1 or 2 = 2 and 3 = 4") == true)
+    assert(evaluate("1 = 2 or 2 <=> 2 and 3 = 3") == true)
+
+    val cols = Seq(ScalaColumn[String]("col1", IndexedSeq(null)))
+    assert(evaluate("1 = 2 or col1 is null and 3 = 3", cols) == true)
   }
 
   test("support logical precedence override by parentheses") {
@@ -146,6 +183,12 @@ class ExpressionParserTest extends AnyFunSuite {
 
   test("reject invalid logical syntax") {
     assertThrows[IllegalArgumentException](ExpressionParser.parse("1 = 1 and"))
+  }
+
+  test("reject invalid is null syntax") {
+    assertThrows[IllegalArgumentException](ExpressionParser.parse("col1 is"))
+    assertThrows[IllegalArgumentException](ExpressionParser.parse("col1 is not"))
+    assertThrows[IllegalArgumentException](ExpressionParser.parse("col1 is 1"))
   }
 
   test("reject invalid between syntax") {
