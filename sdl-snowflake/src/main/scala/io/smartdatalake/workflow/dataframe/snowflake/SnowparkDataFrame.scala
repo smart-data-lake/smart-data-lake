@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.json4s.JString
 import org.json4s.JsonAST.JValue
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -425,6 +426,6 @@ case class SnowparkRow(inner: Row) extends GenericRow {
   override def get(index: Int): Any = inner.get(index)
 
   override def getStruct(index: Int): GenericRow = throw new NotImplementedError("Snowpark row.getStruct not supported by Snowflake")
-  override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
+  override def getAs[T: ClassTag](index: Int): T = get(index).asInstanceOf[T]
   override def toSeq: Seq[Any] = inner.toSeq
 }

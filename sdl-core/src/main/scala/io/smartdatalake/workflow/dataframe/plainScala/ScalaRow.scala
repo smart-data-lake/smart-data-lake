@@ -35,7 +35,12 @@ case class ScalaRow(values: IndexedSeq[Option[Any]]) extends GenericRow {
 
   override def getStruct(index: Int): GenericRow = throw new NotImplementedError("getStruct is not implemented for ScalaRow")
 
-  override def getAs[T](index: Int): T = values(index).asInstanceOf[T]
+  override def getAs[T: ClassTag](index: Int): T = {
+    val v = values(index)
+    val cls = implicitly[ClassTag[T]].runtimeClass
+    if (cls.isAssignableFrom(classOf[Option[_]])) v.asInstanceOf[T]
+    else v.orNull.asInstanceOf[T]
+  }
 
   override def toSeq: Seq[Option[Any]] = values
 

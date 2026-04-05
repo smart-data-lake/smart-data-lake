@@ -21,12 +21,13 @@ package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{GenericSchemaUtil,SchemaUtil,SQLUtil,StringUtil}
+import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil, StringUtil}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.json4s.JsonAST.{JBool, JObject}
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, JArray, JNothing, JString, JValue, NoTypeHints}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.Type
 
 /**
@@ -581,7 +582,7 @@ trait GenericRow extends GenericTypedObject {
 
   def getStruct(index: Int): GenericRow
 
-  def getAs[T](index: Int): T
+  def getAs[T: ClassTag](index: Int): T
 
   //Note: getAs[T](fieldName: String) can not be implemented as in Snowpark a Row does not know the names of its fields!
   def toSeq: Seq[Any]

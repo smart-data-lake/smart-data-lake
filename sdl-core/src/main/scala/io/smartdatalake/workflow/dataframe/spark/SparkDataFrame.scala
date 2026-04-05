@@ -34,6 +34,7 @@ import org.apache.spark.sql.types._
 import org.json4s.JString
 import org.json4s.JsonAST.JValue
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
@@ -530,7 +531,7 @@ case class SparkRow(inner: Row) extends GenericRow {
 
   override def getStruct(index: Int): GenericRow = SparkRow(inner.getStruct(index))
 
-  override def getAs[T](index: Int): T = inner.getAs[T](index)
+  override def getAs[T: ClassTag](index: Int): T = inner.getAs[T](index)
 
   override def toSeq: Seq[Any] = inner.toSeq
 }

@@ -524,7 +524,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     val metrics1 = tgtSubFeed1.metrics.get
     assert(metrics1 == Map("count" -> 2, "countAll" -> 2, "records_written" -> 2, "tgt1AvgRatingGt1" -> 4.0, "count#src1" -> 2, "count#mainInput" -> 2, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "pctComplete" -> 1.0))
     val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 0, "tgt2AvgRatingGt1" -> None, "count#src2" -> 0, "countAll#src2" -> 0, "no_data" -> true))
+    assert(metrics2 == Map("count" -> 0, "records_written" -> 0, "tgt2AvgRatingGt1" -> None, "count#src2" -> 0, "countAll#src2" -> 0, "no_data" -> true))
   }
 
   test("copy load with constraints and expectations main input no_data") {
@@ -567,7 +567,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // check expectation value in metrics
     val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 0, "countAll" -> 0, "tgt1AvgRatingGt1" -> None, "count#src1" -> 0, "count#mainInput" -> 0, "countAll#src1" -> 0, "countAll#mainInput" -> 0, "pctTransfer" -> "null", "pctComplete" -> "null", "no_data" -> true))
+    assert(metrics1 == Map("count" -> 0, "records_written" -> 0, "countAll" -> 0, "tgt1AvgRatingGt1" -> None, "count#src1" -> 0, "count#mainInput" -> 0, "countAll#src1" -> 0, "countAll#mainInput" -> 0, "pctTransfer" -> "null", "pctComplete" -> "null", "no_data" -> true))
     val metrics2 = tgtSubFeed2.metrics.get
     assert(metrics2 == Map("count" -> 2, "tgt2AvgRatingGt1" -> 4.0, "count#src2" -> 2, "countAll#src2" -> 2, "records_written" -> 2))
 
