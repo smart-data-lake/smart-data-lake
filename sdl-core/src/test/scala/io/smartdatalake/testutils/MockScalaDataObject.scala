@@ -161,7 +161,6 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     }
   }
 
-
   def mergeDataFrameByPrimaryKey(dfNew: ScalaDataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): (ScalaDataFrame, MetricsMap) = {
     import functions._
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
