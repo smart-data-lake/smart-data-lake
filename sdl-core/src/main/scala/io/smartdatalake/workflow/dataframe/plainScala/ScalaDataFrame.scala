@@ -116,14 +116,14 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
           this.rows.flatMap(thisRow =>
             rightGrouped.get(filterRow(thisRow, indicesThisJoinCol)) match {
               case Some(matchingRows) => matchingRows.map(thatRow => ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
-              case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(null)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(None)).toIndexedSeq))
             }
           )
         case "right" =>
           otherScala.rows.flatMap(thatRow =>
             leftGrouped.get(filterRow(thatRow, indicesThatJoinCol)) match {
               case Some(matchingRows) => matchingRows.map(thisRow => ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
-              case None => Seq(ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ Seq.fill(indicesThisNonJoinCol.size)(null) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ Seq.fill(indicesThisNonJoinCol.size)(None) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
             }
           )
         case "full" =>
@@ -133,12 +133,12 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
                 thatRow =>
                   ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq)
               }
-              case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(null)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thisRow, indicesThisJoinCol) ++ filterRow(thisRow, indicesThisNonJoinCol) ++ Seq.fill(indicesThatNonJoinCol.size)(None)).toIndexedSeq))
             }
           ) ++ otherScala.rows.flatMap(thatRow =>
             leftGrouped.get(filterRow(thatRow, indicesThatJoinCol)) match {
               case Some(_) => Seq() //already included in the left join part
-              case None => Seq(ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ Seq.fill(indicesThisNonJoinCol.size)(null) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
+              case None => Seq(ScalaRow((filterRow(thatRow, indicesThatJoinCol) ++ Seq.fill(indicesThisNonJoinCol.size)(None) ++ filterRow(thatRow, indicesThatNonJoinCol)).toIndexedSeq))
             }
           )
         case _ => throw new IllegalArgumentException(s"Join type $joinType is not supported. Supported join types are: inner, left, right, full")
@@ -165,10 +165,10 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
         joinType match {
           case "inner" => df
           case "left"  =>
-            if (df.isEmpty) ScalaDataFrame.fromData(Seq(thisRow.values ++ Seq.fill(that.schema.fields.size)(null)), Some(newSchema))
+            if (df.isEmpty) ScalaDataFrame.fromData(Seq(thisRow.values ++ Seq.fill(that.schema.fields.size)(None)), Some(newSchema))
             else df
           case "anti"  =>
-            if (df.isEmpty) ScalaDataFrame.fromData(Seq(thisRow.values ++ Seq.fill(that.schema.fields.size)(null)), Some(newSchema))
+            if (df.isEmpty) ScalaDataFrame.fromData(Seq(thisRow.values ++ Seq.fill(that.schema.fields.size)(None)), Some(newSchema))
             else emptyDf
         }
       }
@@ -180,10 +180,10 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
         joinType match {
           case "inner" => df
           case "right" =>
-            if (df.isEmpty) ScalaDataFrame.fromData(Seq(Seq.fill(this.schema.fields.size)(null) ++ thatRow.values), Some(newSchema))
+            if (df.isEmpty) ScalaDataFrame.fromData(Seq(Seq.fill(this.schema.fields.size)(None) ++ thatRow.values), Some(newSchema))
             else df
           case "anti" =>
-            if (df.isEmpty) ScalaDataFrame.fromData(Seq(Seq.fill(this.schema.fields.size)(null) ++ thatRow.values), Some(newSchema))
+            if (df.isEmpty) ScalaDataFrame.fromData(Seq(Seq.fill(this.schema.fields.size)(None) ++ thatRow.values), Some(newSchema))
             else emptyDf
         }
       }
@@ -287,8 +287,8 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       else columns
       assert(finalColNames.nonEmpty, "No common columns found between the two dataframes for unionByName. Make sure to have at least one column with the same name in both dataframes or set allowMissingColumns=true.")
       val unionData = finalColNames.map { colName =>
-        val thisCol = thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(null)))
-        val otherCol = otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(null)))
+        val thisCol = thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(None)))
+        val otherCol = otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(None)))
         assert(thisCol.definition.dataType == otherCol.definition.dataType || thisCol.definition.dataType == ScalaNullDataType || otherCol.definition.dataType == ScalaNullDataType, s"Data types for column $colName do not match between the two dataframes (${thisCol.definition.dataType.getClass.getSimpleName} != ${otherCol.definition.dataType.getClass.getSimpleName}")
         if (thisCol.definition.dataType == ScalaNullDataType) otherCol.definition.createColumn(data = thisCol.data ++ otherCol.data)
         else thisCol.definition.createColumn(data = thisCol.data ++ otherCol.data)
@@ -323,7 +323,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
     case scalaExpr: ScalaAbstractColumn =>
       assert(scalaExpr.dataType == ScalaBooleanDataType, "The filter expression must have a boolean return type")
       val exprData = scalaExpr.toScalaColumn(this).data
-      val filteredRows = this.rows.zip(exprData).filter(_._2 == true).map(_._1)
+      val filteredRows = this.rows.zip(exprData).filter(_._2.contains(true)).map(_._1)
       ScalaDataFrame.fromRows(filteredRows, Some(schema))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(expression)
   }
@@ -449,7 +449,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
 
 object ScalaDataFrame {
   def fromData(rows: Seq[Seq[Any]], schema: Option[ScalaSchema] = None): ScalaDataFrame = {
-    fromRows(rows.map(row => ScalaRow(row.toIndexedSeq)), schema)
+    fromRows(rows.map(row => ScalaRow(row.map(optionalize).toIndexedSeq)), schema)
   }
 
   def fromData[A <: Product : ClassTag](rows: Seq[A]): ScalaDataFrame = {
@@ -466,7 +466,11 @@ object ScalaDataFrame {
       val colDefs = if (rows.isEmpty) throw new IllegalStateException("Cannot infer schema without data")
       else {
         colNames.zipWithIndex.map { case (c,idx) =>
-          val sample = rows.find(row => row(idx) != null).map(row => row(idx))
+          val sample = rows.find(row => row(idx) != null).map(row => row(idx)).map {
+            case Some(s) => s
+            case None => null
+            case x => x
+          }
           val dataType = ScalaDataType.getFor(sample.map(_.getClass).getOrElse(classOf[Null]))
           dataType.createColumnDefinition(c)
         }
@@ -474,7 +478,12 @@ object ScalaDataFrame {
       ScalaSchema(colDefs)
     }
 
-    fromRows(rows.map(row => ScalaRow(row.toIndexedSeq)), Some(inferSchema))
+    fromRows(rows.map(row => ScalaRow(row.map(optionalize).toIndexedSeq)), Some(inferSchema))
+  }
+
+  def optionalize(v: Any): Option[Any] = v match {
+    case o: Option[_] => o
+    case v => Option(v)
   }
 
   def fromRows(rows: Seq[ScalaRow], schemaIn: Option[ScalaSchema] = None): ScalaDataFrame = {
@@ -482,7 +491,12 @@ object ScalaDataFrame {
     def inferSchema: ScalaSchema = {
       val colDefs = if (rows.isEmpty) throw new IllegalStateException("Cannot infer schema without data")
       else rows.head.values.zipWithIndex.map { case (v, i) =>
-        val dataType = ScalaDataType.getFor(v.getClass)
+        val sample = v match {
+          case Some(s) => s
+          case None => null
+          case x => x
+        }
+        val dataType = ScalaDataType.getFor(sample.getClass)
         dataType.createColumnDefinition(s"col$i")
       }
       ScalaSchema(colDefs)

@@ -30,7 +30,7 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
 
   override def dataType: ScalaDataType[_] = throw new IllegalStateException("Cannot get dataType for explode() expression, because it needs DataFrame to be evaluated.")
 
-  override def data: Seq[_] = throw new IllegalStateException("Cannot get data for explode() expression, because it changes DataFrame granularity. Make sure explode is used as top-level expression in a withColumn statement.")
+  override def data: Seq[Option[_]] = throw new IllegalStateException("Cannot get data for explode() expression, because it changes DataFrame granularity. Make sure explode is used as top-level expression in a withColumn statement.")
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(visitorFunc(this), in.visit(visitorFunc, aggregator))
@@ -39,7 +39,7 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
   def explodeDataFrame(colName: String, df: ScalaDataFrame): ScalaDataFrame = {
     val inResolved = in.toScalaColumn(df)
     assert(inResolved.dataType.isInstanceOf[ScalaArrayDataType], s"Input column for explode() must be of type array, but is ${in.dataType}")
-    val inData = inResolved.data.asInstanceOf[Seq[Seq[Any]]]
+    val inData = inResolved.data.asInstanceOf[Seq[Option[Seq[Any]]]]
     val dataType = fixedDataType
       .orElse(inResolved.dataType.asInstanceOf[ScalaArrayDataType].elementType)
       .getOrElse{
@@ -48,8 +48,8 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
     }
     assert(df.nrRows == inData.size)
     val explodedRows = df.rows.zip(inData).flatMap {
-      case (row, seq) => seq.map(x => (row.values :+ x))
-    }
+      case (row, seqOpt) => seqOpt.map(_.map(x => (row.values :+ Option(x))))
+    }.flatten
     ScalaDataFrame.fromData(explodedRows, Some(ScalaSchema(df.cols.map(_.definition) :+ dataType.createColumnDefinition(colName))))
   }
 

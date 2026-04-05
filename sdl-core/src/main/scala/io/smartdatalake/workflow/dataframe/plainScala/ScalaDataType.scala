@@ -78,7 +78,11 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
   }
 
   def createLiteral(value: Any): ScalaLiteral[A] = {
-    ScalaLiteral(value.asInstanceOf[A])
+    val litValue = value match {
+      case x: Option[A] => x
+      case x => Option(x).map(_.asInstanceOf[A])
+    }
+    ScalaLiteral(litValue)
   }
 
   def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
@@ -90,7 +94,7 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
     else {
       val castFun = getCastFunction(fromColumn.definition.dataType)
       castColumnDefinition(fromColumn.definition)
-        .createColumn(fromColumn.data.map(x => castFun(x)))
+        .createColumn(fromColumn.data.map(x => x.map(castFun)))
     }
   }
 
@@ -295,13 +299,25 @@ object ScalaDataType {
       case cls if cls == classOf[Null] || cls == null => ScalaNullDataType
       case cls if cls == classOf[String] => ScalaStringDataType
       case cls if cls == classOf[Int] || cls == classOf[java.lang.Integer] => ScalaIntDataType
-      case cls if cls == classOf[Double] => ScalaDoubleDataType
+      case cls if cls == classOf[Double] || cls == classOf[java.lang.Double] => ScalaDoubleDataType
       case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
       case cls if cls == classOf[Timestamp] => ScalaTimestampDataType
       case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaArrayDataType(None)
       case _ =>
-        println(cls.getName)
-        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp and Array. Could not match with class ${cls.getSimpleName}")
+        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp and Array. Could not match with class ${cls.getName}")
+    }
+  }
+
+  def getFor(sqlType: String): ScalaDataType[_] = {
+    sqlType.toLowerCase match {
+      case "null" => ScalaNullDataType
+      case "string" => ScalaStringDataType
+      case "int" | "integer" => ScalaIntDataType
+      case "double" => ScalaDoubleDataType
+      case "bool" => ScalaBooleanDataType
+      case "timestamp" => ScalaTimestampDataType
+      case _ =>
+        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp to create SQL types. Could not match with SQL type $sqlType")
     }
   }
 }

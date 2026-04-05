@@ -24,78 +24,79 @@ import org.scalatest.funsuite.AnyFunSuite
 class ScalaAbstractColumnTest extends AnyFunSuite {
 
   import ScalaDataFrame.implicits._
+  import ScalaSubFeed._
 
   test("add literal column") {
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
-    val expected = Seq(2, 3)
+    val expected = Seq(Some(2), Some(3))
     val df = data.toDF("a", "b")
-    val colN = (ScalaLiteral(1) + ScalaColumnReference("a")).toScalaColumn(df)
+    val colN = (lit(1) + ScalaColumnReference("a")).toScalaColumn(df)
     assert(colN.data == expected)
     assert(colN.getName.exists(_.startsWith("col")))
   }
 
   test("add literal column with different datatypes") {
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
-    val expected = Seq(2d, 3d)
+    val expected = Seq(Some(2d), Some(3d))
     val df = data.toDF("a", "b")
-    val colN = (ScalaLiteral(1d) + ScalaColumnReference("a")).toScalaColumn(df)
+    val colN = (lit(1d) + ScalaColumnReference("a")).toScalaColumn(df)
     assert(colN.data == expected)
     assert(colN.getName.exists(_.startsWith("col")))
   }
 
   test("add literal column with different datatypes continued") {
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
-    val expected = Seq(2d, 3d)
+    val expected = Seq(Some(2d), Some(3d))
     val df = data.toDF("a", "b")
-    val colN = (ScalaColumnReference("a") + ScalaLiteral(1d)).toScalaColumn(df)
+    val colN = (ScalaColumnReference("a") + lit(1d)).toScalaColumn(df)
     assert(colN.data == expected)
     assert(colN.getName.exists(_.startsWith("col")))
   }
 
   test("add named expression") {
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
-    val expected = Seq(2d, 3d)
+    val expected = Seq(Some(2d), Some(3d))
     val df = data.toDF("a", "b")
-    val colC = (ScalaNamedExpr(ScalaLiteral(1d) + ScalaColumnReference("a"), "c")).toScalaColumn(df)
+    val colC = (ScalaNamedExpr(lit(1d) + ScalaColumnReference("a"), "c")).toScalaColumn(df)
     assert(colC.data == expected)
     assert(colC.getName.contains("c"))
   }
 
   test("integer div expression") {
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
-    val expected = Seq(0, 1)
+    val expected = Seq(Some(0), Some(1))
     val df = data.toDF("a", "b")
-    val colN = (ScalaColumnReference("a") / ScalaLiteral(2)).toScalaColumn(df)
+    val colN = (ScalaColumnReference("a") / lit(2)).toScalaColumn(df)
     assert(colN.data == expected)
   }
 
   test("double div expression") {
     val data = Seq(Seq(1, "A"), Seq(2, "B"))
-    val expected = Seq(0.5d, 1d)
+    val expected = Seq(Some(0.5d), Some(1d))
     val df = data.toDF("a", "b")
-    val colN = (ScalaColumnReference("a") / ScalaLiteral(2d)).toScalaColumn(df)
+    val colN = (ScalaColumnReference("a") / lit(2d)).toScalaColumn(df)
     assert(colN.data == expected)
   }
 
   test("and expression") {
     val data = Seq(Seq(1, true), Seq(2, false))
-    val expected = Seq(true, false)
+    val expected = Seq(Some(true), Some(false))
     val df = data.toDF("a", "b")
-    val colN = (ScalaColumnReference("b") and ScalaLiteral(true)).toScalaColumn(df)
+    val colN = (ScalaColumnReference("b") and lit(true)).toScalaColumn(df)
     assert(colN.data == expected)
   }
 
   test("equal expression") {
     val data = Seq(Seq(1, true), Seq(2, false))
-    val expected = Seq(true, false)
+    val expected = Seq(Some(true), Some(false))
     val df = data.toDF("a", "b")
-    val colN = (ScalaColumnReference("a") === ScalaLiteral(1)).toScalaColumn(df)
+    val colN = (ScalaColumnReference("a") === lit(1)).toScalaColumn(df)
     assert(colN.data == expected)
   }
 
   test("unary expression (not)") {
     val data = Seq(Seq(1, true), Seq(2, false))
-    val expected = Seq(true, true)
+    val expected = Seq(Some(true), Some(true))
     val df = data.toDF("a", "b")
     val colN = (ScalaColumnReference("a").isNotNull).toScalaColumn(df)
     assert(colN.data == expected)

@@ -44,8 +44,8 @@ case class ScalaColumnDefinition[A: ClassTag](name: String,
 
   def removeMetadata: ScalaColumnDefinition[A] = copy(comment = None)
 
-  def createColumn(data: IndexedSeq[_]): ScalaColumn[A] = {
-    ScalaColumn(this, data.asInstanceOf[IndexedSeq[A]])
+  def createColumn(data: IndexedSeq[Option[_]]): ScalaColumn[A] = {
+    ScalaColumn(this, data.asInstanceOf[IndexedSeq[Option[A]]])
   }
 
   def withDataFrameAlias(alias: Option[String]): ScalaColumnDefinition[A] = copy(dataFrameAlias = alias)

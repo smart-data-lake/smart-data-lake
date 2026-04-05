@@ -31,7 +31,7 @@ import scala.reflect.ClassTag
  * @param data       the actual data of the column
  * @tparam A the Scala type of the column
  */
-case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var data: IndexedSeq[A]) extends ScalaAbstractColumn with SmartDataLakeLogger {
+case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var data: IndexedSeq[Option[A]]) extends ScalaAbstractColumn with SmartDataLakeLogger {
 
   override def dataType: ScalaDataType[A] = definition.dataType
 
@@ -58,7 +58,7 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var da
     // note that data delivery is triggered through markForDataReset() and inputColumns method.
     // if we get no data, we dont need to update.
     inputData.get(definition.getFullName())
-      .foreach(col => data = col.data.asInstanceOf[IndexedSeq[A]])
+      .foreach(col => data = col.data.asInstanceOf[IndexedSeq[Option[A]]])
   }
 
   override def inputColumns: Set[String] = {
@@ -74,6 +74,10 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var da
 object ScalaColumn {
 
   def apply[A: ClassTag](name: String, data: Seq[A]): ScalaColumn[A] = {
+    fromDataOpt(name, data.map(Option(_)))
+  }
+
+  def fromDataOpt[A: ClassTag](name: String, data: Seq[Option[A]]): ScalaColumn[A] = {
     val (alias, colName) = name.split('.') match {
       case Array(a, c) => (Some(a), c)
       case Array(c) => (None, c)
@@ -85,5 +89,12 @@ object ScalaColumn {
 
   def nextColName = s"col${colCounter.incrementAndGet()}"
 
+  def optionalizeUnaryFunc[T](func: (Any) => T): (Option[Any] => Option[T]) = {
+    a => if (a.isEmpty) None else Some(func(a.get))
+  }
+
+  def optionalizeBinaryFunc[T](func: (Any, Any) => T): (Option[Any], Option[Any]) => Option[T] = {
+    (a, b) => if (a.isEmpty || b.isEmpty) None else Some(func(a.get, b.get))
+  }
 }
 

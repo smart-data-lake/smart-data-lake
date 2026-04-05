@@ -55,6 +55,7 @@ object ExpressionParser {
     case object Multiply extends TokenType
     case object Divide extends TokenType
     case object Equal extends TokenType
+    case object NullSafeEqual extends TokenType
     case object NotEqual extends TokenType
     case object LessThan extends TokenType
     case object GreaterThan extends TokenType
@@ -62,6 +63,8 @@ object ExpressionParser {
     case object RightParen extends TokenType
     case object Comma extends TokenType
     case object Between extends TokenType
+    case object Is extends TokenType
+    case object Not extends TokenType
     case object And extends TokenType
     case object Or extends TokenType
     case object End extends TokenType
@@ -128,7 +131,7 @@ object ExpressionParser {
       var continue = true
       while (continue) {
         current.tokenType match {
-          case TokenType.Equal | TokenType.NotEqual | TokenType.LessThan | TokenType.GreaterThan =>
+          case TokenType.Equal | TokenType.NullSafeEqual | TokenType.NotEqual | TokenType.LessThan | TokenType.GreaterThan =>
             val operator = current
             index += 1
             val right = parseAdditive()
@@ -140,6 +143,18 @@ object ExpressionParser {
             val upper = parseAdditive()
             val valueCol = left.toColumn(functions)
             left = ParsedColumn(valueCol >= lower.toColumn(functions) and valueCol <= upper.toColumn(functions))
+          case TokenType.Is =>
+            index += 1
+            val isNegated = if (current.tokenType == TokenType.Not) {
+              index += 1
+              true
+            } else false
+            if (current.tokenType != TokenType.Identifier || !current.text.equalsIgnoreCase("null")) {
+              fail(s"Expected NULL but found '${current.text}'")
+            }
+            index += 1
+            val valueCol = left.toColumn(functions)
+            left = ParsedColumn(if (isNegated) valueCol.isNotNull else valueCol.isNull)
           case _ =>
             continue = false
         }
@@ -195,6 +210,9 @@ object ExpressionParser {
         case TokenType.BooleanLiteral =>
           index += 1
           ParsedLiteral(token.text.toBoolean)
+        case TokenType.Not if index + 1 < tokens.length && tokens(index + 1).tokenType == TokenType.LeftParen =>
+          // `not(...)` is parsed as a regular function call; `is not null` is handled in parseComparison.
+          parseIdentifier()
         case TokenType.Identifier =>
           parseIdentifierOrSpecialSymbol()
         case TokenType.Multiply =>
@@ -376,6 +394,7 @@ object ExpressionParser {
         case TokenType.Multiply => leftCol * rightCol
         case TokenType.Divide => leftCol / rightCol
         case TokenType.Equal => leftCol === rightCol
+        case TokenType.NullSafeEqual => leftCol <=> rightCol
         case TokenType.NotEqual => leftCol =!= rightCol
         case TokenType.LessThan => leftCol < rightCol
         case TokenType.GreaterThan => leftCol > rightCol
@@ -435,6 +454,9 @@ object ExpressionParser {
         case '!' if index + 1 < expression.length && expression.charAt(index + 1) == '=' =>
           add(TokenType.NotEqual, "!=", index)
           index += 2
+        case '<' if index + 2 < expression.length && expression.charAt(index + 1) == '=' && expression.charAt(index + 2) == '>' =>
+          add(TokenType.NullSafeEqual, "<=>", index)
+          index += 3
         case '<' =>
           add(TokenType.LessThan, "<", index)
           index += 1
@@ -501,6 +523,10 @@ object ExpressionParser {
             add(TokenType.BooleanLiteral, text.toLowerCase, start)
           } else if (text.equalsIgnoreCase("between")) {
             add(TokenType.Between, text, start)
+          } else if (text.equalsIgnoreCase("is")) {
+            add(TokenType.Is, text, start)
+          } else if (text.equalsIgnoreCase("not")) {
+            add(TokenType.Not, text, start)
           } else if (text.equalsIgnoreCase("and")) {
             add(TokenType.And, text, start)
           } else if (text.equalsIgnoreCase("or")) {

@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaColumn.{optionalizeBinaryFunc, optionalizeUnaryFunc}
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataType, GenericWhen}
 
 import scala.reflect.ClassTag
@@ -33,7 +34,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
 
   def dataType: ScalaDataType[_]
 
-  def data: Seq[_]
+  def data: Seq[Option[_]]
 
   def inputColumns: Set[String] = Set()
 
@@ -70,7 +71,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
     toScalaColumn(data.toIndexedSeq)
   }
 
-  def toScalaColumn(data: IndexedSeq[_]): ScalaColumn[_] = {
+  def toScalaColumn(data: IndexedSeq[Option[_]]): ScalaColumn[_] = {
     val columnDefinition = getName.getOrElse(ScalaColumn.nextColName).split('.') match {
       case Array(alias, name) => dataType.createColumnDefinition(name).withDataFrameAlias(Some(alias))
       case Array(name) => dataType.createColumnDefinition(name)
@@ -78,107 +79,128 @@ abstract class ScalaAbstractColumn extends GenericColumn {
     columnDefinition.createColumn(data)
   }
 
+  private def compareOptions(a: Option[Any], b: Option[Any]): Option[Boolean] = (a, b) match {
+    case (Some(av), Some(bv)) => Some(av == bv)
+    case _ => None
+  }
+
   override def ===(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal", _ => (_ == _), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal", _ => (a,b) => compareOptions(a,b), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def =!=(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "not equal", _ => (_ != _), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "not equal", _ => (a,b) => compareOptions(a,b).map(x => !x), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
+  private def compareOptionsNullSafe(a: Option[Any], b: Option[Any]): Option[Boolean] = (a, b) match {
+    case (Some(av), Some(bv)) => Some(av == bv)
+    case (None, None) => Some(true)
+    case _ => Some(false)
+  }
+
   override def <=>(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal null", _ => (a,b) => (a == null && b == null) || (a == b), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal null", _ => (a,b) => compareOptionsNullSafe(a,b), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def >(other: GenericColumn): ScalaAbstractColumn = {
+
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", _.numeric.gt, Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", dt => optionalizeBinaryFunc(dt.numeric.gt), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def <(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", _.numeric.lt, Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", dt => optionalizeBinaryFunc(dt.numeric.lt), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def >=(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gteq", _.numeric.gteq, Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gteq", dt => optionalizeBinaryFunc(dt.numeric.gteq), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def <=(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lteq", _.numeric.lteq, Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lteq", dt => optionalizeBinaryFunc(dt.numeric.lteq), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def -(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "minus", _.numeric.minus)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "minus", dt => optionalizeBinaryFunc(dt.numeric.minus))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def +(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "plus", _.numeric.plus)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "plus", dt => optionalizeBinaryFunc(dt.numeric.plus))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def /(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "div", _.numericDiv)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "div", dt => optionalizeBinaryFunc(dt.numericDiv))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def *(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "multiply", _.numeric.times)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "multiply", dt => optionalizeBinaryFunc(dt.numeric.times))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
+
   override def and(other: GenericColumn): ScalaAbstractColumn = {
+    def andFunc: (Option[Any], Option[Any]) => Option[Boolean] = (a, b) => (a, b) match {
+      case (Some(av), Some(bv)) if av.isInstanceOf[Boolean] && bv.isInstanceOf[Boolean] => Some(av.asInstanceOf[Boolean] && bv.asInstanceOf[Boolean])
+      case _ => None
+    }
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "and", _ => (_.asInstanceOf[Boolean] && _.asInstanceOf[Boolean]), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "and", _ => andFunc, Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def or(other: GenericColumn): ScalaAbstractColumn = {
+    def orFunc: (Option[Any], Option[Any]) => Option[Boolean] = (a, b) => (a, b) match {
+      case (Some(av), Some(bv)) if av.isInstanceOf[Boolean] && bv.isInstanceOf[Boolean] => Some(av.asInstanceOf[Boolean] || bv.asInstanceOf[Boolean])
+      case _ => None
+    }
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "or", _ => (_.asInstanceOf[Boolean] || _.asInstanceOf[Boolean]), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "or", _ => orFunc, Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def isin(list: Any*): ScalaAbstractColumn = {
-    ScalaUnaryExpr(this, "isin", x => list.contains(x), Some(ScalaBooleanDataType))
+    ScalaUnaryExpr(this, "isin", x => x.map(xx => list.contains(xx)), Some(ScalaBooleanDataType))
   }
 
   override def isNull: ScalaAbstractColumn = {
-    ScalaUnaryExpr(this, "isNull", x => x == null, Some(ScalaBooleanDataType))
+    ScalaUnaryExpr(this, "isNull", x => Some(x.isEmpty), Some(ScalaBooleanDataType))
   }
 
   override def isNotNull: ScalaAbstractColumn = {
-    ScalaUnaryExpr(this, "isNotNull", x => x != null, Some(ScalaBooleanDataType))
+    ScalaUnaryExpr(this, "isNotNull", x => Some(x.isDefined), Some(ScalaBooleanDataType))
   }
 
   override def as(name: String): ScalaAbstractColumn = {
@@ -188,7 +210,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   override def cast(toDataType: GenericDataType): ScalaAbstractColumn = {
     if (toDataType.isSameType(this.dataType)) this
     else toDataType match {
-      case scalaDataType: ScalaDataType[_] => ScalaUnaryExpr(this, "cast", scalaDataType.getCastFunction(this.dataType), Some(scalaDataType))
+      case scalaDataType: ScalaDataType[_] => ScalaUnaryExpr(this, "cast", optionalizeUnaryFunc(scalaDataType.getCastFunction(this.dataType)), Some(scalaDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(toDataType)
     }
   }
@@ -215,16 +237,16 @@ abstract class ScalaAbstractColumn extends GenericColumn {
  *                      Note: this is a creator function, which is called lazy, because the datatype is not known at construction time
  * @param fixedDataType optional fixed datatype, if the result datatype is known in advance (e.g. for boolean operations)
  */
-case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String, funcCreator: ScalaDataType[Any] => (Seq[Any] => Any), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String, funcCreator: ScalaDataType[Any] => (Seq[Option[Any]] => Option[Any]), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
     cols.map(_.dataType).reduce((a, b) => a.getGreaterType(b))
   )
-  lazy val func: Seq[Any] => Any = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
-  override def data: Seq[_] = {
+  lazy val func: Seq[Option[Any]] => Any = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
+  override def data: Seq[Option[_]] = {
     assert(cols.map(_.data.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.map(c => s"'${c.getName.getOrElse("col")}': ${c.data.size}").mkString(", ")}")
     val colsDataCasted = cols.map { c =>
       val castFun = if (dataType != c.dataType && fixedDataType.isEmpty) dataType.getCastFunction(c.dataType) else (x: Any) => x
-      c.data.map(castFun)
+      c.data.map(_.map(castFun))
     }
     val opFun = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
     colsDataCasted.transpose.map(opFun)
@@ -247,18 +269,18 @@ case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String, funcCre
  *                      Note: this is a creator function, which is called lazy, because the datatype is not known at construction time
  * @param fixedDataType optional fixed datatype, if the result datatype is known in advance (e.g. for boolean operations)
  */
-case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn, opName: String, funcCreator: ScalaDataType[Any] => ((Any, Any) => Any), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn, opName: String, funcCreator: ScalaDataType[Any] => ((Option[Any], Option[Any]) => Option[Any]), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
     left.dataType.getGreaterType(right.dataType)
   )
 
-  override def data: Seq[_] = {
+  override def data: Seq[Option[_]] = {
     assert(left.data.size == right.data.size, s"Size of left data (${left.data.size}) must be equal to size of right data (${right.data.size})")
     val funcDataType = left.dataType.getGreaterType(right.dataType)
-    val func: (Any, Any) => Any = funcCreator(funcDataType.asInstanceOf[ScalaDataType[Any]])
+    val func: (Option[Any], Option[Any]) => Option[Any] = funcCreator(funcDataType.asInstanceOf[ScalaDataType[Any]])
     val castLeft = if (dataType != left.dataType && fixedDataType.isEmpty) dataType.getCastFunction(left.dataType) else (x: Any) => x
     val castRight = if (dataType != right.dataType && fixedDataType.isEmpty) dataType.getCastFunction(right.dataType) else (x: Any) => x
-    (left.data zip right.data).map(pair => func(castLeft(pair._1), castRight(pair._2)))
+    (left.data zip right.data).map(pair => func(pair._1.map(castLeft), pair._2.map(castRight)))
   }
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
@@ -278,10 +300,10 @@ case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn
  * @param func          function for the operation
  * @param fixedDataType optional fixed datatype, if the result datatype is different thant the dataType of the input column, and it is known in advance
  */
-case class ScalaUnaryExpr(in: ScalaAbstractColumn, opName: String, func: Any => Any, fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaUnaryExpr(in: ScalaAbstractColumn, opName: String, func: Option[Any] => Option[Any], fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   override def dataType: ScalaDataType[_] = fixedDataType.getOrElse(in.dataType)
 
-  override def data: Seq[_] = in.data.map(func)
+  override def data: Seq[Option[_]] = in.data.map(func)
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
@@ -295,7 +317,7 @@ case class ScalaUnaryExpr(in: ScalaAbstractColumn, opName: String, func: Any => 
  * @param value literal value
  * @tparam A type of the literal value
  */
-case class ScalaLiteral[A: ClassTag](value: A) extends ScalaAbstractColumn {
+case class ScalaLiteral[A: ClassTag](value: Option[A]) extends ScalaAbstractColumn {
   override val dataType: ScalaDataType[A] = ScalaDataType.getFor[A]
   private var colSize: Option[Int] = None
 
@@ -303,7 +325,7 @@ case class ScalaLiteral[A: ClassTag](value: A) extends ScalaAbstractColumn {
     colSize = Some(size)
   }
 
-  override def data: Seq[_] = {
+  override def data: Seq[Option[_]] = {
     Seq.fill(colSize.getOrElse(throw new IllegalStateException("Literal is not initialized")))(value)
   }
 }
@@ -331,7 +353,7 @@ case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
     resolvedColumn.get.dataType
   }
 
-  override def data: Seq[_] = {
+  override def data: Seq[Option[_]] = {
     assert(isResolved, s"Column reference with name '$name' is not resolved!")
     resolvedColumn.get.data
   }
@@ -349,7 +371,7 @@ case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
 case class ScalaNamedExpr(in: ScalaAbstractColumn, name: String) extends ScalaAbstractColumn {
   override def dataType: ScalaDataType[_] = in.dataType
 
-  override def data: Seq[_] = in.data
+  override def data: Seq[Option[_]] = in.data
 
   override def getName: Option[String] = Some(name)
 
@@ -366,12 +388,12 @@ case class ScalaNamedExpr(in: ScalaAbstractColumn, name: String) extends ScalaAb
  * @param in   input expression
  * @param opName operation name to be given to the expression
  * @param aggFunc aggregation function
- * @param outputDataType  output datatype
+ * @param outputDataType  output datatype; this is a function, which is called lazy, because the datatype is not known at construction time, as it can depend on the datatype of the input expression
  */
-case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String, aggFunc: Seq[Any] => Any, outputDataType: ScalaDataType[_]) extends ScalaAbstractColumn {
-  override def dataType: ScalaDataType[_] = outputDataType
+case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String, aggFunc: Seq[Option[Any]] => Option[Any], outputDataType: () => ScalaDataType[_]) extends ScalaAbstractColumn {
+  override def dataType: ScalaDataType[_] = outputDataType()
 
-  override def data: Seq[_] = {
+  override def data: Seq[Option[_]] = {
     val result = aggFunc(in.data)
     Seq(result)
   }
@@ -392,17 +414,22 @@ case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String, aggFunc: 
 case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn, prev: Option[ScalaAbstractColumn] = None) extends ScalaAbstractColumn with GenericWhen {
   override def dataType: ScalaDataType[_] = prev.getOrElse(in).dataType
 
-  override def data: Seq[_] = {
+  override def data: Seq[Option[_]] = {
     val inData = in.data
-    val conditionData = condition.data.map(c => if (c != null && c.isInstanceOf[Boolean]) c.asInstanceOf[Boolean] else false)
+    val conditionData = condition.data.map(v => v.map {
+      case b: Boolean => b
+      case _ => false
+    })
     val outData = if (prev.isDefined) {
       val prevData = prev.get.data
       conditionData.zip(inData.zip(prevData)).map {
-        case (predicate, (in, prev)) => Option(prev).getOrElse(if (predicate) in else null)
+        case (predicate, (in, prev)) =>
+          val inFiltered = predicate.flatMap(p => if (p) in else None)
+          prev.orElse(inFiltered)
       }
     } else {
       conditionData.zip(inData).map {
-        case (predicate, in) => if (predicate) in else null
+        case (predicate, in) => predicate.flatMap(p => if (p) in else None)
       }
     }
     outData
@@ -433,7 +460,7 @@ case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn
   override def otherwise(value: GenericColumn): ScalaAbstractColumn = {
     value  match {
       case scalaValue: ScalaAbstractColumn =>
-        new ScalaBinaryExpr(this, scalaValue, "otherwise", _ => (a,b) => Option(a).getOrElse(b), Some(dataType)) {
+        new ScalaBinaryExpr(this, scalaValue, "otherwise", _ => (a,b) => a.orElse(b), Some(dataType)) {
           override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
             super.setInputData(inputData, size)
             assert(scalaValue.dataType == dataType, s"The data type of the value in an otherwise expression (${scalaValue.dataType} must be the same as the data type of the value in the previous when expression (${dataType})")
