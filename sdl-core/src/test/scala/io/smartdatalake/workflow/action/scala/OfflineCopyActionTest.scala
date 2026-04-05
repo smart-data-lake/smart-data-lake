@@ -16,24 +16,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action.spark
 
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
+package io.smartdatalake.workflow.action.scala
+
+import io.smartdatalake.testutils.{CopyActionBehaviour, MockScalaDataObject}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.dataset.Equality
-import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
 
-class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
-  with TestToolDataset with Equality with HistorizeActionBehaviour {
+class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with CopyActionBehaviour {
 
-  protected implicit val session: SparkSession = TestUtil.session
-
-  testsFor(historizeWithMergeMode(
-    (id, registry) => MockSparkDataObject(id),
-    (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
-  ))
-
+  test("copy dry-run in offline environment, reading exported schemas") {
+    testCopyActionOffline(
+      (id, registry) => MockScalaDataObject(id),
+      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+    )
+  }
 }

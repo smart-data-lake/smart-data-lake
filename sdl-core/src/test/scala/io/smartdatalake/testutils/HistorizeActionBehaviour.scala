@@ -45,17 +45,11 @@ trait HistorizeActionBehaviour {
   this: AnyFunSuite with Matchers with SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
-
-  def registerDataObject[A <: TableDataObject](dataObject: A)
-                        (implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): A = {
-    dataObject.dropTable(context)
-    instanceRegistry.register(dataObject)
-    dataObject
-  }
+  import TestUtil.registerDataObject
 
   def historizeWithMergeMode(createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
                              createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
-                             tgtConnection: Option[Connection], canDetectNoData: Boolean = true): Unit = {
+                             tgtConnection: Option[Connection] = None, canDetectNoData: Boolean = true): Unit = {
 
     test("historize load mergeModeEnable") {
 
@@ -70,7 +64,6 @@ trait HistorizeActionBehaviour {
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
       val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
       import helper.implicits._
-
 
       // prepare & start 1st load
       val refTimestamp1 = LocalDateTime.now()

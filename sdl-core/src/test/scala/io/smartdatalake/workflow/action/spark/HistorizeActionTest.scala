@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,18 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.historization.HistorizationTestUtils.defaultTimeAxisUnit
 import io.smartdatalake.workflow.ExecutionPhase
+import io.smartdatalake.workflow.action.HistorizeAction
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
@@ -68,15 +68,8 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
     val context = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "historize_input")
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable(context)
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(jdbcConnection)
-    val tgtTable = Table(Some("public"), "historize_output", None, Some(Seq("lastname", "firstname")))
-    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", allowSchemaEvolution = true)
-    tgtDO.dropTable(context)
-    instanceRegistry.register(tgtDO)
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
@@ -153,14 +146,8 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
   test("early validation that output primary key exists") {
     // setup DataObjects
-    val srcTable = Table(Some("default"), "historize_input")
-    val srcPath = tempPath + s"/${srcTable.fullName}"
-    val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(jdbcConnection)
-    val tgtTable = Table(Some("public"), "historize_output")
-    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1")
-    instanceRegistry.register(tgtDO)
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO = MockSparkDataObject("tgt1").register
 
     // check primary key missing
     val exception = intercept[IllegalArgumentException] {

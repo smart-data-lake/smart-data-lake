@@ -25,13 +25,12 @@ import io.smartdatalake.util.spark.dataset.Equality
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-class ScalaHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
+class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
   with TestToolDataset with Equality with HistorizeActionBehaviour {
 
   testsFor(historizeWithMergeMode(
     (id, registry) => MockScalaDataObject(id),
-    (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks),
-    tgtConnection = None
+    (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
   ))
 
 }

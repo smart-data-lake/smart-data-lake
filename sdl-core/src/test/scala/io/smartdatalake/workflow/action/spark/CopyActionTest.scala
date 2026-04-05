@@ -88,8 +88,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // check output
     val r1 = tgtDO.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect().toSet
+      .select($"rating").as[Int].collect().toSet
     assert(r1 == Set(4, 6)) // should be increased by 1 through TestDfTransformer
 
     // check input deleted by incremental move mode
@@ -99,8 +98,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
   test("copy load with custom transformation from code string, incremental move mode (archive) and schema file test") {
 
     // define custom transformation
-    val codeStr =
-      """
+    val codeStr = """
       import org.apache.spark.sql.{DataFrame, SparkSession}
       def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
         import session.implicits._
@@ -132,9 +130,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed))
 
     // check result
-    val r1 = tgtDO.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect().toSeq
+    val r1 = tgtDO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 6) // should be increased by 1 through TestDfTransformer
     // check input archived by incremental move mode
@@ -191,21 +187,33 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
   def testCopyLoadWithTransformationAndConstraintsAndExpectation(approximateUniqueConstraint: Boolean): Unit = {
 
     // setup DataObjects
-    val srcDO = MockSparkDataObject("src1",
+    val srcDO = MockSparkDataObject(
+      "src1",
       expectations = Seq(
         CountExpectation(name = "count", expectation = Some(">= 1")),
-        CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All),
+        CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All)
       )
     ).register
-    val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname")),
+    val tgtDO = MockSparkDataObject(
+      "tgt1",
+      partitions = Seq("lastname"),
+      primaryKey = Some(Seq("lastname", "firstname")),
       constraints = Seq(Constraint("firstnameNotNull", Some("firstname should be non empty"), "firstname is not null")),
       expectations = Seq(
         CountExpectation(expectation = Some(">= 1")),
         SQLExpectation("avgRatingGt1", Some("avg rating should be bigger than 1"), "avg(rating)", Some("> 1")),
-        SQLFractionExpectation("pctBob", countConditionExpression = "firstname = 'bob'", expectation = Some("= 0")), // because we only select Rob and not Bob...
+        SQLFractionExpectation(
+          "pctBob",
+          countConditionExpression = "firstname = 'bob'",
+          expectation = Some("= 0")
+        ), // because we only select Rob and not Bob...
         CountExpectation(name = "countPerPartition", expectation = Some(">= 1"), scope = ExpectationScope.JobPartition),
         CountExpectation(name = "countAll", expectation = Some(">= 1"), scope = ExpectationScope.All),
-        SQLQueryExpectation(name = "countOfPartitionsWith1Record", code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)", scope = ExpectationScope.All),
+        SQLQueryExpectation(
+          name = "countOfPartitionsWith1Record",
+          code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)",
+          scope = ExpectationScope.All
+        ),
         SQLExpectation("resultNull", Some("dont fail if result is null"), "null", Some("> 1")),
         UniqueKeyExpectation("primaryKey", approximate = approximateUniqueConstraint)
       )
@@ -213,8 +221,14 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare & start load with positive constraint and expectation evaluation
     val customTransformerConfig1 = SQLDfTransformer(name = "sql1", code = Some("select * from %{inputViewName} where rating = 5"))
-    val customTransformerConfig2 = SQLDfTransformer(name = "sql2", code = Some("select * from %{inputViewName} where rating = 5")) // test multiple transformers - it doesnt matter if they do the same.
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
+    val customTransformerConfig2 = SQLDfTransformer(
+      name = "sql2",
+      code = Some("select * from %{inputViewName} where rating = 5")
+    ) // test multiple transformers - it doesnt matter if they do the same.
+    val action1 = CopyAction(
+      "ca",
+      srcDO.id,
+      tgtDO.id,
       transformers = Seq(customTransformerConfig1, customTransformerConfig2),
       expectations = Seq(TransferRateExpectation(), CompletenessExpectation(expectation = None))
     )
@@ -225,14 +239,32 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     assert(tgtSubFeed1.dataObjectId == tgtDO.id)
 
     // check result
-    val r1 = tgtDO.getSparkDataFrame()
-      .select($"lastname")
-      .as[String].collect().toSeq
+    val r1 = tgtDO.getSparkDataFrame().select($"lastname").as[String].collect().toSeq
     assert(r1 == Seq("jonson")) // only one record has rating 5 (see where condition)
 
     // check expectation value in metrics
     val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 1, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#jonson" -> 1, "count#src1" -> 1, "count#mainInput" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "countAll" -> 1, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 0.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0, "records_written" -> 1))
+    assert(
+      metrics1 == Map(
+        "count"                        -> 1,
+        "avgRatingGt1"                 -> 5.0,
+        "pctBob"                       -> 0.0,
+        "countPerPartition#jonson"     -> 1,
+        "count#src1"                   -> 1,
+        "count#mainInput"              -> 1,
+        "countAll#src1"                -> 2,
+        "countAll#mainInput"           -> 2,
+        "pctTransfer"                  -> 1.0,
+        "countAll"                     -> 1,
+        "countAll#src1"                -> 2,
+        "countAll#mainInput"           -> 2,
+        "pctComplete"                  -> 0.5,
+        "countOfPartitionsWith1Record" -> 1,
+        "resultNull"                   -> None,
+        "primaryKey"                   -> 1.0,
+        "records_written"              -> 1
+      )
+    )
 
     // overwrite src with 2 record to process
     val l2 = Seq(("dau", "peter", 5), ("dau", "pan", 5)).toDF("lastname", "firstname", "rating")
@@ -242,44 +274,70 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // check expectation value in metrics - countAll should be 2 now, but count should stay 1
     val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 2, "avgRatingGt1" -> 5.0, "pctBob" -> 0.0, "countPerPartition#dau" -> 2, "count#src1" -> 2, "count#mainInput" -> 2, "pctTransfer" -> 1.0, "countAll" -> 3, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctComplete" -> 1.5, "countOfPartitionsWith1Record" -> 1, "resultNull" -> None, "primaryKey" -> 1.0, "records_written" -> 2))
+    assert(
+      metrics2 == Map(
+        "count"                        -> 2,
+        "avgRatingGt1"                 -> 5.0,
+        "pctBob"                       -> 0.0,
+        "countPerPartition#dau"        -> 2,
+        "count#src1"                   -> 2,
+        "count#mainInput"              -> 2,
+        "pctTransfer"                  -> 1.0,
+        "countAll"                     -> 3,
+        "countAll#src1"                -> 2,
+        "countAll#mainInput"           -> 2,
+        "pctComplete"                  -> 1.5,
+        "countOfPartitionsWith1Record" -> 1,
+        "resultNull"                   -> None,
+        "primaryKey"                   -> 1.0,
+        "records_written"              -> 2
+      )
+    )
 
     // fail tgt constraint evaluation
-    val tgtDOConstraintFail = tgtDO.copy(
-      id = "tgt1ConstraintFail",
-      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null")),
-      expectations = Seq()
-    ).register
+    val tgtDOConstraintFail = tgtDO
+      .copy(
+        id = "tgt1ConstraintFail",
+        constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null")),
+        expectations = Seq()
+      )
+      .register
     val actionTgtConstraintFail = CopyAction("ca", srcDO.id, tgtDOConstraintFail.id)
     val ex1 = intercept[TaskFailedException](actionTgtConstraintFail.exec(Seq(srcSubFeed))(contextExec))
     assert(getRootCause(ex1).isInstanceOf[RuntimeException])
 
     // fail src constraint evaluation (validate on read)
-    val srcDOConstraintFail = srcDO.copy(
-      id = "src1ConstraintFail",
-      constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null"))
-    ).register
+    val srcDOConstraintFail = srcDO
+      .copy(
+        id = "src1ConstraintFail",
+        constraints = Seq(Constraint("firstnameNull", Some("firstname should be empty"), "firstname is null"))
+      )
+      .register
     srcDOConstraintFail.writeSparkDataFrame(l1, Seq())
     val actionSrcConstraintFail = CopyAction("ca", srcDOConstraintFail.id, tgtDO.id)
     val ex2 = intercept[TaskFailedException](actionSrcConstraintFail.exec(Seq(SparkSubFeed(None, srcDOConstraintFail.id, Seq())))(contextExec))
     assert(getRootCause(ex2).isInstanceOf[RuntimeException])
 
     // fail tgt expectation evaluation
-    val tgtDOExpectationFail = tgtDO.copy(
-      id = "tgt1ExpectationFail",
-      expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1"))),
-      constraints = Seq()
-    ).register
+    val tgtDOExpectationFail = tgtDO
+      .copy(
+        id = "tgt1ExpectationFail",
+        expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1"))),
+        constraints = Seq()
+      )
+      .register
     instanceRegistry.register(tgtDOExpectationFail)
     val actionExpectationFail = CopyAction("ca", srcDO.id, tgtDOExpectationFail.id)
     val ex3 = intercept[TaskFailedException](actionExpectationFail.exec(Seq(srcSubFeed))(contextExec))
     assert(getRootCause(ex3).isInstanceOf[ExpectationValidationException])
 
     // fail src expectation evaluation
-    val srcDOExpectationFail = srcDO.copy(
-      id = "src1ExpectationFail",
-      expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
-    ).register
+    val srcDOExpectationFail = srcDO
+      .copy(
+        id = "src1ExpectationFail",
+        expectations = Seq(SQLExpectation("avgRatingEq1", Some("avg rating should be 1"), "avg(rating)", Some("= 1")))
+      )
+      .register
     srcDOExpectationFail.writeSparkDataFrame(l1, Seq())
     val actionSrcExpectationFail = CopyAction("ca", srcDOExpectationFail.id, tgtDO.id)
     val ex4 = intercept[TaskFailedException](actionSrcExpectationFail.exec(Seq(SparkSubFeed(None, srcDOExpectationFail.id, Seq())))(contextExec))
@@ -304,9 +362,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
-    val r1 = tgtDO.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect().toSeq
+    val r1 = tgtDO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq
     assert(r1.size == 1)
     assert(r1.head == 5) // no transformer, rating should stay the same
   }
@@ -344,7 +400,9 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val l2 = Seq(("B", "pan", "peter", 11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type" -> "B")))
     srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    assert(
+      srcDO.getSparkDataFrame().count() == 2
+    ) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
@@ -387,7 +445,9 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val l2 = Seq(("B", "pan", "peter", 11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type" -> "B")))
     srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
-    assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
+    assert(
+      srcDO.getSparkDataFrame().count() == 2
+    ) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
 
@@ -406,9 +466,16 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id,
+    val action1 = CopyAction(
+      "ca",
+      srcDO.id,
+      tgtDO.id,
       transformers = Seq(
-        ScalaClassSparkDfTransformer(className = classOf[TestOptionsDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
+        ScalaClassSparkDfTransformer(
+          className = classOf[TestOptionsDfTransformer].getName,
+          options = Map("test" -> "test"),
+          runtimeOptions = Map("appName" -> "application")
+        ),
         FilterTransformer(filterClause = "lastname='jonson'"),
         ColumnsTransformer(additionalColumns = Map("run_id" -> "runId"))
       )
@@ -419,9 +486,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
-    val r1 = tgtDO.getSparkDataFrame()
-      .select($"rating", $"test", $"run_id")
-      .as[(Int, String, Int)].collect().toSeq
+    val r1 = tgtDO.getSparkDataFrame().select($"rating", $"test", $"run_id").as[(Int, String, Int)].collect().toSeq
     assert(r1 == Seq((6, "test-appTest", 1)))
   }
 
@@ -435,7 +500,13 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     // prepare, simulate
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val customTransformerConfig = ScalaClassSparkDfTransformer(className = classOf[TestAggDfTransformer].getName)
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(PartitionDiffMode(applyPartitionValuesTransform = true)))
+    val action1 = CopyAction(
+      "ca",
+      srcDO.id,
+      tgtDO.id,
+      transformers = Seq(customTransformerConfig),
+      executionMode = Some(PartitionDiffMode(applyPartitionValuesTransform = true))
+    )
     val l1 = Seq(("20100101", "jonson", "rob", 5), ("20100103", "doe", "bob", 3)).toDF("dt", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -478,17 +549,13 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val srcSubFeed = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "jonson"))))
     action1.exec(Seq(srcSubFeed))(contextExec).head
 
-    val r1 = tgtDO.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect().toSeq
+    val r1 = tgtDO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq
     assert(r1.toSet == Set(5, 3))
 
     // start 2nd load - data should be overwritten
     action1.exec(Seq(srcSubFeed))(contextExec).head
 
-    val r2 = tgtDO.getSparkDataFrame()
-      .select($"rating")
-      .as[Int].collect().toSeq
+    val r2 = tgtDO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq
     assert(r2.toSet == Set(5, 3))
   }
 
@@ -547,7 +614,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
   }
 
-
   test("copy load detect no-data rowCount=0 from SparkPlan") {
 
     // setup DataObjects
@@ -560,8 +626,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare empty Parquet file & start load
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(SparkRepartitionTransformer(numberOfTasksPerPartition = 10)))
-    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
-      .where(lit(false)) // write empty DataFrame
+    val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating").where(lit(false)) // write empty DataFrame
     Environment._enableSparkPlanNoDataCheck = Some(false)
     srcDO.writeSparkDataFrame(l1, Seq())
     Environment._enableSparkPlanNoDataCheck = Some(true)
@@ -596,7 +661,6 @@ class TestAggDfTransformer extends CustomDfTransformer {
     df.withColumn("mt", substring($"dt", 1, 6))
   }
 
-  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] = {
+  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] =
     Some(partitionValues.map(pv => (pv, PartitionValues(Map("mt" -> pv("dt").toString.take(6))))).toMap)
-  }
 }

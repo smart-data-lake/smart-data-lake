@@ -55,8 +55,7 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite  with Matchers w
     (id, pks, registry) => {
       val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
       DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
-    },
-    None
+    }
   ))
 
   testsFor(historizeIncrementalPipeline(
