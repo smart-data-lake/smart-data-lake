@@ -21,6 +21,8 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.misc.FileUtil.readFromPath
+import io.smartdatalake.util.spark.SparkProductUtil
+import io.smartdatalake.util.spark.SparkProductUtil.getSchemaFromCaseClass
 import io.smartdatalake.util.webservice.OpenApiUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
 import io.smartdatalake.workflow.dataframe._
@@ -144,15 +146,6 @@ object SchemaUtil {
         case _ => true //typeNames are equal
       }
     }
-  }
-
-  def getSchemaFromCaseClass[T <: Product : TypeTag]: StructType = {
-    Encoders.product[T].schema
-  }
-
-  def getSchemaFromCaseClass(tpe: Type): StructType = {
-    val schema = ProductUtil.createSchema(tpe)
-    enrichSchemaCommentsFromCaseClass(schema, tpe)
   }
 
   def enrichSchemaCommentsFromCaseClass(schema: StructType, tpe: Type): StructType = {

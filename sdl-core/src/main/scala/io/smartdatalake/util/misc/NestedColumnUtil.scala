@@ -21,16 +21,13 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataframe.spark.SparkMapDataType
-import org.apache.spark.sql.types.{MapType, StringType}
-
 
 /**
  * Utils to transform DataFrames with nested columns / complex types.
  */
 object NestedColumnUtil extends SmartDataLakeLogger {
 
-  def selectSchema(df: GenericDataFrame, tgtSchema: GenericSchema): GenericDataFrame = {
+  def selectSchema(df: GenericDataFrame, tgtSchema: GenericSchema): GenericDataFrame =
     if (df.schema.fields.map(f => (f.name, f.dataType.sql)) != tgtSchema.fields.map(f => (f.name, f.dataType.sql))) {
       val columns = tgtSchema.fields.map { f =>
         val currentFieldTypes = df.schema.fields.map(f => (f.name, f.dataType)).toMap
@@ -39,11 +36,10 @@ object NestedColumnUtil extends SmartDataLakeLogger {
       }
       df.select(columns)
     } else df
-  }
 
   private[smartdatalake] def selectColumn(column: GenericColumn, currentDataType: GenericDataType, tgtDataType: GenericDataType): GenericColumn = {
-    val functions = DataFrameSubFeed.getFunctions(tgtDataType.subFeedType)
-    (currentDataType,tgtDataType) match {
+    val functions = DataFrameSubFeed.getCompanion(tgtDataType.subFeedType)
+    (currentDataType, tgtDataType) match {
       case (ct: GenericStructDataType, tt: GenericStructDataType) =>
         if (ct.fields.map(f => (f.name, f.dataType.sql)) != tt.fields.map(f => (f.name, f.dataType.sql))) {
           val currentFieldTypes = ct.fields.map(f => (f.name, f.dataType)).toMap
@@ -60,18 +56,19 @@ object NestedColumnUtil extends SmartDataLakeLogger {
         val mapTransformed = functions.transform_values(keyTransformed, (k, v) => selectColumn(v, ct.valueDataType, tt.valueDataType))
         mapTransformed
       // special case json object: string -> map<string,string>
-      case (ct: GenericSimpleDataType, tt: GenericMapDataType) if ct.typeName == "string" && tt.keyDataType.typeName == "string" && tt.valueDataType.typeName == "string" =>
-        functions.from_json(column, SparkMapDataType(MapType(StringType, StringType)))
+      case (ct: GenericSimpleDataType, tt: GenericMapDataType)
+          if ct.typeName == "string" && tt.keyDataType.typeName == "string" && tt.valueDataType.typeName == "string" =>
+        functions.from_json(column, functions.createMapDataType(functions.createSimpleDataType("string"), functions.createSimpleDataType("string")))
       case (ct, tt) if ct.sql != tt.sql => column.cast(tt)
-      case _ => column
+      case _                            => column
     }
   }
 
   /**
-   * Transform a DataFrame with nested Columns, by defining a visitor function.
-   * The visitor function is called for every (nested) attribute/column.
-   * It receives the DataType, Column and Attribute Path (Seq[String]) as input parameters and should return a TransformColumnCmd.
-   * Possible TransformColumnCmd's are KeepColumn, TransformColumn, RemoveColumn.
+   * Transform a DataFrame with nested Columns, by defining a visitor function. The visitor function
+   * is called for every (nested) attribute/column. It receives the DataType, Column and Attribute
+   * Path (Seq[String]) as input parameters and should return a TransformColumnCmd. Possible
+   * TransformColumnCmd's are KeepColumn, TransformColumn, RemoveColumn.
    */
   def transformColumns(df: GenericDataFrame, visitorFunc: (GenericDataType, GenericColumn, Seq[String]) => TransformColumnCmd): GenericDataFrame = {
     val transforms = df.schema.fields.map { f =>
@@ -80,16 +77,20 @@ object NestedColumnUtil extends SmartDataLakeLogger {
     }
     if (transforms.exists(_.changeRequested)) {
       val selCols = df.schema.fields.zip(transforms).flatMap {
-        case (f, KeepColumn) => Some(df(f.name))
+        case (f, KeepColumn)         => Some(df(f.name))
         case (f, t: TransformColumn) => Some(t.newColumn.as(f.name))
-        case (_, RemoveColumn) => None
+        case (_, RemoveColumn)       => None
       }
       df.select(selCols)
-    }
-    else df
+    } else df
   }
 
-  private[smartdatalake] def transformColumn(dataType: GenericDataType, column: GenericColumn, path: Seq[String], visitorFunc: (GenericDataType, GenericColumn, Seq[String]) => TransformColumnCmd): TransformColumnCmd = {
+  private[smartdatalake] def transformColumn(
+      dataType: GenericDataType,
+      column: GenericColumn,
+      path: Seq[String],
+      visitorFunc: (GenericDataType, GenericColumn, Seq[String]) => TransformColumnCmd
+  ): TransformColumnCmd = {
     val functions = DataFrameSubFeed.getFunctions(dataType.subFeedType) // dataType.subFeedType
     // apply column transformation
     visitorFunc(dataType, column, path) match {
@@ -103,19 +104,19 @@ object NestedColumnUtil extends SmartDataLakeLogger {
             }
             if (transforms.exists(_.changeRequested)) {
               val selFields = t.fields.zip(transforms).flatMap {
-                case (f, KeepColumn) => Some(column(f.name))
+                case (f, KeepColumn)         => Some(column(f.name))
                 case (f, t: TransformColumn) => Some(t.newColumn.as(f.name))
-                case (_, RemoveColumn) => None
+                case (_, RemoveColumn)       => None
               }
               TransformColumn(functions.struct(selFields: _*))
-            }
-            else KeepColumn
+            } else KeepColumn
           case t: GenericArrayDataType =>
             val arrayTransformed = functions.transform(column, c => transformColumn(t.elementDataType, c, path, visitorFunc).getOrElse(c))
             if (column != arrayTransformed) TransformColumn(arrayTransformed) else KeepColumn
           case t: GenericMapDataType =>
             val keyTransformed = functions.transform_keys(column, (k, v) => transformColumn(t.keyDataType, k, path :+ "key", visitorFunc).getOrElse(k))
-            val mapTransformed = functions.transform_values(keyTransformed, (k, v) => transformColumn(t.valueDataType, v, path :+ "value", visitorFunc).getOrElse(v))
+            val mapTransformed =
+              functions.transform_values(keyTransformed, (k, v) => transformColumn(t.valueDataType, v, path :+ "value", visitorFunc).getOrElse(v))
             if (column != mapTransformed) TransformColumn(mapTransformed) else KeepColumn
           case _ => KeepColumn
         }
@@ -123,7 +124,6 @@ object NestedColumnUtil extends SmartDataLakeLogger {
     }
   }
 }
-
 
 /**
  * A trait to define column transformations for NestedColumnUtil.transformColumns.
