@@ -23,8 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.{ExpressionEvaluationException, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{ExpressionEvaluationException, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 
 import java.sql.Timestamp
@@ -49,7 +48,7 @@ trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigH
 case class PartitionRetentionMode(retentionCondition: String, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
   override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
-    SparkExpressionUtil.syntaxCheck[PartitionExpressionData,Boolean](dataObject.id, Some("houskeepingMode.retentionCondition"), retentionCondition)
+    ExpressionUtil.syntaxCheck[PartitionExpressionData,Boolean](dataObject.id, Some("houskeepingMode.retentionCondition"), retentionCondition)
   }
   override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     dataObject match {
@@ -57,7 +56,7 @@ case class PartitionRetentionMode(retentionCondition: String, description: Optio
         throw ConfigurationException(s"(${dataObject.id}) PartitionRetentionMode not supported for DataObject without partition columns defined")
       case partitionedDataObject: DataObject with CanHandlePartitions =>
         val pvs = partitionedDataObject.listPartitions
-        val pvsEvaluated = SparkExpressionUtil.evaluateSeq[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.retentionCondition"), retentionCondition, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
+        val pvsEvaluated = ExpressionUtil.evaluateSeq[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.retentionCondition"), retentionCondition, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
         val pvsToDelete = pvsEvaluated
           .filterNot{ case (pvs,keep) => keep.getOrElse(throw ExpressionEvaluationException(s"(${dataObject.id}.housekeepingMode.retentionCondition) expression evaluation should not return 'null' (partitionValue=$pvs"))}
           .map(x => PartitionValues(x._1.elements))
@@ -102,8 +101,8 @@ object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
 case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[String] = None, compactPartitionExpression: Option[String] = None, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
   override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
-    archivePartitionExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionExpressionData, Map[String,String]](dataObject.id, Some("housekeepingMode.archivePartitionExpression"), expression))
-    compactPartitionExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression))
+    archivePartitionExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionExpressionData, Map[String,String]](dataObject.id, Some("housekeepingMode.archivePartitionExpression"), expression))
+    compactPartitionExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression))
   }
   override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
     dataObject match {
@@ -113,7 +112,7 @@ case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[Str
         val pvs = partitionedDataObject.listPartitions
         // evaluate partition to archive
         val pvsToArchiveMapping = archivePartitionExpression.map( expression =>
-          SparkExpressionUtil.evaluateSeq[PartitionExpressionData, Map[String,String]](dataObject.id, Some(s"housekeepingMode.archivePartitionExpression"), expression, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
+          ExpressionUtil.evaluateSeq[PartitionExpressionData, Map[String,String]](dataObject.id, Some(s"housekeepingMode.archivePartitionExpression"), expression, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
             .map{ case (input, resultPvs) => (input.elements, resultPvs.getOrElse(throw ExpressionEvaluationException(s"(${dataObject.id}) housekeepingMode.archivePartitionExpression result is null for partition value ${input.elements}")))}
             .filter{ case (inputPvs, resultPvs) => inputPvs != resultPvs}
             .map{ case (inputPvs, resultPvs) => (PartitionValues(inputPvs), PartitionValues(resultPvs))}
@@ -121,7 +120,7 @@ case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[Str
         val pvsToArchive = pvsToArchiveMapping.map(_._1)
         // evaluate partitions to compact
         val pvsToCompact = compactPartitionExpression.map( expression =>
-          SparkExpressionUtil.evaluateSeq[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
+          ExpressionUtil.evaluateSeq[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
             .map{ case (input, doCompact) => (input.elements, doCompact.getOrElse(throw ExpressionEvaluationException(s"(${dataObject.id}) housekeepingMode.compactPartitionExpression result is null for partition value ${input.elements}")))}
             .filter{ case (inputPvs, doCompact) => doCompact }
             .map{ case (inputPvs, _) => PartitionValues(inputPvs) }

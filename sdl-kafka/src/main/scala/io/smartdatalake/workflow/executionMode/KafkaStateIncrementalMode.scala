@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.workflow.dataobject.{DataObject, KafkaTopicDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFeed}
@@ -41,7 +41,7 @@ case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = N
 
   override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     // validate delayedMaxTimestampExpr expression
-    delayedMaxTimestampExpr.foreach(expression => SparkExpressionUtil.syntaxCheck[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expression))
+    delayedMaxTimestampExpr.foreach(expression => ExpressionUtil.syntaxCheck[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expression))
   }
 
   override def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
@@ -53,7 +53,7 @@ case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = N
 
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     // prepare options
-    val delayedMaxTimestamp = delayedMaxTimestampExpr.flatMap(expr => SparkExpressionUtil.evaluate[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expr, DefaultExpressionData.from(context, Seq())))
+    val delayedMaxTimestamp = delayedMaxTimestampExpr.flatMap(expr => ExpressionUtil.evaluate[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expr, DefaultExpressionData.from(context, Seq())))
     val options = Map(
       KafkaTopicDataObject.delayedMaxTimestampOption -> delayedMaxTimestamp.map(_.toString)
     ).collect { case (key, Some(value)) => key -> value } // remove keys with empty values

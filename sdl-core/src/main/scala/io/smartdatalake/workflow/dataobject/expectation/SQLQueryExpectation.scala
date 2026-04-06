@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.dataobject.expectation
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.ExpressionUtil
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
@@ -55,7 +55,7 @@ case class SQLQueryExpectation(override val name: String, override val descripti
     val inputName = dataObjectId.id
     val inputViewName = ActionHelper.createTemporaryViewName(inputName)
     val inputViewNameOptions = Map(INPUT_VIEW_NAME -> inputViewName, s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
-    val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some(s"expectations.$name.code"), code, inputViewNameOptions)
+    val preparedSql = ExpressionUtil.substituteOptions(dataObjectId, Some(s"expectations.$name.code"), code, inputViewNameOptions)
     try {
       df.get.createOrReplaceTempView(s"$inputViewName")
       // create DataFrame from SQL

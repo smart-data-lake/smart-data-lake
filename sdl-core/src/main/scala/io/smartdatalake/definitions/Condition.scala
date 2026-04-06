@@ -20,7 +20,7 @@
 package io.smartdatalake.definitions
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.ExpressionUtil
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 
 import scala.reflect.runtime.universe.TypeTag
@@ -33,11 +33,11 @@ private[smartdatalake] trait ConditionBase {
   def description: Option[String]
 
   private[smartdatalake] def syntaxCheck[T<:Product:TypeTag](id: ConfigObjectId, configName: Option[String]): Unit = {
-    SparkExpressionUtil.syntaxCheck[T,Boolean](id, configName, expression)
+    ExpressionUtil.syntaxCheck[T,Boolean](id, configName, expression)
   }
 
   private[smartdatalake] def evaluate[T<:Product:TypeTag](id: ConfigObjectId, configName: Option[String], data: T): Boolean = {
-    SparkExpressionUtil.evaluateBoolean[T](id, configName, expression, data)
+    ExpressionUtil.evaluateBoolean[T](id, configName, expression, data)
   }
 }
 

@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package io.smartdatalake.util.misc
+package io.smartdatalake.util.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.ExpressionUtil
 import io.smartdatalake.workflow.action.executionMode.DefaultExecutionModeExpressionData
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, min, udf}
@@ -41,16 +41,17 @@ class SparkExpressionUtilTest extends AnyFunSuite {
   test("evaluate dataFrame equations") {
     import session.implicits._
     val df = List(
-      ("a+b*x+c*x*x+d*x*x*x", 2d, 3d, 4d, 5d, 10d, 5432d),
+      ("a+b*x+c*x*x+d*x*x*x",    2d, 3d, 4d, 5d, 10d, 5432d),
       ("a+b*x+c*x*x+d*log10(x)", 2d, 3d, 4d, 5d, 10d, 437d)
     ).toDF("eqn", "a", "b", "c", "d", "x", "expected")
-    val evalUdf = udf((eqn: String, a: Double, b: Double, c: Double, d: Double, x: Double) => {
-      SparkExpressionUtil.evaluate[MyData, Double](
+    val evalUdf = udf((eqn: String, a: Double, b: Double, c: Double, d: Double, x: Double) =>
+      ExpressionUtil.evaluate[MyData, Double](
         id = DataObjectId("Why do we need this parameter?"),
         configName = Some("Why do we need this parameter?"),
         expression = eqn,
-        data = MyData(a, b, c, d, x))
-    })
+        data = MyData(a, b, c, d, x)
+      )
+    )
     val resultDf = df.withColumn("actual", evalUdf($"eqn", $"a", $"b", $"c", $"d", $"x"))
     val result = resultDf.agg(min($"actual" === $"expected")).as[Boolean].head
     if (!result) {
@@ -61,30 +62,9 @@ class SparkExpressionUtilTest extends AnyFunSuite {
     assert(result)
   }
 
-  test("evaluate boolean") {
-    val result = SparkExpressionUtil.evaluateBoolean(id = DataObjectId("test"), configName = Some("testCondition"), expression = "runId + attemptId = 2", data = data)
-    // result should be true
-    assert(result)
-  }
-
-  test("evaluate string") {
-    val result = SparkExpressionUtil.evaluateString(DataObjectId("test"), Some("testCondition"), "concat(feed, '-', application)", data)
-    assert(result.contains("feedTest-appTest"))
-  }
-
-  test("substitute tokens") {
-    val result = SparkExpressionUtil.substitute(DataObjectId("test"), Some("testCondition"), "hello %{concat(feed, '-', application)}, lets make %{runId + attemptId}", data)
-    assert(result.contains("hello feedTest-appTest, lets make 2"))
-  }
-
-  test("substitute options") {
-    val result = SparkExpressionUtil.substituteOptions(DataObjectId("test"), Some("testCondition"), "hello %{key1}, lets make %{key2}", Map("key1" -> "tester", "key2" -> "tests"))
-    assert(result.contains("hello tester, lets make tests"))
-  }
-
   test("register & apply udf") {
     SparkExpressionUtil.registerSparkUdf("udfAdd1", udf((v: Int) => v + 1))
-    val result = SparkExpressionUtil.evaluate[DefaultExecutionModeExpressionData, Int](DataObjectId("test"), Some("testCondition"), "udfAdd1(runId)", data)
+    val result = ExpressionUtil.evaluate[DefaultExecutionModeExpressionData, Int](DataObjectId("test"), Some("testCondition"), "udfAdd1(runId)", data)
     assert(result.contains(2))
   }
 }

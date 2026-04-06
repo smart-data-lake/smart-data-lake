@@ -20,8 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, TableStatsType}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.{SchemaUtil, ExpressionUtil}
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.DataFrame
@@ -99,7 +98,7 @@ trait CanHandlePartitions { this: DataObject =>
       val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString).toMap, pv.hashCode))
       val expectedHashCodes = partitionsValuesStringWithHashCode
         .map{ case (elements, hashCode) => PartitionValueFilterExpressionData(elements, hashCode)}
-        .filter(p => SparkExpressionUtil.evaluateBoolean(id, None, condition, p))
+        .filter(p => ExpressionUtil.evaluateBoolean(id, None, condition, p))
         .map(_._hashCode)
         .toSet
       partitionValues.filter( pv => expectedHashCodes.contains(pv.hashCode))

@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.DefaultExpressionData
+import io.smartdatalake.util.misc.DefaultExpressionData
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.spark.transformer.{PythonCodeDfTransformer, ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
