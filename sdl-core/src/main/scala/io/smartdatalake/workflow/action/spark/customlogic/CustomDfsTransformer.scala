@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, MethodParameterInfo, ProductUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.SparkProductUtil
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, extractSeqVal, getConverterFor, stdTransformMethodSignature}
@@ -230,7 +231,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
           val columnNames = ProductUtil.classAccessorNames(dsType)
           df.select(columnNames.map(col): _*)
         }
-        val ds = ProductUtil.createDataset(dfWithSelect, dsType)
+        val ds = SparkProductUtil.createDataset(dfWithSelect, dsType)
         (dsParam, ds)
       case sessionParam if sessionParam.tpe =:= typeOf[SparkSession] => (sessionParam, session)
       case dfsParam if dfsParam.tpe =:= typeOf[Map[String, DataFrame]] => (dfsParam, dfs)

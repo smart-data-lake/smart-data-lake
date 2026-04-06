@@ -20,10 +20,6 @@ package io.smartdatalake.util.misc
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, ScalaReflection, SerializerBuildHelper}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, Dataset}
 
 import java.time.format.DateTimeFormatter
 import scala.reflect.ClassTag
@@ -161,34 +157,6 @@ object ProductUtil {
     val msg = StringBuilder.newBuilder
     addObjToBuilder(msg, obj, spacing = false)
     msg.toString
-  }
-
-  /**
-   * Create an Schema for a product based on it's type given as parameter (not as type parameter).
-   */
-  def createSchema(tpe: Type): StructType = {
-    val mirror = ScalaReflection.mirror
-    val cls = mirror.runtimeClass(tpe)
-    ScalaReflection.encoderFor(tpe).schema
-  }
-
-  /**
-   * Create an Encoder for a product based on it's type given as parameter (not as type parameter).
-   */
-  def createEncoder(tpe: Type): ExpressionEncoder[_] = {
-    val mirror = ScalaReflection.mirror
-    val cls = mirror.runtimeClass(tpe)
-    val encoder = ScalaReflection.encoderFor(tpe)
-    val serializer = SerializerBuildHelper.createSerializer(encoder)
-    val deserializer = DeserializerBuildHelper.createDeserializer(encoder)
-    new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
-  }
-
-  /**
-   * Create a Dataset based on the given type of a product.
-   */
-  def createDataset(df: DataFrame, tpe: Type): Dataset[_] = {
-    df.as(createEncoder(tpe))
   }
 
   /**

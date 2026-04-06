@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, ProductUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.SparkProductUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
@@ -147,7 +148,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         val dsType = param.typeSignature.typeArgs.head
         val dataObjectAtThatIndexInConfig = inputDOs(datasetIndex)
         val df = dfs(dataObjectAtThatIndexInConfig.id.id)
-        val ds = ProductUtil.createDataset(df, dsType)
+        val ds = SparkProductUtil.createDataset(df, dsType)
         (paramIndex, ds)
     }
   }
@@ -165,7 +166,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
           } else {
             df
           }
-        val ds = ProductUtil.createDataset(dfWithSelect, dsType)
+        val ds = SparkProductUtil.createDataset(dfWithSelect, dsType)
         (paramIndex, ds)
     }
   }
