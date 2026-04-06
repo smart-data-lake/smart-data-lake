@@ -21,8 +21,8 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.workflow.action.script.CmdScript
 import org.apache.spark.sql.types.DataType
 import org.json4s.{Formats, JBool, JInt, JObject, JString}

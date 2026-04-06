@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.metrics.MetricsUtil.orderMetrics
+import io.smartdatalake.util.misc.MetricsUtil.orderMetrics
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{DefaultExpressionData, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker

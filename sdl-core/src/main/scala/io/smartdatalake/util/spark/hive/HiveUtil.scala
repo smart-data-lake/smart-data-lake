@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.util.hive
+package io.smartdatalake.util.spark.hive
 
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
@@ -457,21 +457,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
 
   def existingTableLocation(table: Table)(implicit session: SparkSession): URI = {
     session.sharedState.externalCatalog.getTable(table.db.get,table.name).location
-  }
-
-  /**
-   * Normalizes a HDFS path so they can be better compared.
-   * i.e. by replacing \ with /
-   *
-   * @param path
-   * @return
-   */
-  def normalizePath(path: String) : String = {
-    // TODO: we should convert to Hadoop Path() and back to String for normalizing
-    path
-      .replaceAll("\\\\", Path.SEPARATOR)
-      .replaceAll("file:/", "")
-      .replaceAll("/+$", "")
   }
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {

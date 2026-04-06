@@ -24,10 +24,10 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc.{AclDef, AclUtil, CompactionUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.SparkStageMetricsListener
+import io.smartdatalake.util.spark.hive.HiveUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.HiveTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -67,6 +67,7 @@ import scala.jdk.CollectionConverters._
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param metadata meta data
  */
+@deprecated(since = "2.9.0")
 case class HiveTableDataObject(override val id: DataObjectId,
                                path: Option[String] = None,
                                override val partitions: Seq[String] = Seq(),
@@ -119,8 +120,8 @@ case class HiveTableDataObject(override val id: DataObjectId,
       // For existing tables, check to see if we write to the same directory. If not, issue a warning.
       if (thisIsTableExisting && path.isDefined) {
         // Normalize both paths before comparing them (remove tick / tock folder and trailing slash)
-        val hadoopPathNormalized = HiveUtil.normalizePath(hadoopPathHolder.toString)
-        val definedPathNormalized = HiveUtil.normalizePath(getAbsolutePath.toString)
+        val hadoopPathNormalized = HdfsUtil.normalizePath(hadoopPathHolder.toString)
+        val definedPathNormalized = HdfsUtil.normalizePath(getAbsolutePath.toString)
 
         if (definedPathNormalized != hadoopPathNormalized)
           logger.warn(s"($id) Table ${table.fullName} exists already with different path ${hadoopPathHolder}. New path definition ${getAbsolutePath} is ignored!")

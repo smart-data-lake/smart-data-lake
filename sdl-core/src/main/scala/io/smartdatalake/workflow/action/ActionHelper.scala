@@ -23,12 +23,9 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitSubFeed, SubFeed}
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.TimestampType
-import org.apache.spark.sql.{AnalysisException, Column, DataFrame}
+import org.apache.spark.sql.AnalysisException
 
 import java.sql.Timestamp
-import java.time.LocalDateTime
 import scala.reflect.runtime.universe.Type
 
 /**
@@ -37,44 +34,15 @@ import scala.reflect.runtime.universe.Type
 object ActionHelper extends SmartDataLakeLogger {
 
   /**
-   * Removes all columns from a [[DataFrame]] except those specified in whitelist.
+   * Check plausibility of latest timestamp of a [[GenericDataFrame]] vs. a given timestamp. Throws
+   * exception if not successful.
    *
-   * @param df              [[DataFrame]] to be filtered
-   * @param columnWhitelist columns to keep
-   * @return [[DataFrame]] with all columns removed except those specified in whitelist
-   */
-  def filterWhitelist(columnWhitelist: Seq[String])(df: DataFrame): DataFrame = {
-    df.select(df.columns.filter(colName => columnWhitelist.contains(colName.toLowerCase)).map(col): _*)
-  }
-
-  /**
-   * Remove all columns in blacklist from a [[DataFrame]].
-   *
-   * @param df              [[DataFrame]] to be filtered
-   * @param columnBlacklist columns to remove
-   * @return [[DataFrame]] with all columns in blacklist removed
-   */
-  def filterBlacklist(columnBlacklist: Seq[String])(df: DataFrame): DataFrame = {
-    df.select(df.columns.filter(colName => !columnBlacklist.contains(colName.toLowerCase)).map(col): _*)
-  }
-
-  /**
-   * create util literal column from [[LocalDateTime ]]
-   */
-  def ts1(t: java.time.LocalDateTime): Column = lit(t.toString).cast(TimestampType)
-
-
-  def dropDuplicates(pks: Seq[String])(df: DataFrame): DataFrame = {
-    df.dropDuplicates(pks)
-  }
-
-  /**
-   * Check plausibility of latest timestamp of a [[DataFrame]] vs. a given timestamp.
-   * Throws exception if not successful.
-   *
-   * @param timestamp    to compare with
-   * @param df           [[DataFrame]] to compare with
-   * @param tstmpColName the timestamp column of the dataframe
+   * @param timestamp
+   *   to compare with
+   * @param df
+   *   [[GenericDataFrame]] to compare with
+   * @param tstmpColName
+   *   the timestamp column of the dataframe
    */
   def checkDataFrameNotNewerThan(timestamp: Timestamp, df: GenericDataFrame, tstmpColName: String): Unit = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
@@ -91,7 +59,8 @@ object ActionHelper extends SmartDataLakeLogger {
              | Timestamp current load: $timestamp
              | Highest existing timestamp: ${existingLatestCaptured.get}
           """.
-            stripMargin)
+            stripMargin
+        )
       }
     }
   }
@@ -99,10 +68,9 @@ object ActionHelper extends SmartDataLakeLogger {
   /**
    * search common inits between to partition column definitions
    */
-  def searchCommonInits(partitions1: Seq[String], partitions2: Seq[String]): Seq[Seq[String]] = {
+  def searchCommonInits(partitions1: Seq[String], partitions2: Seq[String]): Seq[Seq[String]] =
     partitions1.inits.toSeq.intersect(partitions2.inits.toSeq)
       .filter(_.nonEmpty)
-  }
 
   /**
    * search greatest common init between to partition column definitions
@@ -113,18 +81,20 @@ object ActionHelper extends SmartDataLakeLogger {
     else None
   }
 
-  def getOptionalDataFrame(input: CanCreateDataFrame, partitionValues: Seq[PartitionValues], subFeedType: Type)
-                          (implicit context: ActionPipelineContext): Option[GenericDataFrame] = try {
+  def getOptionalDataFrame(input: CanCreateDataFrame, partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit
+      context: ActionPipelineContext
+  ): Option[GenericDataFrame] = try
     Some(input.getDataFrame(partitionValues, subFeedType))
-  } catch {
+  catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
-    case e: AnalysisException if e.getMessage().contains("[TABLE_OR_VIEW_NOT_FOUND]") || e.getMessage().contains("[UNABLE_TO_INFER_SCHEMA]") || e.getMessage().contains("[DELTA_MISSING_DELTA_TABLE]") => None
+    case e
+        if e.getClass.getSimpleName == "AnalysisException" && e.getMessage.contains("[TABLE_OR_VIEW_NOT_FOUND]") ||
+          e.getMessage().contains("[UNABLE_TO_INFER_SCHEMA]") || e.getMessage().contains("[DELTA_MISSING_DELTA_TABLE]") => None
     case _: NoDataToProcessWarning => None
   }
 
   /**
-   * Replace all special characters in a String with underscore
-   * Used to get valid temp view names
+   * Replace all special characters in a String with underscore Used to get valid temp view names
    */
   def replaceSpecialCharactersWithUnderscore(str: String): String = {
     val invalidCharacters = "[^a-zA-Z0-9_]".r
@@ -132,30 +102,27 @@ object ActionHelper extends SmartDataLakeLogger {
   }
 
   /**
-   * Create a valid temporary view name for SQL transformation.
-   * Apart from replacing special characters, a postfix is added to make the name unique in case the input name is also an existing table.
+   * Create a valid temporary view name for SQL transformation. Apart from replacing special
+   * characters, a postfix is added to make the name unique in case the input name is also an
+   * existing table.
    *
-   * @param inputName name of the input the temporary view should be created for
+   * @param inputName
+   *   name of the input the temporary view should be created for
    */
-  def createTemporaryViewName(inputName: String): String = {
+  def createTemporaryViewName(inputName: String): String =
     replaceSpecialCharactersWithUnderscore(inputName) + TEMP_VIEW_POSTFIX
-  }
 
-  def replaceLegacyViewName(sql: String, inputViewName: String): String = {
+  def replaceLegacyViewName(sql: String, inputViewName: String): String =
     sql.replaceAll("\\s" + inputViewName.stripSuffix(ActionHelper.TEMP_VIEW_POSTFIX) + "(\\s|\\.|$)", s" $inputViewName" + "$1")
-  }
 
-  def createSkippedSubFeed(output: DataObject): SubFeed = {
+  def createSkippedSubFeed(output: DataObject): SubFeed =
     InitSubFeed(dataObjectId = output.id, partitionValues = Seq(), isSkipped = true)
-  }
 
   /**
    * Create results for skipped actions, e.g. InitSubFeeds with isSkipped = true
    */
-  def createSkippedSubFeeds(outputs: Seq[DataObject]): Seq[SubFeed] = {
+  def createSkippedSubFeeds(outputs: Seq[DataObject]): Seq[SubFeed] =
     outputs.map(output => createSkippedSubFeed(output))
-  }
 
   val TEMP_VIEW_POSTFIX = "_sdltemp"
 }
-
