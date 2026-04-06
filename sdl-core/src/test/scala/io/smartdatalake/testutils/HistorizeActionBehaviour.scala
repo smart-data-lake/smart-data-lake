@@ -339,7 +339,7 @@ trait HistorizeActionBehaviour {
 
   def historizeIncrementalPipeline(createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
                                    createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame with CanCreateIncrementalOutput),
-                                   tgtConnection: Option[Connection], canDetectNoData: Boolean = true): Unit = {
+                                   tgtConnection: Option[Connection] = None, canDetectNoData: Boolean = true): Unit = {
 
     test("historize load mergeModeEnable and copy incremental action") {
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry

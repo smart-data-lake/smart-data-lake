@@ -39,16 +39,14 @@ import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.LocalDateTime
 
-class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite  with Matchers with SmartDataLakeLogger
-  with TestToolDataset with Equality with HistorizeActionBehaviour {
+class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with Matchers
+  with SmartDataLakeLogger with HistorizeActionBehaviour {
 
   // set additional spark options for delta lake
   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
-
-  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
   testsFor(historizeWithMergeMode(
     (id, registry) => MockSparkDataObject(id),
@@ -63,7 +61,6 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite  with Matchers w
     (id, pks, registry) => {
       val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
       DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
-    },
-    None
+    }
   ))
 }

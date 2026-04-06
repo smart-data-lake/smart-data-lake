@@ -409,6 +409,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         case ("num_target_rows_inserted", v) => "rows_inserted" -> v
         case ("num_target_rows_updated", v) => "rows_updated" -> v
         case ("num_target_rows_deleted", v) => "rows_deleted" -> v
+        case ("num_source_rows", v) => "records_written" -> v
         case (k,v) => k -> v
       }
 
