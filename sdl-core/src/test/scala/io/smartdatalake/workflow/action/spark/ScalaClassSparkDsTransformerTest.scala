@@ -84,7 +84,7 @@ class ScalaClassSparkDsTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare & start load
     val testAction = CopyAction(id = s"ScalaClassSparkDsTransformer", inputId = srcDO.id, outputId = tgt1DO.id,
-      transformers = Seq(ScalaClassSparkDsTransformer(transformerClassName = "io.smartdatalake.workflow.action.TestDSTransformer")))
+      transformers = Seq(ScalaClassSparkDsTransformer(transformerClassName = classOf[TestDSTransformer].getName)))
     val srcSubFeed = SparkSubFeed(None, "src1", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
 
