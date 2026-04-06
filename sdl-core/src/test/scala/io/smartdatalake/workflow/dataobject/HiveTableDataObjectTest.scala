@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.{ColumnStatsType, Environment, SDLSaveMode, 
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.hive.HiveUtil
+import io.smartdatalake.util.spark.hive.HiveUtil
 import io.smartdatalake.workflow.ProcessingLogicException
 
 class HiveTableDataObjectTest extends DataObjectTestSuite {

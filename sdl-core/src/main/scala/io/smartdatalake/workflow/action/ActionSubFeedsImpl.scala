@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.metrics.MetricsUtil.{orderMetrics, orderMetricsDefault}
+import io.smartdatalake.util.misc.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils

@@ -21,9 +21,9 @@ package io.smartdatalake.config
 import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions._
-import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.{SecretProviderConfig, StringOrSecret}
+import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef

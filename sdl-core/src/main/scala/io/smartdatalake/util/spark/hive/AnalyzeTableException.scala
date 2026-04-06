@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,31 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.util.hive
+package io.smartdatalake.util.spark.hive
 
 /**
- * Usage context of partitions
+ * Exception thrown when statistics for a table, column or partition can not be collected.
+ *
+ * @param message Message of exception
  */
-private[smartdatalake] object HivePartitionString extends Enumeration {
-  type HivePartitionString = Value
-
-  /**
-   * Where claus in Hive query
-   */
-  val HiveQueryWhereClause = Value
-
-  /**
-   * In HDFS path
-   */
-  val HdfsPath = Value
-
-  /**
-   * In Hive create table DDl
-   */
-  val HiveTableDdlClause = Value
-
-  /**
-   * While adding Hive partitions
-   */
-  val AddPartitionDdlClause = Value
-}
+private[smartdatalake] class AnalyzeTableException(message: String) extends RuntimeException(message) {}

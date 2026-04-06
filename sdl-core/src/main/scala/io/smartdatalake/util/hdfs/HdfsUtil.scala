@@ -376,4 +376,14 @@ object HdfsUtil extends SmartDataLakeLogger {
     def hasNext: Boolean = underlying.hasNext
     def next(): T = underlying.next()
   }
+
+  /**
+   * Normalizes a HDFS path so they can be better compared.
+   * i.e. by replacing \ with /
+   */
+  def normalizePath(path: String) : String = {
+    new Path(path).toString
+      .replaceAll("file:/", "")
+      .replaceAll("/+$", "")
+  }
 }

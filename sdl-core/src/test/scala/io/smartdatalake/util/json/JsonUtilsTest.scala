@@ -19,6 +19,7 @@
 
 package io.smartdatalake.util.json
 
+import io.smartdatalake.util.spark.json.JsonUtils
 import org.json4s.jackson.JsonMethods
 import org.scalatest.funsuite.AnyFunSuite
 

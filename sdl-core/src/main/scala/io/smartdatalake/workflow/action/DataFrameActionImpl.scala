@@ -22,11 +22,10 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions._
-import io.smartdatalake.metrics.{SparkStreamingMetrics, SparkStreamingQueryListener}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ScalaUtil
-import io.smartdatalake.util.spark.{DummyStreamProvider, SparkPlanNoDataWarning}
+import io.smartdatalake.util.spark.{DummyStreamProvider, SparkPlanNoDataWarning, SparkStreamingMetrics, SparkStreamingQueryListener}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode

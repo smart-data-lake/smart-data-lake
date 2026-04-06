@@ -21,7 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataFrameTestHelper.assertDataFramesEqual
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
-import io.smartdatalake.util.hdfs.{PartitionValues, SparkRepartitionDef}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.spark.sql.types.StructType

@@ -93,6 +93,7 @@ case class AclElement (aclType:String, name:String, permission: String) {
  *
  * In this structure good limitations are: MinLevelPermissionModify=2, MinLevelPermissionOverwrite=5
  */
+@deprecated(since = "2.9.0")
 private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
 
   //TODO: make this more generic
