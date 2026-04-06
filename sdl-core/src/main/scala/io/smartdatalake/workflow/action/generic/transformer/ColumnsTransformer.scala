@@ -23,7 +23,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -60,7 +60,7 @@ case class ColumnsTransformer(override val name: String = "additionalColumns", o
     val data = DefaultExpressionData.from(context, partitionValues)
     val dfLit = additionalColumns.foldLeft(df){
       case (df, (colName, litExpr)) =>
-        val value = SparkExpressionUtil.evaluate[DefaultExpressionData,Any](actionId, Some(name), litExpr, data)
+        val value = ExpressionUtil.evaluate[DefaultExpressionData,Any](actionId, Some(name), litExpr, data)
         df.withColumn(colName, lit(value.orNull))
     }
     val dfDerived = additionalDerivedColumns.foldLeft(dfLit){

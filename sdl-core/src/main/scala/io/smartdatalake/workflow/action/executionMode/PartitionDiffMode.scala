@@ -24,8 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.ProductUtil
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.{ProductUtil, ExpressionUtil}
 import io.smartdatalake.workflow.action.ActionHelper.searchCommonInits
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
@@ -78,9 +77,9 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
     // validate fail condition
     failConditionsDef.foreach(_.syntaxCheck[PartitionDiffModeExpressionData](actionId, Some("failCondition")))
     // validate select expression
-    selectExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), expression))
+    selectExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), expression))
     // validate select additional input expression
-    selectAdditionalInputExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), expression))
+    selectAdditionalInputExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), expression))
     // check alternativeOutput exists
     alternativeOutput
   }
@@ -130,7 +129,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                 inputPartitionValues = filteredInputPartitionValues.map(_.getMapString), outputPartitionValues = filteredOutputPartitionValues.map(_.getMapString),
                 selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               selectedOutputPartitionValues = if (selectExpression.isDefined) {
-                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
+                ExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
                   .map(_.map(PartitionValues(_)))
                   .getOrElse(selectedOutputPartitionValues)
                   .sorted(outputOrdering)
@@ -145,7 +144,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               data = data.copy(selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               // apply optional select additional input partitions expression
               selectedInputPartitionValues = if (selectAdditionalInputExpression.isDefined) {
-                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
+                ExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
                   .map(_.map(PartitionValues(_)))
                   .getOrElse(selectedInputPartitionValues)
                   .sorted(inputOrdering)

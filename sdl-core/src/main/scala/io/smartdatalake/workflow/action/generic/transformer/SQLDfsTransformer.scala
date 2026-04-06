@@ -24,8 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, FileUtil, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
 import io.smartdatalake.workflow.action.{Action, ActionHelper}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -95,7 +94,7 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform",
         val sql = file.map(file => FileUtil.readFromPath(new Path(file)))
           .orElse(code).get
         val df = try {
-          var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
+          var preparedSql = ExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
           // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
           if (Environment.replaceSqlTransformersOldTempViewName) {
             preparedSql = inputViewNameOptions.values.foldLeft(preparedSql) {

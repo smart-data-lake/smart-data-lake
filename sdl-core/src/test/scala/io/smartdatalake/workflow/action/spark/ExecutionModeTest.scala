@@ -24,6 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.ExpressionUtil
 import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.action.executionMode._

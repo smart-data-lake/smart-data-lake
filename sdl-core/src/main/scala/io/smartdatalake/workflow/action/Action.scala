@@ -23,8 +23,7 @@ import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
@@ -179,7 +178,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     executionCondition.foreach(_.syntaxCheck[SubFeedsExpressionData](id, Some("executionCondition")))
 
     // validate metricsFailCondition
-    metricsFailCondition.foreach(c => SparkExpressionUtil.syntaxCheck[Metric,Boolean](id, Some("metricsFailCondition"), c))
+    metricsFailCondition.foreach(c => ExpressionUtil.syntaxCheck[Metric,Boolean](id, Some("metricsFailCondition"), c))
   }
 
   /**

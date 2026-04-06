@@ -24,8 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, FileUtil, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
@@ -78,7 +77,7 @@ case class SQLDfTransformer(override val name: String = "sqlTransform",
     val sql = file.map(file => FileUtil.readFromPath(new Path(file)))
       .orElse(code)
       .getOrElse(throw ConfigurationException(s"Either `file` or `code` must be defined for SQLDfTransformer"))
-    var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
+    var preparedSql = ExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
     try {
       df.createOrReplaceTempView(s"$inputViewName")
       // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.

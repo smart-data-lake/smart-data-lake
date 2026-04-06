@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ExpressionUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig, SttpWebserviceClient, WebserviceMethod}

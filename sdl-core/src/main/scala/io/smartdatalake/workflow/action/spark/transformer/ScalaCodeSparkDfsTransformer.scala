@@ -24,8 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{CustomCodeUtil, FileUtil}
-import io.smartdatalake.util.spark.DefaultExpressionData
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, FileUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType

@@ -19,8 +19,7 @@
 package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{CustomCodeUtil, MethodParameterInfo, ProductUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.DefaultExpressionData
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, MethodParameterInfo, ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, extractSeqVal, getConverterFor, stdTransformMethodSignature}

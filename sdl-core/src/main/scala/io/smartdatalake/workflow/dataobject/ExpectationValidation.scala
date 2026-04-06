@@ -22,9 +22,8 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.metrics.MetricsUtil.orderMetrics
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{DefaultExpressionData, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
@@ -177,7 +176,7 @@ private[smartdatalake] trait ExpectationValidation {
     // the evaluation of expectations is made using Spark expressions
     val validationResults = expectationValidationCols.map {
       case (expectation, col) =>
-        val errorMsg = SparkExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner.expr.sql, defaultExpressionData)
+        val errorMsg = ExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner.expr.sql, defaultExpressionData)
         (expectation, errorMsg)
     }.toMap.filter(_._2.nonEmpty).mapValues(_.get) // keep only failed results
     // log all failed results (before throwing exception)

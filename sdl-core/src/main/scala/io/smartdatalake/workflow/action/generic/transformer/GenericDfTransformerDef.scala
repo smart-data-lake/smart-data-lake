@@ -22,7 +22,7 @@ package io.smartdatalake.workflow.action.generic.transformer
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -151,7 +151,7 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
     runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
+      expr => ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
     }.filter(_._2.isDefined).mapValues(_.get).toMap
   }
 }

@@ -25,8 +25,8 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SchemaUtil}
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil, ProductUtil, SQLUtil, SchemaUtil}
+import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
@@ -425,7 +425,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
-      val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)
+      val preparedSql = ExpressionUtil.substitute(id, configName, sql, data)
       logger.info(s"($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
       connection.execJdbcStatement(preparedSql, logging = false)
     }
