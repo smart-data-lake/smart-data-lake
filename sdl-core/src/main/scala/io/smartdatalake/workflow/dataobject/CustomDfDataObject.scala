@@ -33,6 +33,8 @@ import org.apache.spark.sql.DataFrame
  * Generic [[DataObject]] containing a config object.
  * E.g. used to implement a CustomAction that reads a Webservice.
  */
+@deprecated("2.9.0", "create custom DataObject directly instead")
+@Deprecated
 case class CustomDfDataObject(override val id: DataObjectId,
                               creator: CustomDfCreatorConfig,
                               override val schemaMin: Option[GenericSchema] = None,
