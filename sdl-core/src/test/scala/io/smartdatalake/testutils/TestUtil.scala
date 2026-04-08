@@ -31,7 +31,7 @@ import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, ParquetFileDataObject, Table}
+import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
@@ -392,6 +392,17 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
     val tempPath = tempDir.toAbsolutePath.toString
     TestUtil.deleteOnExit(tempPath)
     val dataObject = ParquetFileDataObject(id, path = tempPath)
+    instanceRegistry.register(dataObject)
+    dataObject
+  }
+
+  def registerDataObject[A <: DataObject](dataObject: A)
+                                         (implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): A = {
+    dataObject match {
+      case tableDataObject: TableDataObject => tableDataObject.dropTable
+      case fileDataObject: FileRefDataObject => fileDataObject.deleteAll
+      case _ => ()
+    }
     instanceRegistry.register(dataObject)
     dataObject
   }

@@ -99,7 +99,7 @@ case class DeduplicateAction(override val id: ActionId,
     // customize update condition
     val updateCondition = if (updateCapturedColumnOnlyWhenChanged) {
       val (colsToUpdate, colsNew) = checkRecordChangedColumns.partition(outputCols.contains)
-      val colsToUpdateConditions = colsToUpdate.map(c => s"existing.$c != new.$c or (existing.$c is not null and new.$c is null) or (existing.$c is null and new.$c is not null)") // comparing equality including null is complicated with standard sql
+      val colsToUpdateConditions = colsToUpdate.map(c => s"not(existing.$c <=> new.$c)") // comparing equality including null is complicated with standard sql
       val colsNewCondition = colsNew.map(c => s"new.$c is not null") // null is the default value of the new column, we need to update if the value in new data is not null
       Some((colsToUpdateConditions ++ colsNewCondition).mkString(" or "))
     }

@@ -24,13 +24,19 @@ import io.smartdatalake.workflow.dataframe.GenericField
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
+/**
+ * Definition of a column in a ScalaDataFrame
+ * The data type is deduced from the generic type A if not explicitly provided through dataType
+ */
 case class ScalaColumnDefinition[A: ClassTag](name: String,
-                                              nullable: Boolean = false,
+                                              dataFrameAlias: Option[String] = None,
+                                              nullable: Boolean = true,
                                               comment: Option[String] = None,
-                                             _dataType: Option[ScalaDataType[A]] = None) extends GenericField {
+                                              dataTypeOverride: Option[ScalaDataType[A]] = None
+                                             ) extends GenericField {
 
   // datatype is deduced from generic type A if not explicitly provided
-  val dataType: ScalaDataType[A] = _dataType.getOrElse(ScalaDataType.getFor[A])
+  val dataType: ScalaDataType[A] = dataTypeOverride.getOrElse(ScalaDataType.getFor[A])
 
   def makeNullable: ScalaColumnDefinition[A] = copy(nullable = true)
 
@@ -38,9 +44,13 @@ case class ScalaColumnDefinition[A: ClassTag](name: String,
 
   def removeMetadata: ScalaColumnDefinition[A] = copy(comment = None)
 
-  def createColumn(data: IndexedSeq[_]): ScalaColumn[A] = {
-    ScalaColumn(this, data.asInstanceOf[IndexedSeq[A]])
+  def createColumn(data: IndexedSeq[Option[_]]): ScalaColumn[A] = {
+    ScalaColumn(this, data.asInstanceOf[IndexedSeq[Option[A]]])
   }
+
+  def withDataFrameAlias(alias: Option[String]): ScalaColumnDefinition[A] = copy(dataFrameAlias = alias)
+
+  def getFullName() = dataFrameAlias.map(a => s"$a.$name").getOrElse(name)
 
   override def subFeedType: Type = typeOf[ScalaSubFeed]
 }

@@ -21,7 +21,7 @@ package io.smartdatalake.config
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
-import io.smartdatalake.workflow.action.TestDfTransformer
+import io.smartdatalake.workflow.action.spark.TestDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.script.CmdScript
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig

@@ -29,10 +29,12 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Row, functions}
+import org.apache.spark.sql.{Column, DataFrame, Encoder, Encoders, Row, functions}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.reflect.runtime.universe.TypeTag
 
 /**
  * A SparkSubFeed is used to transport [[DataFrame]]'s between Actions.
@@ -140,16 +142,29 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def first(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.first(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def abs(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.abs(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def count(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.count(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def countDistinct(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
-    val innerColumns = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkColumn(functions.count_distinct(functions.struct(innerColumns:_*)))
+  override def countDistinct(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.countDistinct(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
   }
   override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn = {
     column match {
@@ -164,6 +179,14 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case sparkColumn: SparkColumn => SparkColumn(functions.size(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
+  }
+  override def least(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkColumn(functions.least(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
+  }
+  override def greatest(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkColumn(functions.greatest(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def explode(column: GenericColumn): GenericColumn = {
     column match {
@@ -392,6 +415,20 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
 
   override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
     SparkMapDataType(MapType(keyTpe.asInstanceOf[SparkDataType].inner, valueTpe.asInstanceOf[SparkDataType].inner))
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val spark = context.sparkSession
+    import spark.implicits._
+    implicit val encoder: Encoder[A] = Encoders.product[A]
+    SparkDataFrame(rows.toDF)
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    val spark = context.sparkSession
+    import spark.implicits._
+    implicit val encoder: Encoder[A] = Encoders.product[A]
+    SparkDataFrame(rows.toDF(colNames:_*))
   }
 }
 

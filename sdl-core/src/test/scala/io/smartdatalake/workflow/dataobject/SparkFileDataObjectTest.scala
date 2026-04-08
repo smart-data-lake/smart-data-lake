@@ -24,7 +24,7 @@ import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ProcessingLogicException
-import io.smartdatalake.workflow.action.CustomFileActionTest
+import io.smartdatalake.workflow.action.file.CustomFileActionTest
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path

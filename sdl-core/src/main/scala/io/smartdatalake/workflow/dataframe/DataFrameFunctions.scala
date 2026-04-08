@@ -38,8 +38,13 @@ trait DataFrameFunctions {
   def lit(value: Any): GenericColumn
   def min(column: GenericColumn): GenericColumn
   def max(column: GenericColumn): GenericColumn
+  def first(column: GenericColumn): GenericColumn
   def size(column: GenericColumn): GenericColumn
   def explode(column: GenericColumn): GenericColumn
+  def abs(column: GenericColumn): GenericColumn
+  def least(columns: GenericColumn*): GenericColumn
+  def greatest(columns: GenericColumn*): GenericColumn
+
   /**
    * Construct array from given columns and removing null values
    */
@@ -49,8 +54,8 @@ trait DataFrameFunctions {
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
-  def countDistinct(columns: GenericColumn*): GenericColumn
-  def approxCountDistinct(columns: GenericColumn, rsd: Option[Double] = None): GenericColumn
+  def countDistinct(column: GenericColumn): GenericColumn
+  def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn
   def coalesce(columns: GenericColumn*): GenericColumn
 
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen
@@ -72,6 +77,18 @@ trait DataFrameFunctions {
   def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn
 
   def hash(column: GenericColumn): GenericColumn
+
+  /**
+   * Create a column expression to compare a list of columns between rows.
+   * If useHash is true, the expression will use a hash function to reduce the size of the value to compare, otherwise the columns are compared as is, normally as struct of the columns.
+   * The default implementation below can be overridden by implementations if needed, e.g. because they dont support struct or hash functions, but the default implementation should work for most cases.
+   */
+  def colsComparisionExpr(cols: Seq[GenericColumn], useHash: Boolean = false): GenericColumn = {
+    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colsComparisionExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+    if (useHash) hash(struct(cols.sortBy(_.getName.get):_*))
+    else struct(cols.sortBy(_.getName.get):_*)
+  }
+
   /**
    * Get a DataFrame with the result of the given sql statement.
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.

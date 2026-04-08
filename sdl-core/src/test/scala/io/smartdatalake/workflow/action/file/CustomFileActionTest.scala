@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.file
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.CustomFileAction
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomFileTransformer, CustomFileTransformerConfig}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
@@ -75,7 +76,7 @@ class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test" -> "true")))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some(classOf[TestFileTransformer].getName), options = Some(Map("test" -> "true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, 1)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head
@@ -117,7 +118,7 @@ class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
-    val fileTransformerConfig = CustomFileTransformerConfig(className = Some("io.smartdatalake.workflow.action.TestFileTransformer"), options = Some(Map("test" -> "true")))
+    val fileTransformerConfig = CustomFileTransformerConfig(className = Some(classOf[TestFileTransformer].getName), options = Some(Map("test" -> "true")))
     val action1 = CustomFileAction(id = "cfa", srcDO.id, tgtDO.id, fileTransformerConfig, 1, executionMode = Some(PartitionDiffMode()))
     val srcSubFeed = InitSubFeed("src1", srcPartitionValues) // InitSubFeed needed to test initExecutionMode!
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(contextExec).head

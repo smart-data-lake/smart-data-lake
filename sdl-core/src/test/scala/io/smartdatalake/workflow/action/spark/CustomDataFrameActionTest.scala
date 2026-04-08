@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
@@ -30,6 +30,7 @@ import io.smartdatalake.workflow.action.expectation.{CompletenessExpectation, Tr
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import io.smartdatalake.workflow.action.{CustomDataFrameAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, ExpectationScope, SQLExpectation}
@@ -476,7 +477,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     action1.exec(srcSubFeeds)(contextExec).head
 
     // check that tgt1 is not empty
-    assert(tgtDO1.getSparkDataFrame().count == 2)
+    assert(tgtDO1.getSparkDataFrame().count() == 2)
     // check that tgt2 is empty
     // getSparkDataFrame will throw IllegalArgumentException because it no files have been written to this DataObject...
     intercept[IllegalArgumentException](tgtDO2.getSparkDataFrame())
@@ -523,7 +524,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     val metrics1 = tgtSubFeed1.metrics.get
     assert(metrics1 == Map("count" -> 2, "countAll" -> 2, "records_written" -> 2, "tgt1AvgRatingGt1" -> 4.0, "count#src1" -> 2, "count#mainInput" -> 2, "countAll#src1" -> 2, "countAll#mainInput" -> 2, "pctTransfer" -> 1.0, "pctComplete" -> 1.0))
     val metrics2 = tgtSubFeed2.metrics.get
-    assert(metrics2 == Map("count" -> 0, "tgt2AvgRatingGt1" -> None, "count#src2" -> 0, "countAll#src2" -> 0, "no_data" -> true))
+    assert(metrics2 == Map("count" -> 0, "records_written" -> 0, "tgt2AvgRatingGt1" -> None, "count#src2" -> 0, "countAll#src2" -> 0, "no_data" -> true))
   }
 
   test("copy load with constraints and expectations main input no_data") {
@@ -559,13 +560,14 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     srcDO1.writeSparkDataFrame(dfInput.where(lit(false)), Seq())
     srcDO2.writeSparkDataFrame(dfInput, Seq())
     val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
-    val tgtSubFeeds = action1.exec(srcSubFeeds)(contextExec)
+    val noDataWarn = intercept[NoDataToProcessWarning](action1.exec(srcSubFeeds)(contextExec))
+    val tgtSubFeeds = noDataWarn.results.get
     val tgtSubFeed1 = tgtSubFeeds.find(_.dataObjectId == tgtDO1.id).get
     val tgtSubFeed2 = tgtSubFeeds.find(_.dataObjectId == tgtDO2.id).get
 
     // check expectation value in metrics
     val metrics1 = tgtSubFeed1.metrics.get
-    assert(metrics1 == Map("count" -> 0, "countAll" -> 0, "tgt1AvgRatingGt1" -> None, "count#src1" -> 0, "count#mainInput" -> 0, "countAll#src1" -> 0, "countAll#mainInput" -> 0, "pctTransfer" -> "null", "pctComplete" -> "null", "no_data" -> true))
+    assert(metrics1 == Map("count" -> 0, "records_written" -> 0, "countAll" -> 0, "tgt1AvgRatingGt1" -> None, "count#src1" -> 0, "count#mainInput" -> 0, "countAll#src1" -> 0, "countAll#mainInput" -> 0, "pctTransfer" -> "null", "pctComplete" -> "null", "no_data" -> true))
     val metrics2 = tgtSubFeed2.metrics.get
     assert(metrics2 == Map("count" -> 2, "tgt2AvgRatingGt1" -> 4.0, "count#src2" -> 2, "countAll#src2" -> 2, "records_written" -> 2))
 

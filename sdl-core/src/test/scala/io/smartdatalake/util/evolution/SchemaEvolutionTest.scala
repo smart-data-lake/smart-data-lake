@@ -476,8 +476,6 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
     val newDf = SparkDataFrame(TestUtil.arbitraryDataFrame(schemaNew))
 
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
-    print(oldEvoDf.schema.treeString())
-    print(newEvoDf.schema.treeString())
     assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
     assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkStructDataType].getDataType("b3").typeName.equalsIgnoreCase("int"))
 

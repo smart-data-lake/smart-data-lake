@@ -32,7 +32,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
@@ -324,7 +324,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       case SDLSaveMode.Merge =>
         // write to tmp-table and merge by primary key
         if (connection.directTableOverwrite) logger.warn(s"($id) directTableOverwrite=true can not be applied with SaveMode=Merge")
-        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
+        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions)
+          .getOrElse(SaveModeMergeOptions()))
 
       case SDLSaveMode.Append =>
         // write target table with SaveMode.Append

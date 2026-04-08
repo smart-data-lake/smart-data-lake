@@ -89,35 +89,39 @@ object Historization extends SmartDataLakeLogger {
 
     // add hash-column to easily compare changed records
     val colsToCompare = getCompareColumns(dfNew.columns, historizeWhitelist, historizeBlacklist, Environment.caseSensitive)
-    val dfNewHashed = dfNew.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare))
-    val dfLastHistHashed = dfLastHist.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare))
+    val dfNewHashed = dfNew.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare.map(col)))
+    val dfLastHistHashed = dfLastHist.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare.map(col)))
     val hashColEqualsExpr = col(s"newFeed.$historizeHashColName") === col(s"lastHist.$historizeHashColName")
 
     val joined = dfNewHashed.as("newFeed")
       .join(dfLastHistHashed.as("lastHist"), joinCols(dfNewHashed, dfLastHistHashed, primaryKeyColumns), "full")
 
-    val newRows = joined.where(col(expiryDateCol).isNull)
-      .select(dfNew("*"))
+    val newRows = joined
+      .where(col(expiryDateCol).isNull)
+      .select(col("newFeed.*")).drop(historizeHashColName)
       .withColumn(lastUpdateCol, timestampNew)
       .withColumn(expiryDateCol, doomsday)
 
-    val notInFeedAnymore = joined.where(nullTableCols("newFeed", primaryKeyColumns))
-      .select(dfLastHist("*"))
+    val notInFeedAnymore = joined
+      .where(nullTableCols("newFeed", primaryKeyColumns))
+      .select(col("lastHist.*")).drop(historizeHashColName)
       .withColumn(expiryDateCol, timestampOld)
 
     val noUpdates = joined
       .where(hashColEqualsExpr)
-      .select(dfLastHist("*"))
+      .select(col("lastHist.*")).drop(historizeHashColName)
 
     val updated = joined
       .where(nonNullTableCols("newFeed", primaryKeyColumns))
       .where(not(hashColEqualsExpr))
 
-    val updatedNew = updated.select(dfNew("*"))
+    val updatedNew = updated
+      .select(col("newFeed.*")).drop(historizeHashColName)
       .withColumn(lastUpdateCol, timestampNew)
       .withColumn(expiryDateCol, doomsday)
 
-    val updatedOld = updated.select(dfLastHist("*"))
+    val updatedOld = updated
+      .select(col("lastHist.*")).drop(historizeHashColName)
       .withColumn(expiryDateCol, timestampOld)
 
     // column order is used here!
@@ -185,6 +189,7 @@ object Historization extends SmartDataLakeLogger {
                            addExistingDfHashColumn: Boolean): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfExisting.subFeedType)
     import functions._
+    import io.smartdatalake.util.misc.SeqUtil.SeqStringExtension
 
     // Current timestamp (used for insert and update operations, for "new" value)
     val timestampNew = lit(referenceTimestamp)
@@ -198,15 +203,14 @@ object Historization extends SmartDataLakeLogger {
     val hashColEqualsExpr = existingHashCol === newHashCol
     // add hash column
     val dfNewHashed = addHashCol(dfNew, historizeWhitelist, historizeBlacklist, useHash = true)
-    val dfExistingHashed = if (!addExistingDfHashColumn) {
-      dfExisting
-    } else {
+    val dfExistingHashed = if (addExistingDfHashColumn) {
       addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
-    }
+    } else dfExisting
     // join existing with new and determine operations needed
     val dfOperations = dfExistingHashed.as("existing")
       .where(existingDelimitedCol === lit(Environment.historizationUpperHorizonTimestamp)) // only current records needed
       .select((primaryKey :+ Environment.capturedColumnName :+ Environment.delimitedColumnName :+ historizeHashColName).map(col))
+      .as("existing")
       .join(dfNewHashed.as("new"), primaryKey, "full")
       .withColumn("_operations",
         // 1. primary key matched and attributes have changed -> update record to close existing version, insert record to create new version
@@ -240,7 +244,11 @@ object Historization extends SmartDataLakeLogger {
       .drop(col(s"existing.${Environment.capturedColumnName}"))
       .drop(col(s"existing.${Environment.delimitedColumnName}"))
     // return
-    dfOperationVersioned
+    val techCols = Seq(historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName, historizeHashColName)
+    val resultColOrder = dfExisting.columns.caseSensitiveDiff(techCols :+ historizeDummyColName) ++ dfNew.columns.caseSensitiveDiff(dfExistingHashed.columns) ++ techCols
+    val dfResult = dfOperationVersioned
+      .select(resultColOrder.map(col))
+    dfResult
   }
 
   /**
@@ -287,7 +295,7 @@ object Historization extends SmartDataLakeLogger {
       .withColumn(historizeOperationColName, explode(col("_operations"))) // note: this filters records with no action
       .drop("_operations")
       .withColumn(historizeDummyColName, // dummy column is needed in merge join condition to avoid deduplication in merge statement
-        when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(false)) // inster should not match with existing records in merge join condition
+        when(col(historizeOperationColName) === lit(HistorizationRecordOperations.insertNew), lit(false)) // insert should not match with existing records in merge join condition
           .when(col(historizeOperationColName) === lit(HistorizationRecordOperations.updateClose), lit(true)) // should match with existing records in merge join condition
       )
       .withColumn(Environment.capturedColumnName,
@@ -374,19 +382,11 @@ object Historization extends SmartDataLakeLogger {
     colsToCompare.toSeq.sorted
   }
 
-  // Generic column expression to compare a list of columns
-  private[smartdatalake] def colsComparisionExpr(cols: Seq[String], useHash: Boolean = false)(implicit functions: DataFrameFunctions): GenericColumn = {
-    import functions._
-    logger.debug(s"using hash columns ${cols.sorted.mkString(",")}")
-    if (useHash) hash(struct(cols.sorted.map(col): _*))
-    else struct(cols.sorted.map(col): _*)
-  }
-
   private[smartdatalake] def addHashCol(df: GenericDataFrame, historizeWhitelist: Option[Seq[String]], historizeBlacklist: Option[Seq[String]], useHash: Boolean, colsToIgnore: Seq[String] = Seq()): GenericDataFrame = {
     assert(!df.columns.contains(historizeHashColName), s"DataFrame must not contain column with name $historizeHashColName if addHashCol is called")
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     val colsToCompare = getCompareColumns(df.columns.diff(colsToIgnore), historizeWhitelist, historizeBlacklist)
-    df.withColumn(historizeHashColName, colsComparisionExpr(colsToCompare, useHash))
+    df.withColumn(historizeHashColName, functions.colsComparisionExpr(colsToCompare.map(functions.col), useHash))
   }
 
   private def getPreviousTimeAxisEntry(ts: Timestamp, unit: Duration) = Timestamp.from(ts.toInstant.minus(unit))

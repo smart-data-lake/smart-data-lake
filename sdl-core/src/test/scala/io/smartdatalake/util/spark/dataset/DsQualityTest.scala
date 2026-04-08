@@ -19,8 +19,9 @@
 
 package io.smartdatalake.util.spark.dataset
 
+import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.testutils.spark.dataset.Collection._
-import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
+import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, IntegerType}
@@ -31,9 +32,9 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.Double.{NaN, NegativeInfinity}
 
 class DsQualityTest extends AnyFlatSpec with Matchers
-  with Quality with Equality {
+    with Quality with Equality {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  private implicit val spark: SparkSession = createSparkSession()
+  private implicit val spark: SparkSession = TestUtil.session
 
   import spark.implicits._
 
@@ -57,8 +58,8 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   "getDsStats" should "not fail on arrays" in {
     val actual = dfArray2.getStats
     val expected = List((6L, 6L, Some(-2), Some(3), 5L, List[Int](), List(Some(0), Some(1)))).toDF("cnt_rows",
-        "cnt_id", "min_id", "max_id",
-        "cnt_arr", "min_arr", "max_arr")
+      "cnt_id", "min_id", "max_id",
+      "cnt_arr", "min_arr", "max_arr")
       .select($"cnt_rows", $"cnt_id",
         $"min_id", $"max_id", $"cnt_arr",
         $"min_arr".cast(ArrayType(IntegerType, containsNull = true)).as("min_arr"), $"max_arr")
@@ -70,34 +71,36 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   "fillGaps_next" should "fill the gaps taking value from next row" in {
     val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt")
     val expected = Seq(
-      (Some(0), Some(20190101), Some(3.14), Some(-2.37)),
-      (Some(0), Some(20190102), Some(3.14), Some(-2.37)),
-      (Some(0), Some(20190103), Some(2.72), Some(4.57)),
-      (Some(0), Some(20190104), Some(1.0), Some(3.0)),
-      (Some(0), Some(20190106), Some(1.0), Some(3.0)),
-      (Some(0), Some(20190201), Some(3.14), Some(2.5)),
-      (Some(0), Some(20190207), Some(1.0), Some(2.5)),
-      (Some(1), Some(20190101), Some(42.0), None),
+      (Some(0), Some(20190101), Some(3.14),  Some(-2.37)),
+      (Some(0), Some(20190102), Some(3.14),  Some(-2.37)),
+      (Some(0), Some(20190103), Some(2.72),  Some(4.57)),
+      (Some(0), Some(20190104), Some(1.0),   Some(3.0)),
+      (Some(0), Some(20190106), Some(1.0),   Some(3.0)),
+      (Some(0), Some(20190201), Some(3.14),  Some(2.5)),
+      (Some(0), Some(20190207), Some(1.0),   Some(2.5)),
+      (Some(1), Some(20190101), Some(42.0),  None),
       (Some(1), Some(20190102), Some(-21.3), None),
       (Some(1), Some(20190103), Some(-21.3), None),
-      (Some(1), Some(20190104), Some(-21.3), None)).toDF("id", "dt", "x", "y")
+      (Some(1), Some(20190104), Some(-21.3), None)
+    ).toDF("id", "dt", "x", "y")
     actual.equal(expected) should be(true)
   }
 
   "fillGaps_next" should "fill the gaps taking value from previous row" in {
     val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt", takeNextValueFirst = false)
     val expected = Seq(
-      (Some(0), Some(20190101), Some(3.14), Some(-2.37)),
-      (Some(0), Some(20190102), Some(3.14), Some(-2.37)),
-      (Some(0), Some(20190103), Some(2.72), Some(4.57)),
-      (Some(0), Some(20190104), Some(2.72), Some(4.57)),
-      (Some(0), Some(20190106), Some(1.0), Some(3.0)),
-      (Some(0), Some(20190201), Some(3.14), Some(3.0)),
-      (Some(0), Some(20190207), Some(1.0), Some(2.5)),
-      (Some(1), Some(20190101), Some(42.0), None),
-      (Some(1), Some(20190102), Some(42.0), None),
+      (Some(0), Some(20190101), Some(3.14),  Some(-2.37)),
+      (Some(0), Some(20190102), Some(3.14),  Some(-2.37)),
+      (Some(0), Some(20190103), Some(2.72),  Some(4.57)),
+      (Some(0), Some(20190104), Some(2.72),  Some(4.57)),
+      (Some(0), Some(20190106), Some(1.0),   Some(3.0)),
+      (Some(0), Some(20190201), Some(3.14),  Some(3.0)),
+      (Some(0), Some(20190207), Some(1.0),   Some(2.5)),
+      (Some(1), Some(20190101), Some(42.0),  None),
+      (Some(1), Some(20190102), Some(42.0),  None),
       (Some(1), Some(20190103), Some(-21.3), None),
-      (Some(1), Some(20190104), Some(-21.3), None)).toDF("id", "dt", "x", "y")
+      (Some(1), Some(20190104), Some(-21.3), None)
+    ).toDF("id", "dt", "x", "y")
 
     actual.equal(expected) should be(true)
   }
@@ -113,8 +116,8 @@ class DsQualityTest extends AnyFlatSpec with Matchers
 
     val actual = argument.transformCommentCols(transformRenameCommentFun, colFilter = _ == "x")
     val expected = List((0, 0d), (1, 1d), (2, 4d), (3, 9d)).toDF("id", "x_square")
-    val expectedComments = List(("id", "int", ""),
-      ("x_square", "double", "square of x"))
+    val expectedComments = List(("id", "int",    ""),
+      ("x_square",                     "double", "square of x"))
       .toDF("column", "datatype", "comment")
       .as[(String, String, String)]
 

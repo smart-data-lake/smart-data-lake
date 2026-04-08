@@ -32,7 +32,7 @@ import java.util.UUID
 /**
  * This code is inspired from org.apache.spark.sql.Observation.
  *
- * Note 1: Observations are not supported streaming Datasets
+ * Note 1: Observations are not supported for streaming Datasets
  * Note 2: the name is used to make metrics unique across parallel queries in the same Spark session
  */
 private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends DataFrameObservation with SmartDataLakeLogger {
@@ -78,31 +78,33 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
    * Set an observation name prefix of others metrics to extract if possible.
    * This is used to extract spark observations setup independently, using e.g. ActionId as prefix.
    */
-  def setOtherObservationsPrefix(prefix: String): Unit = {
+  def setOtherObservationsPrefix(prefix: String): SparkObservation = {
     otherObservationsPrefix = Some(prefix)
+    this
   }
   private var otherObservationsPrefix: Option[String] = None
 
   /**
    * Set names of other observation to extract if possible.
    */
-  def setOtherObservationNames(names: Seq[String]): Unit = {
+  def setOtherObservationNames(names: Seq[String]): SparkObservation = {
     otherObservationNames = names
+    this
   }
   private var otherObservationNames: Seq[String] = Seq()
 
   private[spark] def extractMetrics(): Map[String, _] = {
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
-    metrics.getOrElse(Map())
+    val filteredMetrics = metrics.getOrElse(Map())
       .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
-      .flatMap { case (metricName, r) =>
-        val namePostfix = if (metricName != name) {
-          Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
-        } else None
-        val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
-        logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
-        metricEntries
-      }
+    filteredMetrics.flatMap { case (metricName, r) =>
+      val namePostfix = if (metricName != name) {
+        Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
+      } else None
+      val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
+      logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
+      metricEntries
+    }
   }
 
   private[spark] def onFinish(qe: QueryExecution): Unit = {

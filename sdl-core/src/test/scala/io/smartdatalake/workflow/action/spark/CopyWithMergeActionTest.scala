@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SaveModeMergeOptions
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, JdbcTableDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.{Logger, LoggerFactory}
-
-import java.nio.file.Files
 
 class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
   with io.smartdatalake.testutils.spark.dataset.TestToolDataset
@@ -41,14 +38,9 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
   import session.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
-
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:CopyWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
   before {
     instanceRegistry.clear()
@@ -58,16 +50,8 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // setup DataObjects
     val feed = "copy"
-    val srcTable = Table(Some("default"), "copy_input")
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(jdbcConnection)
-    val tgtTable = Table(Some("public"), "copy_output", None, Some(Seq("lastname", "firstname")))
-    val tgtDO = JdbcTableDataObject("tgt1", table = tgtTable, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255)"), allowSchemaEvolution = true)
-    tgtDO.dropTable
-    tgtDO.connection.dropTable(tgtTable.fullName + "_sdltmp")
-    instanceRegistry.register(tgtDO)
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start 1st load
     val action1 = CopyAction("dda", srcDO.id, tgtDO.id, saveModeOptions = Some(SaveModeMergeOptions()))

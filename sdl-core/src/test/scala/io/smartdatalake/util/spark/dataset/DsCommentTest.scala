@@ -19,7 +19,8 @@
 
 package io.smartdatalake.util.spark.dataset
 
-import io.smartdatalake.util.spark.GetSession.{createSparkSession, loggEnv}
+import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -28,7 +29,7 @@ import org.slf4j.{Logger, LoggerFactory}
 class DsCommentTest extends AnyFlatSpec with Matchers
   with Quality with Equality {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  private implicit val spark: SparkSession = createSparkSession()
+    private implicit val spark: SparkSession = TestUtil.session
 
   import spark.implicits._
 

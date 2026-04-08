@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, ParquetFileDataObject, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
@@ -35,7 +36,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.{Files, Path => NioPath}
 
-class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter
+class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
   with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
@@ -58,16 +59,13 @@ class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 
-  test("Df2HiveTable: load custom data frame into Hive table. Reads Hive table into another data frame and compares the two data frames.") {
+  test("load custom data frame into mock DataObject. Reads data and compares with input.") {
 
     // setup DataObjects
     val feed = "customDf2Hive"
     val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
-    val targetTable = Table(db = Some("default"), name = "custom_df_copy", query = None, primaryKey = Some(Seq("line")))
-    val targetDO = HiveTableDataObject(id = "target", Some(tempPath + s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
-    targetDO.dropTable
+    val targetDO = MockSparkDataObject(id = "target").register
     instanceRegistry.register(sourceDO)
-    instanceRegistry.register(targetDO)
 
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
@@ -82,19 +80,19 @@ class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter
   }
 
 
-  test("Df2HiveTable: columns of decimal type should be casted to integral or float type.") {
+  test("columns of decimal type should be casted to integral or float type.") {
 
     // setup DataObjects
-    val feed = "customDf2Hive_dfManyTypes"
+    val feed = "customDf_dfManyTypes"
     val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfManyTypes].getName)))
-    val targetTable = Table(db = Some("default"), name = "custom_dfManyTypes_copy")
-    val targetDO = HiveTableDataObject(id = "target", Some(tempPath + s"/${targetTable.fullName}"), table = targetTable, numInitialHdfsPartitions = 1)
-    targetDO.dropTable
+    val targetDO = ParquetFileDataObject(id = "target", tempPath + s"/customDfCopy")
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
-    val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id, transformers = Seq(StandardizeSparkDatatypesTransformer()))
+    val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id,
+      transformers = Seq(StandardizeSparkDatatypesTransformer())
+    )
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
 
@@ -107,7 +105,7 @@ class CustomDfToHiveTableTest extends AnyFunSuite with BeforeAndAfter
       .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
       .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
     val resultat: Boolean = expected.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable_Decimal2IntegralFloat", Seq())(actual)(expected)
+    if (!resultat) printFailedTestResult("customDf_dfManyTypes", Seq())(actual)(expected)
     assert(resultat)
   }
 

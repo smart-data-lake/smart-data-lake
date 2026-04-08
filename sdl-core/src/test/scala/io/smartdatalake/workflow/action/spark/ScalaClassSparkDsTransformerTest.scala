@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action
+package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsTransformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
@@ -83,7 +84,7 @@ class ScalaClassSparkDsTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare & start load
     val testAction = CopyAction(id = s"ScalaClassSparkDsTransformer", inputId = srcDO.id, outputId = tgt1DO.id,
-      transformers = Seq(ScalaClassSparkDsTransformer(transformerClassName = "io.smartdatalake.workflow.action.TestDSTransformer")))
+      transformers = Seq(ScalaClassSparkDsTransformer(transformerClassName = classOf[TestDSTransformer].getName)))
     val srcSubFeed = SparkSubFeed(None, "src1", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))
 

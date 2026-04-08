@@ -399,12 +399,20 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case _ =>
         outputSubFeed
     }
-    // cleanup inconsistent Spark recordsWritten-metric
-    val recordsWritten = outputSubFeed.metrics.flatMap(_.get("records_written"))
-    val count = outputSubFeed.metrics.flatMap(_.get("count"))
-    if (recordsWritten.contains(0) && count.nonEmpty) outputSubFeed = outputSubFeed.withMetrics(outputSubFeed.metrics.get - "records_written" - "bytes_written").asInstanceOf[DataFrameSubFeed]
+    // cleanup inconsistent Spark recordsWritten-metric and count observation
+    def getOutputMetric(metricName: String) = outputSubFeed.metrics.flatMap(_.get(metricName))
+    val recordsWrittenOrg = getOutputMetric("records_written")
+    val countOrg = getOutputMetric("count")
+    (recordsWrittenOrg, countOrg) match {
+      case (Some(rw: Long), Some(c: Long)) =>
+        val countMax = math.max(rw,c)
+        outputSubFeed = outputSubFeed.withMetrics(outputSubFeed.metrics.get + ("count" -> countMax) + ("records_written" -> countMax)).asInstanceOf[DataFrameSubFeed]
+      case _ => ()
+    }
     // add no_data metric
-    if (count.contains(0) || (count.isEmpty && recordsWritten.contains(0))) outputSubFeed = outputSubFeed.appendMetrics(Map[String, Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
+    if (getOutputMetric("count").orElse(getOutputMetric("records_written")).contains(0)) outputSubFeed = outputSubFeed.appendMetrics(Map[String, Any]("no_data" -> true)).asInstanceOf[DataFrameSubFeed]
+    // throw NoDataToProcessWarning if there is no data to process for this output
+    if (getOutputMetric("no_data").contains(true)) throw NoDataToProcessWarning(id.id, s"($id) no data to process for ${output.id}", results = Some(Seq(outputSubFeed)))
     // return
     outputSubFeed
   }
