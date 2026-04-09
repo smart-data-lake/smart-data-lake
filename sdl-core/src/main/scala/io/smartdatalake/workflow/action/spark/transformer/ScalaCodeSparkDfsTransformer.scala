@@ -28,6 +28,7 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, FileUt
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
@@ -61,7 +62,7 @@ case class ScalaCodeSparkDfsTransformer(override val name: String = "scalaSparkT
     fnTransform
   }
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,DataFrame] = {
-    fnTransform(context.sparkSession, options, dfs)
+    fnTransform(getSparkSession, options, dfs)
   }
   override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaCodeSparkDfsTransformer
 }

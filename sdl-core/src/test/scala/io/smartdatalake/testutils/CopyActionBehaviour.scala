@@ -28,7 +28,9 @@ import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTrans
 import io.smartdatalake.workflow.action.generic.transformer.ScalaClassGenericDfTransformer
 import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, SparkFileDataObject, TableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, TableDataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.hadoop.fs.Path
 import org.slf4j.Logger

@@ -24,14 +24,18 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.StringUtil.replaceNonSqlWithUnderscores
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.action.{CopyAction, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.connection.{Connection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
+import io.smartdatalake.workflow.dataobject.generic.{Table, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
@@ -93,37 +97,17 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
   lazy val session: SparkSession = sparkSessionBuilder().getOrCreate()
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    getDefaultActionPipelineContext(session) // initialize with Spark session incl. Hive support
-  }
-
-  def getDefaultActionPipelineContext(sparkSession: SparkSession)(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    val defaultHadoopConf = new SerializableHadoopConfiguration(new Configuration())
-    val globalConfig = GlobalConfig()
-    val context = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, serializableHadoopConf = defaultHadoopConf, globalConfig = globalConfig)
-    // reuse existing spark session
-    globalConfig._sparkSession = Some(sparkSession)
-    context
+    // set a default spark connection in global config, to easily get spark engine connection in unit tests
+    // note that also context.currentAction needs to be set; this is done in the unit test through sdlb.prepare/init/exec.
+    val globalConfig = GlobalConfig(defaultSparkConnectionId = Some("default-spark"))
+    // create context
+    ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, globalConfig = globalConfig)
   }
 
   // write DataFrame to table
   def prepareHiveTable(table: Table, path: String, df: DataFrame, partitionCols: Seq[String] = Seq()): Unit = {
     if (partitionCols.isEmpty) df.write.mode(SaveMode.Overwrite).option("path", path).saveAsTable(s"${table.fullName}")
     else df.write.mode(SaveMode.Overwrite).option("path", path).partitionBy(partitionCols: _*).saveAsTable(s"${table.fullName}")
-  }
-
-  // returns HiveTableDataObject which is created and provided data frame written to
-  def createHiveTable(db: Option[String] = Some("default"),
-                      schemaMin: Option[StructType] = None,
-                      tableName: String, dirPath: String,
-                      df: DataFrame, partitionCols: Seq[String] = Seq(), primaryKeyColumns: Option[Seq[String]] = None
-                     )(implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): HiveTableDataObject = {
-    val table = Table(db = db, name = tableName, primaryKey = primaryKeyColumns)
-    val path = dirPath + s"$tableName"
-    val hTabDo = HiveTableDataObject(id = s"${tableName}DO", path = Some(path), schemaMin = schemaMin.map(SparkSchema.apply), table = table)
-    hTabDo.dropTable
-    instanceRegistry.register(hTabDo)
-    prepareHiveTable(table, path, df, partitionCols)
-    hTabDo
   }
 
   def copyResourceToFile(resource: String, tgtFile: File): Unit = {
@@ -376,15 +360,6 @@ object TestUtil extends SmartDataLakeLogger with io.smartdatalake.util.spark.dat
 
   def deleteOnExit(path: String): Unit = {
     pathToDeleteOnExit.append(path)
-  }
-
-  def createHiveTableDataObject(id: String)(implicit instanceRegistry: InstanceRegistry): HiveTableDataObject = {
-    val tempDir = Files.createTempDirectory("sdlb-test")
-    val tempPath = tempDir.toAbsolutePath.toString
-    TestUtil.deleteOnExit(tempPath)
-    val dataObject = HiveTableDataObject(id, path = Some(tempPath), table = Table(Some("default"), replaceNonSqlWithUnderscores(id)))
-    instanceRegistry.register(dataObject)
-    dataObject
   }
 
   def createParquetDataObject(id: String)(implicit instanceRegistry: InstanceRegistry): ParquetFileDataObject = {

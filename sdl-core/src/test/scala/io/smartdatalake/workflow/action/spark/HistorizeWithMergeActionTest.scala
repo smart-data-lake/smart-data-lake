@@ -32,8 +32,8 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartD
   protected implicit val session: SparkSession = TestUtil.session
 
   testsFor(historizeWithMergeMode(
-    (id, registry) => MockSparkDataObject(id),
-    (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+    (id, registry) => MockSparkDataObject(id)(registry),
+    (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
   ))
 
 }

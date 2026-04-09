@@ -21,14 +21,13 @@ package io.smartdatalake.config
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
-import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -284,34 +283,6 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       id = "123",
       path = "/path/to/foo",
       partitions = Seq("one", "two")
-    )
-  }
-
-  "CustomDfDataObject" should "be parsable" in {
-    val testCreatorConfig = CustomDfCreatorConfig(
-      className = Some(classOf[TestCustomDfCreator].getName),
-      options = Some(Map("test" -> "foo"))
-    )
-
-    val config = ConfigFactory.parseString(
-      """
-        |dataObjects = {
-        | 123 = {
-        |   type = CustomDfDataObject
-        |   creator {
-        |     class-name = io.smartdatalake.testutils.custom.TestCustomDfCreator
-        |     options = {
-        |       test = foo
-        |     }
-        |   }
-        | }
-        |}
-        |""".stripMargin).resolve
-
-    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    registry.instances.values.head shouldBe CustomDfDataObject(
-      id = "123",
-      creator = testCreatorConfig
     )
   }
 

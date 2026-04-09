@@ -30,7 +30,8 @@ import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTr
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject}
 
 import java.nio.file.Files
 

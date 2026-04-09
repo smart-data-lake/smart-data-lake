@@ -20,7 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite

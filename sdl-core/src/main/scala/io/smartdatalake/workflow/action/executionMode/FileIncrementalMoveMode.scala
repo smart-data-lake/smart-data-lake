@@ -25,7 +25,9 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{DataObject, FileRefDataObject, SparkFileDataObject, SparkFilenameObservation}
+import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
+import io.smartdatalake.workflow.dataobject.spark.{SparkFileDataObject, SparkFilenameObservation}
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed, SubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.Row

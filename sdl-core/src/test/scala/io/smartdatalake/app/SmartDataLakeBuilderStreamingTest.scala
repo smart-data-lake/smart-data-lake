@@ -22,7 +22,7 @@ package io.smartdatalake.app
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -32,7 +32,9 @@ import io.smartdatalake.workflow.action.executionMode.{PartitionDiffMode, SparkS
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import io.smartdatalake.workflow.dataobject.CsvFileDataObject
+import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -80,16 +82,10 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), partitions = Seq("dt", "type"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // fill src table with first partition
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
@@ -714,7 +710,7 @@ class PartitionStreamingTestStateListener2(runIdToAddData: Int) extends StateLis
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
     implicit val _context: ActionPipelineContext = context
-    implicit val _sparkSession: SparkSession = context.sparkSession
+    implicit val _sparkSession: SparkSession = getSparkSession
     import _sparkSession.implicits._
     assert(state.runId == context.executionId.runId && state.attemptId == context.executionId.attemptId)
     logger.info(s"Received metrics for runId=${state.runId} attemptId=${state.attemptId} final=${state.isFinal}")

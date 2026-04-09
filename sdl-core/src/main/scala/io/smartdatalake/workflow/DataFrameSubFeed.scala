@@ -23,7 +23,8 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ProductUtil, ReflectionUtil, ScalaUtil}
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, SchemaValidation, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
 
 import scala.reflect.ClassTag

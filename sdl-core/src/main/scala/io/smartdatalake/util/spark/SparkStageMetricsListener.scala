@@ -25,6 +25,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.SDLExecutionId
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.scheduler.{SparkListener, SparkListenerJobEnd, SparkListenerJobStart, SparkListenerStageCompleted}
 
 import scala.collection.mutable
@@ -52,6 +53,8 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
   private val jobDescriptionRegex = (s"${Regex.quote(context.appConfig.appName)} $actionId").r.unanchored
   // store collected metrics
   private val metrics: mutable.Buffer[SparkStageMetrics] = mutable.Buffer.empty
+
+  private val spark = SparkSubFeed.getSparkSession(context)
 
   /**
    * On job start, register the job ids and stage ids.
@@ -110,7 +113,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
   }
 
   def register: SparkStageMetricsListener = {
-    context.sparkSession.sparkContext.addSparkListener(this)
+    spark.sparkContext.addSparkListener(this)
     this
   }
 
@@ -135,7 +138,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
     }
     metrics.toSeq
   } finally {
-    context.sparkSession.sparkContext.removeSparkListener(this)
+    spark.sparkContext.removeSparkListener(this)
   }
 
   /**

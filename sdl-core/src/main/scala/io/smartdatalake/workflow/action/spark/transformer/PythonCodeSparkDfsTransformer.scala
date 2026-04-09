@@ -28,6 +28,7 @@ import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfTransformer.dedent
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -74,7 +75,7 @@ case class PythonCodeDfsTransformer(
   )(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     // python transformation is executed by passing options and input/output DataFrame through entry point
     try {
-      val entryPoint = new DfsTransformerPythonSparkEntryPoint(context.sparkSession, options, dfs)
+      val entryPoint = new DfsTransformerPythonSparkEntryPoint(getSparkSession, options, dfs)
       val additionalInitCode =
         """
           |# prepare input parameters

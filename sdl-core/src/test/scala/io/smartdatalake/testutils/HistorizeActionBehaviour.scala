@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.action.{CopyAction, HistorizeAction, NoDataToPr
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanCreateIncrementalOutput, CanMergeDataFrame, CanWriteDataFrame, TableDataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers

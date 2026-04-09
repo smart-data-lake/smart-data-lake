@@ -20,6 +20,7 @@
 package io.smartdatalake.testutils.spark.dataset
 
 import io.smartdatalake.app.AppUtil
+import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.dataset.StructTypeUtil
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
@@ -37,7 +38,7 @@ import scala.jdk.CollectionConverters._
  * */
 object Collection extends StructTypeUtil {
 
-  private val spark = AppUtil.createSparkSession(name = "TransformTest", enableHive = false)
+  private val spark = TestUtil.session
 
   import spark.implicits._
 

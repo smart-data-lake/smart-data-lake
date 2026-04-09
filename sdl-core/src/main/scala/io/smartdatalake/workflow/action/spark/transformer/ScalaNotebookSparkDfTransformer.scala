@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.connection.authMode.AuthMode
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql.DataFrame
 import org.json4s._
 import org.json4s.jackson.{JsonMethods, Serialization}
@@ -62,7 +63,7 @@ case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSpa
     fnTransform
   }
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    fnTransform(context.sparkSession, options, df, dataObjectId.id)
+    fnTransform(getSparkSession, options, df, dataObjectId.id)
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookSparkDfTransformer
 }

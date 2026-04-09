@@ -31,8 +31,8 @@ class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with Co
   test("copy dry-run in offline environment, reading exported schemas") {
 
     testCopyActionOffline(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks),
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry),
     )
   }
 
@@ -41,7 +41,7 @@ class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with Co
 
     val tgtSubFeed = testCopyActionOffline(
       (id, registry) => ParquetFileDataObject(id, tempDir.resolve("test1/src1").toString, filenameColumn = Some("_filename"))(registry),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry),
     )
 
     // Verify that the filename column is included in the target schema

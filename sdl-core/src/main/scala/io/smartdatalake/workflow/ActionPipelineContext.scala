@@ -18,16 +18,15 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.{AppUtil, GlobalConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import io.smartdatalake.workflow.connection.Connection
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.SparkSession
 
 import java.time.LocalDateTime
 import scala.collection.mutable
@@ -51,7 +50,6 @@ import scala.collection.mutable
  * @param actionsSelected actions selected for execution by command line parameter --feed-sel
  * @param actionsSkipped actions selected but skipped in current attempt because they already succeeded in a previous attempt.
  */
-@DeveloperApi
 case class ActionPipelineContext (
                                    feed: String, application: String, executionId: SDLExecutionId,
                                    @transient
@@ -65,21 +63,26 @@ case class ActionPipelineContext (
                                    dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map(),
                                    actionsSelected: Seq[ActionId] = Seq(),
                                    actionsSkipped: Seq[ActionId] = Seq(),
-                                   @transient // Prevent polluting output with contents of classLoader field
-                                   serializableHadoopConf: SerializableHadoopConfiguration,
                                    globalConfig: GlobalConfig,
-                                   currentAction: Option[Action] = None
+                                   currentAction: Option[Action] = None,
                                  ) extends SmartDataLakeLogger {
-  private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 
-  private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
+  def withAction(action: Action): ActionPipelineContext = this.copy(currentAction = Some(action))
+
+  def engineConnection: Option[Connection] = {
+    currentAction.flatMap(_.getEngineConnection(this))
+  }
+
+  def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
+
+  def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
     val newValue = dataFrameReuseStatistics.getOrElse(key, Seq()) :+ actionId
     dataFrameReuseStatistics.update(key, newValue)
     newValue.size
   }
 
-  private[smartdatalake] def forgetDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Option[Int] = dataFrameReuseStatistics.synchronized {
+  def forgetDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Option[Int] = dataFrameReuseStatistics.synchronized {
     val key = (dataObjectId, partitionValues)
     val existingValue = dataFrameReuseStatistics.get(key)
     existingValue.map { v =>
@@ -90,29 +93,18 @@ case class ActionPipelineContext (
     }
   }
 
-  def isExecPhase = phase == ExecutionPhase.Exec
+  def isExecPhase: Boolean = phase == ExecutionPhase.Exec
 
   // manage executionId
-  private[smartdatalake] def incrementRunId = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
+  def incrementRunId: ActionPipelineContext = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
 
-  private[smartdatalake] def incrementAttemptId = this.copy(executionId = this.executionId.incrementAttemptId, attemptStartTime = LocalDateTime.now)
+  def incrementAttemptId: ActionPipelineContext = this.copy(executionId = this.executionId.incrementAttemptId, attemptStartTime = LocalDateTime.now)
 
   /**
    * helper method to access hadoop configuration
    */
   def hadoopConf: Configuration = serializableHadoopConf.get
 
-  /**
-   * helper method to access spark session
-   */
-  def sparkSession: SparkSession = {
-    val session = globalConfig.sparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
-    AppUtil.applySdlbRunLoggerContext(session)
-    session
-  }
+  val serializableHadoopConf: SerializableHadoopConfiguration = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
 
-  /**
-   * True if a SparkSession has been created in this job
-   */
-  def hasSparkSession: Boolean = globalConfig.hasSparkSession
 }

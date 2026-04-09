@@ -23,7 +23,6 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.PerformanceUtils.measureTime
 import io.smartdatalake.util.misc.{EnvironmentUtil, SchemaUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.dataobject.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions.{array, col}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -34,6 +33,7 @@ import scala.sys.process.{ProcessLogger, _}
 import scala.util.{Failure, Success, Try}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataobject.generic.Table
 
 /**
  * Provides utility functions for Hive.

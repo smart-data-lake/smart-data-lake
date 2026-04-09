@@ -24,6 +24,9 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.{FileRefDataObject, HadoopFileDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, TableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame}
 

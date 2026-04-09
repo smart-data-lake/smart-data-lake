@@ -26,6 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.dataset
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
@@ -242,7 +243,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getEmptyDataFrame(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
-    SparkDataFrame(dataset.getEmptyDataFrame(inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(inner)(getSparkSession))
   }
 
   override def getDataType(colName: String): SparkDataType = {

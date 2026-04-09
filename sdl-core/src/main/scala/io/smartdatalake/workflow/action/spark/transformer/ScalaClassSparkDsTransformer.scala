@@ -27,6 +27,7 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsTransformer
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql._
 
 
@@ -50,7 +51,7 @@ case class ScalaClassSparkDsTransformer(override val name: String = "ScalaClassS
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsTransformer[FakeProduct, FakeProduct]](transformerClassName)
 
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    customTransformer.transformWithTypeConversion(context.sparkSession, options, df, dataObjectId.id)
+    customTransformer.transformWithTypeConversion(getSparkSession, options, df, dataObjectId.id)
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {

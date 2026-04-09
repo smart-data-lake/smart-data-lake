@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.action.{CopyAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation._
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{lit, substring}

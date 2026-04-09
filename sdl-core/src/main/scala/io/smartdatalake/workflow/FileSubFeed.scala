@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import io.smartdatalake.workflow.dataobject.FileRef
+import io.smartdatalake.workflow.dataobject.file.FileRef
 
 /**
  * A FileSubFeed is used to transport references to files between Actions.

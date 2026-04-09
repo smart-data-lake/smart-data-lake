@@ -24,6 +24,7 @@ import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe

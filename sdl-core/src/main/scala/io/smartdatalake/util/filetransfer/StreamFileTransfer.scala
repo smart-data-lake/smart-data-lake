@@ -19,7 +19,7 @@
 package io.smartdatalake.util.filetransfer
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataobject.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
+import io.smartdatalake.workflow.dataobject.file.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 
 import java.io.{InputStream, OutputStream}

@@ -1,7 +1,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{ExpressionUtil, SmartDataLakeLogger}
@@ -9,9 +9,13 @@ import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig, SttpWebserviceClient, WebserviceMethod}
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
+import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
 import org.apache.spark.sql.DataFrame
@@ -191,6 +195,7 @@ case class ODataDataObject(override val id: DataObjectId,
                            nRetry: Int = 1,
                            responseBufferSetup : Option [ODataResponseBufferSetup] = None,
                            maxRecordCount: Option[Int] = None,
+                           override val sparkConnectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None
                           )
                           (@transient implicit val instanceRegistry: InstanceRegistry)
@@ -354,7 +359,7 @@ case class ODataDataObject(override val id: DataObjectId,
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     import org.apache.spark.sql.functions._
-    val session = context.sparkSession
+    val session = getSparkSession
     import session.implicits._
 
     val recordSchema = schema.get.convert(typeOf[SparkSubFeed]).asInstanceOf[SparkSchema]
@@ -403,7 +408,7 @@ case class ODataDataObject(override val id: DataObjectId,
 
       val responseSchema = StructType(Seq(StructField("@odata.context", StringType), StructField("value", arraySchema)))
 
-      val responsesDf = this.responseBuffer.getDataFrame
+      val responsesDf = this.responseBuffer.getDataFrame(session)
         .select(from_json($"responseString", responseSchema).as("response"))
         .select(explode($"response.value").as("record"))
         .select("record.*")

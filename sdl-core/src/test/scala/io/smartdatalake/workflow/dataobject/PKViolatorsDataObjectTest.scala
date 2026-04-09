@@ -20,11 +20,10 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.TestUtil._
-import io.smartdatalake.testutils.custom.TestCustomDfNonUniqueWithNullCreator
+import io.smartdatalake.testutils.spark.dataset.Collection
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
@@ -111,9 +110,8 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     // creating and registering data objects //
 
     // a custom data object
-    val customDO = CustomDfDataObject(id = "custom_do",
-      creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfNonUniqueWithNullCreator].getName)))
-    instanceRegistry.register(customDO)
+    val customDO = MockSparkDataObject(id = "custom_do").register
+    customDO.writeSparkDataFrame(TestUtil.dfNonUniqueWithNull)
 
     val hiveTablePKidDO = MockSparkDataObject("hive_table_pk_idDO", tableName = "hive_table_pk_id", primaryKey = Some(Seq("id"))).register
     hiveTablePKidDO.writeSparkDataFrame(dfNonUniqueWithNull)

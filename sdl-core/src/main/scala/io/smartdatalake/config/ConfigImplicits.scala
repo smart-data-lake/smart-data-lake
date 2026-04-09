@@ -31,8 +31,8 @@ import io.smartdatalake.workflow.action.spark.customlogic._
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpAuthMode}
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataobject.HousekeepingMode
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation}
+import io.smartdatalake.workflow.dataobject.generic.HousekeepingMode
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -76,7 +76,6 @@ trait ConfigImplicits {
   // see: https://github.com/kxbmap/configs/issues/44
   // TODO: check periodically if still needed, should not be needed with scala 2.13+
   // --------------------------------------------------------------------------------
-  implicit val customDfCreatorConfigReader: ConfigReader[CustomDfCreatorConfig] = ConfigReader.derive[CustomDfCreatorConfig]
   implicit val customDfTransformerConfigReader: ConfigReader[CustomDfTransformerConfig] = ConfigReader.derive[CustomDfTransformerConfig]
   implicit val customDfsTransformerConfigReader: ConfigReader[CustomDfsTransformerConfig] = ConfigReader.derive[CustomDfsTransformerConfig]
   implicit val customFileTransformerConfigReader: ConfigReader[CustomFileTransformerConfig] = ConfigReader.derive[CustomFileTransformerConfig]

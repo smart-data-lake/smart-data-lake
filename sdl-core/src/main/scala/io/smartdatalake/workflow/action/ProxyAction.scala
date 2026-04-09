@@ -24,15 +24,15 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ExcludeFromSchemaExport, FromConfigFactory, SdlConfigObject}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.dag.DAGHelper.NodeId
-import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.agent.Agent
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed}
 import org.apache.spark.sql.types.StructType
+
+import scala.reflect.runtime.universe.Type
 
 /**
  * This[[Action]] executes the action defined by [[wrappedAction]] on a remote agent defined by [[agent]].
@@ -41,6 +41,8 @@ import org.apache.spark.sql.types.StructType
  * @param agent: the agent on which the action should be executed
  */
 case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.ActionId, agent: Agent) extends Action with ExcludeFromSchemaExport {
+  assert(wrappedAction.isInstanceOf[DataFrameActionImpl], "Only Actions handling DataFrames supported by ProxyAction for now")
+  private val dataFrameAction = wrappedAction.asInstanceOf[DataFrameActionImpl]
 
   override def factory: FromConfigFactory[Action] = wrappedAction.factory
 
@@ -73,6 +75,7 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   }
 
   def runOnAgent(executionPhase: ExecutionPhase)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
+
     val agentClient = agent.getClient
 
     val hoconInstructions = AgentClient.prepareHoconInstructions(wrappedAction, context.instanceRegistry.getConnections, agent, executionPhase)
@@ -83,16 +86,17 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
     // if succeeded, create subfeeds with empty dataframes but correct schema
     response.dataObjectIdToSchema.map {
-      case (dataObjectId: DataObjectId, schema: String) => convertToEmptySparkSubFeed(dataObjectId, schema)(context.sparkSession)
+      case (dataObjectId: DataObjectId, schema: String) => convertToEmptySubFeed(dataObjectId, schema, dataFrameAction.subFeedType)
     }.toSeq
   }
 
-  def convertToEmptySparkSubFeed(dataObjectId: DataObjectId, schema: String)(implicit session: SparkSession): SubFeed = {
-    val requiredType = StructType.fromDDL(schema)
-
-    val emptyDF = getEmptyDataFrame(requiredType)(session)
-    SparkSubFeed(dataFrame = Some(SparkDataFrame(emptyDF)), dataObjectId = dataObjectId, partitionValues = Nil,
-      isDummy = true, filter = None)
+  def convertToEmptySubFeed(dataObjectId: DataObjectId, schemaDdl: String, subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+    // TODO: generic create schema from string without using StructType.fromDDL
+    val schema = SparkSchema(StructType.fromDDL(schemaDdl))
+    val emptyDF = companion.getEmptyDataFrame(schema, dataObjectId)
+    companion.getSubFeed(dataFrame = emptyDF, dataObjectId = dataObjectId, Seq())
+      .asDummy()
   }
 }
 

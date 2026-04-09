@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.{DataFrameActionImpl, RuntimeEventState, SparkStreamingExecutionId}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionMetrics, ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.streaming.{StreamingQueryListener, StreamingQueryProgress}
 
@@ -39,7 +40,8 @@ import scala.collection.mutable
 class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: DataObjectId, queryName: String)(implicit context: ActionPipelineContext) extends StreamingQueryListener with SmartDataLakeLogger {
   private var id: UUID = _
   private var isFirstProgress = true
-  context.sparkSession.streams.addListener(this) // self-register
+  private val spark = SparkSubFeed.getSparkSession(context)
+  spark.streams.addListener(this) // self-register
 
   override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = {
     if (queryName == event.name) {
@@ -65,7 +67,7 @@ class SparkStreamingQueryListener(action: DataFrameActionImpl, dataObjectId: Dat
   override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = {
     if (event.id == id) {
       logger.info(s"($queryName) streaming query terminated ${event.exception.map(e => s"exception=$e").getOrElse("normally")}")
-      context.sparkSession.streams.removeListener(this) // self-unregister
+      spark.streams.removeListener(this) // self-unregister
       action.notifySparkStreamingQueryTerminated
       releaseFirstProgressWaitLock()
     }

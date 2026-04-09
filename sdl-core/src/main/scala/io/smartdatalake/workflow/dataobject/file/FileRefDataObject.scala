@@ -1,0 +1,183 @@
+/*
+ * Smart Data Lake - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.workflow.dataobject.file
+
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
+import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
+
+import java.nio.file.FileAlreadyExistsException
+import scala.util.matching.Regex
+
+trait FileRefDataObject extends FileDataObject {
+
+  /**
+   * Definition of partition layout
+   * use %<partitionColName>% as placeholder and * for globs in layout
+   * Note: if you have globs in partition layout, it's not possible to write files to this DataObject
+   * Note: if this is a directory, you must add a final backslash to the partition layout
+   */
+  def partitionLayout(): Option[String]
+
+  /**
+   * Definition of fileName. Default is an asterix to match everything.
+   * This is concatenated with the partition layout to search for files.
+   */
+  val fileName = "*"
+
+  // assert that if partitions are defined, also partition layout is defined and vice-versa
+  require(partitions.nonEmpty || partitionLayout().isEmpty, s"if partitions are defined also partition layout must be defined (${this.id})")
+  require(partitionLayout().isDefined || partitions.isEmpty, s"if partition layout is defined also partitions must be defined (${this.id})")
+  // the partition layout must contain placeholders for all partition columns
+  if (partitions.nonEmpty) {
+    val partitionLayoutTokens = PartitionLayout.extractTokens(partitionLayout().get).toSet
+    require(partitionLayoutTokens == partitions.toSet, s"specified partitions (${partitions.mkString(",")}) don't match with extracted partitions (${partitionLayoutTokens.mkString(",")}) specified partition layout (${partitionLayout()}) for ${this.id}")
+  }
+
+  /**
+   * Method for subclasses to override the base path for this DataObject.
+   * This is for instance needed if pathPrefix is defined in a connection.
+   * @return
+   */
+  def getPath(implicit context: ActionPipelineContext): String = path
+
+  /**
+   * List files for given partition values
+   *
+   * @param partitionValues List of partition values to be filtered. If empty all files in root path of DataObject will be listed.
+   * @return List of [[FileRef]]s
+   */
+  def getFileRefs(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[FileRef]
+
+  /**
+   * Given some [[FileRef]] for another [[DataObject]], translate the paths to the root path of this [[DataObject]]
+   * @param filenameExtractorRegex A regex to extract a part of the filename to keep in the translated FileRef.
+   *                               If the regex contains group definitions, the first group is taken, otherwise the whole regex match.
+   *                               Default is None which keeps the whole filename (without path).
+   */
+  def translateFileRefs(fileRefs: Seq[FileRef], filenameExtractorRegex: Option[Regex] = None)(implicit context: ActionPipelineContext): Seq[FileRefMapping] = {
+    assert(!partitionLayout().exists(_.contains("*")), s"Cannot translate FileRef if partition layout contains * (${partitionLayout()})")
+    fileRefs.map {
+      f =>
+        // extract part of source filename to use
+        var newFileName = filenameExtractorRegex.flatMap(regex => regex.findFirstMatchIn(f.fileName))
+          .map(m => if (m.groupCount>0) m.group(1) else m.matched)
+          .getOrElse(f.fileName)
+        // make filename match this DataObjects FileName pattern.
+        if (!newFileName.matches(this.fileName.replace("*",".*"))) {
+          newFileName += this.fileName.replace("*","")
+        }
+        // prepend path and partition string before fileName
+        val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
+          .map(partitionString => getPath + separator + partitionString + newFileName)
+          .getOrElse(getPath + separator + newFileName)
+        FileRefMapping(f, f.copy(fullPath = newPath, fileName = newFileName))
+    }
+  }
+
+  /**
+   * get partition values formatted by partition layout
+   */
+  def getPartitionString(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Option[String] = {
+    if (partitionLayout().isDefined) Some(partitionValues.getPartitionString(partitionLayout().get))
+    else if (partitions.isEmpty) None
+    else throw new RuntimeException("Partition layout needed when working with PartitionValues")
+  }
+
+  /**
+   * prepare paths to be searched
+   */
+  protected def getSearchPaths(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[(PartitionValues, String)] = {
+    val partitionValuesWithDefault = if (partitionValues.isEmpty) Seq(PartitionValues(Map())) else partitionValues
+    val partitionValuesPaths = partitionValuesWithDefault.map(v => (v, getPartitionString(v)))
+    partitionValuesPaths.map {
+      // through concatenating partition path and filename there might be two "*" one after another - we need to clean this after concatenation
+      case (v, Some(partitionPath)) => (v, s"$getPath$separator$partitionPath$fileName".replace("**","*"))
+      case (v, None) => (v, s"$getPath$separator$fileName".replace("**","*"))
+    }
+  }
+
+  /**
+   * Extract partition values from a given file path
+   */
+  protected def extractPartitionValuesFromFilePath(filePath: String)(implicit context: ActionPipelineContext): PartitionValues = {
+    PartitionLayout.extractPartitionValues(partitionLayout().get + fileName, relativizePath(filePath))
+  }
+
+  private[smartdatalake] def getFilenameFromPath(file: String): String = {
+    assert(!file.endsWith(separator.toString))
+    file.split(separator).last
+  }
+
+  /**
+   * Delete given files. This is used to cleanup files after they are processed.
+   */
+  def deleteFile(file: String)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
+
+  /**
+   * Rename given file. This is used to cleanup files after they are processed.
+   * @throws FileAlreadyExistsException
+   */
+  def renameFile(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteFileRefs not implemented")
+
+  /**
+   * Rename given file. This is used to cleanup files after they are processed.
+   * If new file already exists, make unique by adding currentTimeMillis as postfix to filename.
+   */
+  final def renameFileHandleAlreadyExisting(file: String, newFile: String)(implicit context: ActionPipelineContext): Unit = {
+    try {
+      renameFile(file, newFile)
+    } catch {
+      case _:FileAlreadyExistsException =>
+        val newFileWithTs = newFile + "." + System.currentTimeMillis
+        logger.info(s"(${id}) file already exists, renaming $file to $newFileWithTs")
+        renameFile(file, newFileWithTs)
+    }
+  }
+
+  /**
+   * Define recommended number of files to be read or written in parallel for this DataObject.
+   * Actions using this DataObject are not forced to respect the parallelism given, but they can use the information to better control parallel operations.
+   * When set to None there is no special recommendation for parallelism.
+   * Note: this was implemented for FileTransferAction working with SFtpFileRefDataObject, to make use of SFtpFileRefConnection.maxParallelConnections.
+   */
+  def recommendedParallelism: Option[Int] = None
+
+  /**
+   * Delete all data. This is used to implement SaveMode.Overwrite.
+   */
+  def deleteAll(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"($id) deleteAll not implemented")
+
+  /**
+   * Create directories if not existing.
+   * If no implementation is given, it is assumed that directories will be created on-the-fly when writing a file.
+   */
+  def mkDirs(path: String)(implicit context: ActionPipelineContext): Unit = ()
+
+  /**
+   * Overwrite or Append new data.
+   * When writing partitioned data, this applies only to partitions concerned.
+   */
+  def saveMode: SDLSaveMode
+}
+
+case class FileRef( fullPath:String, fileName: String, partitionValues: PartitionValues) {
+  def toStringShort: String = if (fullPath != "") fullPath else fileName
+}

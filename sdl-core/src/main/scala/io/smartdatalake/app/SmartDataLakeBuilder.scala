@@ -401,8 +401,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
-    val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
-    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
+    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionIdsSelected, actionsSkipped = actionIdsSkipped, globalConfig = globalConfig)
     val actionDAGRun = ActionDAGRun(actionsToExec, actionsToSkip, appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
     val finalSubFeeds = try {
       if (simulation) {
@@ -436,12 +435,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     (finalSubFeeds, actionDAGRun.getStatistics)
   }
 
-  private[smartdatalake] def agentExec(appConfig: CanBuildSmartDataLakeBuilderConfig[_], phase: ExecutionPhase, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now(), attemptStartTime: LocalDateTime = LocalDateTime.now(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq(), simulation: Boolean = false, globalConfig: GlobalConfig = GlobalConfig(enableHive = false))(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
+  private[smartdatalake] def agentExec(appConfig: CanBuildSmartDataLakeBuilderConfig[_], phase: ExecutionPhase, executionId: SDLExecutionId = SDLExecutionId.executionId1, runStartTime: LocalDateTime = LocalDateTime.now(), attemptStartTime: LocalDateTime = LocalDateTime.now(), initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq(), simulation: Boolean = false, globalConfig: GlobalConfig = GlobalConfig())(implicit instanceRegistry: InstanceRegistry): Seq[SubFeed] = {
     // create and execute DAG
     val actionsToExecute = instanceRegistry.getActions
     logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
-    val serializableHadoopConf = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
-    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig.getStdAppConfig(), runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, serializableHadoopConf = serializableHadoopConf, globalConfig = globalConfig)
+    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig.getStdAppConfig(), runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, globalConfig = globalConfig)
     val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {
@@ -507,18 +505,20 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
             }
             // remove spark caches so that new data is read in next iteration
             //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
-            if (context.hasSparkSession) context.sparkSession.sqlContext.clearCache()
+            //TODO: add additional method actionDAGRun.finalizeIteration or similar, which can be used to do some finalization tasks at the end of an iteration, for all connections
+            //if (context.hasSparkSession) context.sparkSession.sqlContext.clearCache()
             // iterate execution
             // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
             Some(actionDAGRun.copy(executionId = newContext.executionId), newContext, Some(startTime))
           } else {
             if (actionsSelected.exists(_.isAsynchronous)) {
-              if (context.hasSparkSession) {
+              //TODO: add additional method actionDAGRun.stopAsynchronous or similar, which will stop asynchronous actions
+              //if (context.hasSparkSession) {
                 // stop active streaming queries
-                context.sparkSession.streams.active.foreach(_.stop())
+                //context.sparkSession.streams.active.foreach(_.stop())
                 // if there were exceptions, throw first one
-                context.sparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
-              }
+                //context.sparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
+              //}
             }
             // otherwise everything went smooth
             logger.info("Stopped streaming gracefully")
@@ -527,15 +527,17 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         } else {
           // if there are no synchronous actions, we wait for termination of asynchronous streaming queries (if we don't wait, the main process will end and kill the streaming query threads...)
           if (!Environment.stopStreamingGracefully) {
-            if (context.hasSparkSession) {
-              context.sparkSession.streams.awaitAnyTermination()
-              context.sparkSession.streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
-            }
+            //TODO: add additional method actionDAGRun.stopAsynchronous(wait=false) or similar, which will stop asynchronous actions
+            //if (context.hasSparkSession) {
+              //context.sparkSession.streams.awaitAnyTermination()
+              //context.sparkSession.streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
+            //}
             actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context) // notify about this asynchronous iteration
           } else {
-            if (context.hasSparkSession) {
-              context.sparkSession.streams.active.foreach(_.stop())
-            }
+            //TODO: add additional method actionDAGRun.stopAsynchronous(wait=true) or similar, which will stop asynchronous actions
+            //if (context.hasSparkSession) {
+            //  context.sparkSession.streams.active.foreach(_.stop())
+            //}
             logger.info("Stopped streaming gracefully")
           }
           None

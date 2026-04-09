@@ -37,8 +37,8 @@ class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter with TestToo
 
   test("deduplicate 1st 2nd load") {
     testDeduplicateTwoRuns(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
@@ -57,15 +57,15 @@ class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter with TestToo
 
   test("deduplicate with filter clause") {
     testDeduplicateWithFilter(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 

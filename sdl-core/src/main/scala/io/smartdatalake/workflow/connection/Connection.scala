@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.connection
 
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.workflow.AtlasExportable
+import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 
 trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
 
@@ -33,6 +33,11 @@ trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] wit
    * Additional metadata for the Connection
    */
   def metadata: Option[ConnectionMetadata]
+
+  /**
+   * A hook for subclasses to perform configurations before the Connection is used for an Action in Init/Exec-phase
+   */
+  def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = ()
 
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"

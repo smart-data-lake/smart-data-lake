@@ -20,19 +20,22 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * As all of the prepackaged DataObjects implementing CanWriteDataFrame also implement CanHandlePartitions, we need to
+ * As all the prepackaged DataObjects implementing CanWriteDataFrame also implement CanHandlePartitions, we need to
  * create a custom DataObject implementation for tests without implementing CanHandlePartitions.
  */
 case class UnpartitionedTestDataObject(override val id: DataObjectId,
+                                       override val sparkConnectionId: Option[ConnectionId] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {
@@ -40,7 +43,7 @@ case class UnpartitionedTestDataObject(override val id: DataObjectId,
   override def options: Map[String, String] = Map() // override options because of conflicting definitions in CanCreateSparkDataFrame and CanWriteSparkDataFrame
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val session = context.sparkSession
+    val session = getSparkSession
     import session.implicits._
     Seq(("test",1),("test",2)).toDF("a","b")
   }

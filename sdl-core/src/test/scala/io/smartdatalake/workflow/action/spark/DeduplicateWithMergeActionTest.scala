@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action.spark
 
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.scalatest.funsuite.AnyFunSuite
@@ -26,23 +27,23 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogge
 
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
 
   }
 
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 }

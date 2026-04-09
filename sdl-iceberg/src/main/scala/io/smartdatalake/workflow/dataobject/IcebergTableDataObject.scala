@@ -33,6 +33,9 @@ import io.smartdatalake.workflow.connection.IcebergTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.file.HasHadoopStandardFilestore
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, CanEvolveSchema, CanHandlePartitions, CanMergeDataFrame, Constraint, ExpectationValidation, HousekeepingMode, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.iceberg
@@ -116,8 +119,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val preReadSql: Option[String] = None,
                                   override val postReadSql: Option[String] = None,
                                   override val preWriteSql: Option[String] = None,
-                                  override val postWriteSql: Option[String] = None)
-                                 (@transient implicit val instanceRegistry: InstanceRegistry)
+                                  override val postWriteSql: Option[String] = None,
+                                  override val sparkConnectionId: Option[ConnectionId] = None
+                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput

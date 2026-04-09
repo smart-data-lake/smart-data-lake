@@ -13,6 +13,8 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, HousekeepingMode}
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -120,7 +122,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
    * parse CSV from DataFrame prepared by Sparks "text" DataSource
    */
   override def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = sparkConnection.sparkSession
     // parse csv files content
     assert(df.columns.head == "value") // reading format=text should give schema "value: string" (+ partition columns)
     df
@@ -130,13 +132,11 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
           val content = csvContentRow.getAs[String]("value")
           val filename = filenameColumn.map(csvContentRow.getAs[String])
           if (filename.isDefined) logger.debug(s"($id) Parsing file $filename, size=${content.length}")
-          try {
-            parseCsvContent(content, parserOptions, filename)
-              .map { parsedRow =>
-                val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // value column is at pos 0, partition columns (if any) and filename column are after that
-                Row(values: _*)
-              }
-          }
+          parseCsvContent(content, parserOptions, filename)
+            .map { parsedRow =>
+              val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // value column is at pos 0, partition columns (if any) and filename column are after that
+              Row(values: _*)
+            }
         }
       }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // value column is at pos 0, partition columns (if any) and filename column are after that
   }
