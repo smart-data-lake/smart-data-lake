@@ -34,6 +34,7 @@ import io.smartdatalake.util.misc.AclDef
 case class HadoopFileConnection(override val id: ConnectionId,
                                 pathPrefix: String,
                                 acl: Option[AclDef] = None,
+                                sparkConnectionId: Option[ConnectionId] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {
 

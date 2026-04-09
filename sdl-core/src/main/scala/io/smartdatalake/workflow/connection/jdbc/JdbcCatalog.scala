@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.generic.PrimaryKeyDefinition
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}

@@ -22,7 +22,6 @@ import java.time.Duration.ofMinutes
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
 import java.time.{Duration, LocalDateTime}
-
 import com.splunk._
 import com.typesafe.config.Config
 import configs.ConfigReader
@@ -33,8 +32,11 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SplunkConnection
 import io.smartdatalake.workflow.dataobject.SplunkFormatter.{fromSplunkStringFormat, toSplunkStringFormat}
+import io.smartdatalake.workflow.dataobject.generic.ConnectionTestException
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
+
 import scala.util.Using
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
@@ -49,8 +51,9 @@ import scala.jdk.CollectionConverters._
 case class SplunkDataObject(override val id: DataObjectId,
                              params: SplunkParams,
                              connectionId: ConnectionId,
+                             override val sparkConnectionId: Option[ConnectionId] = None,
                              override val metadata: Option[DataObjectMetadata] = None
-                           )(implicit instanceRegistry: InstanceRegistry)
+                           )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SplunkService {
 
   /**

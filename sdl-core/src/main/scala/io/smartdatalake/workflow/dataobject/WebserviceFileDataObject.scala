@@ -30,6 +30,7 @@ import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+import io.smartdatalake.workflow.dataobject.file.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}

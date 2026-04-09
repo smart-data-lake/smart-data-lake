@@ -23,7 +23,7 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.networknt.schema.{JsonSchema, JsonSchemaFactory, SpecVersion, ValidationMessage}
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.json.JsonUtils._
@@ -31,12 +31,15 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
+import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, SchemaValidation}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, DatasetHelper}
+import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
 import org.json4s.Formats
 import org.json4s.jackson.JsonMethods.compact
 
@@ -71,8 +74,10 @@ case class AirbyteDataObject(override val id: DataObjectId,
                              cmd: ParsableScriptDef,
                              incrementalCursorFields: Seq[String] = Seq(),
                              maxRecordsPerPartition: Int = 100000,
+                             override val sparkConnectionId: Option[ConnectionId] = None,
                              override val schemaMin: Option[GenericSchema] = None,
-                             override val metadata: Option[DataObjectMetadata] = None)
+                             override val metadata: Option[DataObjectMetadata] = None
+                            )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
 
   // these variables will be initialized in prepare phase
@@ -110,7 +115,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getDataFrame")
-    implicit val session = context.sparkSession
+    implicit val session: SparkSession = sparkConnection.sparkSession
 
     val df = context.phase match {
       // init phase -> return empty dataframe

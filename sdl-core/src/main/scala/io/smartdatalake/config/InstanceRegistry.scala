@@ -21,7 +21,8 @@ package io.smartdatalake.config
 import io.smartdatalake.config.SdlConfigObject.{ConfigObjectId, DataObjectId}
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, ExpectationValidation}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, ExpectationValidation}
+import io.smartdatalake.workflow.dataobject.{DataObject}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag

@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId, stringToDataObjectId}
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
@@ -33,10 +33,14 @@ import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode,
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.CountExpectation
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -107,16 +111,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // setup DataObjects
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
-    val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname", "firstname")))
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
     // second table has partition columns dt only (reduced)
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5) // partition 20180101 is included in partition values filter
@@ -205,16 +203,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // setup DataObjects
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
-    val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname", "firstname")))
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
     // second table has partition columns dt only (reduced)
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname")))
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -537,16 +529,11 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.clear()
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), partitions = Seq("dt", "type"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // fill src table with first partition
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
@@ -692,12 +679,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.clear()
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
-    val srcPath = tempPath + s"/${srcTable.fullName}"
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
     val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
@@ -705,9 +688,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.register(tgt1DO)
     val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
     val tgt2Path = tempPath + s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
+    val tgt2DO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare input DataFrame
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5))
@@ -1065,7 +1046,12 @@ object TestSDLPlugin {
 /**
  * This test DataObject delivers the 10 next numbers on every increment.
  */
-case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None, initVal: Int = 1)
+case class TestIncrementalDataObject(
+                                      override val id: DataObjectId,
+                                      override val sparkConnectionId: Option[ConnectionId] = None,
+                                      override val metadata: Option[DataObjectMetadata] = None,
+                                      initVal: Int = 1
+                                    )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   // State is the start number of the last delivered increment
@@ -1074,7 +1060,7 @@ case class TestIncrementalDataObject(override val id: DataObjectId, override val
   var noDataCreated: Boolean = false
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
-    val session = context.sparkSession
+    val session = getSparkSession
     import session.implicits._
     // simulate no data for one request
     if (previousState == 21 && !noDataCreated && context.phase == ExecutionPhase.Exec) {

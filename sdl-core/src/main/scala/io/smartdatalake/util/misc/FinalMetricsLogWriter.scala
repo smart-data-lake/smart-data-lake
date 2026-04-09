@@ -25,10 +25,9 @@ import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataobject.{CanMergeDataFrame, CanWriteSparkDataFrame, TransactionalTableDataObject}
-import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.explode
+import io.smartdatalake.workflow.dataobject.generic.{CanMergeDataFrame, CanWriteDataFrame, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.CanWriteSparkDataFrame
+import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, DataFrameSubFeed}
 
 import java.sql.Timestamp
 
@@ -51,8 +50,8 @@ class FinalMetricsLogWriter(options: Map[String, StringOrSecret]) extends StateL
   // get data objects
   private val metricsLogDataObjectId = DataObjectId(options("metricsLogDataObjectId").resolve())
   private val actionLogDataObjectId = DataObjectId(options("actionLogDataObjectId").resolve())
-  private lazy val metricsLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanWriteSparkDataFrame with CanMergeDataFrame](metricsLogDataObjectId)
-  private lazy val actionLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanWriteSparkDataFrame with CanMergeDataFrame](actionLogDataObjectId)
+  private lazy val metricsLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanWriteDataFrame with CanMergeDataFrame](metricsLogDataObjectId)
+  private lazy val actionLogDataObject = Environment.instanceRegistry.get[TransactionalTableDataObject with CanWriteDataFrame with CanMergeDataFrame](actionLogDataObjectId)
 
   // primary keys:
   private val metricsLogPrimaryKey = Seq("run_id", "run_start_tstmp", "action_id", "data_object_id")
@@ -62,21 +61,20 @@ class FinalMetricsLogWriter(options: Map[String, StringOrSecret]) extends StateL
 
   override def init(context: ActionPipelineContext): Unit = {
     implicit val iContext: ActionPipelineContext = context
-    implicit val spark: SparkSession = context.sparkSession
 
     // check primary keys set correctly
     assert(metricsLogDataObject.table.primaryKey.contains(metricsLogPrimaryKey), s"Primary key of ${metricsLogDataObject.id} must be set to '${metricsLogPrimaryKey.mkString(", ")}'")
     assert(actionLogDataObject.table.primaryKey.contains(actionLogPrimaryKey), s"Primary key of ${actionLogDataObject.id} must be set to '${actionLogPrimaryKey.mkString(", ")}'")
 
     // check connection and schema
-    actionLogDataObject.initSparkDataFrame(createActionDf(Seq[ActionLog]()), Seq(), saveModeOptions = Some(SaveModeMergeOptions()))
-    metricsLogDataObject.initSparkDataFrame(createMetricsDf(Seq[ActionLog]()), Seq(), saveModeOptions = Some(SaveModeMergeOptions()))
+    actionLogDataObject.init(createActionDf(Seq[ActionLog]()), Seq(), saveModeOptions = Some(SaveModeMergeOptions()))
+    metricsLogDataObject.init(createMetricsDf(Seq[ActionLog]()), Seq(), saveModeOptions = Some(SaveModeMergeOptions()))
 
     logger.info(s"initialized")
   }
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId : Option[ActionId]): Unit = {
-    implicit val spark = context.sparkSession
+    implicit val iContext: ActionPipelineContext = context
 
     // only final state is saved
     if (state.isFinal) {
@@ -84,24 +82,30 @@ class FinalMetricsLogWriter(options: Map[String, StringOrSecret]) extends StateL
       val actionLogs = LogExtractor.getFinalLogs(state, context)
 
       val actionDf = createActionDf(actionLogs)
-      actionLogDataObject.writeSparkDataFrame(actionDf, saveModeOptions = Some(SaveModeMergeOptions()))(context)
+      actionLogDataObject.writeDataFrame(actionDf, saveModeOptions = Some(SaveModeMergeOptions()))
       logger.info(s"logged actions to ${actionLogDataObject.id}")
 
       val metricsDf = createMetricsDf(actionLogs)
-      metricsLogDataObject.writeSparkDataFrame(metricsDf, saveModeOptions = Some(SaveModeMergeOptions()))(context)
+      metricsLogDataObject.writeDataFrame(metricsDf, saveModeOptions = Some(SaveModeMergeOptions()))
       logger.info(s"logged metrics to ${metricsLogDataObject.id}")
     }
   }
 
-  private def createActionDf(actionLog: Seq[ActionLog])(implicit spark: SparkSession) = {
-    import spark.implicits._
-    actionLog.toDF().drop($"data_object_metrics")
+  private def createActionDf(actionLog: Seq[ActionLog])(implicit context: ActionPipelineContext) = {
+    val subFeedType = actionLogDataObject.writeSubFeedSupportedTypes.head
+    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+    import companion._
+    import companion.implicits._
+    actionLog.toDF().drop(col("data_object_metrics"))
   }
-  private def createMetricsDf(actionLog: Seq[ActionLog])(implicit spark: SparkSession) = {
-    import spark.implicits._
+  private def createMetricsDf(actionLog: Seq[ActionLog])(implicit context: ActionPipelineContext) = {
+    val subFeedType = actionLogDataObject.writeSubFeedSupportedTypes.head
+    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+    import companion._
+    import companion.implicits._
     actionLog.toDF()
-      .withColumn("data_object_metrics", explode($"data_object_metrics"))
-      .select($"run_id", $"run_start_tstmp", $"action_id", $"attempt_id", $"data_object_metrics.*")
+      .withColumn("data_object_metrics", explode(col("data_object_metrics")))
+      .select(Seq(col("run_id"), col("run_start_tstmp"), col("action_id"), col("attempt_id"), col("data_object_metrics.*")))
   }
 }
 

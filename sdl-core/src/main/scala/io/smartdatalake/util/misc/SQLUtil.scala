@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataobject.Table
+import io.smartdatalake.workflow.dataobject.generic.Table
 
 object SQLUtil {
 

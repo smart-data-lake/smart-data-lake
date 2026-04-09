@@ -26,7 +26,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.DataFrameActionImpl
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataobject.TableDataObject
+import io.smartdatalake.workflow.dataobject.generic.TableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**

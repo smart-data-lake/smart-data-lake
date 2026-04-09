@@ -18,12 +18,14 @@
  */
 package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
+import io.smartdatalake.workflow.connection.SparkClassicConnection
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -51,6 +53,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class DataObjectsExporterDataObject(id: DataObjectId,
                                          config: Option[String] = None,
+                                         override val sparkConnectionId: Option[ConnectionId],
                                          override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[DataObjectsExporterDataObject] {
@@ -61,7 +64,7 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
    * @return DataFrame including all Dataobjects in the instanceRegistry, used for exporting the metadata
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val session: SparkSession = context.sparkSession
+    val session = sparkConnection.sparkSession
     import session.implicits._
 
     val listElementsSeparator = ","
@@ -101,8 +104,6 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
           getFieldData[Seq[String]](dataObject, "partitions").map(_.mkString(listElementsSeparator)),
           // table
           getFieldData[Table](dataObject, "table").map(_.toString),
-          // creator
-          getFieldData[CustomDfCreatorConfig](dataObject, "creator").map(_.toString),
           // connectionId
           getEventuallyOptionalFieldData[Any](dataObject, "connectionId").map(getIdFromConfigObjectIdOrString)
         )

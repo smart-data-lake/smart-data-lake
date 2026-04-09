@@ -20,7 +20,7 @@
 package io.smartdatalake.testutils
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
@@ -30,9 +30,12 @@ import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark._
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, CanMergeDataFrame, Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -51,8 +54,9 @@ case class MockSparkDataObject(override val id: DataObjectId,
                                tableName: String = "mock",
                                override val constraints: Seq[Constraint] = Seq(),
                                override val expectations: Seq[Expectation] = Seq(),
-                               saveMode: SDLSaveMode = SDLSaveMode.Overwrite
-                              )
+                               saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
+                               override val sparkConnectionId: Option[ConnectionId] = None
+                              ) (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanHandlePartitions with ExpectationValidation with CanMergeDataFrame {
   assert(partitions.isEmpty || saveMode == SDLSaveMode.Overwrite, s"($id) Only saveMode=Overwrite implemented for partitioned MockDataObjects")
@@ -144,7 +148,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
   }
 
   def mergeDataFrameByPrimaryKey(dfNew: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): (DataFrame, MetricsMap) = {
-    val session = context.sparkSession
+    val session = getSparkSession
     import session.implicits._
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
     val saveModeExpr = saveModeOptions.getExpressions(SparkSubFeed.subFeedType)

@@ -22,6 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.HousekeepingMode
 
 /**
  * A dummy [[HousekeepingMode]] for unit tests.

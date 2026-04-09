@@ -33,6 +33,7 @@ import io.smartdatalake.workflow.dataframe.plainScala.{ScalaAbstractColumn, Scal
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, CanMergeDataFrame, CanWriteDataFrame, Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 
 import scala.reflect.runtime.universe.{Type, typeOf}

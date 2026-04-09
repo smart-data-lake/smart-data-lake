@@ -22,11 +22,11 @@ package io.smartdatalake.workflow.action.generic.transformer
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.TimestampType
@@ -44,16 +44,14 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  implicit var contextInit: ActionPipelineContext = _
-  var contextPrep: ActionPipelineContext = _
-  var contextExec: ActionPipelineContext = _
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+
+  val contextInit = TestUtil.getDefaultActionPipelineContext
+  val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
+  implicit val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
 
   before {
-    Environment._instanceRegistry = new InstanceRegistry()
-    contextInit = TestUtil.getDefaultActionPipelineContext(Environment.instanceRegistry)
-    contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-    contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
-    Environment.instanceRegistry.clear()
+    instanceRegistry.clear()
   }
 
   test("deduplication test with primary key") {
@@ -131,10 +129,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
     val feed = "deduplicate_pipeline"
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "deduplicate_input", primaryKey = Some(Seq("pk1", "pk2")))
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)(Environment.instanceRegistry)
-    srcDO.dropTable
-    Environment.instanceRegistry.register(srcDO)
+    val srcDO = MockSparkDataObject("src1", primaryKey = Some(Seq("pk1", "pk2"))).register
 
     val df = Seq(
       (1, 1, "2019-04-25 12:23:29", "2020-06-21 22:51:48"),
@@ -145,10 +140,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
     srcDO.writeSparkDataFrame(df)
 
-    val tgtTable = Table(Some("default"), "deduplicate_output")
-    val tgtDO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)(Environment.instanceRegistry)
-    tgtDO.dropTable
-    Environment.instanceRegistry.register(tgtDO)
+    val tgtDO = MockSparkDataObject("tgt1").register
 
     // setup action
     val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id,
@@ -176,10 +168,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
     val feed = "deduplicate_pipeline"
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "deduplicate_input", primaryKey = Some(Seq("pk1", "pk2")))
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)(Environment.instanceRegistry)
-    srcDO.dropTable
-    Environment.instanceRegistry.register(srcDO)
+    val srcDO = MockSparkDataObject("src1", primaryKey = Some(Seq("pk1", "pk2"))).register
 
     val df = Seq(
       (1, 1, "2019-04-25 12:23:29", "2020-06-21 22:51:48"),
@@ -190,11 +179,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
     srcDO.writeSparkDataFrame(df)
 
-    val tgtTable = Table(Some("default"), "deduplicate_output", None, Some(Seq("pk1", "pk2")))
-    val tgtDO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1)(Environment.instanceRegistry)
-    tgtDO.dropTable
-    Environment.instanceRegistry.register(tgtDO)
-
+    val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("pk1", "pk2"))).register
 
     // setup action
     val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id,
@@ -217,7 +202,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
     ).toDF("pk1", "pk2", "created_at", "updated_at")
       .select($"pk1", $"pk2", $"created_at".cast(TimestampType), $"updated_at".cast(TimestampType)))
 
-    val transformedDf = session.table(s"${tgtTable.fullName}")
+    val transformedDf = tgtDO.getSparkDataFrame()
 
     assert(transformedDf.collect sameElements resultDf.inner.collect)
   }

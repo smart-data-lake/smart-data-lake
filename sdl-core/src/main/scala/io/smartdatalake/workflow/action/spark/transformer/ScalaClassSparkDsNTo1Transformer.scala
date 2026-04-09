@@ -31,6 +31,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransform
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.tolerantGet
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
@@ -71,7 +72,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     val outputDO: DataObject = thisAction.outputs.head
     val outputDatasetId = this.outputDatasetId.getOrElse(outputDO.id.id)
 
-    Map(outputDatasetId -> transformWithParamMapping(actionId, context.sparkSession, options, dfs, inputDOs, partitionValues))
+    Map(outputDatasetId -> transformWithParamMapping(actionId, getSparkSession, options, dfs, inputDOs, partitionValues))
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {

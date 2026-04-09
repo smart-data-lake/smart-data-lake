@@ -21,7 +21,8 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
-import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils, Table}
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 

@@ -22,7 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataobject.FileRef
+import io.smartdatalake.workflow.dataobject.file.FileRef
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 

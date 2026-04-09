@@ -29,6 +29,8 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, HousekeepingMode}
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import org.apache.spark.sql.DataFrame
 
 /**

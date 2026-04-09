@@ -6,7 +6,8 @@ import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.SDLExecutionId
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, SparkFileDataObject}
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, NoTypeHints}

@@ -19,17 +19,20 @@
 
 package io.smartdatalake.workflow.dataframe.spark
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
 import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, dataset}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+import io.smartdatalake.workflow.connection.{HadoopFileConnection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Encoder, Encoders, Row, functions}
+import org.apache.spark.sql.{Column, DataFrame, Encoder, Encoders, Row, SparkSession, functions}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
@@ -96,7 +99,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
   private[smartdatalake] def convertToDummy(schema: SparkSchema)(implicit context: ActionPipelineContext): SparkSubFeed = {
     val dummyDf = dataFrame.map{
       dataFrame =>
-        if (dataFrame.inner.isStreaming) SparkDataFrame(DummyStreamProvider.getDummyDf(schema.inner)(context.sparkSession))
+        if (dataFrame.inner.isStreaming) SparkDataFrame(DummyStreamProvider.getDummyDf(schema.inner)(getSparkSession))
         else schema.getEmptyDataFrame(dataObjectId)
     }
     this.copy(dataFrame = dummyDf, isDummy = true)
@@ -196,11 +199,11 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
     val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkSchema]
-    SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(getSparkSession))
   }
   override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): SparkDataFrame = {
     schema match {
-      case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(context.sparkSession))
+      case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(getSparkSession))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
     }
   }
@@ -244,15 +247,15 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.array_compact(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*)))
   }
   override def array(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def struct(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.struct(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def expr(sqlExpr: String): GenericColumn = SparkColumn(functions.expr(sqlExpr))
@@ -270,7 +273,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   override def concat(exprs: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs)
     SparkColumn(functions.concat(exprs.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def regexp_extract(column: GenericColumn, regexp: String, groupIdx: Int): GenericColumn = {
@@ -310,7 +313,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    SparkDataFrame(context.sparkSession.sql(query))
+    SparkDataFrame(getSparkSession.sql(query))
   }
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
@@ -418,17 +421,25 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val spark = context.sparkSession
-    import spark.implicits._
     implicit val encoder: Encoder[A] = Encoders.product[A]
+    val session = getSparkSession
+    import session.implicits._
     SparkDataFrame(rows.toDF)
   }
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val spark = context.sparkSession
-    import spark.implicits._
     implicit val encoder: Encoder[A] = Encoders.product[A]
+    val session = getSparkSession
+    import session.implicits._
     SparkDataFrame(rows.toDF(colNames:_*))
+  }
+
+  def getSparkSession(implicit context: ActionPipelineContext): SparkSession = {
+    context.engineConnection match {
+      case Some(connection) if connection.isInstanceOf[SparkClassicConnection] => connection.asInstanceOf[SparkClassicConnection].sparkSession
+      case Some(connection) => throw new IllegalStateException(s"Spark connection is required to create DataFrame, but got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
+      case None => throw new IllegalStateException("No connection available in context. Spark connection is required to create DataFrame.")
+    }
   }
 }
 

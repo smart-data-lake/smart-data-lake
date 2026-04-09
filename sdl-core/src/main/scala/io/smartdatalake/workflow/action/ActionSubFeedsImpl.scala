@@ -27,8 +27,10 @@ import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 
 import java.time.Duration
 import scala.collection.SortedSet

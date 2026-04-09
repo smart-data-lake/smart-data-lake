@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,31 +22,21 @@ package io.smartdatalake.app
 import io.smartdatalake.util.secrets.{SecretProvider, SecretProviderConfig, StringOrSecret}
 import org.scalatest.funsuite.AnyFunSuite
 
-class GlobalConfigTest extends AnyFunSuite {
+class SparkClassicConnectionTest extends AnyFunSuite {
+
   test("sparkOptions secrets are resolved in Hadoop config") {
     // prepare
     val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map()))
 
     // execute
-    val globalConfig = GlobalConfig(sparkOptions = Some(Map("spark.hadoop.hadoop.security.authentication" -> StringOrSecret("###TESTPROVIDER#secret###"))),
-      secretProviders = Some(Map("TESTPROVIDER" -> providerConfig)))
+    val globalConfig = GlobalConfig(
+      hadoopOptions = Some(Map("hadoop.security.authentication" -> StringOrSecret("###TESTPROVIDER#secret###"))),
+      secretProviders = Some(Map("TESTPROVIDER" -> providerConfig))
+    )
     val hadoopConfig = globalConfig.getHadoopConfiguration
 
     // check
     assert(hadoopConfig.get("hadoop.security.authentication") == "resolvedSecret")
-  }
-
-  test("sparkOptions secrets are resolved in Spark session configuration") {
-    // prepare
-    val providerConfig = SecretProviderConfig(classOf[TestSecretProvider].getName, Some(Map()))
-
-    // execute
-    val globalConfig = GlobalConfig(sparkOptions = Some(Map("spark.authenticate.secret" -> StringOrSecret("###TESTPROVIDER#secret###"))),
-      secretProviders = Some(Map("TESTPROVIDER" -> providerConfig)))
-    val sparkSession = globalConfig.sparkSession("test", Some("local"))
-
-    // check
-    assert(sparkSession.conf.get("spark.authenticate.secret") == "resolvedSecret")
   }
 }
 

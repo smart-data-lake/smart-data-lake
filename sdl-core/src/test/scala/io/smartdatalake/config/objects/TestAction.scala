@@ -25,7 +25,8 @@ import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, HousekeepingMode, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, HousekeepingMode, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 /**

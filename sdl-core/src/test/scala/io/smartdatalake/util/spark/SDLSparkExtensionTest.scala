@@ -23,7 +23,7 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.addHadoopDefaultSchemaAuthority
 import io.smartdatalake.util.spark.hive.HiveUtil
-import io.smartdatalake.workflow.dataobject.Table
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SparkSession}

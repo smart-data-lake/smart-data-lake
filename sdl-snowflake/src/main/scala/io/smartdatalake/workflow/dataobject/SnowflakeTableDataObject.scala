@@ -37,6 +37,8 @@ import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, Snowpar
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{CanHandleConstraints, CanHandlePartitions, Constraint, ExpectationValidation, PrimaryKeyDefinition, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
@@ -92,6 +94,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
+                                    override val sparkConnectionId: Option[ConnectionId] = None,
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     readTransformer: Option[GenericDfTransformer] = None,

@@ -30,6 +30,8 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, HousekeepingMode}
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 
 /**
  * DataObject of type raw for files with unknown content.

@@ -31,6 +31,7 @@ import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping, FileSubFeed}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession

@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
-import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.generic.PrimaryKeyDefinition
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser

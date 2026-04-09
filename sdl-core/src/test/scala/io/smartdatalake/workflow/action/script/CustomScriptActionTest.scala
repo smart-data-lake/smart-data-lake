@@ -24,7 +24,8 @@ import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomScriptAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, CsvFileDataObject, DataObject, DataObjectMetadata}
+import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
+import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.commons.lang.NotImplementedException
 import org.apache.spark.sql.SparkSession

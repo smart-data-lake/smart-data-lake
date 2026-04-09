@@ -30,13 +30,18 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
+import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkObservation, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation, ExpectationScope}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, ExpectationValidation, SchemaValidation, TableDataObject, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateStreamingDataFrame, SparkFileDataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
+import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
@@ -131,6 +136,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
 
   private[smartdatalake] override def subFeedConverter(): SubFeedConverter[DataFrameSubFeed] = subFeedHelper
 
+  // return engine connection from main output to execute the action
+  override def getEngineConnection(implicit context: ActionPipelineContext): Option[Connection] = mainOutput.getEngineConnection(subFeedType)
+
   override def getRuntimeDataImpl: RuntimeData = {
     // override runtime data implementation for SparkStreamingMode
     if (executionMode.exists(_.isInstanceOf[SparkStreamingMode])) AsynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
@@ -171,7 +179,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case Some(m: SparkStreamingMode) if !context.simulation =>
         // this must be a SparkSubFeed
         val sparkSubFeed = subFeed.asInstanceOf[SparkSubFeed]
-        implicit val sparkSession: SparkSession = context.sparkSession
+        implicit val sparkSession: SparkSession = getSparkSession
         if (subFeed.dataFrame.isEmpty || phase == ExecutionPhase.Exec) { // in exec phase we always needs a fresh streaming DataFrame
           // recreate DataFrame from DataObject
           assert(input.isInstanceOf[CanCreateStreamingDataFrame], s"($id) DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Can not create StreamingDataFrame for executionMode=SparkStreamingOnceMode")
@@ -357,10 +365,10 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
 
   override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     // write subfeed to output
-    setSparkJobMetadata(Some(s"writing to ${subFeed.dataObjectId}"))
+    context.engineConnection.foreach(_.activate(Some(s"writing to ${subFeed.dataObjectId}")))
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     var outputSubFeed = writeSubFeed(subFeed, output, isRecursive)
-    setSparkJobMetadata(None)
+    context.engineConnection.foreach(_.activate(None))
     if (breakDataFrameOutputLineage) outputSubFeed = outputSubFeed.breakLineage
     val isMainOutput = mainOutput.id == output.id
     // get expectations metrics and check violations

@@ -25,6 +25,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
@@ -346,10 +347,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     srcDO.dropTable
     instanceRegistry.register(srcDO)
 
-    val tgtTable = Table(Some("default"), "ap_copy", None, Some(Seq("lastname","firstname")))
-    val tgtDO = HiveTableDataObject( "tgt", Some(tempPath+s"/${tgtTable.fullName}"), table = tgtTable, numInitialHdfsPartitions = 1, partitions = Seq("lastname"))
-    tgtDO.dropTable
-    instanceRegistry.register(tgtDO)
+    val tgtDO = MockSparkDataObject( "tgt", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
 
     // prepare data
     val dfSrc = Seq(("dau","bob",10),

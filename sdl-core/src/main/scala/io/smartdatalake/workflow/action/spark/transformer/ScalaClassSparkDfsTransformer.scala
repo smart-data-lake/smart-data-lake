@@ -27,6 +27,7 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, FileUt
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{CanRecompileFromSrc, GenericDfsTransformer, OptionsGenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.DataFrame
@@ -94,7 +95,7 @@ case class ScalaClassSparkDfsTransformer(override val name: String = "scalaSpark
       case (k,v) => (renamedInputIds.getOrElse(k, k), v)
     }
     val optionsPrep = options ++ overrideOutputId.map(OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID -> _)
-    val outputDfs = customTransformer.transform(context.sparkSession, optionsPrep, mappedInputDfs)
+    val outputDfs = customTransformer.transform(getSparkSession, optionsPrep, mappedInputDfs)
     outputDfs.map {
       case (k,v) => (renamedOutputIds.getOrElse(k, k), v)
     }

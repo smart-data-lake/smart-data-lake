@@ -28,6 +28,7 @@ import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -60,7 +61,7 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
     // python transformation is executed by passing options and input/output DataFrame through entry point
     val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
     try {
-      val entryPoint = new DfTransformerPythonSparkEntryPoint(context.sparkSession, options, df, objectId)
+      val entryPoint = new DfTransformerPythonSparkEntryPoint(SparkSubFeed.getSparkSession, options, df, objectId)
       val additionalInitCode =
         """
           |# prepare input parameters

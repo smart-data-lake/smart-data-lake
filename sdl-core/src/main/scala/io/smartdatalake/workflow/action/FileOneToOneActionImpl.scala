@@ -22,6 +22,7 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.{CanCreateInputStream, CanCreateOutputStream, FileRefDataObject}
 
 /**
  * Implementation of logic needed to use FileSubFeeds with only one input and one output SubFeed.

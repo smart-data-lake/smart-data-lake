@@ -23,7 +23,8 @@ import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceR
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
 import io.smartdatalake.workflow.action.{Action, CustomDataFrameAction, DataFrameOneToOneActionImpl}
-import io.smartdatalake.workflow.dataobject.{CanCreateSparkDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.commons.io.FileUtils
 import scopt.OptionParser
 

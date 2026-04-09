@@ -28,6 +28,8 @@ import io.smartdatalake.util.hdfs.{PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SFtpFileRefConnection
+import io.smartdatalake.workflow.dataobject.file.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
+import io.smartdatalake.workflow.dataobject.generic.ConnectionTestException
 import net.schmizz.sshj.sftp.{SFTPClient, SFTPException}
 
 import java.io.{InputStream, OutputStream}

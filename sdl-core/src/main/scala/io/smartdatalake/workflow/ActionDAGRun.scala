@@ -29,7 +29,8 @@ import io.smartdatalake.util.misc.{LogUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action._
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.slf4j.event.Level
@@ -118,7 +119,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => DummyDAGResult(dataObjectId))
       case (node: Action, _) =>
-        val actionContext = phaseContext.copy(currentAction = Some(node))
+        val actionContext = phaseContext.withAction(node)
         node.prepare(actionContext)
         node.outputs.map(outputDO => DummyDAGResult(outputDO.id.id))
       case x => throw new IllegalStateException(s"Unmatched case $x")
@@ -137,7 +138,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
         val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
         val previousThreadName = setThreadName(getActionThreadName(node.id))
         val resultSubFeeds = try {
-          val actionContext = phaseContext.copy(currentAction = Some(node))
+          val actionContext = phaseContext.withAction(node)
           val inputIds = node.inputs.map(_.id)
           node.preInit(deduplicatedSubFeeds, initialDataObjectsState.filter(state => inputIds.contains(state.dataObjectId)))(actionContext)
           node.init(deduplicatedSubFeeds)(actionContext)
@@ -173,7 +174,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
           val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
           val previousThreadName = setThreadName(getActionThreadName(node.id))
           val resultSubFeeds = try {
-            val actionContext = phaseContext.copy(currentAction = Some(node))
+            val actionContext = phaseContext.withAction(node)
             node.preExec(deduplicatedSubFeeds)(actionContext)
             val resultSubFeeds = node.exec(deduplicatedSubFeeds)(actionContext)
             node.postExec(deduplicatedSubFeeds, resultSubFeeds)(actionContext)

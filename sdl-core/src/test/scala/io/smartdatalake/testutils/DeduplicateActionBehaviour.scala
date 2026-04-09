@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, 
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, CanWriteDataFrame, TableDataObject, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 import org.slf4j.Logger
 

@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.expectation.SQLExpectation
+import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{AnalysisException, SparkSession}

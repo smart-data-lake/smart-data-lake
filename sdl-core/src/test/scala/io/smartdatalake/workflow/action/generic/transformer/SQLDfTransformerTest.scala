@@ -25,7 +25,8 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 

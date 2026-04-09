@@ -22,7 +22,8 @@ package io.smartdatalake.workflow.action.executionMode
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanCreateIncrementalOutput
 import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFeed}
 
 /**

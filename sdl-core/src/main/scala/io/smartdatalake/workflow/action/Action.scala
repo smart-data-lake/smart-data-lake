@@ -23,12 +23,14 @@ import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SmartDataLakeLogger, ExpressionUtil}
+import io.smartdatalake.util.misc.{ExpressionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
+import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
 
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
@@ -237,7 +239,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     // check execution condition
     checkExecutionCondition(subFeeds)
     // init spark jobGroupId to identify metrics
-    setSparkJobMetadata() // TODO: this triggers creating spark session
+    context.engineConnection.foreach(_.activate(Some(s"${context.phase.id} $id")))
     // otherwise continue processing
     (inputs ++ recursiveInputs).foreach(input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
@@ -295,7 +297,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
   private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    val conditionEvaluator = Environment.expressionEvaluatorFactory.getEvaluator[Metric, Boolean](condition)
+    val conditionEvaluator = Environment.expressionEvaluatorFactory().getEvaluator[Metric, Boolean](condition)
     val metrics = subFeeds.flatMap{ subFeed =>
       val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric
       metricsRaw.map{
@@ -311,19 +313,6 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * provide an implementation of the DAG node id
    */
   def nodeId: String = id.id
-
-  /**
-   * Sets the util job description for better traceability in the Spark UI
-   *
-   * Note: This sets Spark local properties, which are propagated to the respective executor tasks.
-   * We rely on this to match metrics back to Actions and DataObjects.
-   * As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
-   *
-   * @param operation phase description (be short...)
-   */
-  def setSparkJobMetadata(operation: Option[String] = None)(implicit context: ActionPipelineContext) : Unit = {
-    context.sparkSession.sparkContext.setJobGroup(s"${context.appConfig.appName} $id runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", operation.getOrElse("").take(255))
-  }
 
   /**
    * Helper to find partition values for a specific DataObject in list of subFeeds
@@ -347,6 +336,10 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
   protected def getOutputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "output")
 
+  /**
+   * Actions needing an engine to execute, e.g. Spark, can override this method to provide the connection to the engine.
+   */
+  def getEngineConnection(implicit context: ActionPipelineContext): Option[Connection] = None
 
   /**
    * Runtime metrics & events

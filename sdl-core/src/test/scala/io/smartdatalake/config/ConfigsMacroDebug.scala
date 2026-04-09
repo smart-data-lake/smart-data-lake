@@ -20,7 +20,7 @@
 package io.smartdatalake.config
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataobject.CustomDfDataObject
+import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, CsvFileDataObjectTest}
 
 /**
  * Configs macro expansion can be debugged in Intellij by creating a run configuration as follows:
@@ -34,18 +34,13 @@ object ConfigsMacroDebug extends App with ConfigImplicits {
     """
       | {
       |   id = 123
-      |   creator {
-      |     class-name = io.smartdatalake.config.TestCustomDfCreator
-      |     options = {
-      |       test = foo
-      |     }
-      |   }
+      |   path = /tmp/test.csv
       | }
       |""".stripMargin).resolve
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   import configs.syntax.RichConfig
-  config.extract[CustomDfDataObject].value
-  //CustomDfDataObject.fromConfig(config)(new InstanceRegistry)
+  config.extract[CsvFileDataObject].value
+  //CsvFileDataObject.fromConfig(config)(new InstanceRegistry)
 
 }

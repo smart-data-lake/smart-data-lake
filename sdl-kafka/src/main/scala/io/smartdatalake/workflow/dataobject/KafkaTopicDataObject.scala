@@ -33,6 +33,8 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, S
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.{AvroSchemaRegistry, JsonSchemaRegistry, KafkaColumnType}
 import io.smartdatalake.workflow.dataobject.TopicPartitionOffsets.getOffsetForSpark
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, CanEvolveSchema, CanHandlePartitions, SchemaValidation}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanCreateStreamingDataFrame, CanWriteSparkDataFrame}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -138,6 +140,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
                                 override val options: Map[String, String] = Map(),
+                                override val sparkConnectionId: Option[ConnectionId] = None,
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame

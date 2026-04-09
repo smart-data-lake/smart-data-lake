@@ -23,7 +23,8 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
 import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
 
 /**

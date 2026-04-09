@@ -30,6 +30,7 @@ import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.FileRef
 
 import java.sql.Timestamp
 import scala.reflect.runtime.universe.TypeTag

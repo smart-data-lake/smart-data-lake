@@ -28,6 +28,8 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransforme
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
+import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 import scala.reflect.runtime.universe.Type

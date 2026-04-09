@@ -26,9 +26,9 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
-import io.smartdatalake.workflow.dataobject.ExpectationValidation
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
+import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation
 import org.apache.spark.sql.Column
 
 

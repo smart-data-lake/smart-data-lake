@@ -644,10 +644,7 @@ object Environment extends SmartDataLakeLogger {
 
   private[smartdatalake] var _sdlPlugins: Seq[SDLPlugin] = Seq()
 
-  // dynamically shared environment for custom code (see also #106)
-  // attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDLB code, but might be used in custom code on your own risk.
-  def sparkSession: SparkSession = _sparkSession
-  private [smartdatalake] var _sparkSession: SparkSession = _
+  // dynamically shared environment for custom code
   def instanceRegistry: InstanceRegistry = _instanceRegistry
   private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
   def globalConfig: GlobalConfig = _globalConfig

@@ -23,10 +23,12 @@ import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataobject.generic.{HousekeepingMode, SchemaValidation, UserDefinedSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 import org.apache.spark.annotation.DeveloperApi
 
 import scala.reflect.ClassTag
+import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe._
 
 /**
@@ -119,6 +121,11 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
     implicit val registryImpl: InstanceRegistry = registry
     getConnection[T](connectionId)
   }
+
+  /**
+   * Return the connection to the engine that is needed to write to this DataObject with the given subFeedType, if any.
+   */
+  def getEngineConnection(subFeedType: universe.Type)(implicit context: ActionPipelineContext): Option[Connection] = None
 
   /**
    * Returns statistics about this DataObject from the catalog. Depending on it's type this can be (see also [[io.smartdatalake.definitions.TableStatsType]])
