@@ -209,7 +209,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   private[smartdatalake] def throwOParserError(): Unit = {
-    logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+    logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
   }
 
   /**
@@ -237,7 +237,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           val latestRunState = stateStore.recoverRunState(latestStateId)
           if (!latestRunState.isFinal || latestRunState.isFailed) {
             // start recovery
-            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state file or the command line parameters given must match the parameters of the run to be recovered: ConfigToRecover=${latestRunState.appConfig} ConfigGiven=${appConfig}")
+            assert(appConfig == latestRunState.appConfig, s"There is a failed run to be recovered. Either you clean-up this state file or the command line parameters given must match the parameters of the run to be recovered: ConfigToRecover=${latestRunState.appConfig} ConfigGiven=$appConfig")
             recoverRun(appConfig, stateStore, latestRunState)._2
           } else {
             val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
@@ -439,7 +439,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // create and execute DAG
     val actionsToExecute = instanceRegistry.getActions
     logger.info(s"starting agentExecution ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
-    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig.getStdAppConfig(), runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, globalConfig = globalConfig)
+    val context = ActionPipelineContext(appConfig.feedSel, appConfig.appName, executionId, instanceRegistry, referenceTimestamp = Some(LocalDateTime.now), appConfig.getStdAppConfig, runStartTime, attemptStartTime, simulation, actionsSelected = actionsToExecute.map(_.id), actionsSkipped = Nil, globalConfig = globalConfig)
     val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {

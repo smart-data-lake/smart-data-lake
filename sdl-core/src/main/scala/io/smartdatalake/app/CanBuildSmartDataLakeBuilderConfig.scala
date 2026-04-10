@@ -99,7 +99,7 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
   }
 
   @JsonIgnore
-  def getStdAppConfig(): SmartDataLakeBuilderConfig = {
+  def getStdAppConfig: SmartDataLakeBuilderConfig = {
     SmartDataLakeBuilderConfig(feedSel, applicationName, configuration, configurationValueOverwrite, master, deployMode, partitionValues, parallelism, statePath, test, streaming)
   }
 }

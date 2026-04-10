@@ -26,7 +26,6 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.{SparkQueryUtil, SparkStageMetricsListener}
-import io.smartdatalake.util.spark.hive.HiveUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.IcebergTableConnection
@@ -34,7 +33,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.file.HasHadoopStandardFilestore
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, CanEvolveSchema, CanHandlePartitions, CanMergeDataFrame, Constraint, ExpectationValidation, HousekeepingMode, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
@@ -627,7 +626,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       if (partitions.isEmpty && isPartitioned) logger.warn(s"($id) partitions are not defined but Iceberg table is partitioned.")
       if (partitions.nonEmpty && isPartitioned) {
         val dfPartitionsPartition = dfPartitions.select(col("partition.*"))
-        val partitions = dfPartitionsPartition.collect().toSeq.map(r => r.getValuesMap[Any](dfPartitionsPartition.columns).mapValues(_.toString).toMap)
+        val partitions = dfPartitionsPartition.collect().toSeq.map(r => r.getValuesMap[Any](dfPartitionsPartition.columns).view.mapValues(_.toString).toMap)
         partitions.map(PartitionValues(_))
       } else Seq()
     } else Seq()
@@ -669,7 +668,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                              (implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = {
     try {
       val session = context.sparkSession
-      import session.implicits._
       val filesDf = context.sparkSession.table(s"${table.fullName}.files")
       val metricsRow = filesDf.select($"readable_metrics.*").head()
       val columns = metricsRow.schema.fieldNames

@@ -27,16 +27,16 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.{SparkQueryUtil, SparkStageMetricsListener}
 import io.smartdatalake.util.spark.hive.HiveUtil
+import io.smartdatalake.util.spark.{SparkQueryUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericSchema}
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.file.HasHadoopStandardFilestore
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, CanEvolveSchema, CanHandleConstraints, CanHandlePartitions, CanMergeDataFrame, Constraint, ExpectationValidation, HousekeepingMode, PrimaryKeyDefinition, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
@@ -571,7 +571,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     implicit val session: SparkSession = context.sparkSession
     partitionValues.foreach {
       case (pvExisting, pvNew) =>
-        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.mapValues(lit).toMap)
+        deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.view.mapValues(lit).toMap)
         logger.info(s"($id) Partition $pvExisting moved to $pvNew")
     }
   }
@@ -609,7 +609,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
     try {
       val session = context.sparkSession
-      import session.implicits._
       val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
       val snapshot = deltaLog.unsafeVolatileSnapshot
       val columns = snapshot.schema.fieldNames
@@ -739,4 +738,3 @@ object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
     extract[DeltaLakeTableDataObject](config)
   }
 }
-

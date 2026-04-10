@@ -109,7 +109,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // check state: two actions succeeded
     val latestState = stateStore.getLatestStateId().get
     val previousRunState = stateStore.recoverRunState(latestState)
-    val previousActionState = previousRunState.actionsState.mapValues(_.state).toMap
+    val previousActionState = previousRunState.actionsState.view.mapValues(_.state).toMap
     val resultActionState = actions.map(a => (a.id, RuntimeEventState.SUCCEEDED)).toMap
     assert(previousActionState == resultActionState)
   }

@@ -50,11 +50,11 @@ class ActionDAGRunTest extends AnyFunSuite {
     val infoA = RuntimeInfo(SDLExecutionId.executionId1, RuntimeEventState.SUCCEEDED, startTstmp = Some(startTime), duration = Some(duration), endTstmp = Some(endTime), msg = Some("test"),
       results = Seq(SparkSubFeed(Some(SparkDataFrame(df)), "do1", partitionValues = Seq(PartitionValues(Map("test"->1))), metrics = Some(Map("test"->1, "test2"->"abc")))),
       dataObjectsState = Seq(DataObjectState(DataObjectId("do1"), "test")))
-    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS), LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS), Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo = sdlbVersionInfo.map(_.filterKeys(_ != "date").toMap), appVersionInfo = appVersionInfo)
+    val state = ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS), LocalDateTime.now.truncatedTo(ChronoUnit.MILLIS), Map(ActionId("a") -> infoA), isFinal = false, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo = sdlbVersionInfo.map(_.view.filterKeys(_ != "date").toMap), appVersionInfo = appVersionInfo)
     val json = state.toJson
     // remove DataFrame from SparkSubFeed, it should not be serialized
     val expectedState = state.copy(actionsState = state.actionsState
-      .mapValues(actionState => actionState
+      .view.mapValues(actionState => actionState
         .copy(results = actionState.results.map {
           case subFeed: SparkSubFeed => subFeed.copy(dataFrame = None)
           case subFeed => subFeed

@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.secrets
 
-import io.smartdatalake.config.{ConfigUtil, ConfigurationException}
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.annotation.DeveloperApi
 
@@ -53,8 +53,8 @@ object SecretsUtil extends SmartDataLakeLogger {
   private[secrets] def resolveSecret(secret: String): String = {
     secret match {
       case SECRET_WITH_PROVIDER_REGEX(providerId, secretName) =>
-        logger.debug(s"getting secret ${secret}")
-        val provider = providers.getOrElse(providerId, throw new ConfigurationException(s"There is no registered secret provider with id ${providerId}"))
+        logger.debug(s"getting secret $secret")
+        val provider = providers.getOrElse(providerId, throw new ConfigurationException(s"There is no registered secret provider with id $providerId"))
         provider.getSecret(secretName)
       case _ => secret
     }

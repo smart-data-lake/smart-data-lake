@@ -120,7 +120,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
    * @return a Map of ids and DataFrames.
    */
   def getDataFrames(partitionValues: Seq[PartitionValues] = Seq(), filters: Map[String, Column] = Map(), selectedTransformerIndexes: Option[Seq[Int]] = None, postProcessOutputSubFeeds: Boolean = false, additionalTransformers: Seq[T] = Seq(), replacedTransformers: Map[Int, T] = Map(), additionalTransformerOptions: Map[Int, Map[String, String]] = Map()): Map[String, DataFrame] = {
-    getGenericDataFrames(partitionValues, filters.mapValues(SparkColumn).toMap, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers, additionalTransformerOptions)
+    getGenericDataFrames(partitionValues, filters.view.mapValues(SparkColumn).toMap, selectedTransformerIndexes, postProcessOutputSubFeeds, additionalTransformers, replacedTransformers, additionalTransformerOptions)
       .collect{case (id, df: SparkDataFrame) => (id,df.inner)}
   }
 
@@ -129,7 +129,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
       case Some(executionMode) =>
         implicit val implicitContext: ActionPipelineContext = context
         // prepare
-        val emptyInputSubFeeds = (action.inputs ++ action.recursiveInputs).map(i => InitSubFeed(i.id, partitionValues, isSkipped = false, metrics = None))
+        val emptyInputSubFeeds = (action.inputs ++ action.recursiveInputs).map(i => InitSubFeed(i.id, partitionValues, metrics = None))
         val mainInput = action.getMainInput(emptyInputSubFeeds)
         val mainSubFeed = emptyInputSubFeeds.find(_.dataObjectId == mainInput.id).get
         val inputSubFeeds = emptyInputSubFeeds.map { subFeed =>
@@ -231,7 +231,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
     assert(!selectedTransformerIndexes.exists(_.isEmpty) || !postProcessOutputSubFeeds, "selectedTransformerIndexes=empty and postProcessOutputSubFeeds=true can not be set together")
 
     // prepare
-    val emptyInputSubFeeds = (action.inputs ++ action.recursiveInputs).map(i => InitSubFeed(i.id, partitionValues, isSkipped = false, metrics = None))
+    val emptyInputSubFeeds = (action.inputs ++ action.recursiveInputs).map(i => InitSubFeed(i.id, partitionValues, metrics = None))
     var (inputSubFeeds, outputSubFeeds) = action.prepareInputSubFeeds(emptyInputSubFeeds)(context)
 
     // filter

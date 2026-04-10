@@ -102,7 +102,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
       .filter(x => runId.isEmpty || runId.contains(x.runId))
       .sortBy(_.getSortAttrs).lastOption
     if (latestStateFile.isEmpty) logger.info(s"No state file for application $appName and runId ${runId.getOrElse("latest")} found.")
-    else logger.debug(s"got state from file ${latestStateFile}")
+    else logger.debug(s"got state from file $latestStateFile")
     latestStateFile
   }
 
@@ -112,7 +112,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
   override def getLatestRunId: Option[Int] = {
     val latestStateFile = getFiles()
       .sortBy(_.getSortAttrs).lastOption
-    logger.debug(s"latest state file is ${latestStateFile}")
+    logger.debug(s"latest state file is $latestStateFile")
     latestStateFile.map(_.runId)
   }
 
@@ -165,10 +165,10 @@ private case class IndexEntry(name: String, runId: Int, attemptId: Int, feedSel:
   }
 }
 private object IndexEntry {
-  def from(state: ActionDAGRunState, relativePath: String) = {
+  def from(state: ActionDAGRunState, relativePath: String): IndexEntry = {
     implicit val localDateTimeOrdering: Ordering[LocalDateTime] = _ compareTo _
     val runEndTime = state.actionsState.values.flatMap(_.endTstmp).toSeq.sorted.lastOption
-    val actionsState = state.actionsState.mapValues(a => IndexActionEntry(a.state, a.outputIds)).toMap
+    val actionsState = state.actionsState.view.mapValues(a => IndexActionEntry(a.state, a.outputIds)).toMap
     IndexEntry(
       state.appConfig.appName, state.runId, state.attemptId, state.appConfig.feedSel,
       state.runStartTime, state.attemptStartTime, runEndTime,

@@ -27,6 +27,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, CanWriteDataFrame, TableDataObject, TransactionalTableDataObject}
@@ -240,7 +241,7 @@ trait DeduplicateActionBehaviour {
       .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2, ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
 
     // the expected result is the final passed value with a captured column
-    val dfExpected = Seq((1, "B", 200, ts("2020-08-16 10:00")))
+    val dfExpected: GenericDataFrame = Seq((1, "B", 200, ts("2020-08-16 10:00")))
       .toDF(colId, colValueOld, colValueNew, Environment.capturedColumnName)
 
     assertDataFramesEqualGeneric(dfExpected, dfResult2)

@@ -29,7 +29,7 @@ import org.scalatest.matchers.should.Matchers
 import org.slf4j.{Logger, LoggerFactory}
 
 class StructTypeUtilTest extends AnyFlatSpec with Matchers
-  with TestTool with StructTypeUtil with Transform {
+    with TestTool with StructTypeUtil with Transform {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = TestUtil.session
 
@@ -37,7 +37,7 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   "createStruct" should "created a struct" in {
     val argument = Array[(String, DataType, Boolean)](("id", IntegerType, false),
-      ("name", StringType, false), ("birthdate", DateType, true))
+      ("name",                                               StringType,  false), ("birthdate", DateType, true))
     val actual = createStruct(argument)
     val expected = StructType(Array(StructField("id", IntegerType, nullable = false),
       StructField("name", StringType, nullable = false),
@@ -47,75 +47,86 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   "euqal" should "fail if column count differ" in {
     val schL: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = IntegerType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = IntegerType, nullable = true)
+      ))
     val schR: StructType = StructType(Array(StructField(name = "x", dataType = IntegerType, nullable = true)))
     schL.equal(schR) shouldBe false
   }
 
   "equal" should "pass even if column order differ" in {
     val schL: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = IntegerType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = IntegerType, nullable = true)
+      ))
     val schR: StructType = StructType(Array(
-      StructField(name = "y", dataType = IntegerType, nullable = true),
-      StructField(name = "x", dataType = IntegerType, nullable = true)))
+        StructField(name = "y", dataType = IntegerType, nullable = true),
+        StructField(name = "x", dataType = IntegerType, nullable = true)
+      ))
     schL.equal(schR) shouldBe true
   }
 
   "equal" should "pass even if nullability differs" in {
     val schL: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = IntegerType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = IntegerType, nullable = true)
+      ))
     val schR: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = IntegerType, nullable = false)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = IntegerType, nullable = false)
+      ))
     schL.equal(schR) shouldBe true
   }
 
   "equal" should "fail if types differ" in {
     val schL: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = DoubleType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = DoubleType, nullable = true)
+      ))
     val schR: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = FloatType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = FloatType, nullable = true)
+      ))
     schL.equal(schR) shouldBe false
   }
 
   "equal" should "fail if nested types differ" in {
     val valuesL: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = DoubleType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = DoubleType, nullable = true)
+      ))
     val valuesR: StructType = StructType(Array(
-      StructField(name = "x", dataType = IntegerType, nullable = true),
-      StructField(name = "y", dataType = FloatType, nullable = true)))
+        StructField(name = "x", dataType = IntegerType, nullable = true),
+        StructField(name = "y", dataType = FloatType, nullable = true)
+      ))
     val schL: StructType = StructType(Array(
-      StructField(name = "id", dataType = StringType, nullable = false),
-      StructField(name = "values", dataType = valuesL, nullable = true)))
+        StructField(name = "id", dataType = StringType, nullable = false),
+        StructField(name = "values", dataType = valuesL, nullable = true)
+      ))
     val schR: StructType = StructType(Array(
-      StructField(name = "id", dataType = StringType, nullable = false),
-      StructField(name = "values", dataType = valuesR, nullable = true)))
+        StructField(name = "id", dataType = StringType, nullable = false),
+        StructField(name = "values", dataType = valuesR, nullable = true)
+      ))
     schL.equal(schR) shouldBe false
   }
 
   "equal" should "ignore nullability but not containsNull" in {
     val rightSchema = StructType(Array(
-      StructField("code_d", ArrayType(StringType, containsNull = true), nullable = true)
-    ))
+        StructField("code_d", ArrayType(StringType, containsNull = true), nullable = true)
+      ))
     val leftSchema =
       StructType(Array(
-        StructField("code_d", ArrayType(StringType, containsNull = false), nullable = true)
-      ))
+          StructField("code_d", ArrayType(StringType, containsNull = false), nullable = true)
+        ))
     leftSchema.equal(rightSchema) shouldBe false
   }
 
   "schema" should "be superset of itself" in {
     val argExpMap: Map[DataFrame, Boolean] = Map(
-      dsComplex.asDf -> true,
-      dsComplexWithNull.asDf -> true,
-      dfHierarchy -> true,
-      dsNonUnique.asDf -> true,
+      dsComplex.asDf          -> true,
+      dsComplexWithNull.asDf  -> true,
+      dfHierarchy             -> true,
+      dsNonUnique.asDf        -> true,
       dsTwoCandidateKeys.asDf -> true
     )
     val testFun: DataFrame => Boolean = df => df.schema.isSuperSetOf(df.schema)
@@ -125,10 +136,10 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   "schema" should "be subset of itself" in {
     val argExpMap: Map[DataFrame, Boolean] = Map(
-      dsComplex.asDf -> true,
-      dsComplexWithNull.asDf -> true,
-      dfHierarchy -> true,
-      dsNonUnique.asDf -> true,
+      dsComplex.asDf          -> true,
+      dsComplexWithNull.asDf  -> true,
+      dfHierarchy             -> true,
+      dsNonUnique.asDf        -> true,
       dsTwoCandidateKeys.asDf -> true
     )
     val testFun: DataFrame => Boolean = df => df.schema.isSubSetOf(df.schema)
@@ -138,10 +149,10 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   "schema" should "be superset of itself reversed" in {
     val argExpMap: Map[DataFrame, Boolean] = Map(
-      dsComplex.asDf -> true,
-      dsComplexWithNull.asDf -> true,
-      dfHierarchy -> true,
-      dsNonUnique.asDf -> true,
+      dsComplex.asDf          -> true,
+      dsComplexWithNull.asDf  -> true,
+      dfHierarchy             -> true,
+      dsNonUnique.asDf        -> true,
       dsTwoCandidateKeys.asDf -> true
     )
     val testFun: DataFrame => Boolean = df => df.schema.isSuperSetOf(new StructType(df.schema.fields.reverse))
@@ -151,10 +162,10 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   "schema" should "be subset of itself reversed" in {
     val argExpMap: Map[DataFrame, Boolean] = Map(
-      dsComplex.asDf -> true,
-      dsComplexWithNull.asDf -> true,
-      dfHierarchy -> true,
-      dsNonUnique.asDf -> true,
+      dsComplex.asDf          -> true,
+      dsComplexWithNull.asDf  -> true,
+      dfHierarchy             -> true,
+      dsNonUnique.asDf        -> true,
       dsTwoCandidateKeys.asDf -> true
     )
     val testFun: DataFrame => Boolean = df => df.schema.isSubSetOf(new StructType(df.schema.fields.reverse))
@@ -164,10 +175,10 @@ class StructTypeUtilTest extends AnyFlatSpec with Matchers
 
   "schema" should "be superset of itself with first column dropped" in {
     val argExpMap: Map[DataFrame, Boolean] = Map(
-      dsComplex.asDf -> true,
-      dsComplexWithNull.asDf -> true,
-      dfHierarchy -> true,
-      dsNonUnique.asDf -> true,
+      dsComplex.asDf          -> true,
+      dsComplexWithNull.asDf  -> true,
+      dfHierarchy             -> true,
+      dsNonUnique.asDf        -> true,
       dsTwoCandidateKeys.asDf -> true
     )
     val testFun: DataFrame => Boolean = df => df.schema.isSuperSetOf(new StructType(df.schema.drop(1).toArray))

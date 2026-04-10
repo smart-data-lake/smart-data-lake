@@ -20,7 +20,7 @@
 package io.smartdatalake.app
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId, stringToDataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
@@ -33,7 +33,6 @@ import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode,
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
-import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -104,7 +103,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // configure SDLPlugin for testing
     Environment._sdlPlugins = Seq(new TestSDLPlugin)
 
-    HdfsUtil.deleteFiles(new Path(statePath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -149,7 +148,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
     }
@@ -176,8 +175,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == selectedPartitions)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -196,7 +195,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery2"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -231,7 +230,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
     }
@@ -254,8 +253,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
       assert(resultActionsState == expectedActionsState)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
@@ -268,7 +267,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery3"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -314,7 +313,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map(
         (action1.id, RuntimeEventState.SKIPPED),
         (action2fail.id, RuntimeEventState.FAILED),
@@ -343,13 +342,13 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1)),
+        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)),
         action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)),
         action3.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)),
         action4.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 2)),
-        action5.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1))
+        action5.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1))
       )
       assert(resultActionsState == expectedActionsState)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -362,7 +361,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-skipped-skipped"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -396,10 +395,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1)),
-        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1))
+        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)),
+        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1))
       )
       assert(resultActionsState == expectedActionsState)
     }
@@ -412,7 +411,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-skipped-metrics"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -447,10 +446,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 1)),
-        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1))
+        action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)),
+        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1))
       )
       assert(resultActionsState == expectedActionsState)
       val action1Metrics = runState.actionsState(action1.id).results.head.metrics.get
@@ -466,7 +465,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-incremental"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -523,7 +522,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     instanceRegistry.clear()
@@ -559,7 +558,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20180101"))))
@@ -586,7 +585,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
@@ -608,8 +607,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     instanceRegistry.clear()
@@ -673,7 +672,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-simulation"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     instanceRegistry.clear()
@@ -855,7 +854,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery4"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -871,7 +870,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc, Seq())
 
-    // start first dag run -> fail
+    // start first dag run
     // load partition 20180101 only
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))),
       executionMode = Some(PartitionDiffMode(nbOfPartitionValuesPerRun = Some(1), partitionColNb = Some(1))))
@@ -893,7 +892,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
       val expectedActionsState = Map(
         (action1.id, (RuntimeEventState.SUCCEEDED, Seq(PartitionValues(Map("dt" -> "20180101"))))),
         (action2failRuntime.id, (RuntimeEventState.FAILED, Seq(PartitionValues(Map("dt" -> "20180101")))))
@@ -920,7 +919,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.state, s.results.head.metrics.flatMap(_.get("testCount")))).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.state, s.results.head.metrics.flatMap(_.get("testCount")))).toMap
       val expectedActionsState = Map(
         (action1.id, (RuntimeEventState.SUCCEEDED, None)),
         (action2success.id, (RuntimeEventState.FAILED, Some(1)))
@@ -946,7 +945,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 3)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
       val expectedActionsState = Map(
         (action1.id, (RuntimeEventState.SUCCEEDED, Seq(PartitionValues(Map("dt" -> "20180101"))))),
         (action2failRuntime.id, (RuntimeEventState.SUCCEEDED, Seq(PartitionValues(Map("dt" -> "20180101")))))

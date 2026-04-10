@@ -26,9 +26,9 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
-import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.TableDataObject
 
 
@@ -75,7 +75,6 @@ case class UniqueKeyExpectation(
   }
   override def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Seq[GenericColumn] = {
     val colsToCheck = (if (key.isEmpty) getPrimaryKeyCols(dataObjectId) else key).map(functions.col)
-    // if (scope == ExpectationScope.Job && functions.requestSubFeedType() == typeOf[SparkSubFeed])
     val countDistinctCol = if (approximate) functions.approxCountDistinct(functions.struct(colsToCheck:_*), approximateRsd).as(countDistinctName)
     else functions.countDistinct(functions.struct(colsToCheck:_*)).as(countDistinctName)
     val countCol = if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
@@ -85,7 +84,7 @@ case class UniqueKeyExpectation(
     val countDistinct = getMetric[Long](dataObjectId,metrics,countDistinctName)
     val count = getMetric[Long](dataObjectId,metrics,countName)
     val (col, pct) = getValidationErrorColumn(dataObjectId, countDistinct, count)
-    val updatedMetrics = metrics.filterKeys(_ != countDistinctName).toMap + (name -> pct)
+    val updatedMetrics = metrics.view.filterKeys(_ != countDistinctName).toMap + (name -> pct)
     (col.map(SparkColumn).toSeq, updatedMetrics)
   }
   override def calculateAsJobDataFrameObservation: Boolean = {

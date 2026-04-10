@@ -48,7 +48,7 @@ class NestedColumnUtilTest extends AnyFunSuite {
           .add("str2", StringType),
         false
       ))
-  private val testDf = spark.createDataFrame(Seq(((currentTstmp, "test1"), Seq((-1L, "test2")))).toDF.rdd, testSchema)
+  private val testDf = spark.createDataFrame(Seq(((currentTstmp, "test1"), Seq((-1L, "test2")))).toDF().rdd, testSchema)
 
   test("select with reduced schema") {
     val selectSchema = new StructType()
@@ -105,9 +105,8 @@ class NestedColumnUtilTest extends AnyFunSuite {
   }
 
   test("transform nested column datatype") {
-    val visitorFunc = (dataType: GenericDataType, column: GenericColumn, path: Seq[String]) =>
-      dataType match {
-        case SparkSimpleDataType(x: TimestampType) => TransformColumn(column.cast(SparkSimpleDataType(LongType)))
+    val visitorFunc = (dataType: GenericDataType, column: GenericColumn, _: Seq[String]) => dataType match {
+        case SparkSimpleDataType(_: TimestampType) => TransformColumn(column.cast(SparkSimpleDataType(LongType)))
         case _                                     => KeepColumn
       }
     val dfTransformed = NestedColumnUtil.transformColumns(SparkDataFrame(testDf), visitorFunc)
@@ -115,8 +114,7 @@ class NestedColumnUtilTest extends AnyFunSuite {
   }
 
   test("remove nested column from array") {
-    val visitorFunc = (dataType: GenericDataType, column: GenericColumn, path: Seq[String]) =>
-      path match {
+    val visitorFunc = (_: GenericDataType, _: GenericColumn, path: Seq[String]) => path match {
         case Seq("b", "str2") => RemoveColumn
         case _                => KeepColumn
       }

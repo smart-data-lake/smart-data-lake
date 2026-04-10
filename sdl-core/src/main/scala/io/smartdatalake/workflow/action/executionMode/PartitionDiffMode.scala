@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, ExpressionUtil}
+import io.smartdatalake.util.misc.{ExpressionUtil, ProductUtil}
 import io.smartdatalake.workflow.action.ActionHelper.searchCommonInits
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -116,12 +116,12 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               val outputOrdering = PartitionValues.getOrdering(outputPartitions)
               val inputOrdering = PartitionValues.getOrdering(inputPartitions)
               // calculate missing partition values
-              val filteredInputPartitionValues = partitionInput.listPartitions.map(_.filterKeys(inputPartitions))
-              val filteredOutputPartitionValues = partitionOutput.listPartitions.map(_.filterKeys(outputPartitions))
-              val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
-                partitionValuesTransform(filteredInputPartitionValues).mapValues(_.filterKeys(outputPartitions))
-              } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
-              val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).mapValues(_.map(_._2))
+               val filteredInputPartitionValues = partitionInput.listPartitions.map(pv => pv.elements.view.filterKeys(inputPartitions.contains).toMap).map(PartitionValues(_))
+               val filteredOutputPartitionValues = partitionOutput.listPartitions.map(pv => pv.elements.view.filterKeys(outputPartitions.contains).toMap).map(PartitionValues(_))
+               val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
+                 partitionValuesTransform(filteredInputPartitionValues).view.mapValues(pv => pv.elements.view.filterKeys(outputPartitions.contains).toMap).toMap.map { case (k, v) => (k, PartitionValues(v)) }
+               } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
+               val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
               var selectedOutputPartitionValues = inputOutputPartitionValuesMap.values.toSet.diff(filteredOutputPartitionValues.toSet).toSeq
               // reverse lookup input partitions as selection of output partitions might have changed
               var selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)

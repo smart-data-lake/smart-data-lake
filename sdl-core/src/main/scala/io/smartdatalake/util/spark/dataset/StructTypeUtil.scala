@@ -98,9 +98,9 @@ trait StructTypeUtil {
         logger.info(s"ignoreColumnOrder = $ignoreColumnOrder")
         logger.info(s"ignoreNullability = $ignoreNullability")
         logger.info(s"this = $niceString")
-        st.printTreeString
+        st.printTreeString()
         logger.info(s"that = ${that.niceString}")
-        that.printTreeString
+        that.printTreeString()
         logger.info(s"this minus that = ${st.diff(that).map(structField2String).mkString(", ")}")
         logger.info(s"that minus this = ${that.diff(st).map(structField2String).mkString(", ")}")
       }

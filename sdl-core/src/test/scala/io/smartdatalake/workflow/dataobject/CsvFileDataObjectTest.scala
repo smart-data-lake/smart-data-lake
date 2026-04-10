@@ -19,15 +19,17 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.testutils.DataFrameTestHelper.assertDataFramesEqual
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.SparkRepartitionDef
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.file.ZipCsvCodec
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SaveMode}
+import org.slf4j.Logger
 
 import java.io.FileInputStream
 import java.nio.file.Files
@@ -37,7 +39,10 @@ import scala.util.Random
 /**
  * Unit tests for [[CsvFileDataObject]].
  */
-class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
+class CsvFileDataObjectTest extends DataObjectTestSuite
+  with Equality with SmartDataLakeLogger with SparkFileDataObjectSchemaBehavior {
+
+  private implicit val loggerImpl: Logger = logger
 
   import session.implicits._
 
@@ -145,7 +150,8 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       val dataObj = CsvFileDataObject.fromConfig(config)
       val df = dataObj.getSparkDataFrame()(contextExec)
 
-      assertDataFramesEqual(df, dfExpected)
+      assert(df.equal(dfExpected))
+
     } finally {
       FileUtils.forceDelete(tempDir.toFile)
     }
@@ -180,7 +186,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
       val dataObj = CsvFileDataObject.fromConfig(config)
       val df = dataObj.getSparkDataFrame()(contextExec)
 
-      assertDataFramesEqual(df, dfExpected)
+      assert(df.equal(dfExpected))
     } finally {
       FileUtils.forceDelete(tempDir.toFile)
     }

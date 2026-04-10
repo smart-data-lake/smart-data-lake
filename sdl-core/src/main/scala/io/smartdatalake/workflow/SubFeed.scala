@@ -76,7 +76,7 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
 }
 object SubFeed {
   def filterPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[PartitionValues] = {
-    partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains).toMap)).filter(_.nonEmpty)
+    partitionValues.map( pvs => PartitionValues(pvs.elements.view.filterKeys(partitions.contains).toMap)).filter(_.nonEmpty)
   }
 }
 

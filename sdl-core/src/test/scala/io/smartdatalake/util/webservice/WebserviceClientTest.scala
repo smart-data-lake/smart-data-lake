@@ -114,5 +114,5 @@ private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
     additionalHeaders = options
   }
 
-  override def getHeaders: Map[String, String] = additionalHeaders.mapValues(_.resolve()).toMap
+  override def getHeaders: Map[String, String] = additionalHeaders.view.mapValues(_.resolve()).toMap
 }

@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject.spark
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId}
+import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
@@ -28,7 +28,6 @@ import io.smartdatalake.util.spark.dataset.{ReadWrite, Transform, getEmptyDataFr
 import io.smartdatalake.util.spark.{SparkRepartitionDef, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkObservation, SparkSchema, SparkSimpleDataType, SparkSubFeed}
@@ -37,11 +36,11 @@ import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput,
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
 import org.apache.spark.sql.functions.{col, input_file_name, lit}
 import org.apache.spark.sql.types.{DataType, StringType, StructType}
-import org.apache.spark.sql._
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
@@ -706,3 +705,4 @@ private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: Stri
     files
   }
 }
+

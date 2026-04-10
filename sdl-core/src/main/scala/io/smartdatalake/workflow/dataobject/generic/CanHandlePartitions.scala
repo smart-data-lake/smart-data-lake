@@ -89,7 +89,7 @@ trait CanHandlePartitions { this: DataObject =>
   private[smartdatalake] final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     expectedPartitionsCondition.map{ condition =>
       // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
-      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.mapValues(_.toString).toMap, pv.hashCode))
+      val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.view.mapValues(_.toString).toMap, pv.hashCode))
       val expectedHashCodes = partitionsValuesStringWithHashCode
         .map{ case (elements, hashCode) => PartitionValueFilterExpressionData(elements, hashCode)}
         .filter(p => ExpressionUtil.evaluateBoolean(id, None, condition, p))

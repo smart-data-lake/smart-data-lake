@@ -21,8 +21,8 @@ package io.smartdatalake.definitions
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
 
 import scala.language.implicitConversions
@@ -149,7 +149,7 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
 object SaveModeMergeOptions {
   def fromSaveModeOptions(saveModeOptions: SaveModeOptions): SaveModeMergeOptions = saveModeOptions match {
     case m: SaveModeMergeOptions => m
-    case m: SaveModeGenericOptions if (m.saveMode == SDLSaveMode.Merge) => SaveModeMergeOptions()
+    case m: SaveModeGenericOptions if m.saveMode == SDLSaveMode.Merge => SaveModeMergeOptions()
     case m => throw new IllegalStateException(s"Cannot convert ${m.getClass.getSimpleName} $m to SaveModeMergeOptions")
   }
 }
@@ -161,6 +161,6 @@ case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType:
   val updateConditionExpr: Option[GenericColumn] = saveMode.updateCondition.map(expr)
   val updateExistingConditionExpr: Option[GenericColumn] = saveMode.updateExistingCondition.map(expr)
   val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(expr)
-  val insertValuesOverrideExpr: Map[String, GenericColumn] = saveMode.insertValuesOverride.mapValues(expr).toMap
+  val insertValuesOverrideExpr: Map[String, GenericColumn] = saveMode.insertValuesOverride.view.mapValues(expr).toMap
   val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(expr)
 }

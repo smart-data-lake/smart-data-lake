@@ -26,7 +26,6 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.dataobject.generic.{CanMergeDataFrame, CanWriteDataFrame, TransactionalTableDataObject}
-import io.smartdatalake.workflow.dataobject.spark.CanWriteSparkDataFrame
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, DataFrameSubFeed}
 
 import java.sql.Timestamp
@@ -139,7 +138,7 @@ object LogExtractor extends SmartDataLakeLogger {
       val numTasks = metrics.get ("num_tasks").map (castToLong)
       val filesWritten = metrics.get ("files_written").map (castToLong)
       val recordsWritten = metrics.get ("records_written").map (castToLong)
-      val filteredMetrics = metrics.filterKeys (! Set ("num_tasks", "files_written", "records_written").contains (_) )
+      val filteredMetrics = metrics.view.filterKeys (! Set ("num_tasks", "files_written", "records_written").contains (_) ).toMap
       MetricsLog (result.dataObjectId.id, Timestamp.valueOf (info.startTstmp.get), numTasks, filesWritten, recordsWritten, filteredMetrics.mapValues (_.toString).toMap, result.partitionValues.map (_.getMapString) )
     }
     ActionLog(executionId.runId, Timestamp.valueOf(context.runStartTime), actionId.id

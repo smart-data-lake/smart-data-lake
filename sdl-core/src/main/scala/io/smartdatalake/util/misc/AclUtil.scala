@@ -93,6 +93,7 @@ case class AclElement (aclType:String, name:String, permission: String) {
  *
  * In this structure good limitations are: MinLevelPermissionModify=2, MinLevelPermissionOverwrite=5
  */
+// TODO: please specify what shall be used instead
 @deprecated(since = "2.9.0")
 private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
 
@@ -148,7 +149,7 @@ private[smartdatalake] object AclUtil extends SmartDataLakeLogger {
   def checkBasedirPath(currentUser: String, path: Path): Unit = {
     if (Environment.hdfsBasedir.isDefined) {
       val baseDirName = Environment.hdfsBasedir.get
-      require(path.toUri.getPath.startsWith(baseDirName.getPath), s"Permissions can only be set under hadoop basedir if hdfsAclsLimitToBasedir is enabled, path=$path, basedir=${baseDirName}")
+      require(path.toUri.getPath.startsWith(baseDirName.getPath), s"Permissions can only be set under hadoop basedir if hdfsAclsLimitToBasedir is enabled, path=$path, basedir=$baseDirName")
     } else {
       val userHome = extractPathLevel(path, Environment.hdfsAclsUserHomeLevel)
       // userHome or username might be pre/postfixed. Check is therefore if one contains the other and vice versa.
