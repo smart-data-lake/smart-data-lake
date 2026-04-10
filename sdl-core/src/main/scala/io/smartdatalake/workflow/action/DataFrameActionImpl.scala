@@ -461,6 +461,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
     // write
     executionMode match {
+      // TODO: move Spark specific logic!
       case Some(m: SparkStreamingMode) if m.isAsynchronous && context.appConfig.streaming =>
         // Use spark streaming mode asynchronously - first microbatch is executed synchronously then it runs on asynchronously.
         assert(subFeed.isStreaming.getOrElse(false), s"($id) ExecutionMode ${m.getClass} needs streaming DataFrame in SubFeed")

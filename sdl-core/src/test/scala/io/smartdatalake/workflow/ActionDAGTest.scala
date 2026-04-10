@@ -62,10 +62,10 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
   var contextExec: ActionPipelineContext = _
 
   before {
+    instanceRegistry.clear()
     contextInit = TestUtil.getDefaultActionPipelineContext
     contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
     contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
-    instanceRegistry.clear()
   }
 
   test("action dag with 2 actions in sequence with state") {
@@ -77,7 +77,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
-    val tgt2DO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname")))
+    val tgt2DO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare DAG
     val statePath = tempPath + "stateTest/"
@@ -100,8 +100,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val r1 = tgt2DO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 5)
+    assert(r1 == Seq(5,5))
 
     // check metrics for MockSparkDataObject
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)

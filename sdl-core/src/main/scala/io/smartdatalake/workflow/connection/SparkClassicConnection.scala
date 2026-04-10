@@ -154,7 +154,8 @@ case class SparkClassicConnection(
    * @param operation phase description (be short...)
    */
   def setSparkJobMetadata(operation: Option[String] = None)(implicit context: ActionPipelineContext) : Unit = {
-    sparkSession.sparkContext.setJobGroup(s"${context.appConfig.appName} $id runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", operation.getOrElse("").take(255))
+    val metadataId = context.currentAction.map(_.id).getOrElse(id)
+    sparkSession.sparkContext.setJobGroup(s"${context.appConfig.appName} $metadataId runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", operation.getOrElse("").take(255))
   }
 
   override def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = {

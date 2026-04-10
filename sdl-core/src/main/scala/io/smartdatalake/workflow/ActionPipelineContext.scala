@@ -21,6 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -70,6 +71,7 @@ case class ActionPipelineContext (
   def withAction(action: Action): ActionPipelineContext = this.copy(currentAction = Some(action))
 
   def engineConnection: Option[Connection] = {
+    Environment
     currentAction.flatMap(_.getEngineConnection(this))
   }
 

@@ -438,9 +438,13 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     context.engineConnection match {
       case Some(connection) if connection.isInstanceOf[SparkClassicConnection] => connection.asInstanceOf[SparkClassicConnection].sparkSession
       case Some(connection) => throw new IllegalStateException(s"Spark connection is required to create DataFrame, but got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
-      case None => throw new IllegalStateException("No connection available in context. Spark connection is required to create DataFrame.")
+      case _ => _defaultSparkSession // for testing only
+        .getOrElse(throw new IllegalStateException("No connection available in context. Spark connection is required to create DataFrame."))
     }
   }
+
+  // This is for testing/lab only: define a default spark connection
+  private[smartdatalake] var _defaultSparkSession: Option[SparkSession] = None
 }
 
 trait SparkWhen extends GenericWhen {
