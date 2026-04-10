@@ -44,6 +44,7 @@ class ValidateOnReadTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("Dont validate expectations with scope=Job on read if there is a DataFrame-Action having this DataObject as output") {

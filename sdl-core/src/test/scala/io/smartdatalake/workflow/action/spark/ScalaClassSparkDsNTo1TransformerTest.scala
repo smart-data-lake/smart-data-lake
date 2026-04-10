@@ -118,6 +118,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("One Ds2To1 Transformation (direct call to exec)") {

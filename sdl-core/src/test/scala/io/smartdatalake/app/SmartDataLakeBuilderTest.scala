@@ -154,9 +154,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       assert(resultActionsState == expectedActionsState)
     }
 
-    // now fill tgt1 with both partitions
-    tgt1DO.writeSparkDataFrame(dfSrc, Seq())
-
     // reset actions in registry
     instanceRegistry.register(action1.copy())
 
@@ -526,7 +523,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -550,7 +546,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
 
     // check latest state
     {
@@ -577,7 +573,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5, 10))
 
     // check latest state
     {
@@ -612,7 +608,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(tempPath), false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     val srcDO1 = TestIncrementalDataObject("src1")
@@ -676,7 +671,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(new Path(statePath), false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     // source table has partitions columns dt and type

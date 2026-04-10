@@ -51,6 +51,7 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("Test Config Parsing") {

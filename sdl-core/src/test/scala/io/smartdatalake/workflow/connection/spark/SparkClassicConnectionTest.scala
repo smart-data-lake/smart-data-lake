@@ -49,6 +49,7 @@ class SparkClassicConnectionTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("sparkOptions secrets are resolved in Spark session configuration") {

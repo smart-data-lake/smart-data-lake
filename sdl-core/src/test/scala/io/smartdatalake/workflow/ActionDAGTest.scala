@@ -63,6 +63,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     contextInit = TestUtil.getDefaultActionPipelineContext
     contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
     contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!

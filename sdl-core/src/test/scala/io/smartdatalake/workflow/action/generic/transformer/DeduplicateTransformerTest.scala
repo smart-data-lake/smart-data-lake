@@ -52,6 +52,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("deduplication test with primary key") {

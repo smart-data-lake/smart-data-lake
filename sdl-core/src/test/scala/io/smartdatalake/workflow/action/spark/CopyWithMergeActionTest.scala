@@ -44,6 +44,7 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("copy 1st 2nd load, SaveModeMergeOptions, schema evolution") {
