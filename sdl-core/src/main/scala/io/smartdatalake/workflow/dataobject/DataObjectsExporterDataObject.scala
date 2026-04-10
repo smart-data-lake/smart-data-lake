@@ -53,7 +53,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class DataObjectsExporterDataObject(id: DataObjectId,
                                          config: Option[String] = None,
-                                         override val sparkConnectionId: Option[ConnectionId],
                                          override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[DataObjectsExporterDataObject] {

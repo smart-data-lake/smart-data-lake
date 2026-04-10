@@ -54,15 +54,12 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 case class ActionsExporterDataObject(id: DataObjectId,
                                      config: Option[String] = None,
-                                     override val sparkConnectionId: Option[ConnectionId] = None,
                                      override val metadata: Option[DataObjectMetadata] = None)
                                (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[ActionsExporterDataObject] {
 
   /**
-   *
-   * @param session SparkSession to use
-   * @return DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
+   * Create a DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val session = sparkConnection.sparkSession

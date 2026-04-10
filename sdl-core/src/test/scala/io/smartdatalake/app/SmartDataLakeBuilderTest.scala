@@ -1048,7 +1048,6 @@ object TestSDLPlugin {
  */
 case class TestIncrementalDataObject(
                                       override val id: DataObjectId,
-                                      override val sparkConnectionId: Option[ConnectionId] = None,
                                       override val metadata: Option[DataObjectMetadata] = None,
                                       initVal: Int = 1
                                     )(implicit val instanceRegistry: InstanceRegistry)

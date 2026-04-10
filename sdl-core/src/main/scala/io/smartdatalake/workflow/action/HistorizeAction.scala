@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
@@ -121,8 +121,9 @@ case class HistorizeAction(
                             override val executionMode: Option[ExecutionMode] = None,
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
-                            override val metadata: Option[ActionMetadata] = None
-                          )(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
+                            override val metadata: Option[ActionMetadata] = None,
+                            override val engineConnectionId: Option[ConnectionId] = None
+                          )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalTableDataObject = getOutputDataObject[TransactionalTableDataObject](outputId)

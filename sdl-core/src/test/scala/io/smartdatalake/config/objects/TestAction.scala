@@ -47,7 +47,7 @@ case class TestAction(override val id: ActionId,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
-                     )(implicit instanceRegistry: InstanceRegistry)
+                     )(implicit val instanceRegistry: InstanceRegistry)
   extends Action {
 
   override def init(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }

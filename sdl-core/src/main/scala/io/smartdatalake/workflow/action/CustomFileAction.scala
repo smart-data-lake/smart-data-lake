@@ -19,12 +19,13 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, TypeMismatchException}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataobject.file.HadoopFileDataObject
 import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
@@ -51,8 +52,9 @@ case class CustomFileAction(override val id: ActionId,
                             override val executionMode: Option[ExecutionMode] = None,
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
-                            override val metadata: Option[ActionMetadata] = None
-                           )(implicit instanceRegistry: InstanceRegistry)
+                            override val metadata: Option[ActionMetadata] = None,
+                            override val engineConnectionId: Option[ConnectionId] = None
+                           )(implicit val instanceRegistry: InstanceRegistry)
   extends FileOneToOneActionImpl with SmartDataLakeLogger {
 
   assert(filesPerPartition>0, s"($id) filesPerPartition must be greater than 0. Current value: $filesPerPartition")
@@ -75,7 +77,7 @@ case class CustomFileAction(override val id: ActionId,
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
-      val session = output.sparkConnection.sparkSession
+      val session = context.engineConnection.asInstanceOf[SparkClassicConnection].sparkSession
       import session.implicits._
 
       // Create a Dataset of files to be processed

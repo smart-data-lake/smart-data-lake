@@ -49,7 +49,6 @@ case class AccessTableDataObject(override val id: DataObjectId,
                                  path: String,
                                  override val schemaMin: Option[GenericSchema] = None,
                                  override var table: Table,
-                                 override val sparkConnectionId: Option[ConnectionId] = None,
                                  override val metadata: Option[DataObjectMetadata] = None
                                 )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TableDataObject with CanCreateSparkDataFrame {

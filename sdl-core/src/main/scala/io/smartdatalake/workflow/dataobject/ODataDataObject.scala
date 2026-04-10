@@ -195,7 +195,6 @@ case class ODataDataObject(override val id: DataObjectId,
                            nRetry: Int = 1,
                            responseBufferSetup : Option [ODataResponseBufferSetup] = None,
                            maxRecordCount: Option[Int] = None,
-                           override val sparkConnectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None
                           )
                           (@transient implicit val instanceRegistry: InstanceRegistry)

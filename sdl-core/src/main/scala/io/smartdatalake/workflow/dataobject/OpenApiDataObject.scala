@@ -106,7 +106,6 @@ case class OpenApiDataObject(override val id: DataObjectId,
                              pagingLinkJsonPath: Option[String] = None,
                              schemaMatchJsonPath: Option[String] = None,
                              maxPagesPerPartition: Int = 10,
-                             override val sparkConnectionId: Option[ConnectionId] = None,
                              override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SmartDataLakeLogger {

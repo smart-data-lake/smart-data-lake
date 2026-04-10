@@ -22,6 +22,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.generic.{HousekeepingMode, SchemaValidation, UserDefinedSchema}
 import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
@@ -107,7 +108,8 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
   /**
    * Handle class cast exception when getting objects from instance registry
    */
-  protected def getConnection[T <: Connection : TypeTag : ClassTag](connectionId: ConnectionId)(implicit registry: InstanceRegistry): T = {
+  protected def getConnectionReg[T <: Connection](connectionId: ConnectionId, registry: InstanceRegistry)(implicit ct: ClassTag[T], tt: TypeTag[T]): T = {
+    implicit val registryImpl: InstanceRegistry = registry
     try {
       registry.get[T](connectionId)
     } catch {
@@ -116,16 +118,9 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
         throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
     }
   }
-
-  protected def getConnectionReg[T <: Connection](connectionId: ConnectionId, registry: InstanceRegistry)(implicit ct: ClassTag[T], tt: TypeTag[T]): T = {
-    implicit val registryImpl: InstanceRegistry = registry
-    getConnection[T](connectionId)
+  protected def getConnection[T <: Connection](connectionId: ConnectionId)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
+    getConnectionReg[T](connectionId, registry)
   }
-
-  /**
-   * Return the connection to the engine that is needed to write to this DataObject with the given subFeedType, if any.
-   */
-  def getEngineConnection(subFeedType: universe.Type)(implicit context: ActionPipelineContext): Option[Connection] = None
 
   /**
    * Returns statistics about this DataObject from the catalog. Depending on it's type this can be (see also [[io.smartdatalake.definitions.TableStatsType]])
