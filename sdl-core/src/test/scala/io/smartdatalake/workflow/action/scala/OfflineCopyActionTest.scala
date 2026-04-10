@@ -19,11 +19,14 @@
 
 package io.smartdatalake.workflow.action.scala
 
-import io.smartdatalake.testutils.{CopyActionBehaviour, MockScalaDataObject}
+import io.smartdatalake.testutils.{CopyActionBehaviour, MockScalaDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
 class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with CopyActionBehaviour {
+
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultScalaConnection
 
   test("copy dry-run in offline environment, reading exported schemas") {
     testCopyActionOffline(

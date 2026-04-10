@@ -72,6 +72,7 @@ class CustomDfsTransformerTest extends AnyFunSuite
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
     val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))
@@ -117,6 +118,7 @@ class CustomDfsTransformerTest extends AnyFunSuite
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
     val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))

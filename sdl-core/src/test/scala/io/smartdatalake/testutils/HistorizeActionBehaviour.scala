@@ -26,7 +26,7 @@ import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode
 import io.smartdatalake.workflow.action.{CopyAction, HistorizeAction, NoDataToProcessWarning}
-import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanCreateIncrementalOutput, CanMergeDataFrame, CanWriteDataFrame, TableDataObject, TransactionalTableDataObject}
@@ -48,6 +48,8 @@ trait HistorizeActionBehaviour {
   implicit private val implicitLogger: Logger = logger
   import TestUtil.registerDataObject
 
+  def defaultEngineConnection: Connection with EngineConnection
+
   def historizeWithMergeMode(createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
                              createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
                              tgtConnection: Option[Connection] = None, canDetectNoData: Boolean = true): Unit = {
@@ -56,6 +58,7 @@ trait HistorizeActionBehaviour {
 
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
       tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
 
       implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
@@ -142,6 +145,7 @@ trait HistorizeActionBehaviour {
 
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
       tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
 
       implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
@@ -233,6 +237,7 @@ trait HistorizeActionBehaviour {
 
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
       tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
 
       implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
@@ -280,6 +285,7 @@ trait HistorizeActionBehaviour {
     test("switch from incremental cdc historization to incremental historization on existing dataframe") {
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
       tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
 
       implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
@@ -345,6 +351,7 @@ trait HistorizeActionBehaviour {
     test("historize load mergeModeEnable and copy incremental action") {
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
       tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
 
       implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
