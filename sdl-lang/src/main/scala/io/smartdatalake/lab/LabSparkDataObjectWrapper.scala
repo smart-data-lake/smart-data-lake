@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.dataobject.file.{FileRefDataObject, HadoopFileD
 import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, TableDataObject}
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
 import java.time.{Instant, LocalDateTime, ZoneId}
 import java.util.TimeZone
@@ -60,15 +60,20 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def where(condition: Column): DataFrame = get().where(condition)
   def select(cols: Column*): DataFrame = get().select(cols:_*)
 
-  def write(dataFrame: DataFrame, topLevelPartitions: Seq[String] = Seq()): Unit = {
-    writeWithPartitions(dataFrame, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
+  def write[T](ds: Dataset[T], topLevelPartitions: Seq[String] = Seq()): Unit = {
+    writeWithPartitions(ds, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
   }
-  def writeWithPartitions(dataFrame: DataFrame, partitions: Seq[Map[String,String]]): Unit = {
-    if(!SmartDataLakeBuilderLab.enableWritingDataObjects) throw new IllegalAccessException("Writing into DataObjects using SmartDataLakeBuilderLab is disabled by default because it is not seen as best practice. Set SmartDataLakeBuilderLab.enableWritingDataObjects=true to remove this limitation if you know what you do.")
-    if(partitions.nonEmpty && partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
+  def writeWithPartitions[T](ds: Dataset[T], partitions: Seq[Map[String,String]]): Unit = {
+    if(!SmartDataLakeBuilderLab.enableWritingDataObjects)
+      throw new IllegalAccessException("Writing into DataObjects using SmartDataLakeBuilderLab is disabled by default" +
+        " because it is not seen as best practice. Set SmartDataLakeBuilderLab.enableWritingDataObjects=true" +
+        " to remove this limitation if you know what you do.")
+    if(partitions.nonEmpty && partitionColumns.isEmpty)
+      throw NotSupportedException(dataObject.id, s"DataObject is not partitioned" +
+        s" but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
     dataObject match {
       case o: CanWriteSparkDataFrame =>
-        o.writeSparkDataFrame(dataFrame, partitions.map(pv => PartitionValues(pv)))(context)
+        o.writeSparkDataFrame(ds, partitions.map(pv => PartitionValues(pv)))(context)
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }
   }

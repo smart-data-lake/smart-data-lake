@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
@@ -32,7 +32,7 @@ class StandardizeColNamesTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("dots in column names are removed") {

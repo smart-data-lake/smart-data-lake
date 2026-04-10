@@ -19,49 +19,46 @@
 
 package io.smartdatalake.workflow.action.spark.transformer
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.config.SdlConfigObject.ActionId
-import org.apache.spark.sql.{SparkSession, Row}
+import org.apache.spark.sql.types.{ArrayType, IntegerType, StringType, StructType}
+import org.apache.spark.sql.{Row, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
-import org.apache.spark.sql.types.{StructType, IntegerType, StringType, ArrayType}
-import java.util.ArrayList
 
-
+import java.util
 
 class SparkFlattenDFTransformerTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
-  import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("Nested DataFrame returns a flat Dataframe") {
     val flattenDfTransformer = SparkFlattenDfTransformer()
     val nestedSchema: StructType = new StructType()
-      .add("name", StringType, true)
+      .add("name", StringType, nullable = true)
       .add("info", new StructType()
-        .add("age", IntegerType, true)
+        .add("age", IntegerType, nullable = true)
         .add("address", new StructType()
-          .add("street", StringType)
-          .add("number", StringType)
+          .add("street", StringType, nullable = true)
+          .add("number", StringType, nullable = true)
         ))
 
     //createDataFrame requires Java Lists
-    val nestedData = new ArrayList[Row]()
+    val nestedData = new util.ArrayList[Row]()
     nestedData.add(Row("Michael", Row(30, Row("Main St","123"))))
     nestedData.add(Row("Bob", Row(25, Row("Elm St","456"))))
 
     val nested_df = session.createDataFrame(nestedData, nestedSchema)
     val new_df = flattenDfTransformer.transform(ActionId("ActionId"), Seq(), nested_df, DataObjectId("dataObjectId"))
     val expectedSchema = new StructType()
-      .add("name", StringType, true)
-      .add("info_age", IntegerType, true)
-      .add("info_address_street", StringType)
-      .add("info_address_number", StringType)
+      .add("name", StringType, nullable = true)
+      .add("info_age", IntegerType, nullable = true)
+      .add("info_address_street", StringType, nullable = true)
+      .add("info_address_number", StringType, nullable = true)
     assert(new_df.schema.equals(expectedSchema))
   }
 
@@ -70,10 +67,10 @@ class SparkFlattenDFTransformerTest extends AnyFunSuite {
     val flattenDfTransformer = SparkFlattenDfTransformer()
 
     val normalSchema: StructType = new StructType()
-      .add("name", StringType, true)
-      .add("age", IntegerType, true)
+      .add("name", StringType, nullable = true)
+      .add("age", IntegerType, nullable = true)
 
-    val unNestedData = new ArrayList[Row]()
+    val unNestedData = new java.util.ArrayList[Row]()
     unNestedData.add(Row("Michael", 30))
     unNestedData.add(Row("Bob", 25))
     val unNested_df = session.createDataFrame(unNestedData, normalSchema)
@@ -86,10 +83,10 @@ class SparkFlattenDFTransformerTest extends AnyFunSuite {
     val flattenDfTransformer = SparkFlattenDfTransformer(enableExplode = true)
 
     val arraySchema: StructType = new StructType()
-      .add("name", StringType, true)
-      .add("hobbies", ArrayType(StringType), true)
+      .add("name", StringType, nullable = true)
+      .add("hobbies", ArrayType(StringType), nullable = true)
 
-    val arrayData = new ArrayList[Row]()
+    val arrayData = new util.ArrayList[Row]()
     arrayData.add(Row("Michael", Seq("football", "programming")))
     arrayData.add(Row("Bob", Seq("playing piano", "reading")))
 
@@ -102,10 +99,10 @@ class SparkFlattenDFTransformerTest extends AnyFunSuite {
     val flattenDfTransformerNoExplode = SparkFlattenDfTransformer()
 
     val arraySchema: StructType = new StructType()
-      .add("name", StringType, true)
-      .add("hobbies", ArrayType(StringType), true)
+      .add("name", StringType, nullable = true)
+      .add("hobbies", ArrayType(StringType), nullable = true)
 
-    val arrayData = new ArrayList[Row]()
+    val arrayData = new util.ArrayList[Row]()
     arrayData.add(Row("Michael", Seq("football", "programming")))
     arrayData.add(Row("Bob", Seq("playing piano", "reading")))
 

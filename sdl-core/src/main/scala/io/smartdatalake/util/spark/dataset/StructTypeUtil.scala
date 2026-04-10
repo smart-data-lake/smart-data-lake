@@ -56,7 +56,7 @@ trait StructTypeUtil {
    * @param nullable  : is field nullable ?
    * @return StructType
    */
-  def createStruct(fieldName: String, fieldType: DataType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
+  def createStruct(fieldName: String, fieldType: DataType = StringType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
 
   implicit class StructSDLB(st: StructType) {
 

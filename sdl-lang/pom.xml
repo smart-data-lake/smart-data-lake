@@ -191,12 +191,6 @@
                 <artifactId>scala-maven-plugin</artifactId>
             </plugin>
 
-            <!-- rewrite pom for compiling with different scala version profiles -->
-            <plugin>
-                <groupId>org.spurint.maven.plugins</groupId>
-                <artifactId>scala-cross-maven-plugin</artifactId>
-            </plugin>
-
             <!-- Copies files in resources folders to target folder. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

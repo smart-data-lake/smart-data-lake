@@ -35,7 +35,7 @@ class ConvertNullValuesTransformerTest extends AnyFunSuite {
 
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("exclusive include- or excludeColumns") {
@@ -183,7 +183,7 @@ class ConvertNullValuesTransformerTest extends AnyFunSuite {
 
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "COLUMn3"))
@@ -207,7 +207,7 @@ class ConvertNullValuesTransformerTest extends AnyFunSuite {
   test("error for non existing include columns (case sensitive)") {
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "column2"))
@@ -261,7 +261,7 @@ class ConvertNullValuesTransformerTest extends AnyFunSuite {
 
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("colUMN1", "coLUmn2"))
@@ -285,7 +285,7 @@ class ConvertNullValuesTransformerTest extends AnyFunSuite {
   test("error for non existing exclude columns (case sensitive)") {
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "column2"))

@@ -26,14 +26,11 @@ import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.TimestampType
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
-
-import java.nio.file.Files
 
 class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
@@ -41,14 +38,11 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   import session.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
-
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  val contextInit = TestUtil.getDefaultActionPipelineContext
-  val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-  implicit val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
+  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextPrep: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
+  implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
 
   before {
     instanceRegistry.clear()
@@ -125,9 +119,6 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   test("deduplication test without primary key") {
 
-    // prepare
-    val feed = "deduplicate_pipeline"
-
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1", primaryKey = Some(Seq("pk1", "pk2"))).register
 
@@ -163,9 +154,6 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("deduplication test with primary key columns detection") {
-
-    // prepare
-    val feed = "deduplicate_pipeline"
 
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1", primaryKey = Some(Seq("pk1", "pk2"))).register

@@ -206,7 +206,7 @@ class DsPkTest extends AnyFlatSpec with Matchers
     actual shouldBe false
   }
 
-  "project" should "project dfComplex onto value only" in {
+  "project" should "project dsComplex onto value only" in {
     val actual = dsComplex.project(Array("value"))
     val rows_expected: List[List[(String, String, List[String])]] = List(
       List(("a", "A", List("a", "A"))),
