@@ -458,7 +458,7 @@ trait SparkWhen extends GenericWhen {
 
   override def otherwise(value: GenericColumn): GenericColumn = {
     value match {
-      case value: SparkColumn => new SparkColumn(col.inner.otherwise(value.inner))
+      case value: SparkColumn => SparkColumn(col.inner.otherwise(value.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(value)
     }
   }

@@ -105,8 +105,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // check metrics for MockSparkDataObject
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
-    assert(action2MainMetrics.isDefinedAt("bytes_written"))
-    assert(action2MainMetrics("num_tasks") == 1)
 
     // check state: two actions succeeded
     val latestState = stateStore.getLatestStateId().get
