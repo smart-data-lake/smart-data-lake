@@ -71,7 +71,6 @@ case class ActionPipelineContext (
   def withAction(action: Action): ActionPipelineContext = this.copy(currentAction = Some(action))
 
   def engineConnection: Option[Connection] = {
-    //TODO
     currentAction.flatMap(_.getEngineConnection(instanceRegistry))
   }
 
