@@ -602,6 +602,18 @@ object Environment extends SmartDataLakeLogger {
   var _throwExceptionOnSparkListenerError: Option[Boolean] = None
 
   /**
+   * The id of the default engine connection to use.
+   */
+  def defaultEngineConnectionId: String = {
+    if (_defaultEngineConnectionId.isEmpty) {
+      _defaultEngineConnectionId = Some(EnvironmentUtil.getSdlParameter("defaultEngineConnectionId").getOrElse("default-engine"))
+    }
+    _defaultEngineConnectionId.get
+  }
+
+  var _defaultEngineConnectionId: Option[String] = None
+
+  /**
    * Timeout in seconds to wait for DataFrame observation result.
    * Note that this is only relevant for asynchronous observations, e.g. SparkObservation.
    * Default is 1 second.
@@ -643,6 +655,8 @@ object Environment extends SmartDataLakeLogger {
   }
 
   private[smartdatalake] var _sdlPlugins: Seq[SDLPlugin] = Seq()
+
+
 
   // dynamically shared environment for custom code
   def instanceRegistry: InstanceRegistry = _instanceRegistry

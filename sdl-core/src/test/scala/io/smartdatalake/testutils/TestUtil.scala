@@ -104,7 +104,7 @@ object TestUtil extends SmartDataLakeLogger with Equality {
       }
   }
 
-  private val defaultSparkConnection = SparkClassicConnection(id = "default-spark", master = Some("local"))
+  val defaultSparkConnection = SparkClassicConnection(id = Environment.defaultEngineConnectionId, master = Some("local"))
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     // set a default spark connection in global config, to easily get spark engine connection in unit tests

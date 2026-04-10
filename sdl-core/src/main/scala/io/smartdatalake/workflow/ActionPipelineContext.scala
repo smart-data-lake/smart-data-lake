@@ -26,7 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
-import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.apache.hadoop.conf.Configuration
 
 import java.time.LocalDateTime
@@ -70,8 +70,8 @@ case class ActionPipelineContext (
 
   def withAction(action: Action): ActionPipelineContext = this.copy(currentAction = Some(action))
 
-  def engineConnection: Option[Connection] = {
-    currentAction.flatMap(_.getEngineConnection(instanceRegistry))
+  def engineConnection: Option[Connection with EngineConnection] = {
+    currentAction.map(_.getEngineConnection(instanceRegistry))
   }
 
   def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)

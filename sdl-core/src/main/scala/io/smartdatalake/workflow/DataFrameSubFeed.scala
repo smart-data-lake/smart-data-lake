@@ -164,8 +164,8 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
       def toDF(implicit context: ActionPipelineContext): GenericDataFrame = {
         createDataFrame(rows)
       }
-      def toDF(colNames: String*)(implicit context: ActionPipelineContext): GenericDataFrame = {
-        createDataFrame(rows, colNames)
+      def toDF(colName: String, colNames: String*)(implicit context: ActionPipelineContext): GenericDataFrame = {
+        createDataFrame(rows, colName +: colNames)
       }
     }
   }

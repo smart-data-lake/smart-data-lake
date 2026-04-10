@@ -345,15 +345,14 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   def engineConnectionId: Option[ConnectionId] = None
 
-  def getEngineConnection(implicit registry: InstanceRegistry): Option[Connection with EngineConnection] = {
-    engineConnectionId.map { connectionId =>
-      try {
-        registry.get[Connection with EngineConnection](connectionId)
-      } catch {
-        case _: NoSuchElementException => throw new NoSuchElementException(s"($id) $connectionId not found in instance registry")
-        case TypeMismatchException(_, currentClass, expectedType) =>
-          throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
-      }
+  def getEngineConnection(implicit registry: InstanceRegistry): Connection with EngineConnection = {
+    val connectionId = engineConnectionId.getOrElse(ConnectionId(Environment.defaultEngineConnectionId))
+    try {
+      registry.get[Connection with EngineConnection](connectionId)
+    } catch {
+      case _: NoSuchElementException => throw new NoSuchElementException(s"($id) $connectionId not found in instance registry")
+      case TypeMismatchException(_, currentClass, expectedType) =>
+        throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
     }
   }
 

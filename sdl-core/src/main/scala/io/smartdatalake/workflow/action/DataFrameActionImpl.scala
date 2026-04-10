@@ -120,9 +120,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // search common types in input & output
     val commonInputOutputTypes = commonInputTypes.intersect(commonOutputTypes)
     if (commonInputOutputTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs & outputs")
-    val commonTypes = getEngineConnection(instanceRegistry).map{ connection =>
-      commonInputOutputTypes.filter(_ =:= connection.subFeedType)
-    }.getOrElse(commonInputOutputTypes)
+    val commonTypes = commonInputOutputTypes.filter(_ =:= getEngineConnection(instanceRegistry).subFeedType)
     if (commonTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs/outputs and engine connection")
     val commonType = if (transformerSubFeedType.isDefined && !(transformerSubFeedType.get =:= typeOf[DataFrameSubFeed])) {
       // if transformerSubFeedType is defined and not generic, we have to take that one and assert it is in common types list

@@ -81,8 +81,6 @@ case class LocalStorageAgentSmartDataLakeBuilderConfig(override val feedSel: Str
                                                        override val applicationName: Option[String] = Some("storage-agent"),
                                                        override val configuration: Seq[String] = Seq(),
                                                        override val configurationValueOverwrite: Map[String, String] = Map(),
-                                                       override val master: Option[String] = None,
-                                                       override val deployMode: Option[String] = None,
                                                        override val partitionValues: Option[Seq[PartitionValues]] = None,
                                                        override val parallelism: Int = 1,
                                                        override val statePath: Option[String] = None,

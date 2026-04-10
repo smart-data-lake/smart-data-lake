@@ -36,11 +36,6 @@ trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] wit
    */
   def metadata: Option[ConnectionMetadata]
 
-  /**
-   * A hook for subclasses to perform configurations before the Connection is used for an Action in Init/Exec-phase
-   */
-  def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = ()
-
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
   }
@@ -68,5 +63,14 @@ case class ConnectionMetadata(
  * A trait for connections that can be used as execution engine.
  */
 trait EngineConnection {
+  /**
+   * The type of the sub-feed that this engine can execute.
+   */
   def subFeedType: Type
+
+  /**
+   * A hook for subclasses to perform configurations before the Connection is used for an Action in Init/Exec-phase
+   */
+  def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = ()
+
 }
