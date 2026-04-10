@@ -81,8 +81,6 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   def sparkRepartition: Option[SparkRepartitionDef]
 
-  override def sparkConnectionId: Option[ConnectionId] = connection.flatMap(_.sparkConnectionId)
-
   /**
    * Callback that enables potential transformation to be applied to `df` before the data is written.
    *

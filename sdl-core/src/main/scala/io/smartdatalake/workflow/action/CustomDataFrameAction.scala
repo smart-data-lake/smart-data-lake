@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -69,8 +69,9 @@ case class CustomDataFrameAction(override val id: ActionId,
                                  override val expectations: Seq[ActionExpectation] = Seq(),
                                  override val metadata: Option[ActionMetadata] = None,
                                  recursiveInputIds: Seq[DataObjectId] = Seq(),
-                                 override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
-                             )(implicit instanceRegistry: InstanceRegistry) extends DataFrameActionImpl {
+                                 override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq(),
+                                 override val engineConnectionId: Option[ConnectionId] = None
+                             )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])

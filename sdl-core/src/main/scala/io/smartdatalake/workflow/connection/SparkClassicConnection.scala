@@ -30,11 +30,13 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.SparkException
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.slf4j.MDC
 
+import scala.reflect.runtime.universe.{Type, typeOf}
 import scala.util.Try
 
 /**
@@ -65,7 +67,9 @@ case class SparkClassicConnection(
     pythonUDFs: Option[Map[String, PythonUDFCreatorConfig]] = None,
     kryoClasses: Option[Seq[String]] = None,
     override val metadata: Option[ConnectionMetadata] = None
-) extends Connection with SmartDataLakeLogger {
+) extends Connection with EngineConnection with SmartDataLakeLogger {
+
+  val subFeedType: Type = typeOf[SparkSubFeed]
 
   @transient private var _sparkSession: Option[SparkSession] = None
   def sparkSession(implicit context: ActionPipelineContext): SparkSession = {

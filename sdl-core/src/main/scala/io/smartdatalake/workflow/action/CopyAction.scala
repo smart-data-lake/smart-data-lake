@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -62,8 +62,9 @@ case class CopyAction(override val id: ActionId,
                       override val expectations: Seq[ActionExpectation] = Seq(),
                       override val saveModeOptions: Option[SaveModeOptions] = None,
                       override val metadata: Option[ActionMetadata] = None,
-                      override val agentId: Option[AgentId] = None
-                     )(implicit instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
+                      override val agentId: Option[AgentId] = None,
+                      override val engineConnectionId: Option[ConnectionId] = None
+                     )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: DataObject with CanWriteDataFrame = getOutputDataObject[DataObject with CanWriteDataFrame](outputId)

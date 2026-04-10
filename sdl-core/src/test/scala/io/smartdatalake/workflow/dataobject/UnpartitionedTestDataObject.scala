@@ -35,7 +35,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * create a custom DataObject implementation for tests without implementing CanHandlePartitions.
  */
 case class UnpartitionedTestDataObject(override val id: DataObjectId,
-                                       override val sparkConnectionId: Option[ConnectionId] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame {

@@ -22,6 +22,8 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
 
+import scala.reflect.runtime.universe.Type
+
 trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
 
   /**
@@ -62,3 +64,9 @@ case class ConnectionMetadata(
                                tags: Seq[String] = Seq()
                              )
 
+/**
+ * A trait for connections that can be used as execution engine.
+ */
+trait EngineConnection {
+  def subFeedType: Type
+}

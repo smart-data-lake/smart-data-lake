@@ -42,7 +42,7 @@ case class CustomScriptAction(override val id: ActionId,
                               scripts: Seq[ParsableScriptDef] = Seq(),
                               override val executionCondition: Option[Condition] = None,
                               override val metadata: Option[ActionMetadata] = None
-                       )(implicit instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
+                       )(implicit val instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
 
   override val inputs: Seq[DataObject] = inputIds.map(getInputDataObject[DataObject])
   override val outputs: Seq[DataObject with CanReceiveScriptNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveScriptNotification])

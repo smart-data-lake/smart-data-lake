@@ -59,7 +59,7 @@ case class FileTransferAction(override val id: ActionId,
                               override val executionCondition: Option[Condition] = None,
                               override val metricsFailCondition: Option[String] = None,
                               override val metadata: Option[ActionMetadata] = None)
-                             ( implicit instanceRegistry: InstanceRegistry)
+                             ( implicit val instanceRegistry: InstanceRegistry)
   extends FileOneToOneActionImpl {
 
   override val input: FileRefDataObject with CanCreateInputStream = getInputDataObject[FileRefDataObject with CanCreateInputStream](inputId)

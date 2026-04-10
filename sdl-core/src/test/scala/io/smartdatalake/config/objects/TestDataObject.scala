@@ -45,7 +45,6 @@ case class TestDataObject( id: DataObjectId,
                            args: Seq[String],
                            connectionId: Option[ConnectionId] = None,
                            primaryKey: Option[Seq[String]] = None,
-                           override val sparkConnectionId: Option[ConnectionId] = None,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame

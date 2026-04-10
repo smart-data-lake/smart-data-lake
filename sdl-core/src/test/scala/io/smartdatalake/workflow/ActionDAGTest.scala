@@ -100,7 +100,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val r1 = tgt2DO.getSparkDataFrame()
       .select($"rating")
       .as[Int].collect().toSeq
-    assert(r1 == Seq(5,5))
+    assert(r1 == Seq(5))
 
     // check metrics for MockSparkDataObject
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)

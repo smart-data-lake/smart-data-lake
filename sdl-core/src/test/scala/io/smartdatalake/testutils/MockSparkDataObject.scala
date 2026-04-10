@@ -55,7 +55,6 @@ case class MockSparkDataObject(override val id: DataObjectId,
                                override val constraints: Seq[Constraint] = Seq(),
                                override val expectations: Seq[Expectation] = Seq(),
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
-                               override val sparkConnectionId: Option[ConnectionId] = None
                               ) (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanHandlePartitions with ExpectationValidation with CanMergeDataFrame {

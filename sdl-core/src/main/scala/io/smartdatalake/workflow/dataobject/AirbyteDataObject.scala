@@ -74,7 +74,6 @@ case class AirbyteDataObject(override val id: DataObjectId,
                              cmd: ParsableScriptDef,
                              incrementalCursorFields: Seq[String] = Seq(),
                              maxRecordsPerPartition: Int = 100000,
-                             override val sparkConnectionId: Option[ConnectionId] = None,
                              override val schemaMin: Option[GenericSchema] = None,
                              override val metadata: Option[DataObjectMetadata] = None
                             )(@transient implicit val instanceRegistry: InstanceRegistry)

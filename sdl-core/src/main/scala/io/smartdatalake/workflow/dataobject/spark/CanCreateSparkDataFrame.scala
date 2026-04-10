@@ -55,21 +55,13 @@ trait CanCreateSparkDataFrame extends CanCreateDataFrame { this: DataObject =>
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
 
-  override private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed])
+  def sparkConnection(implicit context: ActionPipelineContext): SparkClassicConnection = {
+    context.engineConnection.asInstanceOf[SparkClassicConnection]
+  }
 
-  def sparkConnectionId: Option[ConnectionId]
+  override private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed])
 
   implicit def instanceRegistry: InstanceRegistry
 
-  def sparkConnection(implicit context: ActionPipelineContext): SparkClassicConnection = {
-    val connectionId = sparkConnectionId.orElse(context.globalConfig.defaultSparkConnectionId)
-      .getOrElse(throw ConfigurationException(s"($id) Missing Spark connection: sparkConnectionId of DataObject and globalConfig.defaultSparkConnectionId are not defined"))
-    getConnection[SparkClassicConnection](connectionId)
-  }
-
-  override def getEngineConnection(subFeedType: universe.Type)(implicit context: ActionPipelineContext): Option[Connection] = {
-    if (subFeedType =:= typeOf[SparkSubFeed]) Some(sparkConnection)
-    else throw new IllegalStateException(s"($id) Unsupported subFeedType ${subFeedType.typeSymbol.name} for getting engine connection")
-  }
 }
 

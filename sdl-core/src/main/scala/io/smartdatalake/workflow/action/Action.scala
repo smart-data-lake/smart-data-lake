@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
-import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.DataObject
 
@@ -92,6 +92,10 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    */
   def mainOutputId: Option[DataObjectId] = None
 
+  /**
+   * The instance registry is needed to get the DataObjects defined as input and output in the Action config.
+   */
+  def instanceRegistry: InstanceRegistry
 
   /**
    * Optional execution condition for this action.
@@ -339,7 +343,19 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Actions needing an engine to execute, e.g. Spark, can override this method to provide the connection to the engine.
    */
-  def getEngineConnection(implicit context: ActionPipelineContext): Option[Connection] = None
+  def engineConnectionId: Option[ConnectionId] = None
+
+  def getEngineConnection(implicit registry: InstanceRegistry): Option[Connection with EngineConnection] = {
+    engineConnectionId.map { connectionId =>
+      try {
+        registry.get[Connection with EngineConnection](connectionId)
+      } catch {
+        case _: NoSuchElementException => throw new NoSuchElementException(s"($id) $connectionId not found in instance registry")
+        case TypeMismatchException(_, currentClass, expectedType) =>
+          throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
+      }
+    }
+  }
 
   /**
    * Runtime metrics & events

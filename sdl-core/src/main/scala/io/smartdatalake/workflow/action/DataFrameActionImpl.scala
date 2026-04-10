@@ -19,8 +19,8 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, TypeMismatchException}
+import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
-import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkObservation, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
@@ -41,6 +41,7 @@ import io.smartdatalake.workflow.dataobject.spark.{CanCreateStreamingDataFrame, 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -117,15 +118,19 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val commonInputTypes = allInputTypes.toSet.reduce(_ intersect _)
     val commonOutputTypes = outputs.map(_.writeSubFeedSupportedTypes).map(explodeGenericType).toSet.reduce(_ intersect _)
     // search common types in input & output
-    val commonTypes = commonInputTypes.intersect(commonOutputTypes)
-    if (commonTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs & outputs")
+    val commonInputOutputTypes = commonInputTypes.intersect(commonOutputTypes)
+    if (commonInputOutputTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs & outputs")
+    val commonTypes = getEngineConnection(instanceRegistry).map{ connection =>
+      commonInputOutputTypes.filter(_ =:= connection.subFeedType)
+    }.getOrElse(commonInputOutputTypes)
+    if (commonTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs/outputs and engine connection")
     val commonType = if (transformerSubFeedType.isDefined && !(transformerSubFeedType.get =:= typeOf[DataFrameSubFeed])) {
       // if transformerSubFeedType is defined and not generic, we have to take that one and assert it is in common types list
-      assert(commonTypes.contains(transformerSubFeedType.get), s"($id) subfeed type of transformers (${transformerSubFeedType.get}) doesnt exist in common subfeed types of inputs & outputs (${commonTypes.mkString(", ")})")
+      assert(commonTypes.contains(transformerSubFeedType.get), s"($id) subfeed type of transformers (${transformerSubFeedType.get}) doesnt exist in common subfeed types of inputs & outputs (${commonInputOutputTypes.mkString(", ")})")
       transformerSubFeedType.get
     } else {
       // if transformerSubFeedType is None or generic, take the first matching entry from the inputs list
-      allInputTypes.flatten.find(commonTypes.contains).get
+      allInputTypes.flatten.find(commonInputOutputTypes.contains).get
     }
     logger.info(s"($id) selected subFeedType ${commonType.typeSymbol.name}")
     commonType
@@ -135,9 +140,6 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   }
 
   private[smartdatalake] override def subFeedConverter(): SubFeedConverter[DataFrameSubFeed] = subFeedHelper
-
-  // return engine connection from main output to execute the action
-  override def getEngineConnection(implicit context: ActionPipelineContext): Option[Connection] = mainOutput.getEngineConnection(subFeedType)
 
   override def getRuntimeDataImpl: RuntimeData = {
     // override runtime data implementation for SparkStreamingMode

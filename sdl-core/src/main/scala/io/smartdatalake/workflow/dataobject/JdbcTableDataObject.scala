@@ -110,7 +110,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
                                incrementalOutputExpr: Option[String] = None,
-                               override val sparkConnectionId: Option[ConnectionId] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame

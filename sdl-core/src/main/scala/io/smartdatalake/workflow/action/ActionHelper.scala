@@ -18,8 +18,11 @@
  */
 package io.smartdatalake.workflow.action
 
+import io.smartdatalake.config.SdlConfigObject.ConnectionId
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, TypeMismatchException}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
@@ -27,7 +30,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitS
 import org.apache.spark.sql.AnalysisException
 
 import java.sql.Timestamp
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.Type
+import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Collection of helper functions for Actions
