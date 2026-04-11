@@ -76,8 +76,6 @@ trait ConfigImplicits {
   // see: https://github.com/kxbmap/configs/issues/44
   // TODO: check periodically if still needed, should not be needed with scala 2.13+
   // --------------------------------------------------------------------------------
-  implicit val customDfTransformerConfigReader: ConfigReader[CustomDfTransformerConfig] = ConfigReader.derive[CustomDfTransformerConfig]
-  implicit val customDfsTransformerConfigReader: ConfigReader[CustomDfsTransformerConfig] = ConfigReader.derive[CustomDfsTransformerConfig]
   implicit val customFileTransformerConfigReader: ConfigReader[CustomFileTransformerConfig] = ConfigReader.derive[CustomFileTransformerConfig]
   implicit val sparkUdfCreatorConfigReader: ConfigReader[SparkUDFCreatorConfig] = ConfigReader.derive[SparkUDFCreatorConfig]
   implicit val sparkRepartitionDefReader: ConfigReader[SparkRepartitionDef] = ConfigReader.derive[SparkRepartitionDef]

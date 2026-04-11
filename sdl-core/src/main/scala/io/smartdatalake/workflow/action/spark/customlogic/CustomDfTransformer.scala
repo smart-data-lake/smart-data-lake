@@ -19,10 +19,6 @@
 package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.DefaultExpressionData
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
-import io.smartdatalake.workflow.action.spark.transformer.{PythonCodeDfTransformer, ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -52,59 +48,6 @@ trait CustomDfTransformer extends Serializable {
    *         Return None if mapping is 1:1.
    */
   def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = None
-}
-
-/**
- * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)
- * Define a transform function which receives a DataObjectIds, a DataFrames and a map of options and has to return a
- * DataFrame, see also [[CustomDfTransformer]].
- *
- * Note about Python transformation: Environment with Python and PySpark needed.
- * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
- * Other variables available are
- * - `inputDf`: Input DataFrame
- * - `options`: Transformation options as Map[String,String]
- * - `dataObjectId`: Id of input dataObject as String
- * Output DataFrame must be set with `setOutputDf(df)`.
- *
- * @param className Optional class name implementing trait [[CustomDfTransformer]]
- * @param scalaFile Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type [[fnTransformType]].
- * @param scalaCode Optional scala code for transformation. The scala code needs to be a function of type [[fnTransformType]].
- * @param sqlCode Optional SQL code for transformation.
- *                Use tokens %{<key>} to replace with runtimeOptions in SQL code.
- *                Example: "select * from test where run = %{runId}"
- * @param pythonFile Optional pythonFile to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.
- * @param pythonCode Optional pythonCode to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.
- * @param options Options to pass to the transformation
- * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- */
-@deprecated("use transformers instead")
-case class CustomDfTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None, scalaCode: Option[String] = None, sqlCode: Option[String] = None, pythonFile: Option[String] = None, pythonCode: Option[String] = None, options: Option[Map[String,String]] = None, runtimeOptions: Option[Map[String,String]] = None) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined || pythonFile.isDefined || pythonCode.isDefined, "Either className, scalaFile, scalaCode, sqlCode, pythonFile or code must be defined for CustomDfTransformer")
-
-  val impl: GenericDfTransformerDef = className.map(clazz => ScalaClassSparkDfTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  .orElse {
-    scalaFile.map(file => ScalaCodeSparkDfTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.orElse{
-    scalaCode.map(code => ScalaCodeSparkDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.orElse {
-      sqlCode.map(code => SQLDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.orElse {
-    pythonFile.map(file => PythonCodeDfTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.orElse{
-    pythonCode.map(code => PythonCodeDfTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.get
-
-  override def toString: String = {
-    if (className.isDefined)      "className: " +className.get
-    else if(scalaFile.isDefined)  "scalaFile: " +scalaFile.get
-    else if(scalaCode.isDefined)  "scalaCode: " +scalaCode.get
-    else if(sqlCode.isDefined)    "sqlCode: "   +sqlCode.get
-    else if(pythonCode.isDefined) "code: "+pythonCode.get
-    else if(pythonFile.isDefined) "pythonFile: "+pythonFile.get
-    else throw new IllegalStateException("transformation undefined!")
-  }
 }
 
 object CustomDfTransformerConfig {

@@ -22,11 +22,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.SparkProductUtil
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer.{extractOptionVal, extractSeqVal, getConverterFor, stdTransformMethodSignature}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.{prepareTolerantKey, tolerantGet}
-import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
@@ -89,46 +86,6 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with TransformInfo w
   override def getInputDataObjectsNameAndType: Option[Seq[(String, universe.Type)]] = customTransformMethodWrapper.map(_.getInputDataObjectNames.mapValues(_.tpe).toSeq)
   override def isSingleInput: Boolean = customTransformMethodWrapper.exists(_.getInputDataObjectNames.keys.size==1)
   override def isSingleOutput: Boolean = customTransformMethodWrapper.exists(_.returnsSingleDataset)
-}
-
-/**
- * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m).
- * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has
- * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomDfsTransformer]].
- *
- * @param className Optional class name implementing trait [[CustomDfsTransformer]]
- * @param scalaFile Optional file where scala code for transformation is loaded from. The scala code in the file needs to be a function of type [[fnTransformType]].
- * @param scalaCode Optional scala code for transformation. The scala code needs to be a function of type [[fnTransformType]].
- * @param sqlCode Optional map of output DataObject id and corresponding SQL Code.
- *                Use tokens %{<key>} to replace with runtimeOptions in SQL code.
- *                Example: "select * from test where run = %{runId}"
- * @param options Options to pass to the transformation
- * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- */
-@deprecated("use transformers instead")
-case class CustomDfsTransformerConfig( className: Option[String] = None, scalaFile: Option[String] = None,
-                                       scalaCode: Option[String] = None, sqlCode: Option[Map[String,String]] = None,
-                                       options: Option[Map[String,String]] = None,
-                                       runtimeOptions: Option[Map[String,String]] = None) {
-  require(className.isDefined || scalaFile.isDefined || scalaCode.isDefined || sqlCode.isDefined, "Either className, scalaFile, scalaCode or sqlCode must be defined for CustomDfsTransformer")
-
-  // Load Transformer code from appropriate location
-  val impl: GenericDfsTransformerDef = className.map(clazz => ScalaClassSparkDfsTransformer(className = clazz, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-    .orElse {
-      scalaFile.map(file => ScalaCodeSparkDfsTransformer(file = Some(file), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-    }.orElse{
-    scalaCode.map(code => ScalaCodeSparkDfsTransformer(code = Some(code), options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.orElse {
-    sqlCode.map(code => SQLDfsTransformer(code = code, options = options.getOrElse(Map()), runtimeOptions = runtimeOptions.getOrElse(Map())))
-  }.get
-
-  override def toString: String = {
-    if(className.isDefined)       "className: "+className.get
-    else if(scalaFile.isDefined)  "scalaFile: "+scalaFile.get
-    else if(scalaCode.isDefined)  "scalaCode: "+scalaCode.get
-    else                          "sqlCode: "+sqlCode.get
-  }
 }
 
 object CustomDfsTransformerConfig {

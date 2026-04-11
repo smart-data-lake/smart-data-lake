@@ -26,10 +26,9 @@ import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import java.sql.Timestamp
@@ -52,7 +51,6 @@ import scala.reflect.runtime.universe.Type
  *
  * @param inputId                             inputs DataObject
  * @param outputId                            output DataObject
- * @param transformer                         optional custom transformation to apply
  * @param transformers                        optional list of transformations to apply before deduplication. See [[sparktransformer]] for a list of included Transformers.
  *                                            The transformations are applied according to the lists ordering.
  * @param ignoreOldDeletedColumns             if true, remove no longer existing columns in Schema Evolution
@@ -69,8 +67,6 @@ import scala.reflect.runtime.universe.Type
 case class DeduplicateAction(override val id: ActionId,
                              inputId: DataObjectId,
                              outputId: DataObjectId,
-                             @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                             transformer: Option[CustomDfTransformerConfig] = None,
                              transformers: Seq[GenericDfTransformer] = Seq(),
                              ignoreOldDeletedColumns: Boolean = false,
                              ignoreOldDeletedNestedColumns: Boolean = true,
@@ -128,9 +124,7 @@ case class DeduplicateAction(override val id: ActionId,
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
   require(mergeModeEnable || !updateCapturedColumnOnlyWhenChanged, s"($id) updateCapturedColumnOnlyWhenChanged = true is not implemented for mergeModeEnable = false")
 
-  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toList ++ transformers
-
-  override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // deduplicate transformer can be ignored as it is generic
+  override val transformerSubFeedSupportedTypes: Seq[Type] = transformers.map(_.getSubFeedSupportedType) // deduplicate transformer can be ignored as it is generic
 
   validateConfig()
 
@@ -147,7 +141,7 @@ case class DeduplicateAction(override val id: ActionId,
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
-    transformerDefs.foreach(_.prepare(id))
+    transformers.foreach(_.prepare(id))
   }
 
   private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
@@ -177,7 +171,7 @@ case class DeduplicateAction(override val id: ActionId,
       }
     }
 
-    transformerDefs :+ deduplicateTransformer
+    transformers :+ deduplicateTransformer
   }
 
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {

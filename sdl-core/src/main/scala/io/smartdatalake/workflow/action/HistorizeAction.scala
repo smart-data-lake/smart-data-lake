@@ -28,10 +28,9 @@ import io.smartdatalake.util.historization.{Historization, HistorizationRecordOp
 import io.smartdatalake.util.misc.GenericSchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataObjectState, SubFeed}
 
 import java.sql.Timestamp
@@ -69,7 +68,6 @@ import scala.util.{Failure, Success, Try}
  * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
  *                                      Keeping deleted columns in complex data types has performance impact as all new data
  *                                      in the future has to be converted by a complex function.
- * @param transformer optional custom transformation to apply
  * @param transformers optional list of transformations to apply before historization. The transformations are applied according to the lists ordering.
  * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance by using incremental historization.
  *                        Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
@@ -101,8 +99,6 @@ case class HistorizeAction(
                             override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
-                            @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                            transformer: Option[CustomDfTransformerConfig] = None,
                             transformers: Seq[GenericDfTransformer] = Seq(),
                             filterClause: Option[String] = None,
                             historizeBlacklist: Option[Seq[String]] = None,
@@ -195,7 +191,7 @@ case class HistorizeAction(
   // primary key
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
 
-  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+  private val transformerDefs: Seq[GenericDfTransformerDef] = transformers
 
   override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // historize transformer can be ignored as it is generic
 

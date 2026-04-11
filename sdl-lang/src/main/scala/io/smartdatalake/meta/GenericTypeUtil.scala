@@ -49,7 +49,6 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   typeOf[HttpAuthMode],
     typeOf[ValidationRule],
     typeOf[SaveModeOptions],
-    typeOf[CustomDfTransformerConfig],
     typeOf[Expectation]
   )
 

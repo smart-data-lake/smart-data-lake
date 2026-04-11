@@ -25,7 +25,6 @@ import io.smartdatalake.definitions.{Condition, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
