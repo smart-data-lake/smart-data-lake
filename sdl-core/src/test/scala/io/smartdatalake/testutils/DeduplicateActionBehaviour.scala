@@ -27,6 +27,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, CanWriteDataFrame, TableDataObject, TransactionalTableDataObject}
