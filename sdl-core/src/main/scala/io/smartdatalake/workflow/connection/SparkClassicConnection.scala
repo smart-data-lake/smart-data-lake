@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.connection
 
 import com.typesafe.config.Config
-import io.smartdatalake.app.AppUtil.{MDC_SDLB_PROPERTIES, createMaskedSecretsKVLog, logger}
+import io.smartdatalake.app.AppUtil.{MDC_SDLB_PROPERTIES, createMaskedSecretsKVLog}
 import io.smartdatalake.app.ModulePlugin
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
@@ -102,7 +102,7 @@ case class SparkClassicConnection(
     // get global hadoop options
     val hadoopOptions = context.globalConfig.hadoopOptions.map(_.map { case (k, v) => (s"spark.hadoop.$k", v) }.toMap).getOrElse(Map())
     Seq(moduleOptions, executorPluginOptions, caseSensitivityOptions).reduceOption(mergeSparkOptions).map(
-      _.mapValues(StringOrSecret).toMap
+      _.view.mapValues(StringOrSecret).toMap
     ).getOrElse(Map()) ++ hadoopOptions
   }
 
@@ -249,7 +249,7 @@ object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDa
     def optionalEnableHive(enable: Boolean): SparkSession.Builder =
       if (enable) builder.enableHiveSupport()
       else builder
-    def optionalExtension(extension: Option[(SparkSessionExtensions => Unit)]): SparkSession.Builder =
+    def optionalExtension(extension: Option[SparkSessionExtensions => Unit]): SparkSession.Builder =
       extension.map(e => builder.withExtensions(e)).getOrElse(builder)
   }
 

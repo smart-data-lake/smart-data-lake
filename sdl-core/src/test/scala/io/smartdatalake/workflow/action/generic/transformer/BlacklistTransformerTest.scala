@@ -34,7 +34,7 @@ class BlacklistTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("only columns where the names match are removed") {
@@ -64,7 +64,7 @@ class BlacklistTransformerTest extends AnyFunSuite {
   test("column blacklisting is case sensitive if Environment.caseSensitive=true") {
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
     val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("ColumN1"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "ColumN1"))

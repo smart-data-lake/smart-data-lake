@@ -20,8 +20,8 @@
 package io.smartdatalake.util.azure
 
 import io.smartdatalake.app.StateListener
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.util.misc.ProductUtil.attributesWithValuesForCaseClass
 import io.smartdatalake.util.misc.ScalaUtil.{optionalizeMap, optionalizeSeq}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -52,7 +52,7 @@ import java.time.LocalDateTime
  */
 class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListener with SmartDataLakeLogger {
 
-  val includeMetadata = options.get("includeMetadata").map(_.resolve().toBoolean).getOrElse(false)
+  private val includeMetadata = options.get("includeMetadata").exists(_.resolve().toBoolean)
   val batchSize = 100 // azure log analytics' limit
 
   val backend: LogAnalyticsBackend[StateLogEvent] = if (options.isDefinedAt("workspaceId")) {
@@ -95,7 +95,7 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
     val results = runtimeInfo.results.map {
       result =>
         val metadata = instanceRegistry.get[DataObject](result.dataObjectId).metadata
-        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").mapValues(_.toString).toMap
+        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").view.mapValues(_.toString).toMap
         else Map()
         val dataObjectsState = runtimeInfo.dataObjectsState.find(_.dataObjectId == result.dataObjectId).map(_.state)
         StateLogEvent(logContext, actionId.id, runtimeInfo.state.toString, runtimeInfo.msg,
@@ -133,4 +133,3 @@ object StateLogEventContext {
 }
 
 case class StateLogEvent(context: StateLogEventContext, actionId: String, state: String, msg: Option[String], dataObjectId: Option[String] = None, metadata: Option[Map[String, String]] = None, metrics: Option[Map[String, Any]] = None, partitionValues: Option[Seq[String]] = None, dataObjectsState: Option[String] = None)
-

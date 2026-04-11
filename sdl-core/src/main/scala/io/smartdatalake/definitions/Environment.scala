@@ -23,7 +23,6 @@ import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
 import io.smartdatalake.util.misc._
-import org.apache.spark.sql.SparkSession
 import org.slf4j.event.Level
 
 import java.net.URI
@@ -123,8 +122,7 @@ object Environment extends SmartDataLakeLogger {
   def hdfsAclsLimitToBasedir: Boolean = {
     if (_hdfsAclsLimitToBasedir.isEmpty) {
       _hdfsAclsLimitToBasedir = Some(
-        EnvironmentUtil.getSdlParameter("hdfsAclsLimitToBasedir")
-         .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("hdfsAclsLimitToBasedir").forall(_.toBoolean)
       )
     }
     _hdfsAclsLimitToBasedir.get
@@ -181,8 +179,7 @@ object Environment extends SmartDataLakeLogger {
   def enableCheckConfigDuplicates: Boolean = {
     if (_enableCheckConfigDuplicates.isEmpty) {
       _enableCheckConfigDuplicates = Some(
-        EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates").forall(_.toBoolean)
       )
     }
     _enableCheckConfigDuplicates.get
@@ -197,8 +194,7 @@ object Environment extends SmartDataLakeLogger {
   def schemaEvolutionNewColumnsLast: Boolean = {
     if (_schemaEvolutionNewColumnsLast.isEmpty) {
       _schemaEvolutionNewColumnsLast = Some(
-        EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast").forall(_.toBoolean)
       )
     }
     _schemaEvolutionNewColumnsLast.get
@@ -212,8 +208,7 @@ object Environment extends SmartDataLakeLogger {
   def schemaValidationIgnoresNullability: Boolean = {
     if (_schemaValidationIgnoresNullability.isEmpty) {
       _schemaValidationIgnoresNullability = Some(
-        EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability").forall(_.toBoolean)
       )
     }
     _schemaValidationIgnoresNullability.get
@@ -232,8 +227,7 @@ object Environment extends SmartDataLakeLogger {
   def schemaValidationDeepComarison: Boolean = {
     if (_schemaValidationDeepComarison.isEmpty) {
       _schemaValidationDeepComarison = Some(
-        EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison").forall(_.toBoolean)
       )
     }
     _schemaValidationDeepComarison.get
@@ -246,8 +240,7 @@ object Environment extends SmartDataLakeLogger {
   def enableAutomaticDataFrameCaching: Boolean = {
     if (_enableAutomaticDataFrameCaching.isEmpty) {
       _enableAutomaticDataFrameCaching = Some(
-        EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching").forall(_.toBoolean)
       )
     }
     _enableAutomaticDataFrameCaching.get
@@ -259,7 +252,7 @@ object Environment extends SmartDataLakeLogger {
    */
   def enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
     EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
-      .map(_.toBoolean).getOrElse(false)
+      .exists(_.toBoolean)
   }
 
   /**
@@ -284,8 +277,7 @@ object Environment extends SmartDataLakeLogger {
   def simplifyFinalExceptionLog: Boolean = {
     if (_simplifyFinalExceptionLog.isEmpty) {
       _simplifyFinalExceptionLog = Some(
-        EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog").forall(_.toBoolean)
       )
     }
     _simplifyFinalExceptionLog.get
@@ -303,7 +295,7 @@ object Environment extends SmartDataLakeLogger {
     if (_includeDAGResultExceptionInLog.isEmpty) {
       _includeDAGResultExceptionInLog = Some(
         EnvironmentUtil.getSdlParameter("includeDAGResultExceptionInLog")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _includeDAGResultExceptionInLog.get
@@ -334,8 +326,7 @@ object Environment extends SmartDataLakeLogger {
   def replaceSqlTransformersOldTempViewName: Boolean = {
     if (_replaceSqlTransformersOldTempViewName.isEmpty) {
       _replaceSqlTransformersOldTempViewName = Some(
-        EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName").forall(_.toBoolean)
       )
     }
     _replaceSqlTransformersOldTempViewName.get
@@ -347,11 +338,11 @@ object Environment extends SmartDataLakeLogger {
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is disabled by default, as it might have performance impact if file size is big. It can be enabled on demand by setting the corresponding java property or environment variable.
    */
-  def updateSparkFileDataObjectSampleDataFile: Boolean = {
+  def updateSparkFileDataObjectSampleDataFile(): Boolean = {
     if (_updateSparkFileDataObjectSampleDataFile.isEmpty) {
       _updateSparkFileDataObjectSampleDataFile = Some(
         EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSampleDataFile")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _updateSparkFileDataObjectSampleDataFile.get
@@ -365,8 +356,7 @@ object Environment extends SmartDataLakeLogger {
   def enableSparkFileDataObjectNoDataCheck: Boolean = {
     if (_enableSparkFileDataObjectNoDataCheck.isEmpty) {
       _enableSparkFileDataObjectNoDataCheck = Some(
-        EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck").forall(_.toBoolean)
       )
     }
     _enableSparkFileDataObjectNoDataCheck.get
@@ -381,8 +371,7 @@ object Environment extends SmartDataLakeLogger {
   def enableSparkPlanNoDataCheck: Boolean = {
     if (_enableSparkPlanNoDataCheck.isEmpty) {
       _enableSparkPlanNoDataCheck = Some(
-        EnvironmentUtil.getSdlParameter("enableSparkPlanNoDataCheck")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableSparkPlanNoDataCheck").forall(_.toBoolean)
       )
     }
     _enableSparkPlanNoDataCheck.get
@@ -396,8 +385,7 @@ object Environment extends SmartDataLakeLogger {
   def enableInputDataObjectCount: Boolean = {
     if (_enableInputDataObjectCount.isEmpty) {
       _enableInputDataObjectCount = Some(
-        EnvironmentUtil.getSdlParameter("enableInputDataObjectCount")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableInputDataObjectCount").forall(_.toBoolean)
       )
     }
     _enableInputDataObjectCount.get
@@ -423,11 +411,10 @@ object Environment extends SmartDataLakeLogger {
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is enabled by default, as it has not big impact on performance.
    */
-  def updateSparkFileDataObjectSchemaFile: Boolean = {
+  def updateSparkFileDataObjectSchemaFile(): Boolean = {
     if (_updateSparkFileDataObjectSchemaFile.isEmpty) {
       _updateSparkFileDataObjectSchemaFile = Some(
-        EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile").forall(_.toBoolean)
       )
     }
     _updateSparkFileDataObjectSchemaFile.get
@@ -442,7 +429,7 @@ object Environment extends SmartDataLakeLogger {
     if (_parseSchemaFilesLazy.isEmpty) {
       _parseSchemaFilesLazy = Some(
         EnvironmentUtil.getSdlParameter("parseSchemaFilesLazy")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _parseSchemaFilesLazy.get
@@ -457,7 +444,7 @@ object Environment extends SmartDataLakeLogger {
     if (_compileScalaCodeLazy.isEmpty) {
       _compileScalaCodeLazy = Some(
         EnvironmentUtil.getSdlParameter("compileScalaCodeLazy")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _compileScalaCodeLazy.get
@@ -493,8 +480,7 @@ object Environment extends SmartDataLakeLogger {
   def failSimulationOnMissingInputSubFeeds: Boolean = {
     if (_failSimulationOnMissingInputSubFeeds.isEmpty) {
       _failSimulationOnMissingInputSubFeeds = Some(
-        EnvironmentUtil.getSdlParameter("failSimulationOnMissingInputSubFeeds")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("failSimulationOnMissingInputSubFeeds").forall(_.toBoolean)
       )
     }
     _failSimulationOnMissingInputSubFeeds.get
@@ -635,7 +621,7 @@ object Environment extends SmartDataLakeLogger {
       "path", "table.name"
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
-  val runIdPartitionColumnName = "run_id"
+  val runIdPartitionColumnName: String = "run_id"
 
 
   // instantiate sdl plugins if configured. The class names must be separated by a comma.

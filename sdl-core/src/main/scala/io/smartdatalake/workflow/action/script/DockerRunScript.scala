@@ -57,8 +57,8 @@ case class DockerRunScript(override val name: String = "docker-run", override va
     val localDataDirToMountAbsolut = localDataDirToMount.map(d => if (!Paths.get(d).isAbsolute) s"$workDir/$d" else d)
     val localDataDirToMountParameters = localDataDirToMountAbsolut.map(d => Seq("-v", s"${preparePath(d)}:$containerDataDir")).getOrElse(Seq())
     // prepare parameters
-    val dockerParameters = parameters.filterKeys(_.startsWith("dockerParam")).toSeq.sortBy(_._1).map(_._2) ++ localDataDirToMountParameters
-    val runParameters = parameters.filterKeys(_.startsWith("runParam")).toSeq.sortBy(_._1).map(_._2)
+    val dockerParameters = parameters.view.filterKeys(_.startsWith("dockerParam")).toSeq.sortBy(_._1).map(_._2) ++ localDataDirToMountParameters
+    val runParameters = parameters.view.filterKeys(_.startsWith("runParam")).toSeq.sortBy(_._1).map(_._2)
     // cmd must be split for windows but not for linux
     val cmd = if (EnvironmentUtil.isWindowsOS) Seq("cmd", "/C") ++ CmdScript.splitCmdParameters(winDockerCmd)
     else CmdScript.splitCmdParameters(linuxDockerCmd)

@@ -48,7 +48,7 @@ case class CmdScript(override val name: String = "cmd", override val description
   if (!EnvironmentUtil.isWindowsOS) assert(linuxCmd.isDefined, s"($name) linuxCmd must be defined when running on Linux")
 
   override private[smartdatalake] def getCmd(parameters: Map[String,String]): Seq[String] = {
-    val cmdParams = parameters.filterKeys(_.startsWith("param")).toSeq.sortBy(_._1).map(_._2)
+    val cmdParams = parameters.view.filterKeys(_.startsWith("param")).toSeq.sortBy(_._1).map(_._2)
     val cmd = if (EnvironmentUtil.isWindowsOS) {
       val cmdElements = if (isWslCmd) CmdScript.splitCmdParameters(winCmd.get).map(e => if (e.matches(raw"^(\.|([A-Z]:)?)\\.*")) preparePath(e) else e)
         else CmdScript.splitCmdParameters(winCmd.get)

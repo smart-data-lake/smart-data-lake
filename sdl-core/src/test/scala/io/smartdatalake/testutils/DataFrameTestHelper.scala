@@ -20,17 +20,18 @@
 package io.smartdatalake.testutils
 
 import io.circe.yaml
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.{col, count, to_timestamp}
+import org.apache.spark.sql.functions.{col, to_timestamp}
 import org.apache.spark.sql.types._
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.language.implicitConversions
 
-object DataFrameTestHelper {
+object DataFrameTestHelper extends Equality {
 
   val ts: String => TypedValue = formattedTimeStamp => TypedValue(formattedTimeStamp, TimestampType)
   val str: String => TypedValue = str => TypedValue(str, StringType)
@@ -169,115 +170,15 @@ object DataFrameTestHelper {
     case _ => throw new Exception("Unable to convert to TypedValue")
   }
 
-  /**
-   *
-   * Check that two DataFrames are equal. This includes
-   *  - the schema is equal
-   *  - the content is equal
-   *
-   * @param dfExpected        the expected dataframe
-   * @param dfActual          the actual dataframe
-   * @param ignoreColumnOrder whether or not to ignore the order of columns
-   * @param ignoreNullability whether or not to ignore nullability of fields
-   * @return whether or not the dataframes are equal
-   */
-  def assertDataFramesEqual(dfExpected: DataFrame, dfActual: DataFrame, ignoreColumnOrder: Boolean = true, ignoreNullability: Boolean = true): Unit = {
-    require(dfExpected != null && dfActual != null, "DFs must not be null")
-
-    // check columns, if they do not match, we can return here
-    val sameColumns = dfExpected.columns.toSeq.sorted == dfActual.columns.toSeq.sorted
-    if (!sameColumns) {
-      val colsLeftButNotRight = (dfExpected.columns.toSet -- dfActual.columns.toSet).mkString("\n")
-      assert(colsLeftButNotRight.isEmpty, s"These columns are only present in the expected DataFrame: \n$colsLeftButNotRight")
-      val colsRightButNotLeft = (dfActual.columns.toSet intersect dfExpected.columns.toSet).mkString("\n")
-      assert(colsRightButNotLeft.isEmpty, s"These columns are only present in the actual DataFrame: \n$colsRightButNotLeft")
-    }
-
-    // compare schema
-    val (expectedPrime, actualPrime) = if (ignoreColumnOrder) {
-      (dfExpected, dfActual.select(dfExpected.columns.map(col): _*))
-    } else {
-      (dfExpected, dfActual)
-    }
-
-    assertSchemasEqual(expectedPrime.schema, actualPrime.schema, ignoreNullability)
-
-    // now compare data
-    val expectedPrimeCount = expectedPrime.groupBy(expectedPrime.columns.map(col): _*).agg(count("*").as("rowcount"))
-    val actualPrimeCount = actualPrime.groupBy(actualPrime.columns.map(col): _*).agg(count("*").as("rowcount"))
-    val (expectedMinusActual, actualMinusExpected) = symmetricDifference(expectedPrimeCount, actualPrimeCount)
-    val sameData = expectedMinusActual.count() == 0 && actualMinusExpected.count() == 0
-
-    if (!sameData) {
-      val messageRows =
-        s"""
-        non-equal rows
-        rows which appear in expected but not in actual:
-        ${DatasetHelper.showString(expectedMinusActual, 100)}
-        rows which appear in actual but not in expected:
-        ${DatasetHelper.showString(actualMinusExpected, 100)}
-      """
-
-      // compute difference at column-level. This is tricky because the equality of rows involve all columns
-      // What we can do is to take the rows which show a difference at row-level, and check whether we have columns
-      // which do not appear in the other df
-      val colsToCheck = expectedMinusActual.columns
-      val colsWhichDiff = colsToCheck.filter { c =>
-        val (lmr, rml) = symmetricDifference(expectedMinusActual, actualMinusExpected, col(c))
-        lmr.union(rml).count() > 0 // col diffs
-      }
-      val messageColumns = if (colsWhichDiff.nonEmpty) s"The difference is probably in columns : ${colsWhichDiff.mkString(",")}" else ""
-      assert(assertion = false, Seq(messageRows, messageColumns).filter(message => message.nonEmpty).mkString("\n"))
-    }
-  }
-
-  def assertDataFramesEqualGeneric(dfExpected: GenericDataFrame, dfActual: GenericDataFrame, ignoreColumnOrder: Boolean = true, ignoreNullability: Boolean = true): Unit = {
+  def assertDataFramesEqualGeneric(dfExpected: GenericDataFrame,
+                                   dfActual: GenericDataFrame,
+                                   ignoreColumnOrder: Boolean = true,
+                                   ignoreNullability: Boolean = true)
+                                  (implicit logger: Logger): Unit = {
     (dfExpected, dfActual) match {
-      case (dfExpected: SparkDataFrame, dfActual: SparkDataFrame) => assertDataFramesEqual(dfExpected.inner, dfActual.inner, ignoreColumnOrder, ignoreNullability)
+      case (dfExpected: SparkDataFrame, dfActual: SparkDataFrame) =>
+        assert(dfExpected.inner.equal(dfActual.inner, ignoreColumnOrder, ignoreNullability))
     }
-  }
-
-  def assertSchemasEqual(expected: StructType, actual: StructType, ignoreNullability: Boolean = false): Unit = {
-    val sameSchema = if (ignoreNullability) {
-      // in this case we can compare the simple-string which does include types, but
-      // not nullability. This is easier than traversing the schema recursively.
-      val expectedSimpleSchema = expected.simpleString
-      val actualSimpleSchema = actual.simpleString
-      expectedSimpleSchema == actualSimpleSchema
-    } else {
-      // compare full schema
-      expected == actual
-    }
-
-    if (!sameSchema) {
-      val differentTypes = expected.toSet.diff(actual.toSet)
-      val differentTypesString = differentTypes.map(structType => {
-        val treeStringExpected = StructType(expected.fields.filter(_.name == structType.name)).treeString
-        val treeStringActual = StructType(actual.fields.filter(_.name == structType.name)).treeString
-        s"""
-           |- Column: ${structType.name}
-           |  Expected type:
-           |  ${treeStringExpected.linesIterator.drop(1).mkString(System.lineSeparator() + "  ")}
-           |  Actual type:
-           |  ${treeStringActual.linesIterator.drop(1).mkString(System.lineSeparator() + "  ")}
-        """.stripMargin.trim
-      }).mkString("\n")
-      assert(differentTypes.isEmpty, "Actual schema differs from expected schema:\n" + differentTypesString)
-    }
-  }
-
-  /**
-   * Computes the non-equal rows of 2 dataframes, must have same number of columns
-   *
-   * @param df1     A DataFrame to compare
-   * @param df2     A DataFrame to compare
-   * @param columns the columns to include in the check, if none are given, take all columns
-   * @return (rows from df1 not in df2, rows from df2 not in df1)
-   */
-  private def symmetricDifference(df1: DataFrame, df2: DataFrame, columns: Column*) = {
-    assert(df1.columns.sameElements(df2.columns), "dfs have not same columns")
-    val colsToSelect = if (columns.isEmpty) df1.columns.map(col).toSeq else columns
-    (df1.select(colsToSelect: _*).except(df2.select(colsToSelect: _*)), df2.select(colsToSelect: _*).except(df1.select(colsToSelect: _*)))
   }
 
   case class TypedValue(value: Any, dataType: DataType)

@@ -79,7 +79,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val appName = "sdlb-normal"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
@@ -146,7 +146,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
       val runState = stateStore.recoverRunState(stateId)
       assert(runState.runId >= 3)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues.isEmpty)
@@ -159,8 +159,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val appName = "sdlb-streaming"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
@@ -254,7 +254,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
       // only one SDL run executed (streaming action is asynchronous)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.executionId, s.state)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.executionId, s.state)).toMap
       val expectedActionsState = Map((action1.id, (SDLExecutionId(1), RuntimeEventState.SUCCEEDED))) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
       assert(resultActionsState == expectedActionsState)
       assert(getFirstMetrics(runState.actionsState(action1.id))("records_written") == 1)
@@ -267,8 +267,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val appName = "sdlb-streaming2"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
@@ -349,8 +349,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val appName = "sdlb-streaming3"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
@@ -444,7 +444,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val feedName = "test"
 
     HdfsUtil.deleteFiles(new Path(tempPath), doWarn = false)
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
@@ -516,8 +516,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val appName = "sdlb-streaming5"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
@@ -603,8 +603,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
     val appName = "sdlb-streaming6"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), doWarn = false)
     implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 

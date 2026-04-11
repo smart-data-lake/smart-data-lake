@@ -160,7 +160,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // schema evolution sorts newDf according to oldDf
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
-    assert(oldEvoDf.columns.toSeq == newEvoDf.columns.toSeq)
+    assert(oldEvoDf.columns == newEvoDf.columns)
   }
 
   test("New columns: new column exists in addition to existing columns") {
@@ -249,7 +249,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
     )
     val colSortedDf = SchemaEvolution.sortColumns(df, order)
 
-    assert(colSortedDf.columns.map(c => c).toSeq == order)
+    assert(colSortedDf.columns.map(c => c) == order)
   }
 
   test("DataFrame with same column names but different datatypes are recognized") {
@@ -461,8 +461,8 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf))
 
     val tgtColOrder = Seq("a","b","c","d")
-    assert(oldEvoDf.columns.toSeq == tgtColOrder ++ colsToIgnore)
-    assert(newEvoDf.columns.toSeq == tgtColOrder)
+    assert(oldEvoDf.columns == tgtColOrder ++ colsToIgnore)
+    assert(newEvoDf.columns == tgtColOrder)
   }
 
   test("New column in struct type") {
@@ -553,7 +553,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(
@@ -603,11 +603,11 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // schema evolution sorts newDf according to oldDf
     val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = Environment.caseSensitive)
-    assert(oldEvoDf.columns.toSeq == newEvoDf.columns.toSeq)
+    assert(oldEvoDf.columns == newEvoDf.columns)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
 
@@ -615,7 +615,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(
@@ -670,14 +670,14 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: DataFrame columns should be sorted in a specific order") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schema = StructType(List(
@@ -711,18 +711,18 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
     )
     val colSortedDf = SchemaEvolution.sortColumns(df, order, Environment.caseSensitive)
 
-    assert(colSortedDf.columns.map(c => c).toSeq == order)
+    assert(colSortedDf.columns.map(c => c) == order)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: DataFrame with same column names but different datatypes are recognized") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(
@@ -758,14 +758,14 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: Column dropped: dropped column still used but with empty values and ignored according to config") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(
@@ -815,7 +815,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
 
   }
 
@@ -823,7 +823,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     // column renamed?
@@ -871,14 +871,14 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: New columns and technical cols to ignore") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(
@@ -923,14 +923,14 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: Numerical columns can be cast to String") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(
@@ -957,7 +957,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
 
   }
 
@@ -965,7 +965,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(StructField("A", StringType), StructField("b", IntegerType), StructField("C", IntegerType), StructField("dl_ts_captured", TimestampType), StructField("dl_ts_delimited", TimestampType)))
@@ -979,12 +979,12 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
     assert(!SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, Environment.caseSensitive))
 
     val tgtColOrder = Seq("A", "b", "C", "d")
-    assert(oldEvoDf.columns.toSeq == tgtColOrder ++ colsToIgnore)
-    assert(newEvoDf.columns.toSeq == tgtColOrder)
+    assert(oldEvoDf.columns == tgtColOrder ++ colsToIgnore)
+    assert(newEvoDf.columns == tgtColOrder)
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
 
   }
 
@@ -992,7 +992,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType))))))
@@ -1012,14 +1012,14 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: Changed data type in struct type") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(StructField("A", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("B2", IntegerType))))))
@@ -1037,14 +1037,14 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("CaseSensitive: Changed data type of array type") {
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(StructField("a", StringType), StructField("B", ArrayType(FloatType))))
@@ -1062,7 +1062,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
 
   }
 
@@ -1070,7 +1070,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(StructField("A", StringType), StructField("B", ArrayType(StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType)))))))
@@ -1088,7 +1088,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
 
   }
 
@@ -1096,7 +1096,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // Prepare case sensitivity
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
 
     val schemaOld = StructType(List(StructField("a", StringType), StructField("B", ArrayType(StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType), StructField("B3", IntegerType)))))))
@@ -1114,7 +1114,7 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
     // clean up case sensitivity
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
 
   }
 

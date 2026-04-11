@@ -25,7 +25,7 @@ import scala.collection.SortedSet
 
 object MetricsUtil {
   def orderMetrics(metrics: MetricsMap, orderedKeys: SortedSet[String] = SortedSet()): Seq[(String,Any)] = {
-    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.filterKeys(!orderedKeys.contains(_)).toSeq.sortBy(_._1)
+    orderedKeys.toSeq.flatMap(k => metrics.get(k).map(v => (k,v))) ++ metrics.view.filterKeys(!orderedKeys.contains(_)).toMap.toSeq.sortBy(_._1)
   }
 
   def orderMetricsDefault(metrics: MetricsMap): Seq[(String,Any)] = {

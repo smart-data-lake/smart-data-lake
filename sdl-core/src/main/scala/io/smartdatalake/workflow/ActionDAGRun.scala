@@ -153,14 +153,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   }
 
   private def unionDuplicateSubFeeds(subFeeds: Seq[SubFeed], actionId: ActionId)(implicit context: ActionPipelineContext): Seq[SubFeed] = {
-    subFeeds.groupBy(_.dataObjectId).mapValues {
+    subFeeds.groupBy(_.dataObjectId).view.mapValues {
       subFeeds =>
         if (subFeeds.size > 1) {
           logger.info(s"($actionId) Creating union of multiple SubFeeds as input for ${subFeeds.head.dataObjectId}")
           // start with !skipped subFeeds to use more specific union function.
           subFeeds.sortBy(_.isSkipped).reverse.reduce((s1, s2) => s1.union(s2))
         } else subFeeds.head
-    }.values.toSeq
+    }.toMap.values.toSeq
   }
 
   def exec(context: ActionPipelineContext): Seq[SubFeed] = {
@@ -294,7 +294,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    * Get Action count per RuntimeEventState
    */
   def getStatistics: Map[RuntimeEventState, Int] = {
-    getRuntimeInfos.map(_._2.state).groupBy(identity).mapValues(_.size).toMap
+    getRuntimeInfos.map(_._2.state).groupBy(identity).view.mapValues(_.size).toMap
   }
 
   /**
@@ -335,12 +335,12 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
     // this can be created by combining input and output ids between actions
     val nodeInputs = actions.map(action => (action.id, action.inputs.map(_.id)))
     val outputsToNodeMap = actions.flatMap(action => action.outputs.map(output => (output.id, action.id)))
-      .groupBy(_._1).mapValues(_.map(_._2))
+      .groupBy(_._1).view.mapValues(_.map(_._2)).toMap
     val allEdges = nodeInputs.flatMap { case (nodeIdTo, inputIds) => inputIds.flatMap(inputId => outputsToNodeMap.getOrElse(inputId, Seq()).map(action => (Some(action), nodeIdTo, inputId))) } ++
       nodeInputs.flatMap { case (nodeIdTo, inputIds) => inputIds.filter(inputId => !outputsToNodeMap.contains(inputId)).map(inputId => (None, nodeIdTo, inputId)) }
 
     // test
-    val duplicateEdges = allEdges.groupBy(identity).mapValues(_.size).filter(_._2 > 1).keys
+    val duplicateEdges = allEdges.groupBy(identity).view.mapValues(_.size).toMap.filter(_._2 > 1).keys
     assert(duplicateEdges.isEmpty, s"Duplicate edges found: $duplicateEdges")
 
     // create init node from input edges
@@ -371,7 +371,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // log ascii dag if max line length is small enough
     val dagString = dag.render(nodeToString)
-    if (LogUtil.splitLines(dagString).map(_.size).max <= Environment.dagGraphLogMaxLineLength) {
+    if (LogUtil.splitLines(dagString).map(_.length).max <= Environment.dagGraphLogMaxLineLength) {
       logger.info(s"$msg:\n$dagString\n")
     } else {
       logger.info(s"$msg:\n ${dag.sortedNodes.map(nodeToString).mkString("\n ")}\n")

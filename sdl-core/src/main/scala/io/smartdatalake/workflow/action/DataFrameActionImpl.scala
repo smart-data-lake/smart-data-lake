@@ -19,7 +19,7 @@
 
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry, TypeMismatchException}
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.TaskFailedException
@@ -30,19 +30,16 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.SparkStreamingMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
-import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkObservation, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation, ExpectationScope}
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, ExpectationValidation, SchemaValidation, TableDataObject, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateStreamingDataFrame, SparkFileDataObject}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{StreamingQuery, Trigger}
 
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
@@ -137,7 +134,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     ScalaUtil.companionOf[DataFrameSubFeedCompanion](subFeedType)
   }
 
-  private[smartdatalake] override def subFeedConverter(): SubFeedConverter[DataFrameSubFeed] = subFeedHelper
+  private[smartdatalake] override def subFeedConverter: SubFeedConverter[DataFrameSubFeed] = subFeedHelper
 
   override def getRuntimeDataImpl: RuntimeData = {
     // override runtime data implementation for SparkStreamingMode
@@ -435,7 +432,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       })
     // calculate metrics on input DataObject
     val inputAggColumns = actionExpectationsInputAggColumns
-      .groupBy(_._1).mapValues(_.map(_._2)).toMap
+      .groupBy(_._1).view.mapValues(_.map(_._2)).toMap
     inputAggColumns.flatMap { case (dataObjectId, aggExpressions) =>
       val dataObject = inputMap(dataObjectId) match {
         case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame => evDataObject
@@ -450,7 +447,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val mainInputIdSuffix = s"#${prioritizedMainInputCandidates.head.id.id}"
     // copy all metrics with name `<metric>#<dataObjectId>` as `<metric>#mainInput`
     metrics ++
-      metrics.filterKeys(_.endsWith(mainInputIdSuffix))
+      metrics.view.filterKeys(_.endsWith(mainInputIdSuffix)).toMap
         .map { case (k, v) => k.stripSuffix(mainInputIdSuffix) + "#mainInput" -> v }
   }
 

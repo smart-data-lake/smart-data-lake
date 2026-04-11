@@ -69,7 +69,7 @@ private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFr
     if (metricsRow.isDefined) {
       // convert results to metrics map
       dfObservations.schema.columns.zip(metricsRow.get.toSeq).toMap
-        .mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
+        .view.mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
     } else Map()
   }
 }

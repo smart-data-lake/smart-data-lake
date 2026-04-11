@@ -83,7 +83,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
 
   override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ excelOptions.toMap(schema).filter {
       case (_, v) => v.isDefined
-  }.mapValues(_.get.toString).toMap.map(identity) // make serializable
+  }.view.mapValues(_.get.toString).toMap.map(identity) // make serializable
 
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.afterRead(df)

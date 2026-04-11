@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -50,7 +50,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   override lazy val transformerSubFeedType: Option[Type] = {
     val transformerTypeStats = transformerSubFeedSupportedTypes
       .filterNot(_ =:= typeOf[DataFrameSubFeed]) // ignore generic transformers
-      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._2)
+      .groupBy(identity).view.mapValues(_.size).toMap.toSeq.sortBy(_._2)
     assert(transformerTypeStats.size <= 1, s"($id) No common transformer subFeedType type found: ${transformerTypeStats.map { case (tpe, cnt) => s"${tpe.typeSymbol.name}: $cnt" }.mkString(",")}")
     transformerTypeStats.map(_._1).headOption
   }

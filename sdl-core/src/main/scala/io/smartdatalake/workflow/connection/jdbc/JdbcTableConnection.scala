@@ -34,6 +34,7 @@ import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.StructType
+
 import java.sql.{DatabaseMetaData, DriverManager, ResultSet, Connection => SqlConnection}
 
 /**
@@ -70,8 +71,6 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                connectionPoolMaxIdleTimeSec: Option[Int] = None,
                                @Deprecated @deprecated("Use connectionPool.maxWaitTimeSec instead.", "2.6.1")
                                connectionPoolMaxWaitTimeSec: Option[Int] = None,
-                               @Deprecated @deprecated("Enabling autoCommit is no longer recommended.", "2.5.0")
-                               override val autoCommit: Boolean = false,
                                connectionInitSql: Option[String] = None,
                                directTableOverwrite: Boolean = false,
                                connectionPool: ConnectionPoolConfig = ConnectionPoolConfig(),
@@ -87,7 +86,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
   // setup connection pool
   override val pool: GenericObjectPool[SqlConnection] = connectionPool
     .withOverride(connectionPoolMaxIdleTimeSec, connectionPoolMaxWaitTimeSec)
-    .create(maxParallelConnections, getConnection _, connectionInitSql, autoCommit)
+    .create(maxParallelConnections, getConnection _, connectionInitSql)
   override val jdbcDialect: JdbcDialect = JdbcDialects.get(url)
 
   def test(): Unit = {
@@ -158,7 +157,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
   // and not having to adapt the Query for different DBs.
   def getJdbcPrimaryKey(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
     val (catalog, schema) = (catalogOption.getOrElse(""), schemaOption.getOrElse(""))
-    var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
+    val resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
     this.catalog.handlePrimaryKeyResultSet(resultSet)
   }
 

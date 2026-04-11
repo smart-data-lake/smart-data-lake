@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
 import io.smartdatalake.workflow.dataobject.generic.Table
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
 
 class SQLDfsTransformerTest extends AnyFunSuite {
@@ -35,7 +35,7 @@ class SQLDfsTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   val con1 = JdbcTableConnection("con1", url = "123", driver = "driver") // dummy
@@ -52,7 +52,7 @@ class SQLDfsTransformerTest extends AnyFunSuite {
   val action1 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id))
   instanceRegistry.register(action1)
 
-  val emptyDf = Seq((1,"a")).toDF("num","str")
+  val emptyDf: DataFrame = Seq((1,"a")).toDF("num","str")
 
   test("options and view name token are replaced and sql can be parsed") {
     val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select %{inputViewName_src1}.num, %{option1} from %{inputViewName_src1}"))

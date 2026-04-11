@@ -96,7 +96,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
   private[spark] def extractMetrics(): Map[String, _] = {
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
     val filteredMetrics = metrics.getOrElse(Map())
-      .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
+      .view.filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
     filteredMetrics.flatMap { case (metricName, r) =>
       val namePostfix = if (metricName != name) {
         Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))

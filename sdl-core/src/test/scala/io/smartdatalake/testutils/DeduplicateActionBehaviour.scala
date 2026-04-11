@@ -246,7 +246,7 @@ trait DeduplicateActionBehaviour {
       .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2, ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
 
     // the expected result is the final passed value with a captured column
-    val dfExpected = Seq((1, "B", 200, ts("2020-08-16 10:00")))
+    val dfExpected: GenericDataFrame = Seq((1, "B", 200, ts("2020-08-16 10:00")))
       .toDF(colId, colValueOld, colValueNew, Environment.capturedColumnName)
 
     assertDataFramesEqualGeneric(dfExpected, dfResult2)

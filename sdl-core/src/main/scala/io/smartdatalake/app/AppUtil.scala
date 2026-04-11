@@ -23,7 +23,6 @@ import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.spark.SparkEnv
 import org.apache.spark.util.ChildFirstURLClassLoader
 import org.slf4j.MDC
 
@@ -61,11 +60,11 @@ object AppUtil extends SmartDataLakeLogger {
         // add urls on this level to accumulator
         clazz.asInstanceOf[URLClassLoader].getURLs
         .map( url => (url.getFile.split('/').last, url))
-        .filter{ case (name, url) => jars.contains(name)}
+        .filter{ case (name, _) => jars.contains(name)}
         .toMap
 
       // check if any jars without URL are left
-      val jarMissing = jars.exists(jar => urlsAcc.get(jar).isEmpty)
+      val jarMissing = jars.exists(jar => !urlsAcc.contains(jar))
       // return accumulated if there is no parent left or no jars are missing anymore
       if (clazz.getParent == null || !jarMissing) urlsAcc else collectUrls(clazz.getParent, urlsAcc)
     }
@@ -74,7 +73,7 @@ object AppUtil extends SmartDataLakeLogger {
     val urlsMap = collectUrls(initialLoader, Map())
 
     // check if everything found
-    val jarsNotFound = jars.filter( jar => urlsMap.get(jar).isEmpty)
+    val jarsNotFound = jars.filter( jar => !urlsMap.contains(jar))
     if (jarsNotFound.nonEmpty) {
       logger.info(s"""available jars are ${initialLoader.getURLs.mkString(", ")} (not including parent classpaths)""")
       throw ConfigurationException(s"""jars ${jarsNotFound.mkString(", ")} not found in parent class loaders classpath. Cannot initialize ChildFirstURLClassLoader.""")

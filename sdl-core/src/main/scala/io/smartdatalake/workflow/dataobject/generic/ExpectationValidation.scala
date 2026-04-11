@@ -27,9 +27,9 @@ import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRul
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.ExpectationScope
 import io.smartdatalake.workflow.dataobject.expectation._
-import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation.defaultExpectations
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -88,11 +88,11 @@ private[smartdatalake] trait ExpectationValidation {
       val forceGenericObservationCons = forceGenericObservation || jobExpectations.exists(!_.calculateAsJobDataFrameObservation)
       val normalAggColumns = defaultAggColumns ++ (if (!forceGenericObservationCons) jobAggColumns else Seq())
       val forceGenericAggColumns = if (forceGenericObservationCons) jobAggColumns else Seq()
-      val (dfObserved, normalObservation) = setupObservation(dfConstraints, normalAggColumns, context.isExecPhase, pushDownTolerant, forceGenericObservation = false)
+      val (dfObserved, normalObservation) = setupObservation(dfConstraints, normalAggColumns, context.isExecPhase, pushDownTolerant)
       val genericObservation = if (forceGenericAggColumns.nonEmpty) Some(setupObservation(dfConstraints, forceGenericAggColumns, context.isExecPhase, pushDownTolerant, forceGenericObservation = true)._2) else None
       // if there are now two GenericCalculatedObservations, combine them to avoid duplicate query execution
       val observations = (normalObservation, genericObservation) match {
-        case (o1: GenericCalculatedObservation, Some(o2: GenericCalculatedObservation)) => Seq(GenericCalculatedObservation(o1.df, (o1.aggregateColumns ++ o2.aggregateColumns): _*))
+        case (o1: GenericCalculatedObservation, Some(o2: GenericCalculatedObservation)) => Seq(GenericCalculatedObservation(o1.df, o1.aggregateColumns ++ o2.aggregateColumns: _*))
         case (o1, o2) => Seq(Some(o1), o2).flatten
       }
       (dfObserved, observations)
@@ -120,7 +120,7 @@ private[smartdatalake] trait ExpectationValidation {
           val rawMetrics = dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap)
           val metrics = rawMetrics.flatMap { rawMetrics =>
             val partitionValuesStr = partitionedDataObject.partitions.map(rawMetrics).map(_.toString).mkString(partitionDelimiter)
-            rawMetrics.filterKeys(!partitionedDataObject.partitions.contains(_))
+            rawMetrics.view.filterKeys(!partitionedDataObject.partitions.contains(_)).toMap
               .map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
           }
           metrics.toMap
@@ -156,7 +156,7 @@ private[smartdatalake] trait ExpectationValidation {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     val expectationsToValidate = (expectations ++ additionalExpectations)
       .filter(e => !scopeJobOnly || e.scope == ExpectationScope.Job)
-    if (logger.isDebugEnabled()) logger.debug(s"($id) validating $loggerContext expectations ${expectationsToValidate.map(e => s"${e.name}/${e.scope}").mkString(" ")}. Got scopeJobAndInputMetrics: ${scopeJobAndInputMetrics.mapValues(_.toString).map { case (k, v) => s"$k=$v" }.mkString(" ")}")
+    if (logger.isDebugEnabled()) logger.debug(s"($id) validating $loggerContext expectations ${expectationsToValidate.map(e => s"${e.name}/${e.scope}").mkString(" ")}. Got scopeJobAndInputMetrics: ${scopeJobAndInputMetrics.view.mapValues(_.toString).toMap.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
     // collect metrics with scope = JobPartition
     val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All
@@ -179,7 +179,7 @@ private[smartdatalake] trait ExpectationValidation {
       case (expectation, col) =>
         val errorMsg = ExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.inner.expr.sql, defaultExpressionData)
         (expectation, errorMsg)
-    }.toMap.filter(_._2.nonEmpty).mapValues(_.get) // keep only failed results
+    }.toMap.filter(_._2.nonEmpty).view.mapValues(_.get).toMap // keep only failed results
     // log all failed results (before throwing exception)
     validationResults
       .foreach(result => result._1.failedSeverity match {
@@ -187,7 +187,7 @@ private[smartdatalake] trait ExpectationValidation {
         case ExpectationSeverity.Error => logger.error(s"($id) ${result._2}")
       })
     // throw exception on error, but log metrics before
-    val errors = validationResults.filterKeys(_.failedSeverity == ExpectationSeverity.Error)
+    val errors = validationResults.view.filterKeys(_.failedSeverity == ExpectationSeverity.Error).toMap
     if (errors.nonEmpty) logger.error(s"($id) Expectation validation failed with metrics " + orderMetrics(updatedMetrics).map { case (k, v) => s"$k=$v" }.mkString(" "))
     val exceptions = errors.map(result => ExpectationValidationException(result._2)).toSeq
     // return consolidated and updated metrics

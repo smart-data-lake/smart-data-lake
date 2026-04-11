@@ -19,7 +19,6 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil._
 import io.smartdatalake.testutils.spark.dataset.Collection
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -49,9 +48,9 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
-  test("normal pk violations") {
+   test("normal pk violations") {
     val src = MockSparkDataObject("source_tableDO", tableName = "source_table", primaryKey = Some(Seq("id"))).register
-    src.writeSparkDataFrame(dfNonUniqueWithNull)
+    src.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]
@@ -80,7 +79,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
   test("pk violations with null values") {
     // creating and registering data object //
     val src = MockSparkDataObject("hive_table_pk_id_ValueDO", tableName = "hive_table_pk_id_Value", primaryKey = Some(Seq("id", "value"))).register
-    src.writeSparkDataFrame(dfNonUniqueWithNull)
+    src.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]
@@ -112,16 +111,16 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
     // a custom data object
     val customDO = MockSparkDataObject(id = "custom_do").register
-    customDO.writeSparkDataFrame(TestUtil.dfNonUniqueWithNull)
+    customDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     val hiveTablePKidDO = MockSparkDataObject("hive_table_pk_idDO", tableName = "hive_table_pk_id", primaryKey = Some(Seq("id"))).register
-    hiveTablePKidDO.writeSparkDataFrame(dfNonUniqueWithNull)
+    hiveTablePKidDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     val hiveTableNoPKDO = MockSparkDataObject("hive_table_no_pkDO", tableName = "hive_table_no_pk").register
-    hiveTableNoPKDO.writeSparkDataFrame(dfTwoCandidateKeys)
+    hiveTableNoPKDO.writeSparkDataFrame(Collection.dsTwoCandidateKeys.toDF())
 
     val hiveTablePKidValueDO = MockSparkDataObject("hive_table_pk_id_valueDO", tableName = "hive_table_pk_id_value", primaryKey = Some(Seq("id", "value"))).register
-    hiveTablePKidValueDO.writeSparkDataFrame(dfNonUniqueWithNull)
+    hiveTablePKidValueDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]

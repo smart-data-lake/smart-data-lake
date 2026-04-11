@@ -309,26 +309,6 @@
             </build>
         </profile>
         <profile>
-            <id>scala-2.12</id>
-            <activation>
-                <!-- scala 2.12 is default in spark 3.3/3.4 -->
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <properties>
-                <scala.minor.version>2.12</scala.minor.version>
-                <scala.version>${scala.minor.version}.18</scala.version>
-                <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
-            </properties>
-        </profile>
-        <profile>
-            <id>scala-2.13</id>
-            <properties>
-                <scala.minor.version>2.13</scala.minor.version>
-                <scala.version>${scala.minor.version}.12</scala.version>
-                <!-- attention, if updating this scoverage-maven-plugin might not work anymore -->
-            </properties>
-        </profile>
-        <profile>
             <id>test-sonar</id>
             <build>
                 <plugins>
@@ -420,9 +400,9 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <license.header.file>src/license/gplv3-header.txt</license.header.file>
-        <maven.compiler.release>11</maven.compiler.release>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <scala.deps.scope>compile</scala.deps.scope>
         <spark.deps.scope>compile</spark.deps.scope>
         <hadoop.deps.scope>compile</hadoop.deps.scope>
@@ -437,8 +417,8 @@
         <parquet.deps.scope>compile</parquet.deps.scope>
         <parquet.test.deps.scope>test</parquet.test.deps.scope>
         <jetty.deps.scope>compile</jetty.deps.scope>
-        <scala.minor.version>2.12</scala.minor.version>
-        <scala.version>${scala.minor.version}.15</scala.version>
+        <scala.minor.version>2.13</scala.minor.version>
+        <scala.version>${scala.minor.version}.12</scala.version>
         <spark.version>3.5.5
         </spark.version><!-- delta-lake 3.3.2 is not yet compatible with Spark 3.5.6 because of https://github.com/delta-io/delta/issues/4671 -->
         <spark-extensions.version>3.5.5
@@ -716,21 +696,6 @@
                             </compilerPlugin>
                         </compilerPlugins>
                     </configuration>
-                </plugin>
-
-                <!-- rewrite pom for compiling with different scala version profiles -->
-                <plugin>
-                    <groupId>org.spurint.maven.plugins</groupId>
-                    <artifactId>scala-cross-maven-plugin</artifactId>
-                    <version>0.3.0</version>
-                    <executions>
-                        <execution>
-                            <id>rewrite-pom</id>
-                            <goals>
-                                <goal>rewrite-pom</goal>
-                            </goals>
-                        </execution>
-                    </executions>
                 </plugin>
 
                 <!-- Copies files in resources folders to target folder. -->

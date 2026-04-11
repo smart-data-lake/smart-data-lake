@@ -25,11 +25,9 @@ import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef, SQLDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
-import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
-import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -43,7 +41,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
- * @param transformer            optional custom transformation for multiple dataframes to apply
  * @param transformers list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the ordering of the list.
  *                     Note that all outputs of previous transformers are kept as input for next transformer,
@@ -56,8 +53,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 case class CustomDataFrameAction(override val id: ActionId,
                                  inputIds: Seq[DataObjectId],
                                  outputIds: Seq[DataObjectId],
-                                 @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                                 transformer: Option[CustomDfsTransformerConfig] = None,
                                  transformers: Seq[GenericDfsTransformer] = Seq(),
                                  override val breakDataFrameLineage: Boolean = false,
                                  override val persist: Boolean = false,
@@ -77,18 +72,14 @@ case class CustomDataFrameAction(override val id: ActionId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 
-  if (executionMode.exists(_.isInstanceOf[SparkStreamingMode]) && (transformer.exists(_.sqlCode.nonEmpty) || transformers.exists(_.isInstanceOf[SQLDfsTransformer])))
+  if (executionMode.exists(_.isInstanceOf[SparkStreamingMode]) && transformers.exists(_.isInstanceOf[SQLDfsTransformer]))
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
   validateConfig()
 
-  private[smartdatalake] def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfsTransformerDef] = {
-    transformers ++ transformer.map(_.impl)
-  }
-
   override def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val partitionValues = getMainPartitionValues(inputSubFeeds)
-    val outputDfsMap = applyTransformers(getTransformers, partitionValues, inputSubFeeds)
+    val outputDfsMap = applyTransformers(transformers, partitionValues, inputSubFeeds)
     // create output subfeeds from transformed dataframes
     outputSubFeeds.map { subFeed=>
       val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDfsMap.keys.mkString(", ")}."))
@@ -102,15 +93,15 @@ case class CustomDataFrameAction(override val id: ActionId,
   }
 
   override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    applyTransformers(transformers ++ transformer.map(_.impl).toSeq, partitionValues)
+    applyTransformers(transformers, partitionValues)
   }
 
-  private val transformerDefs: Seq[GenericDfsTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+  private val transformerDefs: Seq[GenericDfsTransformerDef] = transformers
 
   override val transformerSubFeedType: Option[Type] = {
     val transformerTypeStats = transformerDefs.map(_.getSubFeedSupportedType)
       .filterNot(_ =:= typeOf[DataFrameSubFeed]) // ignore generic transformers
-      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._2)
+      .groupBy(identity).view.mapValues(_.size).toMap.toSeq.sortBy(_._2)
     assert(transformerTypeStats.size <= 1, s"No common transformer subFeedType type found: ${transformerTypeStats.map{case (tpe,cnt) => s"${tpe.typeSymbol.name}: $cnt"}.mkString(",")}")
     transformerTypeStats.map(_._1).headOption
   }

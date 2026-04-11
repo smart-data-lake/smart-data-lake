@@ -171,7 +171,7 @@ object BuildVersionInfo extends SmartDataLakeLogger {
       }
     }
   }
-  lazy val sdlbVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo(app=false)
+  lazy val sdlbVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo()
   lazy val appVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo(app=true)
 
   def getRevision: String = {

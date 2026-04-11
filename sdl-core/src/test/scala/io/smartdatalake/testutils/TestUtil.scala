@@ -24,9 +24,7 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.StringUtil.replaceNonSqlWithUnderscores
-import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.util.spark.dataset.Equality
@@ -39,7 +37,6 @@ import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
 import io.smartdatalake.workflow.dataobject.generic.{Table, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
-import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.sshd.common.file.nativefs.NativeFileSystemFactory
@@ -74,16 +71,19 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     keyStorePath.toString
   }
 
+// TODO: merge with io.smartdatalake.util.spark.GetSession, to avoid code duplication.
+//  Note that GetSession is in main sources, so it cannot depend on test sources,
+//  but maybe we can move the common code to a separate object in main sources.
   def sparkSessionBuilder(additionalSparkProperties: Map[String, StringOrSecret] = Map()): SparkSession.Builder = {
     // create builder
     val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
-        case (builder, config) => builder.config(config._1, config._2.resolve())
-      }
+      case (builder, config) => builder.config(config._1, config._2.resolve())
+    }
       .config("hive.exec.dynamic.partition", "true")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
       .config("spark.sql.shuffle.partitions", "2")
-      //.config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
+      // .config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
       // add nodata spark extension
       .withExtensions(new SDLSparkExtension)
     // Configure hive metastore location
@@ -95,14 +95,13 @@ object TestUtil extends SmartDataLakeLogger with Equality {
   }
 
   // create SparkSession if needed
-  lazy val session: SparkSession = {
+  lazy val session: SparkSession =
     SparkSubFeed._defaultSparkSession
       .getOrElse {
         val session = sparkSessionBuilder().getOrCreate()
         SparkSubFeed._defaultSparkSession = Some(session)
         session
       }
-  }
 
   val defaultSparkConnection = SparkClassicConnection(id = Environment.defaultEngineConnectionId, master = Some("local"))
   val defaultScalaConnection = ScalaConnection(id = Environment.defaultEngineConnectionId)
@@ -112,14 +111,22 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     // note that also context.currentAction needs to be set; this is done in the unit test through sdlb.prepare/init/exec.
     val globalConfig = GlobalConfig(defaultSparkConnectionId = Some("default-spark"))
     // create context
-    ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("feedTest", Some("appTest")), phase = ExecutionPhase.Init, globalConfig = globalConfig)
+    ActionPipelineContext(
+      "feedTest",
+      "appTest",
+      SDLExecutionId.executionId1,
+      instanceRegistry,
+      Some(LocalDateTime.now()),
+      SmartDataLakeBuilderConfig("feedTest", Some("appTest")),
+      phase = ExecutionPhase.Init,
+      globalConfig = globalConfig
+    )
   }
 
   // write DataFrame to table
-  def prepareHiveTable(table: Table, path: String, df: DataFrame, partitionCols: Seq[String] = Seq()): Unit = {
+  def prepareHiveTable(table: Table, path: String, df: DataFrame, partitionCols: Seq[String] = Seq()): Unit =
     if (partitionCols.isEmpty) df.write.mode(SaveMode.Overwrite).option("path", path).saveAsTable(s"${table.fullName}")
     else df.write.mode(SaveMode.Overwrite).option("path", path).partitionBy(partitionCols: _*).saveAsTable(s"${table.fullName}")
-  }
 
   def copyResourceToFile(resource: String, tgtFile: File): Unit = {
     val inputStream = this.getClass.getClassLoader.getResourceAsStream(resource)
@@ -137,19 +144,23 @@ object TestUtil extends SmartDataLakeLogger with Equality {
       override def authenticate(user: String, password: String, session: ServerSession): Boolean = user == usr && password == pwd
     })
     sshd.start()
-    //Thread.sleep(1000000)
+    // Thread.sleep(1000000)
     // return
     sshd
   }
 
   /**
-   * Setup simple webserver with given ports
-   * Different stubs are generated automatically to answer different URLs with predefined return codes
+   * Setup simple webserver with given ports Different stubs are generated automatically to answer
+   * different URLs with predefined return codes
    *
-   * @param host      bind address, usually localhost / 127.0.0.1
-   * @param port      port for http calls
-   * @param httpsPort port for https calls
-   * @return instance of [[WireMockServer]]
+   * @param host
+   *   bind address, usually localhost / 127.0.0.1
+   * @param port
+   *   port for http calls
+   * @param httpsPort
+   *   port for https calls
+   * @return
+   *   instance of [[WireMockServer]]
    */
   def startWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
     configureFor(host, port)
@@ -170,197 +181,74 @@ object TestUtil extends SmartDataLakeLogger with Equality {
 
   def setupWebserviceStubs(): Unit = {
     stubFor(post(urlEqualTo("/good/post/no_auth"))
-      .willReturn(aResponse().withBody("{{request.path.[0]}}"))
+        .willReturn(aResponse().withBody("{{request.path.[0]}}"))
     )
 
     stubFor(get(urlEqualTo("/good/no_auth/"))
-      .willReturn(aResponse().withStatus(200))
+        .willReturn(aResponse().withStatus(200))
     )
 
     stubFor(get(urlMatching("/good/basic_auth/"))
-      .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
-      .willReturn(ok("request looks good"))
+        .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
+        .willReturn(ok("request looks good"))
     )
 
     stubFor(get(urlMatching("/good/client_id/"))
-      .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
-      .willReturn(ok("request looks good"))
+        .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
+        .willReturn(ok("request looks good"))
     )
 
     stubFor(get(urlMatching("/good/token/"))
-      .withHeader("Authorization", equalTo("Bearer ZnMxOmZyZWl0YWcyMDE3x"))
-      .willReturn(ok("request looks good"))
+        .withHeader("Authorization", equalTo("Bearer ZnMxOmZyZWl0YWcyMDE3x"))
+        .willReturn(ok("request looks good"))
     )
 
     stubFor(get(urlMatching("/bad/*/"))
-      .willReturn(aResponse.withStatus(404))
+        .willReturn(aResponse.withStatus(404))
     )
   }
-
-  @deprecated(message = "use TestTool.testArgumentExpectedMapWithComment", since = "2.9.0")
-  def testArgumentExpectedMapWithComment[K, V](experiendum: K => V, argExpMapComm: Map[(String, K), V]): Unit = {
-
-    def logFailure(argument: K, actual: V, expected: V, comment: String): Unit = {
-      logger.error("Test case failed !")
-      logger.error(s"   argument = $argument")
-      logger.error(s"   actual   = $actual")
-      logger.error(s"   expected = $expected")
-      logger.error(s"   comment  = $comment")
-    }
-
-    def checkKey(x: (String, K)): Boolean = x match {
-      case (comment, argument) =>
-        val actual = experiendum(argument)
-        val expected = argExpMapComm(x)
-        val result = actual == expected
-        if (!result) {
-          logFailure(argument, actual, expected, comment)
-        }
-        result
-      case _ => throw new Exception(s"Something went wrong: checkKey called with parameter x=$x")
-    }
-
-    val results: Set[Boolean] = argExpMapComm.keySet.map(checkKey)
-    assert(results.forall(p => p))
-  }
-
-  @deprecated(message = "use TestTool.testArgumentExpectedMap", since = "2.9.0")
-  def testArgumentExpectedMap[K, V](experiendum: K => V, argExpMap: Map[K, V]): Unit = {
-    def addEmptyComment(x: (K, V)): ((String, K), V) = x match {
-      case (k, v) => (("", k), v)
-    }
-
-    val argExpMapWithReason: Map[(String, K), V] = argExpMap.map(addEmptyComment)
-    testArgumentExpectedMapWithComment(experiendum, argExpMapWithReason)
-  }
-
 
   // a few data frames
-  @deprecated(message = "use Collection.dsComplex", since = "2.9.0")
-  def dfComplex: DataFrame = {
-    import session.implicits._
-    val rowsComplex: Seq[(Int, Seq[(String, String, Seq[String])])] = Seq(
-      (1, Seq(("a", "A", Seq("a", "A")))),
-      (2, Seq(("b", "B", Seq("b", "B")))),
-      (3, Seq(("c", "C", Seq("c", "C")))),
-      (4, Seq(("d", "D", Seq("d", "D")))),
-      (5, Seq(("e", "E", Seq("e", "E"))))
-    )
-    rowsComplex.toDF("id", "value")
-  }
-
-  def dfEmptyNilSchema: DataFrame = session.createDataFrame(Seq.empty[Row].asJava, StructType(Nil))
-
-  def dfEmptyWithSchema: DataFrame = {
-    import session.implicits._
-    Seq.empty[String].toDF()
-  }
-
-
   val nullableStringField: StructField = StructField("nullable", StringType, nullable = true)
   val notNullableStringField: StructField = StructField("notnullable", StringType, nullable = false)
   val nullableStructField: StructField = StructField("structnull", StructType(nullableStringField :: notNullableStringField :: Nil), nullable = true)
   val notNullableStructField: StructField = StructField("structnotnull", StructType(nullableStringField :: notNullableStringField :: Nil), nullable = false)
-  val nullableArrayField: StructField = StructField("arrwithnull", ArrayType(StructType(nullableStringField :: notNullableStringField :: Nil), containsNull = true))
-  val notNullableArrayField: StructField = StructField("arrwithoutnull", ArrayType(StructType(nullableStringField :: notNullableStringField :: Nil), containsNull = false))
-  val nullableMapField: StructField = StructField("mapwithnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = true))
-  val notNullableMapField: StructField = StructField("mapwithoutnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = false))
-
-  def dfEmptyWithStructuredSchema: DataFrame = {
-    session.createDataFrame(session.sparkContext.makeRDD(Seq.empty[Row]),
-      StructType(
-        nullableStringField
-          :: notNullableStringField
-          :: nullableStructField
-          :: notNullableStructField
-          :: notNullableArrayField
-          :: nullableArrayField
-          :: notNullableMapField
-          :: nullableMapField
-          :: Nil
-      )
-    )
-  }
-
-  def dfComplexWithNull: DataFrame = {
-    import session.implicits._
-    val rowsComplexWithNull: Seq[(Option[Int], Option[Seq[(String, String, Seq[String])]])] = Seq(
-      (Some(1), Some(Seq(("a", "A", Seq("a", "A"))))),
-      (Some(2), Some(Seq(("b", "B", Seq("b", "B"))))),
-      (Some(3), Some(Seq(("c", "C", null: Seq[String])))),
-      (Some(4), Some(Seq(("d", "D", Seq("d", "D"))))),
-      (Some(5), None),
-      (None, None)
-    )
-    rowsComplexWithNull.toDF("id", "value")
-  }
-
-  def dfHierarchy: DataFrame = {
-    import session.implicits._
-    val rowsHierarchy: Seq[(String, String)] = Seq(("a", "ab"), ("a", "ac"), ("ac", "aca"), ("b", "ba"),
-      ("c", "ca"), ("ca", "caa"), ("ca", "cab"), ("c", "cb"), ("cb", "X"), ("c", "cc"), ("cc", "X"), ("X", "Y"), ("Y", "Z"))
-    rowsHierarchy.toDF("parent", "child")
-  }
-
-  def dfNonUnique: DataFrame = {
-    import session.implicits._
-    val rowsNonUnique: Seq[(String, String)] = Seq(("1let", "unilet"),
-      ("2let", "doublet"), ("2let", "doublet"),
-      ("3let", "triplet"), ("3let", "triplet"), ("3let", "triplet"),
-      ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"), ("4let", "quatriplet"))
-    rowsNonUnique.toDF("id", "value")
-  }
-
-  def dfNonUniqueWithNull: DataFrame = {
-    import session.implicits._
-    val rowsNonUnique: Seq[(String, Option[String])] = Seq(("0let", None),
-      ("1let", Some("unilet")),
-      ("2let", Some("doublet")), ("2let", Some("doublet")),
-      ("3let", Some("triplet")), ("3let", Some("triplet")), ("3let", Some("triplet")),
-      ("4let", Some("quatriplet")), ("4let", Some("quatriplet")), ("4let", Some("quatriplet")), ("4let", Some("quatriplet")))
-    rowsNonUnique.toDF("id", "value")
-  }
-
-  def dfTwoCandidateKeys: DataFrame = {
-    import session.implicits._
-    val rowsTwoCandidateKeys: Seq[(String, String, Int, Int, Int, Double)] = Seq(
-      ("a", "a", 1, 1, 1, 17.3),
-      ("a", "b", 1, 1, 2, 17.3),
-      ("b", "a", 1, 2, 1, 42.0),
-      ("b", "b", 1, 2, 2, -3.14),
-      ("b", "c", 2, 1, 1, -3.14)
-    )
-    rowsTwoCandidateKeys.toDF("string_id1", "string_id2", "int_id1", "int_id2", "int_id3", "x")
-  }
+  val nullableArrayField: StructField =
+    StructField("arrwithnull", ArrayType(StructType(nullableStringField :: notNullableStringField :: Nil), containsNull = true))
+  val notNullableArrayField: StructField =
+    StructField("arrwithoutnull", ArrayType(StructType(nullableStringField :: notNullableStringField :: Nil), containsNull = false))
+  val nullableMapField: StructField =
+    StructField("mapwithnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = true))
+  val notNullableMapField: StructField =
+    StructField("mapwithoutnull", MapType(IntegerType, StructType(nullableStringField :: notNullableStringField :: Nil), valueContainsNull = false))
 
   def arbitraryDataFrame(schema: StructType, nbRecords: Int = 100)(implicit session: SparkSession): DataFrame = {
     val nbOfArrayRecords = 3
     import scala.jdk.CollectionConverters._
-    def arbitraryValue(dataType: DataType): Any = {
+    def arbitraryValue(dataType: DataType): Any =
       dataType match {
-        case IntegerType => Arbitrary.arbInt.arbitrary.sample.get
-        case LongType => Arbitrary.arbLong.arbitrary.sample.get
-        case StringType => Arbitrary.arbString.arbitrary.sample.get
-        case FloatType => Arbitrary.arbFloat.arbitrary.sample.get
-        case DoubleType => Arbitrary.arbDouble.arbitrary.sample.get
-        case TimestampType => new Timestamp(Gen.choose(0L, Instant.now().toEpochMilli).sample.get) // arbDate creates dates too far in the past (negative millis), we use a custom generator therefore...
+        case IntegerType   => Arbitrary.arbInt.arbitrary.sample.get
+        case LongType      => Arbitrary.arbLong.arbitrary.sample.get
+        case StringType    => Arbitrary.arbString.arbitrary.sample.get
+        case FloatType     => Arbitrary.arbFloat.arbitrary.sample.get
+        case DoubleType    => Arbitrary.arbDouble.arbitrary.sample.get
+        case TimestampType => new Timestamp(Gen.choose(0L,
+            Instant.now().toEpochMilli).sample.get) // arbDate creates dates too far in the past (negative millis), we use a custom generator therefore...
         case d: StructType => arbitraryRow(d.fields)
-        case d: ArrayType => (1 to nbOfArrayRecords).map(x => arbitraryValue(d.elementType))
+        case d: ArrayType  => (1 to nbOfArrayRecords).map(_ => arbitraryValue(d.elementType))
       }
-    }
 
     def arbitraryRow(fields: Array[StructField]): Row = {
       val colValues = fields.map(f => arbitraryValue(f.dataType))
       Row.fromSeq(colValues)
     }
 
-    val rows = (1 to nbRecords).map(x => arbitraryRow(schema.fields)).asJava
+    val rows = (1 to nbRecords).map(_ => arbitraryRow(schema.fields)).asJava
     session.createDataFrame(rows, schema)
   }
 
-  def getMetrics(runtimeInfo: RuntimeInfo, dataObjectId: DataObjectId): MetricsMap = {
+  def getMetrics(runtimeInfo: RuntimeInfo, dataObjectId: DataObjectId): MetricsMap =
     runtimeInfo.results.find(_.dataObjectId == dataObjectId).get.metrics.getOrElse(Map())
-  }
 
   private lazy val pathToDeleteOnExit: mutable.Buffer[String] = {
     val buffer = mutable.Buffer[String]()
@@ -369,9 +257,8 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     buffer
   }
 
-  def deleteOnExit(path: String): Unit = {
+  def deleteOnExit(path: String): Unit =
     pathToDeleteOnExit.append(path)
-  }
 
   def createParquetDataObject(id: String)(implicit instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
     val tempDir = Files.createTempDirectory("sdlb-test")
@@ -382,12 +269,11 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     dataObject
   }
 
-  def registerDataObject[A <: DataObject](dataObject: A)
-                                         (implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): A = {
+  def registerDataObject[A <: DataObject](dataObject: A)(implicit instanceRegistry: InstanceRegistry, context: ActionPipelineContext): A = {
     dataObject match {
-      case tableDataObject: TableDataObject => tableDataObject.dropTable
+      case tableDataObject: TableDataObject  => tableDataObject.dropTable
       case fileDataObject: FileRefDataObject => fileDataObject.deleteAll
-      case _ => ()
+      case _                                 => ()
     }
     instanceRegistry.register(dataObject)
     dataObject

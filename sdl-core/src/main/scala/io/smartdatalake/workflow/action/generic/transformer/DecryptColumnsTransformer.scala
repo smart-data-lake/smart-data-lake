@@ -19,12 +19,11 @@
 
 package io.smartdatalake.workflow.action.generic.transformer
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB, EncryptDecryptGCM, EncryptDecryptSupport}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
+import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.DataFrame
 
@@ -34,7 +33,7 @@ import org.apache.spark.sql.DataFrame
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param decryptColumns List of columns [columnA, columnB] to be encrypted
- * @param keyVariable    contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
+ * @param key            contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
  *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
  * @param algorithm      Specify: "GCM" (AES/GCM/NoPadding), "ECB" (AES/ECB/PKCS5Padding),
  *                       alternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM
@@ -42,22 +41,21 @@ import org.apache.spark.sql.DataFrame
 case class DecryptColumnsTransformer(override val name: String = "encryptColumns",
                                      override val description: Option[String] = None,
                                      decryptColumns: Seq[String],
-                                     @Deprecated @deprecated("Use `key` instead", "2.5.0") private val keyVariable: Option[String] = None,
-                                     private val key: Option[StringOrSecret],
+                                     private val key: StringOrSecret,
                                      algorithm: String = "GCM"
                                     )
   extends SparkDfTransformer with EncryptDecryptSupport {
-  private val cur_key: StringOrSecret = key.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keyVariable.get))
-  private val keyBytes: Array[Byte] = cur_key.resolve().getBytes
+  private val keyBytes: Array[Byte] = key.resolve().getBytes
 
   val crypt: EncryptDecrypt = algorithm match {
     case "GCM" => new EncryptDecryptGCM(keyBytes)
     case "ECB" => new EncryptDecryptECB(keyBytes)
     case classname if classname.contains(".") => loadEncryptDecryptClass(classname, keyBytes)
-    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
+    case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm $algorithm")
   }
 
-  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
+  override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues],
+                         df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     crypt.decryptColumns(df, decryptColumns)
   }
 

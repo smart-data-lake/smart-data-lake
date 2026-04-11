@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.SchemaViolationException
+import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.dataframe.snowflake.SnowparkSubFeed
@@ -44,9 +44,9 @@ import org.scalatest.matchers.should.Matchers.intercept
  */
 object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
 
-  implicit val sparkSession = TestUtil.session
-  implicit val instanceRegistry = new InstanceRegistry()
-  implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
+  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
+  implicit val context: InstanceRegistry => ActionPipelineContext =  ConfigToolbox.getDefaultActionPipelineContext
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
 

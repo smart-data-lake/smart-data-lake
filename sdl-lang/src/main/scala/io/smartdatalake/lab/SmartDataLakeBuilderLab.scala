@@ -117,7 +117,7 @@ case class SmartDataLakeBuilderLab[D,A](
     // filter
     dfs = filters.foldLeft(dfs) {
       case (dfs, (column, filterExpr)) =>
-        dfs.mapValues(df => if (df.schema.fieldNames.contains(column)) df.filter(filterExpr) else df).toMap
+        dfs.view.mapValues(df => if (df.schema.fieldNames.contains(column)) df.filter(filterExpr) else df).toMap
     }
 
     // transform

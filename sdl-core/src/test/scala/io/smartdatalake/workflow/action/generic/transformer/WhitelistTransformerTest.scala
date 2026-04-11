@@ -34,7 +34,7 @@ class WhitelistTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("only columns where the names match are whitelisted") {
@@ -64,7 +64,7 @@ class WhitelistTransformerTest extends AnyFunSuite {
   test("column whitelisting is case sensitive if Environment.caseSensitive=true") {
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
     val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("ColumN1", "blop"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "ColumN1"))
@@ -77,13 +77,14 @@ class WhitelistTransformerTest extends AnyFunSuite {
 
     // cleanup
     Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    session.conf.set(SQLConf.CASE_SENSITIVE.key, value = previousCaseSensitive)
   }
 
   test("column whitelisting throws no error if whitelisted column has dots") {
     // prepare
     val whitelistTransformer = WhitelistTransformer(columnWhitelist = Seq("column.1"))
-    val df = SparkDataFrame(Seq((1), (2)).toDF("column.1"))
+    val df =
+      SparkDataFrame(Seq(1, 2).toDF("column.1"))
 
     // execute
     val transformed = whitelistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())

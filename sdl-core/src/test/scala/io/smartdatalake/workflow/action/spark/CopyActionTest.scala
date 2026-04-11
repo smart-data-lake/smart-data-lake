@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOptions}
-import io.smartdatalake.testutils.TestUtil.dfNonUniqueWithNull
+import io.smartdatalake.testutils.spark.dataset.Collection
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -34,7 +34,7 @@ import io.smartdatalake.workflow.action.{CopyAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation._
-import io.smartdatalake.workflow.dataobject.generic.{Constraint, Table}
+import io.smartdatalake.workflow.dataobject.generic.Constraint
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{lit, substring}
@@ -70,8 +70,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("copy load with custom transformation class and incremental move mode (delete)") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = ParquetFileDataObject("src1", tempPath + s"/src1", filenameColumn = Some("_filename"))
     srcDO.deleteAll
     instanceRegistry.register(srcDO)
@@ -111,8 +109,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     """
     val customTransformerConfig = ScalaCodeSparkDfTransformer(code = Some(codeStr))
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = ParquetFileDataObject("src1", tempPath + s"/src1")
     srcDO.deleteAll
     instanceRegistry.register(srcDO)
@@ -146,8 +142,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("copy load incremental move mode (archive) V1 DataSource") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = XmlFileDataObject("src1", tempPath + s"/src1")
     srcDO.deleteAll
     instanceRegistry.register(srcDO)
@@ -192,7 +186,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val srcDO = MockSparkDataObject(
       "src1",
       expectations = Seq(
-        CountExpectation(name = "count", expectation = Some(">= 1")),
+        CountExpectation(expectation = Some(">= 1")),
         CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All)
       )
     ).register
@@ -351,8 +345,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
   // Almost the same as copy load but without any transformation
   test("copy load without transformer (similar to old ingest action)") {
 
-    // setup DataObjects
-    val feed = "notransform"
     val srcDO = MockSparkDataObject("src1").register
     val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -371,9 +363,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("copy with partition diff execution mode") {
 
-    // setup DataObjects
-    val feed = "partitiondiff"
-    val srcTable = Table(Some("default"), "copy_input")
     val srcDO = MockSparkDataObject("src1", partitions = Seq("type")).register
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("type"), primaryKey = Some(Seq("type", "lastname", "firstname"))).register
 
@@ -386,7 +375,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val l1PartitionValues = Seq(PartitionValues(Map("type" -> "A")))
     srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
     action.preInit(Seq(srcSubFeed), Seq())
-    val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
     action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
@@ -417,8 +405,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("copy load with spark incremental mode and schema evolution") {
 
-    // setup DataObjects
-    val feed = "partitiondiff"
     val srcDO = MockSparkDataObject("src1", partitions = Seq("type")).register
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("type"), primaryKey = Some(Seq("type", "lastname", "firstname"))).register
 
@@ -431,7 +417,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val l1PartitionValues = Seq(PartitionValues(Map("type" -> "A")))
     srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
     action.preInit(Seq(srcSubFeed), Seq())
-    val initOutputSubFeeds = action.init(Seq(srcSubFeed))
     action.preExec(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
     action.postExec(Seq(srcSubFeed), Seq(tgtSubFeed1))
@@ -462,8 +447,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("copy load with filter, additional columns and transformer options") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = MockSparkDataObject("src1").register
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -494,8 +477,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("date to month aggregation with partition value transformation and PartitionDiffMode") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("mt"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -539,8 +520,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("copy load force saveMode") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = MockSparkDataObject("src1").register
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -563,8 +542,6 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   test("fail on reading missing partition") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname", "firstname")).register
     val tgtDO = MockSparkDataObject("tgt1", partitions = Seq("lastname", "firstname"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -602,7 +579,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     // The Action should choose an appropriate SubFeedType for init/exec based on the output DataObject.
 
     val pkDO = MockSparkDataObject("pkTest", primaryKey = Some(Seq("id"))).register
-    pkDO.writeSparkDataFrame(dfNonUniqueWithNull)
+    pkDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     val srcDO = PKViolatorsDataObject("src1")
     instanceRegistry.register(srcDO)
@@ -613,13 +590,10 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig1))
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
     action1.init(Seq(srcSubFeed))(contextInit).head
-    val tgtSubFeed1 = action1.exec(Seq(srcSubFeed))(contextExec).head
   }
 
   test("copy load detect no-data rowCount=0 from SparkPlan") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = ParquetFileDataObject("src1", tempPath + s"/src1")
     srcDO.deleteAll
     instanceRegistry.register(srcDO)

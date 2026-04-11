@@ -495,7 +495,7 @@ trait Transform extends Serializable {
         case 1 => map_from_entries(col("values")).as("curry_map")
         case _ => transform_values(map_from_entries(col("values")),
           List.range(2, pkCols.size)
-            .foldLeft[(Column, Column) ⇒ Column]((_, c) => applyFunToValues(f = map_from_entries)(c)) {
+            .foldLeft[(Column, Column) => Column]((_, c) => applyFunToValues(f = map_from_entries)(c)) {
               (col, _) => (_, x) => applyFunToValues(f = c => transform_values(map_from_entries(c), col))(x)
             })
           .as("curry_map")
@@ -521,7 +521,7 @@ trait Transform extends Serializable {
 
     def breakLineageIfNotExecPhase(isExec: Boolean): DataFrame = {
       if (!isExec) getEmptyDataFrame(ds.schema)(ds.sparkSession)
-      else ds.toDF
+      else ds.toDF()
     }
 
   }
