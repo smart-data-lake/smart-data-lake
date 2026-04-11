@@ -61,7 +61,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     instanceRegistry.register(kafkaConnection)
     val dataObject = KafkaTopicDataObject("kafka1", topicName = topic, connectionId = "kafkaCon1")
     val df = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
-    dataObject.writeSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
     val dfRead = dataObject.getSparkDataFrame(Seq())
     assert(dfRead.getSymmetricDifference(df).isEmpty)
   }

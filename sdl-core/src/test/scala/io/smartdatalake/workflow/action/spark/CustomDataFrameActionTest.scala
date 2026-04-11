@@ -309,8 +309,8 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.register(action)
 
     val df = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(df, Seq())
-    src2DO.writeSparkDataFrame(df, Seq())
+    srcDO.writeSparkDataFrame(df)
+    src2DO.writeSparkDataFrame(df)
 
     val tgtSubFeeds = action.exec(Seq(SparkSubFeed(None, srcDO.id.id, Seq()),SparkSubFeed(None, src2DO.id.id, Seq())))(contextExec)
     assert(tgtSubFeeds.map(_.dataObjectId).toSet == Set(tgtDO.id))

@@ -46,7 +46,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     dataObject.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
-    dataObject.writeSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
     val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.getSymmetricDifference(df).isEmpty)
   }
@@ -59,7 +59,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     dataObject.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
-    dataObject.writeSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
     val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.getSymmetricDifference(df).isEmpty)
     dataObject.deleteAllData()
@@ -78,7 +78,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     srcDO.dropTable
     val df = Seq(("ext","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
     srcDO.initSparkDataFrame(df, Seq())
-    srcDO.writeSparkDataFrame(df, Seq())
+    srcDO.writeSparkDataFrame(df)
     instanceRegistry.register(srcDO)
 
     val tgtDO = JdbcTableDataObject( "jdbcDO2", table = Table(Some("public"), "table2"), connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)")
@@ -113,7 +113,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     dataObject1.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject1.initSparkDataFrame(df, Seq())(contextInit)
-    dataObject1.writeSparkDataFrame(df, Seq())(contextExec)
+    dataObject1.writeSparkDataFrame(df)(contextExec)
 
     // read prepared data
     val table2 = Table(Some("public"), "table2", query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
@@ -124,7 +124,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     assert(resultat)
 
     // assert cannot write to DataObject with query defined
-    intercept[IllegalArgumentException](dataObject2.writeSparkDataFrame(df, Seq())(contextExec))
+    intercept[IllegalArgumentException](dataObject2.writeSparkDataFrame(df)(contextExec))
   }
 
   // query parameter doesn't work with hsqldb
@@ -137,7 +137,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     dataObject1.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject1.initSparkDataFrame(df, Seq())(contextInit)
-    dataObject1.writeSparkDataFrame(df, Seq())(contextExec)
+    dataObject1.writeSparkDataFrame(df)(contextExec)
 
     // prepare view dataObject
     val table2 = Table(Some("public"), "table2", query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
@@ -195,7 +195,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
-    dataObject.writeSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
     dataObject.prepare
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions(contextExec)
@@ -210,7 +210,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.prepare
     dataObject.initSparkDataFrame(df, Seq())
-    dataObject.writeSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions(contextExec)
     assert(partitionValues.toSet == Set(PartitionValues(Map("abc" -> "ext")), PartitionValues(Map("abc" -> "int"))))
@@ -334,7 +334,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     dataObject.dropTable
     val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
-    dataObject.writeSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
     val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
     assert(dfRead.getSymmetricDifference(df).isEmpty)
   }

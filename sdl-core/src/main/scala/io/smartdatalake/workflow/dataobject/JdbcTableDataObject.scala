@@ -338,11 +338,11 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): MetricsMap = {
-    if (connection.directTableOverwrite) {
+    if (connection.directTableOverwrite || !isTableExisting) {
       writeDataFrameInternal(df, table.fullName, SaveMode.Overwrite)
     } else try {
       // create & write to temp-table
-      val tableSchema = getExistingSchema.get
+      val tableSchema = getExistingSchema.getOrElse(df.schema)
       val metrics = writeToTempTable(df, tableSchema)
       overwriteTableWithTempTableInTransaction(partitionValues)
       // return
@@ -358,7 +358,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     try {
       // cleanup existing data
       if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsStatement(partitionValues))
-      else transaction.execJdbcStatement(deleteAllDataStatement)
+      else transaction.execJdbcStatement(deleteAllDataStatement())
       // append into final table in one step, then commit
       transaction.execJdbcStatement(s"insert into ${table.fullName} select * from ${tmpTable.fullName}")
       transaction.commit()
