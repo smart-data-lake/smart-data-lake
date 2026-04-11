@@ -1,4 +1,4 @@
-name: Snapshot Build 2.13
+name: Snapshot Build
 
 on:
   push:

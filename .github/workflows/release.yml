@@ -69,14 +69,6 @@ jobs:
         MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-    - name: Maven deploy to sonatype for Scala 2.12
-      # exclude sdl-parent (!.) as it is already uploaded with previous deploy; it stays the same and cannot be replaced in remote repository
-      run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy -pl '!.,!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
-      env:
-        MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-        MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-        MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-
     - name: Git Commit
       run: |
         git add -A
