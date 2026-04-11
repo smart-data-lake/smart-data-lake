@@ -43,7 +43,6 @@ import scala.reflect.runtime.universe.Type
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
- * @param transformer optional custom transformation to apply.
  * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the lists ordering.
  */
@@ -51,8 +50,6 @@ case class CopyAction(override val id: ActionId,
                       inputId: DataObjectId,
                       outputId: DataObjectId,
                       deleteDataAfterRead: Boolean = false,
-                      @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                      transformer: Option[CustomDfTransformerConfig] = None,
                       transformers: Seq[GenericDfTransformer] = Seq(),
                       override val breakDataFrameLineage: Boolean = false,
                       override val persist: Boolean = false,
@@ -71,14 +68,12 @@ case class CopyAction(override val id: ActionId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
 
-  private val transformerDefs: Seq[GenericDfTransformerDef] = transformer.map(t => t.impl).toList ++ transformers
-
-  override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType)
+  override val transformerSubFeedSupportedTypes: Seq[Type] = transformers.map(_.getSubFeedSupportedType)
 
   validateConfig()
 
   private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
-    transformerDefs
+    transformers
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {

@@ -21,13 +21,11 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
-import io.smartdatalake.testutils.custom.TestCustomDfCreator
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
+import io.smartdatalake.testutils.spark.dataset.{Collection, TestToolDataset}
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
@@ -74,7 +72,10 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
     // setup DataObjects
     val feed = "customDf2Delta"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
@@ -103,7 +104,10 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
     // setup DataObjects
     val feed = "customDf2Delta_partitioned"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
@@ -615,7 +619,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
   test("copy load expectations test") {
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
 
     // setup DataObjects
     val src1Table = Table(db = Some(deltaDb), name = "test_expectations_src1")

@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.BigQueryTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.generic.{Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
@@ -141,7 +141,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     require(isTableExisting, f"The provided table ${table.name} doesn't exist")
-    val df = context.sparkSession
+    val df = SparkSubFeed.getSparkSession
       .read
       .format("bigquery")
       .options(sparkOptions)

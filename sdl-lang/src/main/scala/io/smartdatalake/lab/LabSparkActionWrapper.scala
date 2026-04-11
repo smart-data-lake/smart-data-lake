@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import io.smartdatalake.workflow.action.{CustomDataFrameAction, DataFrameActionImpl, DataFrameOneToOneActionImpl}
-import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame}
+import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, InitSubFeed}
 import org.apache.spark.sql.{Column, DataFrame}
@@ -37,7 +37,7 @@ import org.apache.spark.sql.{Column, DataFrame}
 case class LabSparkDfsActionWrapper[A <: CustomDataFrameAction](action: A, context: ActionPipelineContext) extends LabSparkActionWrapper[A, GenericDfsTransformerDef, CustomDfsTransformer](action, context) {
   override private[smartdatalake] def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed], selectedTransformerIndexes: Option[Seq[Int]], additionalTransformers: Seq[GenericDfsTransformerDef], replacedTransformers: Map[Int, GenericDfsTransformerDef], additionalTransformerOptions: Map[Int, Map[String, String]]): Map[String, GenericDataFrame] = {
     val mainPartitionValues = action.getMainPartitionValues(inputSubFeeds)(context)
-    val transformers = action.getTransformers(context)
+    val transformers = action.transformers
     val selectedTransformerIndexesPrep = selectedTransformerIndexes.map(_.filter(_ < transformers.size)).getOrElse(transformers.indices).toSet
     val transformersToApply = transformers.zipWithIndex
       .filter {case (t,idx) => selectedTransformerIndexesPrep.contains(idx)}
@@ -60,7 +60,7 @@ case class LabSparkDfsActionWrapper[A <: CustomDataFrameAction](action: A, conte
   }
 
   override def recompileFromSrc(srcDir: String): Unit = {
-    action.getTransformers(context).collect { case t: CanRecompileFromSrc => t }.foreach(_.recompileFromSrc(srcDir))
+    action.transformers.collect { case t: CanRecompileFromSrc => t }.foreach(_.recompileFromSrc(srcDir))
   }
 }
 
@@ -134,7 +134,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
         val mainSubFeed = emptyInputSubFeeds.find(_.dataObjectId == mainInput.id).get
         val inputSubFeeds = emptyInputSubFeeds.map { subFeed =>
           val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
-          action.updateInputPartitionValues(action.inputMap(subFeed.dataObjectId), action.subFeedConverter().fromSubFeed(subFeed), partitionValues)
+          action.updateInputPartitionValues(action.inputMap(subFeed.dataObjectId), action.subFeedConverter.fromSubFeed(subFeed), partitionValues)
         }
         // apply execution mode
         val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
@@ -270,7 +270,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
 private case class LabSparkDfsTransformer(override val name: String = "labScalaSparkTransform", customTransformer: CustomDfsTransformer, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfsTransformer with ExcludeFromSchemaExport {
   override val description: Option[String] = None
   override def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
-    customTransformer.transform(context.sparkSession, options, dfs)
+    customTransformer.transform(SparkSubFeed.getSparkSession, options, dfs)
   }
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     customTransformer.transformPartitionValues(options, partitionValues)
@@ -281,7 +281,7 @@ private case class LabSparkDfsTransformer(override val name: String = "labScalaS
 private case class LabSparkDfTransformer(override val name: String = "labScalaSparkTransform", customTransformer: CustomDfTransformer, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer with ExcludeFromSchemaExport {
   override val description: Option[String] = None
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    customTransformer.transform(context.sparkSession, options, df, dataObjectId.id)
+    customTransformer.transform(SparkSubFeed.getSparkSession, options, df, dataObjectId.id)
   }
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
     customTransformer.transformPartitionValues(options, partitionValues)

@@ -179,8 +179,6 @@ object LogEventWithSparkLocalProperties {
         AppUtil.MDC_SDLB_PROPERTIES
           .flatMap(k => Option((k, tc.getLocalProperty(k))))
           .foreach { case (k, v) => data.put(k, v) }
-        AppUtil.getMachineContext
-          .foreach { case (k, v) => data.put(k, v) }
         data
       })
     } else emptyContextMap

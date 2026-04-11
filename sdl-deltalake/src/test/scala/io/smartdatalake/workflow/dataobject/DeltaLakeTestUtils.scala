@@ -20,6 +20,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.TestUtil.sparkSessionBuilder
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
 
 object DeltaLakeTestUtils {
@@ -34,9 +36,17 @@ object DeltaLakeTestUtils {
     dbname
   }
 
-  def session : SparkSession = additionalSparkProperties
-    .foldLeft(TestUtil.sparkSessionBuilder()) {
-      case (builder, config) => builder.config(config._1, config._2)
-    }.getOrCreate()
+  lazy val session: SparkSession = {
+    val session = additionalSparkProperties
+      .foldLeft(TestUtil.sparkSessionBuilder()) {
+        case (builder, config) => builder.config(config._1, config._2)
+      }.getOrCreate()
+      .getOrElse {
+        val session = sparkSessionBuilder().getOrCreate()
+        SparkSubFeed._defaultSparkSession = Some(session)
+        session
+      }
+
+  }
 
 }

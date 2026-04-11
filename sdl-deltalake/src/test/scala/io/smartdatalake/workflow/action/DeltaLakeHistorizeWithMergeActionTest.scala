@@ -18,28 +18,17 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
-import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.generic.Table
-import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils, HiveTableDataObject}
-import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils}
 import org.apache.spark.sql.SparkSession
-import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
-import java.sql.Timestamp
-import java.time.LocalDateTime
 
 class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with Matchers
   with SmartDataLakeLogger with HistorizeActionBehaviour {
@@ -53,7 +42,7 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with Matchers
   private val tempPath = tempDir.toAbsolutePath.toString
 
   testsFor(historizeWithMergeMode(
-    (id, registry) => MockSparkDataObject(id),
+    (id, registry) => MockSparkDataObject(id)(registry),
     (id, pks, registry) => {
       val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
       DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
@@ -61,7 +50,7 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with Matchers
   ))
 
   testsFor(historizeIncrementalPipeline(
-    (id, registry) => MockSparkDataObject(id),
+    (id, registry) => MockSparkDataObject(id)(registry),
     (id, pks, registry) => {
       val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
       DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)

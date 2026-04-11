@@ -21,17 +21,18 @@ package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.ConfigToolbox
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
+import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.dataobject.generic.Table
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject}
+import org.apache.spark.sql.SparkSession
 
 import java.nio.file.Files
 
@@ -49,9 +50,9 @@ import java.nio.file.Files
 object SparkAndSnowparkDataPipelineIT extends App {
 
   val sdlb = DefaultSmartDataLakeBuilder
-  implicit val instanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession = TestUtil.session
-  implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val context: ActionPipelineContext =  ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
   val tempDir = Files.createTempDirectory("test")
   val tempPath = tempDir.toAbsolutePath.toString
@@ -60,10 +61,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
 
   // setup DataObjects
   val feed = "copy"
-  val srcTable = Table(Some("default"), "copy_input")
-  val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-  srcDO.dropTable
-  instanceRegistry.register(srcDO)
+  val srcDO = MockSparkDataObject( "src1").register
   val tgt1Table = Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "tgt1", None, Some(Seq("lastname")))
   val tgt1DO = SnowflakeTableDataObject("tgt1", tgt1Table, connectionId = "sfCon")
   tgt1DO.dropTable
@@ -76,7 +74,6 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val tgt3DO = SnowflakeTableDataObject("tgt3", tgt3Table, connectionId = "sfCon")
   tgt3DO.dropTable
   instanceRegistry.register(tgt3DO)
-
 
   // first action copy with Spark from Hive to Snowflake
   val action1 = CopyAction("copySpark", srcDO.id, tgt1DO.id)

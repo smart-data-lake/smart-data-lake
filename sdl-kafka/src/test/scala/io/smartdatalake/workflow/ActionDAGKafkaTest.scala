@@ -24,6 +24,7 @@ import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -78,7 +79,7 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
     val l1 = Seq(("doe-john", 5)).toDF("key", "value")
     srcDO.writeSparkDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
-    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformers = Seq(SQLDfTransformer(code = Some("select 'test' as key, value from kafka1"))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // exec dag

@@ -130,7 +130,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     connectionId: Option[ConnectionId] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
-                                    override val sparkConnectionId: Option[ConnectionId] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
@@ -149,7 +148,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   val filetype: String = ".parquet"
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     val thisIsTableExisting = isTableExisting
     require(thisIsTableExisting || path.isDefined, s"($id) DeltaTable ${table.fullName} does not exist, so path must be set or table should be managed (isManaged=true)")
 
@@ -187,7 +186,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def deltaTable(implicit session: SparkSession): DeltaTable = DeltaTable.forName(session, table.fullName)
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     super.prepare
     if (connection.exists(_.checkDeltaLakeSparkOptions) && !UCFileSystemFactory.isDatabricksEnv) { // check not needed if on Databricks UC environment (and actionally it fails because this is configured differently on Databricks)
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("io.delta.sql.DeltaSparkSessionExtension"),
@@ -237,15 +236,15 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   private[smartdatalake] def convertPathToDeltaFormat(implicit context: ActionPipelineContext): Unit = {
     val deltaPath = s"parquet.`$hadoopPath`"
     if (partitions.isEmpty) {
-      DeltaTable.convertToDelta(context.sparkSession, deltaPath)
+      DeltaTable.convertToDelta(SparkSubFeed.getSparkSession, deltaPath)
     } else {
       val partitionSchema = StructType(partitions.map(p => StructField(p, StringType)))
-      DeltaTable.convertToDelta(context.sparkSession, deltaPath, partitionSchema)
+      DeltaTable.convertToDelta(SparkSubFeed.getSparkSession, deltaPath, partitionSchema)
     }
   }
 
   private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     if(!propertyExists(enableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
   }
 
@@ -267,7 +266,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
 
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
 
     val cdcActivated = propertyExistsWithValue(enableCdcFeedProperty, "true")
 
@@ -277,7 +276,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
       val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_commit_timestamp").desc)
 
-      context.sparkSession.read.format("delta")
+      SparkSubFeed.getSparkSession.read.format("delta")
         .option("readChangeFeed", "true")
         .option("startingVersion", incrementalOutputExpr.get)
         .table(table.fullName)
@@ -287,7 +286,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         .drop("_rank", "_change_type", "_commit_version", "_commit_timestamp")
 
     } else
-      context.sparkSession.table(table.fullName)
+      SparkSubFeed.getSparkSession.table(table.fullName)
 
     if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
 
@@ -322,7 +321,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
 
     val genericDf = SparkDataFrame(df)
@@ -434,7 +433,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    * This all is done in one transaction.
    */
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
     val saveModeExpr = saveModeOptions.getExpressions(SparkSubFeed.subFeedType)
     def toSpark(expr: GenericColumn): Column = expr.asInstanceOf[SparkColumn].inner
@@ -492,7 +491,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   def vacuum(implicit context: ActionPipelineContext): Unit = {
 
-    val session = context.sparkSession
+    val session = SparkSubFeed.getSparkSession
 
     def intervalHasPassed(lastExecution: Timestamp): Boolean = {
       val timePassed = Duration.between(lastExecution.toLocalDateTime, LocalDateTime.now)
@@ -514,11 +513,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
-    context.sparkSession.catalog.databaseExists(table.getDbName)
+    SparkSubFeed.getSparkSession.catalog.databaseExists(table.getDbName)
   }
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
-    context.sparkSession.catalog.tableExists(table.fullName)
+    SparkSubFeed.getSparkSession.catalog.tableExists(table.fullName)
   }
 
   /**
@@ -552,7 +551,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     val (pvs,d) = PerformanceUtils.measureDuration(
-      if(isTableExisting) PartitionValues.fromDataFrame(SparkDataFrame(context.sparkSession.table(table.fullName).select(partitions.map(col):_*).distinct()))
+      if(isTableExisting) PartitionValues.fromDataFrame(SparkDataFrame(SparkSubFeed.getSparkSession.table(table.fullName).select(partitions.map(col):_*).distinct()))
       else Seq()
     )
     logger.debug(s"($id) listPartitions took $d")
@@ -564,11 +563,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
    */
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val helper: SparkSubFeed.type = SparkSubFeed
-    partitionValues.map(_.getFilterExpr).foreach(expr => deltaTable(context.sparkSession).delete(expr.exprSql))
+    partitionValues.map(_.getFilterExpr).foreach(expr => deltaTable(SparkSubFeed.getSparkSession).delete(expr.exprSql))
   }
 
   override def movePartitions(partitionValues: Seq[(PartitionValues, PartitionValues)])(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     partitionValues.foreach {
       case (pvExisting, pvNew) =>
         deltaTable.update(pvExisting.getFilterExpr(SparkSubFeed).asInstanceOf[SparkColumn].inner, pvNew.elements.view.mapValues(lit).toMap)
@@ -577,7 +576,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     HiveUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
   }
 
@@ -587,7 +586,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getStats(update: Boolean = false)(implicit context: ActionPipelineContext): Map[String, Any] = {
     try {
-      implicit val session: SparkSession = context.sparkSession
+      implicit val session: SparkSession = SparkSubFeed.getSparkSession
       import session.implicits._
       val dfHistory = deltaTable.history()
         .select("timestamp", "userMetadata").as[(Long,String)]
@@ -608,10 +607,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
     try {
-      val session = context.sparkSession
+      val session = SparkSubFeed.getSparkSession
       val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
       val snapshot = deltaLog.unsafeVolatileSnapshot
       val columns = snapshot.schema.fieldNames
+      import session.implicits._
 
       def colExists(schema: StructType, nestedCol: Seq[String]): Boolean = {
         nestedCol match {
@@ -690,7 +690,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
   }
 
@@ -699,7 +699,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val schemaConstraint = if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '${schema.get}'"
     val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
     val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
-    val df = context.sparkSession.sql(query)
+    val df = SparkSubFeed.getSparkSession.sql(query)
     val (primaryKeyCols, primaryKeyName) = df.collect().foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
     (primaryKeyCols.toList, primaryKeyName.toList) match {
       case (List(), _) => None
@@ -711,23 +711,23 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
-    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+    SparkQueryUtil.executeSqlStatementBasedOnTable(SparkSubFeed.getSparkSession, query, table)
   }
 
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
-    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+    SparkQueryUtil.executeSqlStatementBasedOnTable(SparkSubFeed.getSparkSession, query, table)
   }
 
   def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
-    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+    SparkQueryUtil.executeSqlStatementBasedOnTable(SparkSubFeed.getSparkSession, query, table)
   }
 
   def updateExistingColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
     comments.foreach( comment => {
       val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
-      SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
+      SparkQueryUtil.executeSqlStatementBasedOnTable(SparkSubFeed.getSparkSession, query, table)
     }
     )
   }

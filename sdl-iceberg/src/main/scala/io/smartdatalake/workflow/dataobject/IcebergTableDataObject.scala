@@ -119,7 +119,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   override val postReadSql: Option[String] = None,
                                   override val preWriteSql: Option[String] = None,
                                   override val postWriteSql: Option[String] = None,
-                                  override val sparkConnectionId: Option[ConnectionId] = None
                                  )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
@@ -137,7 +136,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   val filetypePattern: String = ".*(\\.parquet|\\.avro|\\.orc|c\\d\\d\\d)$" // Iceberg supports to read mixed tables! 'c000' can be the file ending for parquet files of legacy hive tables!
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     val thisIsTableExisting = isTableExisting
     val thisIsPathBasedCatalog = isPathBasedCatalog(getIcebergCatalog)
     require(thisIsTableExisting || thisIsPathBasedCatalog || path.isDefined, s"($id) Iceberg table ${table.fullName} does not exist, so path must be set.")
@@ -207,7 +206,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     super.prepare
     if (connection.exists(_.checkIcebergSparkOptions)) {
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"),
@@ -251,7 +250,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * converts an existing hive table with parquet files to an iceberg table
    */
   private[smartdatalake] def convertTableToIceberg(implicit context: ActionPipelineContext): Unit = {
-    SparkActions.get(context.sparkSession).migrateTable(getIdentifier.toString)
+    SparkActions.get(SparkSubFeed.getSparkSession).migrateTable(getIdentifier.toString)
   }
 
   /**
@@ -273,12 +272,12 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     // create table
     logger.info(s"($id) convertPathToIceberg: creating iceberg table")
     // get schema using Spark. Note that this only work for parquet files.
-    val sparkSchema = context.sparkSession.read.parquet(dataPath.toString).schema
+    val sparkSchema = SparkSubFeed.getSparkSession.read.parquet(dataPath.toString).schema
     createIcebergTable(sparkSchema)
     // add files
     logger.info(s"($id) convertPathToIceberg: add_files")
     val parallelismStr = connection.flatMap(_.addFilesParallelism.map(", parallelism => " + _)).getOrElse("")
-    context.sparkSession.sql(s"CALL ${getIcebergCatalog.name}.system.add_files(table => '${getIdentifier.toString}', source_table => '`parquet`.`$dataPath`'$parallelismStr)")
+    SparkSubFeed.getSparkSession.sql(s"CALL ${getIcebergCatalog.name}.system.add_files(table => '${getIdentifier.toString}', source_table => '`parquet`.`$dataPath`'$parallelismStr)")
     // cleanup potential SDLB .schema directory
     HdfsUtil.deletePath(new Path(hadoopPath, ".schema"), doWarn = false)(filesystem)
     logger.info(s"($id) convertPathToIceberg: succeeded")
@@ -297,11 +296,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val df = incrementalOutputExpr match {
       case Some(snapshotId) =>
         require(table.primaryKey.isDefined, s"($id) PrimaryKey for table [${table.fullName}] needs to be defined when using DataObjectStateIncrementalMode")
-        val icebergTable = if(snapshotId == "0") context.sparkSession.table(table.fullName)
+        val icebergTable = if(snapshotId == "0") SparkSubFeed.getSparkSession.table(table.fullName)
           else {
 
           // activate temporary cdc view
-          context.sparkSession.sql(
+          SparkSubFeed.getSparkSession.sql(
             s"""CALL ${getIcebergCatalog.name}.system.create_changelog_view(table => '${getIdentifier.toString}'
                |, options => map('start-snapshot-id', '$snapshotId')
                |, compute_updates => true
@@ -312,7 +311,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           val temporaryViewName = table.name + "_changes"
 
           val windowSpec = Window.partitionBy(table.primaryKey.get.map(col): _*).orderBy(col("_change_ordinal").desc)
-          context.sparkSession.read
+          SparkSubFeed.getSparkSession.read
             .table(temporaryViewName)
             .where(expr("_change_type IN ('INSERT','UPDATE_AFTER')"))
             .withColumn("_rank", rank().over(windowSpec))
@@ -321,7 +320,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         }
         incrementalOutputExpr = Some(getIcebergTable.currentSnapshot().snapshotId().toString)
         icebergTable
-      case _ => context.sparkSession.table(table.fullName)
+      case _ => SparkSubFeed.getSparkSession.table(table.fullName)
     }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
@@ -357,7 +356,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    */
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                                   (implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     implicit val helper: SparkSubFeed.type = SparkSubFeed
 
     val genericDf = SparkDataFrame(df)
@@ -444,7 +443,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     // check if temp-table existing
     if(getIcebergCatalog.tableExists(getTableIdentifier)) {
       logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be replaced.")
@@ -462,7 +461,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * This all is done in one transaction.
    */
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
     try {
@@ -475,7 +474,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, SQLUtil.sparkQuoteCaseSensitiveColumn(_))
       updateExistingStatement.foreach{stmt =>
         logger.info(s"($id) executing update existing statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
-        context.sparkSession.sql(stmt)
+        SparkSubFeed.getSparkSession.sql(stmt)
       }
 
       // override missing columns with null value, as Iceberg needs all target columns be included in insert statement
@@ -491,7 +490,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       // execute
       logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptionsExt).map(e => e._1+"="+e._2).mkString(" ")}")
       logger.debug(s"($id) merge statement: $mergeStmt")
-      context.sparkSession.sql(mergeStmt)
+      SparkSubFeed.getSparkSession.sql(mergeStmt)
       // return
       metrics
     } finally {
@@ -539,7 +538,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   def vacuum(implicit context: ActionPipelineContext): Unit = {
     historyRetentionPeriod.foreach { hours =>
       val (_, d) = PerformanceUtils.measureDuration {
-        SparkActions.get(context.sparkSession)
+        SparkActions.get(SparkSubFeed.getSparkSession)
           .expireSnapshots(getIcebergTable)
           .expireOlderThan(System.currentTimeMillis - hours * 60 * 60 * 1000)
           .execute
@@ -568,7 +567,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
   private def getCatalogAndIdentifier(implicit context: ActionPipelineContext): CatalogAndIdentifier = {
     if (_catalogAndIdentifier.isEmpty) {
-      _catalogAndIdentifier = Some(Spark3Util.catalogAndIdentifier(context.sparkSession, table.nameParts.asJava))
+      _catalogAndIdentifier = Some(Spark3Util.catalogAndIdentifier(SparkSubFeed.getSparkSession, table.nameParts.asJava))
     }
     _catalogAndIdentifier.get
   }
@@ -620,7 +619,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (isTableExisting) {
-      val dfPartitions = context.sparkSession.table(s"${table.fullName}.partitions")
+      val dfPartitions = SparkSubFeed.getSparkSession.table(s"${table.fullName}.partitions")
       val isPartitioned = dfPartitions.columns.contains("partition")
       if (partitions.nonEmpty && !isPartitioned) logger.warn(s"($id) partitions are defined but Iceberg table is not partitioned.")
       if (partitions.isEmpty && isPartitioned) logger.warn(s"($id) partitions are not defined but Iceberg table is partitioned.")
@@ -637,7 +636,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    */
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     val deleteStmt = SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, SQLUtil.sparkQuoteCaseSensitiveColumn(_))
-    context.sparkSession.sql(deleteStmt)
+    SparkSubFeed.getSparkSession.sql(deleteStmt)
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
@@ -667,8 +666,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])
                              (implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = {
     try {
-      val session = context.sparkSession
-      val filesDf = context.sparkSession.table(s"${table.fullName}.files")
+      val session = SparkSubFeed.getSparkSession
+      import session.implicits._
+      val filesDf = SparkSubFeed.getSparkSession.table(s"${table.fullName}.files")
       val metricsRow = filesDf.select($"readable_metrics.*").head()
       val columns = metricsRow.schema.fieldNames
       columns.map {
@@ -713,7 +713,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     sqlOpt.foreach(stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
   }
 

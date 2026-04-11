@@ -90,7 +90,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     // get DataObjects
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(config.configPaths)
     val hadoopConf = globalConfig.getHadoopConfiguration
-    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter"), master=Some(config.master)), phase = ExecutionPhase.Init, serializableHadoopConf = new SerializableHadoopConfiguration(hadoopConf), globalConfig = globalConfig)
+    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter")), phase = ExecutionPhase.Init, globalConfig = globalConfig)
     val dataObjects = registry.getDataObjects
       .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
     logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.targets.mkString(",")}")

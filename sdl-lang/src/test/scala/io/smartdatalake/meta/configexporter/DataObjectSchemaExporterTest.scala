@@ -160,7 +160,7 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
   test("export statistics") {
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(Seq(configPath))
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(registry)
-    val session = context.sparkSession
+    val session = SparkSubFeed.getSparkSession
     import session.implicits._
     // prepare data object
     val hiveDO = registry.get[HiveTableDataObject](DataObjectId("dataObjectHive14"))
