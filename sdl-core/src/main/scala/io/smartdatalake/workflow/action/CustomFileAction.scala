@@ -26,6 +26,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.file.HadoopFileDataObject
 import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
@@ -77,7 +78,7 @@ case class CustomFileAction(override val id: ActionId,
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
-      val session = context.engineConnection.asInstanceOf[SparkClassicConnection].sparkSession
+      val session = SparkSubFeed.getSparkSession
       import session.implicits._
 
       // Create a Dataset of files to be processed

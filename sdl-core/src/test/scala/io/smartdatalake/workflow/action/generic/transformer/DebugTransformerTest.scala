@@ -25,9 +25,12 @@ import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
+import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-class DebugTransformerTest extends AnyFunSuite {
+import java.nio.file.Files
+
+class DebugTransformerTest extends AnyFunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -35,6 +38,12 @@ class DebugTransformerTest extends AnyFunSuite {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+
+  before {
+    instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
+  }
+
 
   test("copy load with transformer, a regular and a skipped input, skipped input is reset after decision to execute Action was made") {
 

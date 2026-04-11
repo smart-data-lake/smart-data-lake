@@ -18,11 +18,14 @@
  */
 package io.smartdatalake.workflow.action.scala
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockScalaDataObject}
+import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockScalaDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
 class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with DeduplicateActionBehaviour {
+
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultScalaConnection
 
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(

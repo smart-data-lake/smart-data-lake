@@ -56,6 +56,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }

@@ -39,6 +39,7 @@ import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanW
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import io.smartdatalake.util.misc.SeqUtil._
 
 import scala.jdk.CollectionConverters._
 
@@ -96,8 +97,8 @@ case class MockSparkDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
-    assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
-    assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
+    assert(partitionValues.flatMap(_.keys).distinct.caseSensitiveDiff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
+    assert(partitions.caseSensitiveDiff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // recreate DataFrame to truncate logical plan to avoid side-effects in tests
@@ -108,8 +109,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
       finalSaveMode match {
         case SDLSaveMode.Overwrite =>
           // mimick partition overwrite
-          val inferredPartitionValues = if (partitionValues.isEmpty && partitions.nonEmpty) PartitionValues.fromDataFrame(SparkDataFrame(df.select(partitions.map(col): _*)))
-          else partitionValues
+          val inferredPartitionValues = PartitionValues.fromDataFrame(SparkDataFrame(newDf.select(partitions.map(col): _*)))
           val newDataFrames = inferredPartitionValues.map(pv => (pv, newDf.where(getPartitionValueFilter(pv)))).toMap
           if (newDataFrames.nonEmpty) {
             partitionedDataFrameMock = Some(
