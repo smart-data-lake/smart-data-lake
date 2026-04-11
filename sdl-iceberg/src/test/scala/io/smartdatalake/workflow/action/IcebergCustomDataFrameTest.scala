@@ -52,6 +52,7 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("CustomDataFrameAction with recursiveInput") {

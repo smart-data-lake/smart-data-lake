@@ -8,7 +8,7 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>sdl-debezium_${scala.minor.version}</artifactId>
+  <artifactId>sdl-debezium_2.13</artifactId>
   <packaging>jar</packaging>
   <name>sdl-debezium</name>
 

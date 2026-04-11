@@ -26,7 +26,7 @@
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
-	<artifactId>sdl-deltalake_${scala.minor.version}</artifactId>
+	<artifactId>sdl-deltalake_2.13</artifactId>
 	<packaging>jar</packaging>
 
 	<name>sdl-deltalake</name>

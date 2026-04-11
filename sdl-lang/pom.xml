@@ -29,7 +29,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>sdl-lang_${scala.minor.version}</artifactId>
+    <artifactId>sdl-lang_2.13</artifactId>
     <packaging>jar</packaging>
 
     <name>sdl-lang</name>

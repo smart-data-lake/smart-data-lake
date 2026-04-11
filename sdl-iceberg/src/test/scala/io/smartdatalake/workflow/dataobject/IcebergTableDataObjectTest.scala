@@ -58,6 +58,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("Write data") {

@@ -55,6 +55,7 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {

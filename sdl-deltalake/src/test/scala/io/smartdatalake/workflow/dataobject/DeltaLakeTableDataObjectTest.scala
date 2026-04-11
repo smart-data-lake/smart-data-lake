@@ -67,6 +67,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("CustomDf2DeltaTable") {

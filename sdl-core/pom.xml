@@ -27,7 +27,7 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>sdl-core_${scala.minor.version}</artifactId>
+    <artifactId>sdl-core_2.13</artifactId>
     <packaging>jar</packaging>
 
     <name>sdl-core</name>

@@ -25,6 +25,7 @@ import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -45,6 +46,8 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with Matchers
 
   // set additional spark options for delta lake
   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
+
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
