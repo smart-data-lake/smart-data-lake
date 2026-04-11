@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,14 +19,7 @@
 
 package io.smartdatalake.app
 
-import java.util
-
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
-import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, PluginContext, SparkPlugin}
-import org.apache.spark.{SparkConf, SparkContext, SparkEnv}
-
-import scala.jdk.CollectionConverters._
+import io.smartdatalake.util.misc.MemoryUtils
 
 /**
  * Configuration for periodic memory usage logging
@@ -48,4 +41,3 @@ private[smartdatalake] object MemoryLogTimerConfig{
   private val LOG_LINUX_CGROUP_MEM_OPTION = "spark.smartdatalake.memoryLog.logLinuxCGroupMem"
   private val LOG_BUFFERS_OPTION = "spark.smartdatalake.memoryLog.logBuffers"
 }
-

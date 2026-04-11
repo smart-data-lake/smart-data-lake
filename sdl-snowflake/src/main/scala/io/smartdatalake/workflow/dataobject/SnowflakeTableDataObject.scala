@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, Snowpar
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
-import io.smartdatalake.workflow.dataobject.generic.{CanHandleConstraints, CanHandlePartitions, Constraint, ExpectationValidation, PrimaryKeyDefinition, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
