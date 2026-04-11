@@ -28,8 +28,6 @@
     <modules>
         <module>sdl-core</module>
         <module>sdl-kafka</module>
-        <module>sdl-splunk</module>
-        <module>sdl-jms</module>
         <module>sdl-deltalake</module>
         <module>sdl-iceberg</module>
         <module>sdl-snowflake</module>
@@ -564,7 +562,6 @@
         <typesafe.config.version>1.4.3</typesafe.config.version>
         <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
         <monix.version>3.4.1</monix.version>
-        <splunk.version>1.6.5.0</splunk.version>
         <sshj.version>0.35.0</sshj.version>
         <snowflake-spark.version>3.1.1</snowflake-spark.version>
         <snowflake-snowpark.version>1.17.0</snowflake-snowpark.version>
