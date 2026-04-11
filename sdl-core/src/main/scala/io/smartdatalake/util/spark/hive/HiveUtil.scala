@@ -98,24 +98,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Calculate maximum number of records per file to reach the HDFS block size as closely as possible
-   * Numbers are retrieved from catalog so if a table doesn't have statistics, we will return None here
-   *
-   * We will reduce the number by 2%: If the number is too low, the block is not filled optimally. On the other hand,
-   * if the number is too high we end up with an additional (very small) block which is worse.
-   *
-   * @param table Hive Table
-   * @return Desired number of records per file if it can be determined, None otherwise
-   */
-  def calculateMaxRecordsPerFileFromStatistics(table: Table)(implicit session: SparkSession): Option[BigInt] = {
-    val desiredSizePerFile = HdfsUtil.desiredFileSize(session.sparkContext.hadoopConfiguration)
-    logger.debug("Desired filesize for session is " +desiredSizePerFile +" bytes.")
-
-    session.sharedState.externalCatalog.getTable(table.db.get, table.name).stats.flatMap(s =>
-      s.rowCount.map(rCount => (desiredSizePerFile / (s.sizeInBytes / rCount))*98/100))
-  }
-
-  /**
    * Collects column-level statistics for partitions
    *
    * @param table Hive table
@@ -128,7 +110,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       partitionValues.map{
         partitionValue =>
           // extend PartitionValue with defaults for missing partition colums
-          partitionValue.elements.mapValues(Some(_)) ++ partitionCols.diff(partitionValue.keys.toSeq).map( c => (c, None))
+          partitionValue.elements.view.mapValues(Some(_)) ++ partitionCols.diff(partitionValue.keys.toSeq).map( c => (c, None))
       }
     } else {
       // create a default entry for every partition column to compute statistics for all partition values existing on the storage
@@ -198,134 +180,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Writes DataFrame to Hive table by using DataFrameWriter.
-   * A missing table gets created. Dynamic partitioning is used to create partitions on the fly by Spark.
-   * Existing data of partition is overwritten, if table has no partitions all table-data is overwritten.
-   *
-   *
-   * @param session SparkSession
-   * @param dfNew DataFrame to write
-   * @param outputPath Path to store files for Table
-   * @param table Table
-   * @param partitions Partition column names
-   * @param hdfsOutputType tables underlying file format, default = parquet
-   * @param numInitialHdfsPartitions the initial number of files created if table does not exist yet, default = -1. Note: the number of files created is controlled by the number of Spark partitions.
-   */
-  def writeDfToHive(dfNew: DataFrame, outputPath: Path, table: Table, partitions: Seq[String], saveMode: SaveMode, numInitialHdfsPartitions: Int = -1)(implicit session: SparkSession): Unit = {
-    logger.info(s"(${table.fullName}) writeDfToHive: starting outputPath=$outputPath partitions=$partitions saveMode=${saveMode.name}")
-
-    // check if all partition cols are present in DataFrame
-    val missingPartitionCols = SchemaUtil.checkMissingCols(partitions, dfNew.columns.toSeq, Environment.caseSensitive)
-    require( missingPartitionCols.isEmpty, s"(${table.fullName}) Partition column(s) ${missingPartitionCols.mkString(",")} are missing in DataFrame columns (${dfNew.columns.mkString(",")})." )
-
-    // check if table exists and location is correct
-    val tableExists = isHiveTableExisting(table)
-    if (!tableExists) logger.info(s"(${table.fullName}) writeDfToHive: table doesnt exist yet")
-
-    // check if partitionsOpt match with existing table definition
-    if (tableExists) {
-      val existingPartitions = getTablePartitionCols(table).getOrElse(Seq())
-      val (partitionsMatch, configuredCols, existingCols) = SchemaUtil.checkPartitionMatch(partitions, existingPartitions, Environment.caseSensitive)
-
-      require( partitionsMatch, s"(${table.fullName}) writeDfToHive: configured vs existing partition columns are different: configured=$configuredCols, existing=$existingCols" )
-    }
-
-    // check if this run is with SchemaEvolution and sort columns (partition columns last)
-    val (df_newColsSorted, withSchemaEvolution) = if (tableExists) {
-      // check if schema evolution
-      val df_existing = session.table(table.fullName)
-      val withSchemaEvolution = !SchemaEvolution.hasSameColNamesAndTypes(SparkDataFrame(df_existing), SparkDataFrame(dfNew))
-      if (withSchemaEvolution) logger.info(s"(${table.fullName}) writeDfToHive: schema evolution detected\nexisting=${df_existing.schema.treeString}\nnew=${dfNew.schema.treeString}")
-
-      // Schema evolution with Partitions can only be done with other TransactionalTableDataObjects
-      require( !(withSchemaEvolution && partitions.nonEmpty), s"(${table.fullName}) Schema evolution with partitions is not working on Hive tables anymore as TickTock tables are deprecated! Use Delta, Iceberg,... instead." )
-
-      // move partition cols last, retain current column ordering if not schema evolution
-      // TODO: Do partitions-columns not only need to be at the end, but also in the right order if you have more than one?
-      val colsSorted = movePartitionColsLast( if (withSchemaEvolution) dfNew.columns else df_existing.columns, partitions )
-      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
-      val df_newColsSorted = dfNew.select(colsSorted.map(col):_*)
-      (df_newColsSorted, withSchemaEvolution)
-
-    } else { // table does not exists
-      // move partition cols last
-      val colsSorted = movePartitionColsLast( dfNew.columns, partitions )
-      logger.debug(s"(${table.fullName}) writeDfToHive: columns sorted to ${colsSorted.mkString(",")}")
-      val df_newColsSorted = dfNew.select(colsSorted.map(col):_*)
-      (df_newColsSorted, false)
-    }
-
-    // write to table
-    val originalMaxRecordsPerFile = session.conf.get("spark.sql.files.maxRecordsPerFile")
-    if (tableExists && !withSchemaEvolution) {
-      // insert into existing table
-      logger.info(s"(${table.fullName}) writeDfToHive: insert into ${table.fullName}")
-
-      // Try to determine maximum number of records according to catalog statistics
-      val df_partitioned = if (numInitialHdfsPartitions == -1) {
-        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
-        df_newColsSorted
-      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
-        // pass DataFrame straight through if AQE is enabled
-        logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
-        df_newColsSorted
-      } else {
-        val maxRecordsPerFile: Option[BigInt] = calculateMaxRecordsPerFileFromStatistics(table)
-        if (maxRecordsPerFile.isDefined) {
-          // if exact number of records could be determined from Hive statistics, use it to split files
-          logger.info(s"(${table.fullName}) writing with maxRecordsPerFile " + maxRecordsPerFile.get.toLong)
-          // TODO: Check for side effects (df.write.option("maxRecordsPerFile", ... ) does only work for FileWriters, but spark config "spark.sql.files.maxRecordsPerFile" works also for writing tables,
-          //       so we're setting it on the current runtime config used by all DFs / RDDs
-          session.conf.set("spark.sql.files.maxRecordsPerFile", maxRecordsPerFile.get.toLong)
-          HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath, reducePartitions = true)
-        } else {
-          HdfsUtil.repartitionForHdfsFileSize(df_newColsSorted, outputPath)
-        }
-      }
-
-      // Write file
-      df_partitioned.write
-        .mode(saveMode)
-        .insertInto(table.fullName)
-
-    } else {
-      // for new tables:
-      // use user defined numInitialHdfsPartitions or leave partitioning as is
-      // it's assumed that i.e. a CustomDfCreator takes care of proper partitioning in this case
-      val df_partitioned = if (numInitialHdfsPartitions == -1) {
-        // pass DataFrame straight through if numInitialHdfsPartitions == -1, in this case the file size in the responsibility of the framework and must be controlled in custom transformations
-        df_newColsSorted
-      } else if (EnvironmentUtil.isSparkAdaptiveQueryExecEnabled) {
-        // pass DataFrame straight through if AQE is enabled
-        logger.warn(s"(${table.fullName}) numInitialHdfsPartitions is ignored when Spark 3.0 Adaptive Query Execution (AQE) is enabled")
-        df_newColsSorted
-      } else df_newColsSorted.repartition(numInitialHdfsPartitions)
-
-      // create and write to table
-      if (partitions.nonEmpty) { // with partitions
-        logger.info(s"(${table.fullName}) writeDfToHive: creating external partitioned table at location $outputPath")
-        implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(outputPath)
-        HdfsUtil.deletePath(outputPath, doWarn=false) // delete existing data, as all partitions need to be written when table is created.
-        df_partitioned.write
-          .partitionBy(partitions:_*)
-          .format(OutputType.Parquet.toString)
-          .option("path", outputPath.toString)
-          .mode("overwrite")
-          .saveAsTable(table.fullName)
-
-      } else { // without partitions
-        logger.info(s"(${table.fullName}) writeDfToHive: creating table at location $outputPath")
-        df_partitioned.write
-          .format(OutputType.Parquet.toString)
-          .option("path", outputPath.toString)
-          .mode("overwrite")
-          .saveAsTable(table.fullName)
-      }
-    }
-    session.conf.set("spark.sql.files.maxRecordsPerFile", originalMaxRecordsPerFile.toLong)
-  }
-
-  /**
    * Collects table statistics for table or table with partitions
    *
    * @param table Hive table
@@ -378,29 +232,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Executes a Hive system command through [[ProcessBuilder]].
-   * Execution s blocked until the external command is finished.
-   *
-   * @param stmt Hive command to be executed
-   * @throws AnalyzeTableException If system command has a return code != 0
-   * @return Command exit status == 0: true, otherwise false
-   */
-  def execHiveSystemCommand(stmt: String): Boolean = {
-    val cmd = "kinit"
-    val stdOut = new StringBuilder
-    val stdErr = new StringBuilder
-    val exitStatus = cmd ! ProcessLogger(stdOut append _, stdErr append _)
-    if (exitStatus == 0) {
-      logger.info(s"$cmd: stdOut: $stdOut")
-      true
-    } else {
-      logger.error(s"Hive system command failed, cmd: $cmd, exit status: $exitStatus, stderr: $stdErr")
-      false
-    }
-  }
-
-  /**
-   * Loggs an exception thrown by a Hive statement and re-throws it.
+   * Logs an exception thrown by a Hive statement and re-throws it.
    *
    * @param e exception to be handled
    * @param stmt Hive statement that threw the exception
@@ -408,55 +240,6 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    */
   def handleSqlException(e: Exception, stmt: String) : Unit = {
     logger.warn(s"Error in SQL statement '$stmt':\n${e.getMessage}")
-  }
-
-  /**
-   * Checks if a Hive table exists
-   *
-   * @return true if a table exists, otherwise false
-   */
-  def isHiveTableExisting(table: Table)(implicit session: SparkSession): Boolean = {
-    if (table.db.isDefined) session.catalog.tableExists(table.db.get, table.name)
-    else session.catalog.tableExists(table.name)
-  }
-
-  def hiveTableLocation(table: Table)(implicit session: SparkSession): String = {
-    val extendedDescribe = session.sql(s"describe extended ${table.fullName}")
-      .cache()
-
-    // Spark 2.2, 2.3: Location is found as row with col_name == "Location",
-    // Some tables can have a real column "Location", so the data_type column is also verified for a path with "/"
-    //
-    // +----------------------------+-----------------------------+-------+
-    //|col_name                    |data_type                    |comment|
-    //+----------------------------+-----------------------------+-------+
-    // ...
-    //|Location                    |string                       |null   |
-    //
-    //|                            |                             |       |
-    //|# Detailed Table Information|                             |       |
-    //...
-    //|Location                    |hdfs://nameservice1/user/... |       |
-    //+----------------------------+-----------------------------+-------+
-    //
-    val location22 = Try(extendedDescribe.where(col("col_name") === "Location" && col("data_type")
-      .contains(Path.SEPARATOR_CHAR)).select("data_type").first().getString(0)).toOption
-
-    // Spark 2.1: Location must be parsed from row with col_name == "Detailed Table Information"
-    val tableDetails = extendedDescribe.where("col_name like '%Detailed Table Information%'").select("*").first()
-      .toString.map( c => if( c < ' ') " " else c).mkString // translate linebreak and control characters to whitespace
-    // look for location in table details with regexp
-    val locationPattern = """.*Location: ([^,\)]*)[,\)].*""".r
-    val location21 = tableDetails match {
-      case locationPattern(location) => Some(location)
-      case _ => None
-    }
-
-    location22.orElse(location21).getOrElse( throw new TableInformationException( s"Location for table ${table.fullName} not found"))
-  }
-
-  def existingTableLocation(table: Table)(implicit session: SparkSession): URI = {
-    session.sharedState.externalCatalog.getTable(table.db.get,table.name).location
   }
 
   def listPartitions(table: Table, partitions: Seq[String])(implicit session: SparkSession): Seq[PartitionValues] = {
