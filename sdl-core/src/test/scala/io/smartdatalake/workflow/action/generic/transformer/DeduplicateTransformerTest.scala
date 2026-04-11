@@ -46,6 +46,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("deduplication test with primary key") {
@@ -128,16 +129,14 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
       (2, 2, "2019-05-26 13:37:10", "2023-06-16 01:55:49"),
     ).toDF("pk1", "pk2", "created_at", "updated_at")
       .select($"pk1", $"pk2", $"created_at".cast(TimestampType), $"updated_at".cast(TimestampType))
-
     srcDO.writeSparkDataFrame(df)
-
     val tgtDO = MockSparkDataObject("tgt1").register
 
     // setup action
     val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id,
       transformers = Seq(DeduplicateTransformer(rankingExpression = Some("coalesce(updated_at, created_at)")))
-    )(Environment.instanceRegistry)
-    Environment.instanceRegistry.register(action)
+    )
+    instanceRegistry.register(action)
 
     // setup DAG
     val dag = ActionDAGRun(Seq(action))
@@ -164,16 +163,14 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
       (2, 2, "2019-05-26 13:37:10", "2023-06-16 01:55:49"),
     ).toDF("pk1", "pk2", "created_at", "updated_at")
       .select($"pk1", $"pk2", $"created_at".cast(TimestampType), $"updated_at".cast(TimestampType))
-
     srcDO.writeSparkDataFrame(df)
-
     val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("pk1", "pk2"))).register
 
     // setup action
     val action = CopyAction("copy_with_deduplication", srcDO.id, tgtDO.id,
       transformers = Seq(DeduplicateTransformer(rankingExpression = Some("coalesce(updated_at, created_at)")))
-    )(Environment.instanceRegistry)
-    Environment.instanceRegistry.register(action)
+    )
+    instanceRegistry.register(action)
 
     // setup DAG
     val dag = ActionDAGRun(Seq(action))

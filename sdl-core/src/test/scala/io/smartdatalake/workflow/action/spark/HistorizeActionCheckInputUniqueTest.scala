@@ -43,6 +43,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("HistorizeAction with checkInputUnique=true should succeed with unique input keys") {

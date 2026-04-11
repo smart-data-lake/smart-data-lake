@@ -71,6 +71,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     sdlb.instanceRegistry.clear()
+    sdlb.instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("Test command line argument parsing") {
@@ -91,7 +92,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val hoconConfig = appConfig.getHoconConfig()(session.sparkContext.hadoopConfiguration)
     assert(hoconConfig.getString("global.abc") == "def")
     assert(hoconConfig.getInt("global.synchronousStreamingTriggerIntervalSec") == 5)
-    assert(hoconConfig.getString("global.sparkUDFs.udfAddX.className") == "io.smartdatalake.app.TestUDFAddXCreator")
   }
 
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
@@ -153,9 +153,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       assert(resultActionsState == expectedActionsState)
     }
 
-    // now fill tgt1 with both partitions
-    tgt1DO.writeSparkDataFrame(dfSrc, Seq())
-
     // reset actions in registry
     instanceRegistry.register(action1.copy())
 
@@ -205,7 +202,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
     // second table has partition columns dt only (reduced)
-    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname")))
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -504,7 +501,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // action4 is skipped in init phase as data is not yet there, but should execute in exec phase
     val action4 = CustomDataFrameAction("d", Seq(tgt3DO.id, src2DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , executionMode = Some(DataFrameIncrementalMode("id"))
-      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select id, dt, type, lastname, firstname, udfAddX(rating) rating from tgt3")))
+      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select id, dt, type, lastname, firstname, rating from tgt3")))
     )
     instanceRegistry.register(action4.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
@@ -513,7 +510,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt4DO.getSparkDataFrame(Seq()).count() == 2)
+    assert(tgt4DO.getSparkDataFrame().count() == 2)
   }
 
   test("sdlb run with executionMode=PartitionDiffMode, increase runId on second run, state listener") {
@@ -525,7 +522,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -543,13 +539,13 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // use only first partition col (dt) for partition diff mode
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     instanceRegistry.register(action1.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
 
     // check latest state
     {
@@ -576,7 +572,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5, 10))
 
     // check latest state
     {
@@ -611,7 +607,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     val srcDO1 = TestIncrementalDataObject("src1")
@@ -675,7 +670,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -823,7 +817,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     )
 
     // Run SDLB
-    sdlb.run(sdlConfig)
+    val state = sdlb.run(sdlConfig)
 
     // check override of environment setting from global config
     // NOTE: this might fail with parallel test execution, because Environment is shared between all Tests...

@@ -52,8 +52,6 @@ case class SmartDataLakeBuilderConfig(override val feedSel: String = null,
                                       override val applicationName: Option[String] = None,
                                       override val configuration: Seq[String] = Seq(),
                                       override val configurationValueOverwrite: Map[String, String] = Map(),
-                                      override val master: Option[String] = None,
-                                      override val deployMode: Option[String] = None,
                                       override val partitionValues: Option[Seq[PartitionValues]] = None,
                                       override val parallelism: Int = 1,
                                       override val statePath: Option[String] = None,
@@ -218,6 +216,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
+    require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null, "Env variable HADOOP_HOME needs to be set in local mode on Windows!")
     AppUtil.setSdlbRunLoggerContext(appConfig)
     val stats = try {
       // invoke SDLPlugins if configured

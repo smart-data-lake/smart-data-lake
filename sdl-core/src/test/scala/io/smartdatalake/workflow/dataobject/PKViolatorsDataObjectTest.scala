@@ -45,6 +45,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
    test("normal pk violations") {

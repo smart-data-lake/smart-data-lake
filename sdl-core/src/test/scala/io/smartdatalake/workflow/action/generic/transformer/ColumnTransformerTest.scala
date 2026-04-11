@@ -41,6 +41,7 @@ class ColumnTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("only columns where the names match are removed") {

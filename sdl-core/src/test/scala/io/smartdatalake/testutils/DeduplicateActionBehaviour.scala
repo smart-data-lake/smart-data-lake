@@ -26,8 +26,7 @@ import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
-import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMergeDataFrame, CanWriteDataFrame, TableDataObject, TransactionalTableDataObject}
@@ -45,6 +44,8 @@ trait DeduplicateActionBehaviour {
 
   import TestUtil.registerDataObject
 
+  def defaultEngineConnection: Connection with EngineConnection
+
   def testDeduplicateTwoRuns(
       createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
       createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
@@ -53,6 +54,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -115,6 +117,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -149,6 +152,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -211,6 +215,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val helper = DataFrameSubFeed.getCompanion(subFeedType)
@@ -255,6 +260,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -346,6 +352,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -446,6 +453,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))

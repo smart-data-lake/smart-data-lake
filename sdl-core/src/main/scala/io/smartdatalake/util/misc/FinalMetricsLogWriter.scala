@@ -95,14 +95,14 @@ class FinalMetricsLogWriter(options: Map[String, StringOrSecret]) extends StateL
     val companion = DataFrameSubFeed.getCompanion(subFeedType)
     import companion._
     import companion.implicits._
-    actionLog.toDF().drop(col("data_object_metrics"))
+    actionLog.toDF.drop(col("data_object_metrics"))
   }
   private def createMetricsDf(actionLog: Seq[ActionLog])(implicit context: ActionPipelineContext) = {
     val subFeedType = actionLogDataObject.writeSubFeedSupportedTypes.head
     val companion = DataFrameSubFeed.getCompanion(subFeedType)
     import companion._
     import companion.implicits._
-    actionLog.toDF()
+    actionLog.toDF
       .withColumn("data_object_metrics", explode(col("data_object_metrics")))
       .select(Seq(col("run_id"), col("run_start_tstmp"), col("action_id"), col("attempt_id"), col("data_object_metrics.*")))
   }

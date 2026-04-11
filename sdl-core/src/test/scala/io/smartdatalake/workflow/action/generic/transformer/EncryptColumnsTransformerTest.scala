@@ -112,6 +112,7 @@ class EncryptColumnsTransformerTest extends AnyFunSuite {
 
     val globalConfig = GlobalConfig.from(config)
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
 
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = s"ids:actenc,ids:actdec")

@@ -50,6 +50,7 @@ trait DataObjectTestSuite extends AnyFunSuite with Matchers with BeforeAndAfter 
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     additionalBefore()
   }
 

@@ -19,14 +19,17 @@
 package io.smartdatalake.workflow.action.scala
 
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockScalaDataObject}
+import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockScalaDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
   with TestToolDataset with Equality with HistorizeActionBehaviour {
+
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultScalaConnection
 
   testsFor(historizeWithMergeMode(
     (id, registry) => MockScalaDataObject(id),

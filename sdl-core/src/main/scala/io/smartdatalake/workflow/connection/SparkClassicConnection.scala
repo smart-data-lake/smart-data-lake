@@ -74,6 +74,7 @@ case class SparkClassicConnection(
   @transient private var _sparkSession: Option[SparkSession] = None
   def sparkSession(implicit context: ActionPipelineContext): SparkSession = {
     if (_sparkSession.isEmpty) {
+      require(!master.contains("yarn") || System.getenv("SPARK_HOME") != null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!")
       val sparkOptionsExtended = additionalSparkOptions ++ sparkOptions
       checkCaseSensitivityIsConsistent(sparkOptionsExtended)
       val sparkSession = SparkClassicConnection.createSparkSession(context.application, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)

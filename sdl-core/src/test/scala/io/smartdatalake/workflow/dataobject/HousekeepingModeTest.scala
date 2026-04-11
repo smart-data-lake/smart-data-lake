@@ -55,6 +55,7 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("PartitionRetentionMode") {

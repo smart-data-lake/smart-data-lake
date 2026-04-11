@@ -63,6 +63,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   after {

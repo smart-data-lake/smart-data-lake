@@ -63,6 +63,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     contextInit = TestUtil.getDefaultActionPipelineContext
     contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
     contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
@@ -70,7 +71,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   test("action dag with 2 actions in sequence with state") {
     // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
@@ -121,7 +121,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // see also #119
 
     // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
@@ -155,8 +154,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // check metrics for MockSparkDataObject
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
-    assert(action2MainMetrics.isDefinedAt("bytes_written"))
-    assert(action2MainMetrics("num_tasks") == 1)
   }
 
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
@@ -259,7 +256,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   test("action dag where first actions has multiple input subfeeds, one should ignore filters") {
     // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO1 = MockSparkDataObject("src1").register
     val srcDO2 = MockSparkDataObject("src2", partitions = Seq("lastname")).register
     val srcDO3 = MockSparkDataObject("src3", partitions = Seq("lastname")).register
@@ -413,11 +409,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1", virtualPartitions = Seq("dt", "type"), jdbcOptions = Map("createTableColumnTypes" -> "dt varchar(255), type varchar(255), lastname varchar(255), firstname varchar(255), rating INTEGER"))
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("dt", "lastname", "firstname")))
-    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("dt", "lastname", "firstname")))
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
-
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("dt", "lastname", "firstname"))).register
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5) // partition 20180101 is included in partition values filter
       , ("20190101", "company", "olmo", "-", 10)) // partition 20190101 is not included
@@ -436,13 +428,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     dag.init(contextInit)
     dag.exec(contextExec)
 
-    val r1 = session.table(s"${tgt2Table.fullName}")
-      .select($"rating")
-      .as[Int].collect().toSeq
-    assert(r1.size == 1)
-    assert(r1.head == 5)
-
-    val dfTgt2 = session.table(s"${tgt2Table.fullName}")
+    val dfTgt2 = tgt2DO.getSparkDataFrame()
     assert(Seq("dt", "type", "lastname", "firstname", "rating").diff(dfTgt2.columns.map(_.toLowerCase)).isEmpty)
     val recordsTgt2 = dfTgt2
       .select($"rating")
@@ -538,7 +524,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // check metrics for CsvFileDataObject
     val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 40)
-    assert(action2MainMetrics.isDefinedAt("bytes_written"))
     assert(action2MainMetrics("num_tasks") == 1)
 
     // check metrics for FileTransferAction

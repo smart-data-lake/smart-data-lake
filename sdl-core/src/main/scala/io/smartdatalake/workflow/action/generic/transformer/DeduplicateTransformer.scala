@@ -41,7 +41,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param primaryKeyColumns Optional list of primary key columns.
  *                          If left empty the primary key of the Actions output DataObject is used.
  */
-case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: Option[String] = None, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]]) extends GenericDfTransformer {
+case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: Option[String] = None, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]])
+  extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
 
@@ -49,7 +50,7 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
     import functions._
 
     val primaryKey: Seq[String] = primaryKeyColumns.orElse {
-      val action = Environment.instanceRegistry.get[DataFrameActionImpl](actionId)
+      val action = context.instanceRegistry.get[DataFrameActionImpl](actionId)
       action.mainOutput match {
         case dataObject: TableDataObject => dataObject.table.primaryKey
         case _ => None

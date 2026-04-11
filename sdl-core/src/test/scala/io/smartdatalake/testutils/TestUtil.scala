@@ -29,9 +29,9 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.connection.SparkClassicConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.action.{CopyAction, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.connection.{Connection, ScalaConnection, SparkClassicConnection}
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
 import io.smartdatalake.workflow.dataobject.generic.{Table, TableDataObject}
@@ -103,13 +103,13 @@ object TestUtil extends SmartDataLakeLogger with Equality {
         session
       }
 
-  private val defaultSparkConnection = SparkClassicConnection(id = "default-spark", master = Some("local"))
+  val defaultSparkConnection = SparkClassicConnection(id = Environment.defaultEngineConnectionId, master = Some("local"))
+  val defaultScalaConnection = ScalaConnection(id = Environment.defaultEngineConnectionId)
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     // set a default spark connection in global config, to easily get spark engine connection in unit tests
     // note that also context.currentAction needs to be set; this is done in the unit test through sdlb.prepare/init/exec.
     val globalConfig = GlobalConfig(defaultSparkConnectionId = Some("default-spark"))
-    instanceRegistry.register(defaultSparkConnection)
     // create context
     ActionPipelineContext(
       "feedTest",

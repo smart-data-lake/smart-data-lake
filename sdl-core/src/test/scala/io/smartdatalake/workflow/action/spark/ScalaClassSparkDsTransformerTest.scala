@@ -59,6 +59,7 @@ class ScalaClassSparkDsTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
   after {
     instanceRegistry.clear()
