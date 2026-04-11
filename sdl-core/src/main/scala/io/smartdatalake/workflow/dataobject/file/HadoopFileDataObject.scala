@@ -22,7 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
-import io.smartdatalake.util.misc.{AclDef, AclUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.HadoopFileConnection
 import org.apache.hadoop.fs._
@@ -46,13 +46,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    * @return the current [[InstanceRegistry]].
    */
   def instanceRegistry(): InstanceRegistry
-
-  /**
-   * Return the ACL definition for the Hadoop path of this DataObject
-   *
-   * @see [[org.apache.hadoop.fs.permission.AclEntry]]
-   */
-  def acl(): Option[AclDef]
 
   /**
    * Return the connection id.
@@ -261,15 +254,10 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
     super.preWrite
-    // validate if acl's must be / are configured before writing
-    if (Environment.hadoopAuthoritiesWithAclsRequired.exists(a => filesystem.getUri.toString.contains(a))) {
-      require(acl().isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
-    }
   }
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    applyAcls
   }
 
   override def createInputStreams(path: String)(implicit context: ActionPipelineContext): Iterator[InputStream] = {
@@ -315,11 +303,6 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
       if (s.isDirectory) filesystem.delete(hadoopPath, /*recursive*/ true)
       else filesystem.delete(s.getPath, false)
     }
-  }
-
-  protected[workflow] def applyAcls(implicit context: ActionPipelineContext): Unit = {
-    val aclToApply = acl().orElse(connection.flatMap(_.acl))
-    if (aclToApply.isDefined) AclUtil.addACLs(aclToApply.get, hadoopPath)(filesystem)
   }
 
   def extractPartitionValuesFromDirPath(dirPath: String)(implicit context: ActionPipelineContext): PartitionValues = {

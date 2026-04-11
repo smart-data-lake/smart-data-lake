@@ -87,7 +87,6 @@ import scala.util.Try
  * @param saveMode               [[SDLSaveMode]] to use when writing files, default is "Overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution   If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param historyRetentionPeriod Optional Iceberg retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
- * @param acl                    override connection permissions for files created tables hadoop directory with this connection
  * @param connectionId           optional id of [[IcebergTableConnection]]
  * @param metadata               meta data
  * @param preReadSql             SQL-statement to be executed in exec phase before reading input table. If the catalog and/or schema are not
@@ -110,7 +109,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                   saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                   override val allowSchemaEvolution: Boolean = false,
                                   historyRetentionPeriod: Option[Int] = None, // hours
-                                  acl: Option[AclDef] = None,
                                   connectionId: Option[ConnectionId] = None,
                                   override val expectedPartitionsCondition: Option[String] = None,
                                   override val housekeepingMode: Option[HousekeepingMode] = None,
@@ -345,10 +343,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
     super.preWrite
-    // validate if acl's must be / are configured before writing
-    if (Environment.hadoopAuthoritiesWithAclsRequired.exists(a => filesystem.getUri.toString.contains(a))) {
-      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
-    }
   }
 
   /**
@@ -434,9 +428,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
     // vacuum iceberg table
     vacuum
-
-    // fix acls
-    if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
 
     // return
     sparkMetrics ++ icebergMetrics

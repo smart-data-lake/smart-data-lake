@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.AclDef
 
 /**
  * Connection information for hive tables
@@ -29,13 +28,11 @@ import io.smartdatalake.util.misc.AclDef
  * @param id unique id of this connection
  * @param db hive db
  * @param pathPrefix optional schema, authority and base path for tables directory on hadoop.
- * @param acl permissions for files created with this connection
  * @param metadata
  */
 case class HiveTableConnection( override val id: ConnectionId,
                                 db: String,
                                 pathPrefix: Option[String] = None,
-                                acl: Option[AclDef] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {
 

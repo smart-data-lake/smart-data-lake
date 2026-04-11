@@ -99,7 +99,6 @@ import scala.util.Try
  * @param minVacuumInterval Optional String to determine the minimum time interval between two vacuum operations. If the parameter is set,
  *                          SDLB will look at the last vacuum-execution time in the table and compare it to the current time. If the parameter is not set or if a vacuum has never happened, it will vacuum the table.
  *                          The interval must be provided as a String in ISO 8601 Duration format (e.g. "P4DT12H" for "four days and twelve hours")
- * @param acl override connection permissions for files created tables hadoop directory with this connection
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
@@ -126,7 +125,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     updateColumnComments: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
                                     minVacuumInterval: Option[String] = None,
-                                    acl: Option[AclDef] = None,
                                     connectionId: Option[ConnectionId] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val housekeepingMode: Option[HousekeepingMode] = None,
@@ -303,10 +301,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
     super.preWrite
-    // validate if acl's must be / are configured before writing
-    if (Environment.hadoopAuthoritiesWithAclsRequired.exists(a => filesystem.getUri.toString.contains(a))) {
-      require(acl.isDefined, s"($id) ACL definitions are required for writing DataObjects on hadoop authority ${filesystem.getUri} by environment setting hadoopAuthoritiesWithAclsRequired")
-    }
   }
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
@@ -417,9 +411,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     // vacuum delta lake table
     vacuum
-
-    // fix acls
-    if (acl.isDefined) AclUtil.addACLs(acl.get, hadoopPath)(filesystem)
 
     // return
     sparkMetrics ++ deltaMetrics

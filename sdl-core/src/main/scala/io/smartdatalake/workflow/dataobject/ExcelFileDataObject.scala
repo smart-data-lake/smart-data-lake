@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.misc.{AclDef, StringUtil}
+import io.smartdatalake.util.misc.StringUtil
 import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -63,7 +63,6 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1)),
-                               override val acl: Option[AclDef] = None,
                                override val connectionId: Option[ConnectionId] = None,
                                override val filenameColumn: Option[String] = None,
                                override val expectedPartitionsCondition: Option[String] = None,

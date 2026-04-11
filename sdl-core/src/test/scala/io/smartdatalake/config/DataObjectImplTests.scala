@@ -21,7 +21,6 @@ package io.smartdatalake.config
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
-import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
@@ -65,7 +64,6 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       path = "/path/to/foo",
       partitions = Seq.empty,
       saveMode = SDLSaveMode.Append,
-      acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(aclType = "group", name = "test", permission = "r-x")))),
       metadata = Some(DataObjectMetadata(name = Some("test"), description = Some("i am a test")))
     )
   }

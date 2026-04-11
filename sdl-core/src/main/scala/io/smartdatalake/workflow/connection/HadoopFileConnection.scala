@@ -21,19 +21,16 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.AclDef
 
 /**
  * Connection information for files on hadoop
  *
  * @param id unique id of this connection
  * @param pathPrefix schema, authority and base path for accessing files on hadoop
- * @param acl permissions for files created with this connection
  * @param metadata
  */
 case class HadoopFileConnection(override val id: ConnectionId,
                                 pathPrefix: String,
-                                acl: Option[AclDef] = None,
                                 sparkConnectionId: Option[ConnectionId] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {
