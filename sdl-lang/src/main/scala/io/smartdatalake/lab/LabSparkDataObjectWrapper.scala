@@ -73,7 +73,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
         s" but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
     dataObject match {
       case o: CanWriteSparkDataFrame =>
-        o.writeSparkDataFrame(ds, partitions.map(pv => PartitionValues(pv)))(context)
+        o.writeSparkDataFrame(ds.toDF(), partitions.map(pv => PartitionValues(pv)))(context)
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }
   }
@@ -134,7 +134,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def refresh(): Unit = {
     dataObject match {
       case o: TableDataObject =>
-        context.sparkSession.catalog.refreshTable(o.table.fullName)
+        SparkSubFeed.getSparkSession(context).catalog.refreshTable(o.table.fullName)
       case _ => throw NotSupportedException(dataObject.id, "is not a TableDataObject")
     }
   }

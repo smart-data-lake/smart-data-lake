@@ -349,7 +349,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare & start load
-    val action1 = CopyAction("a1", srcDO.id, tgtDO.id, transformer = None)
+    val action1 = CopyAction("a1", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())

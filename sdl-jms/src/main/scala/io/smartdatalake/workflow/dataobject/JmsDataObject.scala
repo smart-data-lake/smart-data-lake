@@ -26,6 +26,7 @@ import io.smartdatalake.util.jms.{JmsQueueConsumerFactory, SynchronousJmsReceive
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.generic.SchemaValidation
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -60,13 +61,13 @@ case class JmsDataObject(override val id: DataObjectId,
                          connectionFactory: String,
                          queue: String,
                          override val metadata: Option[DataObjectMetadata] = None)
-                        (implicit instanceRegistry: InstanceRegistry)
+                        (implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SchemaValidation {
 
   if(schemaMin.isDefined) logger.warn("SchemaMin ignored, for JmsDataObject is always fixed to payload:string")
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     val consumerFactory = new JmsQueueConsumerFactory(jndiContextFactory, jndiProviderUrl, authMode.userSecret.resolve(), authMode.passwordSecret.resolve(), connectionFactory, queue)
     val receiver = new SynchronousJmsReceiver[String](consumerFactory,
       TextMessageHandler.convert2Text, batchSize, Duration(maxWaitSec, TimeUnit.SECONDS),

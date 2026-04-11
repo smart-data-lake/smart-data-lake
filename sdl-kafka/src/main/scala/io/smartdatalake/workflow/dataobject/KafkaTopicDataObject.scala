@@ -140,9 +140,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
                                 override val options: Map[String, String] = Map(),
-                                override val sparkConnectionId: Option[ConnectionId] = None,
                                 override val metadata: Option[DataObjectMetadata] = None
-                           )(implicit instanceRegistry: InstanceRegistry)
+                           )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
     with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema
     with io.smartdatalake.util.spark.dataset.Transform {
@@ -218,7 +217,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
-    val dfRaw = context.sparkSession
+    val dfRaw = SparkSubFeed.getSparkSession
       .readStream
       .format("kafka")
       .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
@@ -244,7 +243,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
 
     // get DataFrame from topic
     val dfRaw = if (_kafkaStateIncrementalModeEnabled && context.isExecPhase) {
@@ -513,7 +512,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def createReadSchema(writeSchema: GenericSchema)(implicit context: ActionPipelineContext): GenericSchema = {
     writeSchema match {
       case sparkWriteSchema: SparkSchema =>
-        implicit val session: SparkSession = context.sparkSession
+        implicit val session: SparkSession = SparkSubFeed.getSparkSession
         // add additional columns created by kafka source
         val readSchemaRaw = sparkWriteSchema.inner
           .add("topic", StringType)

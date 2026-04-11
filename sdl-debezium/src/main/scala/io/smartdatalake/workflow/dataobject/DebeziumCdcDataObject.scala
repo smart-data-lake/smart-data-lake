@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanCreateIncrementalOutput, SchemaValidation, Table}
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -78,7 +78,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  schemaMin: Option[GenericSchema] = None,
                                  debeziumProperties: Option[Map[String, String]] = None,
                                  maxWaitTimeAfterLastBatchMilliSeconds: Option[Int] = Some(10000),
-                                 override val sparkConnectionId: Option[ConnectionId] = None,
                                  override val metadata: Option[DataObjectMetadata] = None)
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation {
@@ -127,7 +126,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
-    implicit val spark: SparkSession = context.sparkSession
+    implicit val spark: SparkSession = SparkSubFeed.getSparkSession
 
     def getRecordsFromDebeziumEngine(
                                       properties: Properties,

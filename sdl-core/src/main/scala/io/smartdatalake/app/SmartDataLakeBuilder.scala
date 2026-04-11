@@ -505,7 +505,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
             // remove spark caches so that new data is read in next iteration
             //TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
             //TODO: add additional method actionDAGRun.finalizeIteration or similar, which can be used to do some finalization tasks at the end of an iteration, for all connections
-            //if (context.hasSparkSession) context.sparkSession.sqlContext.clearCache()
+            //if (context.hasSparkSession) SparkSubFeed.getSparkSession.sqlContext.clearCache()
             // iterate execution
             // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
             Some(actionDAGRun.copy(executionId = newContext.executionId), newContext, Some(startTime))
@@ -514,9 +514,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               //TODO: add additional method actionDAGRun.stopAsynchronous or similar, which will stop asynchronous actions
               //if (context.hasSparkSession) {
                 // stop active streaming queries
-                //context.sparkSession.streams.active.foreach(_.stop())
+                //SparkSubFeed.getSparkSession.streams.active.foreach(_.stop())
                 // if there were exceptions, throw first one
-                //context.sparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
+                //SparkSubFeed.getSparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
               //}
             }
             // otherwise everything went smooth
@@ -528,14 +528,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           if (!Environment.stopStreamingGracefully) {
             //TODO: add additional method actionDAGRun.stopAsynchronous(wait=false) or similar, which will stop asynchronous actions
             //if (context.hasSparkSession) {
-              //context.sparkSession.streams.awaitAnyTermination()
-              //context.sparkSession.streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
+              //SparkSubFeed.getSparkSession.streams.awaitAnyTermination()
+              //SparkSubFeed.getSparkSession.streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
             //}
             actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context) // notify about this asynchronous iteration
           } else {
             //TODO: add additional method actionDAGRun.stopAsynchronous(wait=true) or similar, which will stop asynchronous actions
             //if (context.hasSparkSession) {
-            //  context.sparkSession.streams.active.foreach(_.stop())
+            //  SparkSubFeed.getSparkSession.streams.active.foreach(_.stop())
             //}
             logger.info("Stopped streaming gracefully")
           }

@@ -20,12 +20,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.ConfigToolbox
+import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
@@ -78,9 +79,9 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
     println("Initial read test started")
 
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     Environment._instanceRegistry = instanceRegistry
-    implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
     // Setup connection
     val connection = DebeziumConnection(
@@ -144,9 +145,9 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
     println("Insert test started")
 
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     Environment._instanceRegistry = instanceRegistry
-    implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
     // Setup connection
     val connection = DebeziumConnection(
@@ -209,9 +210,9 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
     println("Update test started")
 
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     Environment._instanceRegistry = instanceRegistry
-    implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
     // Setup connection
     val connection = DebeziumConnection(
@@ -274,9 +275,9 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
     println("Delete test started")
 
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     Environment._instanceRegistry = instanceRegistry
-    implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
     // Setup connection
     val connection = DebeziumConnection(
@@ -339,9 +340,9 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
     println("No new data test started")
 
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     Environment._instanceRegistry = instanceRegistry
-    implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
     // Setup connection
     val connection = DebeziumConnection(

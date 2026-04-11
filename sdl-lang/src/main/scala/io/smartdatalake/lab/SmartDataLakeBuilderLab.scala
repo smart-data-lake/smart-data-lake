@@ -53,7 +53,7 @@ case class SmartDataLakeBuilderLab[D,A](
                                        ) {
 
   @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader, session.sparkContext.hadoopConfiguration)
-  @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
+  @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(registry)
   @transient val dataObjects: D = dataObjectCatalogFactory(registry, context)
   @transient val actions: A = actionCatalogFactory(registry, context)
   @transient private val dataObjectsTolerantKey = registry.getDataObjects.map{d => (prepareTolerantKey(d.id.id), d)}.toMap

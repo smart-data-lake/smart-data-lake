@@ -31,6 +31,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.SplunkConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.SplunkFormatter.{fromSplunkStringFormat, toSplunkStringFormat}
 import io.smartdatalake.workflow.dataobject.generic.ConnectionTestException
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
@@ -51,7 +52,6 @@ import scala.jdk.CollectionConverters._
 case class SplunkDataObject(override val id: DataObjectId,
                              params: SplunkParams,
                              connectionId: ConnectionId,
-                             override val sparkConnectionId: Option[ConnectionId] = None,
                              override val metadata: Option[DataObjectMetadata] = None
                            )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SplunkService {
@@ -75,7 +75,7 @@ case class SplunkDataObject(override val id: DataObjectId,
   }
 
   private def readFromSplunk(params: SplunkParams)(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     val queryTimeIntervals = splitQueryTimes(params.queryFrom, params.queryTo, params.queryTimeInterval).repartition(params.parallelRequests)
     val searchResultRdd = queryTimeIntervals.map(interval => readRowsFromSplunk(interval, params)).as[Seq[Row]].rdd
     val searchResultRddFlattened = searchResultRdd.flatMap(identity)

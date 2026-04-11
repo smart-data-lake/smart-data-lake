@@ -51,7 +51,7 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with
     ))
 
   testsFor(historizeIncrementalPipeline(
-      (id, registry) => MockSparkDataObject(id),
+      (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
         IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)

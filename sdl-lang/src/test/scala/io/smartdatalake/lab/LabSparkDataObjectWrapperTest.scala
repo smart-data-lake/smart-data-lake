@@ -47,7 +47,7 @@ class LabSparkDataObjectWrapperTest extends AnyFunSuite {
 
     {
       val df = srcDO1Wrapper.get("doe")
-      assert(df.count==1)
+      assert(df.count() == 1)
     }
   }
 }

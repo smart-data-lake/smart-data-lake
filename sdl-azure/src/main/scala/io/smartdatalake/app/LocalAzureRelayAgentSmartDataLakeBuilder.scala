@@ -32,8 +32,6 @@ case class LocalAzureRelayAgentSmartDataLakeBuilderConfig(override val feedSel: 
                                                           override val applicationName: Option[String] = Some("AgentApp"),
                                                           override val configuration: Seq[String] = Seq(),
                                                           override val configurationValueOverwrite: Map[String, String] = Map(),
-                                                          override val master: Option[String] = Some("local[*]"),
-                                                          override val deployMode: Option[String] = None,
                                                           override val partitionValues: Option[Seq[PartitionValues]] = None,
                                                           override val parallelism: Int = 1,
                                                           override val statePath: Option[String] = None,

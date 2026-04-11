@@ -18,8 +18,10 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
+import io.smartdatalake.config.ConfigsMacroDebug.instanceRegistry
+import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils}
@@ -32,6 +34,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
   with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
+
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
@@ -65,4 +69,5 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
       }
     )
   }
+
 }
