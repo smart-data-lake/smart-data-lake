@@ -49,8 +49,6 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
   override def nodeId: NodeId = wrappedAction.nodeId
 
-  override def atlasName: String = wrappedAction.atlasName
-
   override def metadata: Option[ActionMetadata] = wrappedAction.metadata
 
   override def inputs: Seq[DataObject] = wrappedAction.inputs

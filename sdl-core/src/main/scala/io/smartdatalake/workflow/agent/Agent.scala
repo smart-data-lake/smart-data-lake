@@ -22,10 +22,9 @@ package io.smartdatalake.workflow.agent
 import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.config.SdlConfigObject.AgentId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.workflow.AtlasExportable
 import io.smartdatalake.workflow.connection.Connection
 
-private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConfig[Agent] with AtlasExportable {
+private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConfig[Agent] {
   /**
    * A unique identifier for this instance.
    */
@@ -51,5 +50,4 @@ private[smartdatalake] trait Agent extends SdlConfigObject with ParsableFromConf
     s"$id[${this.getClass.getSimpleName}]"
   }
 
-  override def atlasName: String = id.id
 }

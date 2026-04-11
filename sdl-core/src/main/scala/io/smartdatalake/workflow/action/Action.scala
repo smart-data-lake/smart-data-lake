@@ -29,8 +29,8 @@ import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, TransactionalTableDataObject}
 
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
@@ -40,7 +40,7 @@ import scala.reflect.runtime.universe._
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
  * the DAG of actions.
  */
-trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger with AtlasExportable {
+trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger {
 
   /**
    * A unique identifier for this instance.
@@ -429,7 +429,6 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     s"$toStringShort Inputs: $inputStr Outputs: $outputStr"
   }
 
-  override def atlasName: String = id.id
 }
 
 /**

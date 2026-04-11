@@ -20,11 +20,11 @@ package io.smartdatalake.workflow.connection
 
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
+import io.smartdatalake.workflow.ActionPipelineContext
 
 import scala.reflect.runtime.universe.Type
 
-trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
+trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] {
 
   /**
    * A unique identifier for this instance.
@@ -40,7 +40,6 @@ trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] wit
     s"$id[${this.getClass.getSimpleName}]"
   }
 
-  override def atlasName: String = id.id
 }
 
 /**

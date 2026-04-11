@@ -60,10 +60,6 @@ trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaVali
     getPKduplicates(subFeedType).unionByName(getPKnulls(subFeedType))
   }
 
-  override def atlasQualifiedName(prefix: String): String = s"${table.db.getOrElse("default")}.${table.name}"
-
-  override def atlasName: String = id.id
-
   /**
    * Returns statistics about this DataObject from the catalog. Depending on it's type this can be
    * - min
