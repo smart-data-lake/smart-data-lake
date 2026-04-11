@@ -344,7 +344,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     a [ProcessingLogicException] should be thrownBy dataObject.writeSparkDataFrame(df, partitionValues = Seq())
   }
 
-  private def createJsonFiles(path: file.Path, nbOfFile: Int = 100, filenamePrefix: String = "test") = {
+  private def createJsonFiles(path: java.nio.file.Path, nbOfFile: Int = 100, filenamePrefix: String = "test") = {
     Files.createDirectory(path)
     logger.info(s"creating test files in $path")
     (1 to nbOfFile).foreach { i =>
@@ -352,7 +352,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
       writer.write(s"""{"value": $i}""")
       writer.close()
     }
-    assert(file.Files.list(path).count == nbOfFile)
+    assert(Files.list(path).count == nbOfFile)
   }
 
   // create data for 2 partitions and compact one of them
@@ -371,8 +371,8 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.movePartitions(pvsToMove)
 
     //check
-    assert(!file.Files.exists(partitionPathA)) // p=A is deleted
-    assert(file.Files.list(partitionPathB).count == 20) // check p=A moved to p=B
+    assert(!Files.exists(partitionPathA)) // p=A is deleted
+    assert(Files.list(partitionPathB).count == 20) // check p=A moved to p=B
     assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head == 110) // check completeness of p=A + p=B
   }
 
