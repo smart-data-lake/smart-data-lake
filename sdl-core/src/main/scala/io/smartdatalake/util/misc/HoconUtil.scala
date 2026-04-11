@@ -19,7 +19,7 @@
 
 package io.smartdatalake.util.misc
 
-import com.typesafe.config.{ConfigList, ConfigObject, ConfigValue, ConfigValueFactory, ConfigValueType}
+import com.typesafe.config._
 
 import scala.jdk.CollectionConverters._
 

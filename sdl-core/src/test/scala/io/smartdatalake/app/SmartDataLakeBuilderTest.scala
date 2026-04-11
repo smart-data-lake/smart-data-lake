@@ -729,6 +729,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
         |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
@@ -776,6 +777,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
         |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
@@ -794,8 +796,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
   test("sdlb run with state file using FinalStateWriter, FinalMetricsWriter, uiBackend and Environment setting override from config") {
 
-    val port = 8080 // for some reason, only the default port seems to work
-    val httpsPort = 8443
+    val port = 8888
+    val httpsPort = 8889
     val host = "127.0.0.1"
     val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
     TestUtil.setupWebserviceStubs()

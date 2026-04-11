@@ -21,18 +21,19 @@ package io.smartdatalake.testutils
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
+import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.action.{CopyAction, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.action.{RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.connection.{Connection, ScalaConnection, SparkClassicConnection}
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
 import io.smartdatalake.workflow.dataobject.generic.{Table, TableDataObject}
@@ -104,8 +105,21 @@ object TestUtil extends SmartDataLakeLogger with Equality {
         session
       }
 
-  val defaultSparkConnection = SparkClassicConnection(id = Environment.defaultEngineConnectionId, master = Some("local"))
-  val defaultScalaConnection = ScalaConnection(id = Environment.defaultEngineConnectionId)
+  val defaultSparkConnection: SparkClassicConnection = {
+    implicit val dummyRegistry: InstanceRegistry = new InstanceRegistry
+    // parse from config, so that connection._config value is filled for agent config serialization tests...
+    ConfigParser.parseConfigObject[Connection](
+      ConfigFactory.parseString(s"type = SparkClassicConnection, id = ${Environment.defaultEngineConnectionId}, master = local")
+    ).asInstanceOf[SparkClassicConnection]
+  }
+  val defaultScalaConnection: ScalaConnection = {
+    implicit val dummyRegistry: InstanceRegistry = new InstanceRegistry
+    // parse from config, so that connection._config value is filled for agent config serialization tests...
+    ConfigParser.parseConfigObject[Connection](
+      ConfigFactory.parseString(s"type = ScalaConnection, id = ${Environment.defaultEngineConnectionId}")
+    ).asInstanceOf[ScalaConnection]
+    ScalaConnection(id = Environment.defaultEngineConnectionId)
+  }
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
     // set a default spark connection in global config, to easily get spark engine connection in unit tests

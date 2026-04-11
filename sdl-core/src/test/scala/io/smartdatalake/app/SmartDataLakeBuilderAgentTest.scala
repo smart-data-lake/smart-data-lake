@@ -63,7 +63,10 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
 
     val actionToSend = sdlb.instanceRegistry.getActions.filter(_.id.id == "remote-to-cloud-jetty-agent").head.asInstanceOf[ProxyAction].wrappedAction
 
-    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil, JettyAgent(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
+    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil,
+      JettyAgent(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap),
+      ExecutionPhase.Exec
+    )
     val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)
