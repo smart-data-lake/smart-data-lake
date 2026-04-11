@@ -19,10 +19,13 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.{DataObjectTestSuite, MockSparkDataObject}
+import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
+import io.smartdatalake.testutils.{DataObjectTestSuite, MockSparkDataObject}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.util.spark.GetSession.loggEnv
+import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -33,18 +36,21 @@ import java.nio.file.Files
 class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
+
   import session.implicits._
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableDataObjectTest", "org.hsqldb.jdbcDriver")
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
+  loggEnv
+
   test("write and read jdbc table") {
     instanceRegistry.register(jdbcConnection)
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
@@ -55,9 +61,9 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     instanceRegistry.register(jdbcConnection)
     // Use double quotes for case sensitivity in HSQLDB
     val table = Table(Some("\"PUBLIC\""), "\"CaseSensitiveTable1\"")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
@@ -69,19 +75,19 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     instanceRegistry.register(jdbcConnection)
 
     val table1 = Table(Some("public"), "table1")
-    val srcDO = JdbcTableDataObject( "jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)")
+    val srcDO = JdbcTableDataObject("jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)")
       , preReadSql = Some(s"insert into ${table1.fullName} values ('preRead','smith','%{feed}',3);")
       , postReadSql = Some(s"insert into ${table1.fullName} values ('postRead','smith','%{feed}',3);")
       , preWriteSql = Some(s"insert into ${table1.fullName} values ('preWrite','smith','%{feed}',3);") // should not be inserted on src
       , postWriteSql = Some(s"insert into ${table1.fullName} values ('postWrite','smith','%{feed}',3);") // should not be inserted on src
     )
     srcDO.dropTable
-    val df = Seq(("ext","doe","john",5)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5)).toDF("type", "lastname", "firstname", "rating")
     srcDO.initSparkDataFrame(df, Seq())
     srcDO.writeSparkDataFrame(df, Seq())
     instanceRegistry.register(srcDO)
 
-    val tgtDO = JdbcTableDataObject( "jdbcDO2", table = Table(Some("public"), "table2"), connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)")
+    val tgtDO = JdbcTableDataObject("jdbcDO2", table = Table(Some("public"), "table2"), connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)")
       , preReadSql = Some(s"insert into ${table1.fullName} values ('preRead','emma','%{feed}',3);") // should not be inserted on tgt
       , postReadSql = Some(s"insert into ${table1.fullName} values ('postRead','emma','%{feed}',3);") // should not be inserted on tgt
       , preWriteSql = Some(s"insert into ${table1.fullName} values ('preWrite','emma','%{feed}',3);")
@@ -109,15 +115,15 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
     // prepare data
     val table1 = Table(Some("public"), "table1")
-    val dataObject1 = JdbcTableDataObject( "jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val dataObject1 = JdbcTableDataObject("jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject1.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("type", "lastname", "firstname", "rating")
     dataObject1.initSparkDataFrame(df, Seq())(contextInit)
     dataObject1.writeSparkDataFrame(df, Seq())(contextExec)
 
     // read prepared data
     val table2 = Table(Some("public"), "table2", query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
-    val dataObject2 = JdbcTableDataObject( "jdbcDO2", table = table2, connectionId = "jdbcCon1")
+    val dataObject2 = JdbcTableDataObject("jdbcDO2", table = table2, connectionId = "jdbcCon1")
     val actual = dataObject2.getSparkDataFrame(Seq())(contextExec)
     val expected = df.select($"lastname", $"firstname").where($"type" === "ext")
     val resultat = actual.equal(expected)
@@ -133,15 +139,18 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
     // prepare data
     val table1 = Table(Some("public"), "table1")
-    val dataObject1 = JdbcTableDataObject( "jdbcDO1", table = table1, connectionId = "jdbcCon1", jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val dataObject1 = JdbcTableDataObject("jdbcDO1", table = table1, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject1.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
+      .toDF("type", "lastname", "firstname", "rating")
     dataObject1.initSparkDataFrame(df, Seq())(contextInit)
     dataObject1.writeSparkDataFrame(df, Seq())(contextExec)
 
     // prepare view dataObject
-    val table2 = Table(Some("public"), "table2", query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
-    val srcDO = JdbcTableDataObject( "jdbcDO2", table = table2, connectionId = "jdbcCon1")
+    val table2 = Table(Some("public"), "table2",
+      query = Some("select lastname, firstname from public.table1 where type = 'ext'"))
+    val srcDO = JdbcTableDataObject("jdbcDO2", table = table2, connectionId = "jdbcCon1")
     instanceRegistry.register(srcDO)
     val tgtDO = MockSparkDataObject("tgt").register
     instanceRegistry.register(tgtDO)
@@ -155,6 +164,49 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     val expected = tgtDO.getSparkDataFrame(Seq())(contextExec)
     val resultat = actual.equal(expected)
     assert(resultat)
+  }
+
+  // query parameter doesn't work with hsqldb
+  test("custom transformation of jdbc table with query and where clause") {
+    instanceRegistry.register(jdbcConnection)
+
+    // prepare data
+    val allData = Table(db = Some("public"), name = "allData")
+    val dataObjectAll = JdbcTableDataObject(id = "jdbcAll", table = allData, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "id int, text varchar(255)"))
+    dataObjectAll.dropTable
+    val dfAll = List((1, "abc"), (2, "def"), (3, "abc"), (4, "ghi"), (5, "abc"), (6, "def")).toDF("id", "text")
+    dataObjectAll.initSparkDataFrame(dfAll, Nil)(contextInit)
+    dataObjectAll.writeSparkDataFrame(dfAll, Nil)(contextExec)
+
+    // prepare view dataObject as source
+    val filteredData = Table(db = Some("public"), name = "filteredData",
+      query = Some("select id, text from public.allData where text<'g'"))
+    val srcDO = JdbcTableDataObject(id = "srcData", table = filteredData, connectionId = "jdbcCon1")
+    instanceRegistry.register(srcDO)
+
+    // prepare target
+    val targetTab = Table(db = Some("public"), name = "target")
+    val tgtDO = JdbcTableDataObject(id = "target", table = targetTab, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "id int, text varchar(255), _rnk int"))
+    tgtDO.dropTable
+    val expected = List((1, "abc", 1), (2, "def", 1), (3, "abc", 2), (5, "abc", 3), (6, "def", 2))
+      .toDF("id", "text", "_rnk")
+    tgtDO.initSparkDataFrame(expected.where($"id"===1), Nil)(contextInit)
+    tgtDO.writeSparkDataFrame(expected.where($"id"===1), Nil)(contextExec)
+    instanceRegistry.register(tgtDO)
+
+    val action = CustomDataFrameAction(id = "jdbcTransform",
+      inputIds = List(srcDO.id), outputIds = Seq(tgtDO.id),
+      metadata = Some(ActionMetadata(feed = Some("jdbcTransform"))),
+      transformers = List(ScalaClassSparkDfsTransformer(className = classOf[TestCustomDfsTransformer].getName))
+    )
+    val srcSubFeed = SparkSubFeed(None, srcDO.id, Nil)
+    action.init(Seq(srcSubFeed))(contextInit).head
+    action.exec(Seq(srcSubFeed))(contextExec).head
+
+    val actual = tgtDO.getSparkDataFrame(Nil)(contextExec).orderBy($"id")
+    assert(actual.equal(expected))
   }
 
   test("isTableExisting should return not only the table but also the view - read jdbc:hsqldb view and table") {
@@ -175,7 +227,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
       val dfReadView = dataObjectView.getSparkDataFrame(Seq())
       val dfReadTable = dataObjectTable.getSparkDataFrame(Seq())
 
-      val df = Seq(("test_data")).toDF("test_column")
+      val df = Seq("test_data").toDF("test_column")
       assert(jdbcConnection.catalog.asInstanceOf[DefaultJdbcCatalog].isTableExisting(s"$db.${view.name}"))
       assert(jdbcConnection.catalog.asInstanceOf[DefaultJdbcCatalog].isTableExisting(s"$db.${table.name}"))
       assert(dfReadView.getSymmetricDifference(df).isEmpty)
@@ -190,10 +242,10 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
   test("list jdbc table virtual partitions") {
     instanceRegistry.register(jdbcConnection)
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("abc"), jdbcOptions = Map("createTableColumnTypes"->"abc varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("abc"), jdbcOptions = Map("createTableColumnTypes" -> "abc varchar(255), lastname varchar(255), firstname varchar(255)"))
     dataObject.dropTable
 
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     dataObject.prepare
@@ -205,9 +257,11 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
   test("list jdbc table virtual partitions case quoted identifier") {
     instanceRegistry.register(jdbcConnection)
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", virtualPartitions = Seq("abc"), createSql = Some("""CREATE TABLE public.table1 ("aBc" varchar(255) , lastname varchar(255) , firstname varchar(255) , rating INTEGER NOT NULL)"""))
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1",
+      virtualPartitions = Seq("abc"),
+      createSql = Some("""CREATE TABLE public.table1 ("aBc" varchar(255) , lastname varchar(255) , firstname varchar(255) , rating INTEGER NOT NULL)"""))
     dataObject.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("abc", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("abc", "lastname", "firstname", "rating")
     dataObject.prepare
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
@@ -219,62 +273,62 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
   test("SaveMode merge") {
     instanceRegistry.register(jdbcConnection)
-    val targetTable = Table(db = Some("public"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
-    val targetDO = JdbcTableDataObject( "jdbcDO1", table = targetTable, connectionId = "jdbcCon1", saveMode = SDLSaveMode.Merge, jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val targetTable = Table(db = Some("public"), name = "test_merge", query = None, primaryKey = Some(Seq("type", "lastname", "firstname")))
+    val targetDO = JdbcTableDataObject("jdbcDO1", table = targetTable, connectionId = "jdbcCon1", saveMode = SDLSaveMode.Merge, jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
     targetDO.dropTable
 
     // first load
-    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()(contextExec)
     val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key
-    val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
+    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()(contextExec)
-    val expected2 = Seq(("ext","doe","john",10),("ext","smith","peter",3),("int","emma","brown",7))
+    val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating")
     val resultat2 = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    if (!resultat2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
     assert(resultat2)
   }
 
   test("SaveMode merge with schema evolution") {
     instanceRegistry.register(jdbcConnection)
-    val targetTable = Table(db = Some("public"), name = "test_merge", query = None, primaryKey = Some(Seq("type","lastname","firstname")))
-    val targetDO = JdbcTableDataObject( "jdbcDO1", table = targetTable, connectionId = "jdbcCon1", allowSchemaEvolution = true, saveMode = SDLSaveMode.Merge, jdbcOptions = Map("createTableColumnTypes"->"type varchar(255), lastname varchar(255), firstname varchar(255)"))
+    val targetTable = Table(db = Some("public"), name = "test_merge", query = None, primaryKey = Some(Seq("type", "lastname", "firstname")))
+    val targetDO = JdbcTableDataObject("jdbcDO1", table = targetTable, connectionId = "jdbcCon1", allowSchemaEvolution = true, saveMode = SDLSaveMode.Merge, jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
     targetDO.dropTable
 
     // first load
-    val df1 = Seq(("ext","doe","john",5),("ext","smith","peter",3))
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
       .toDF("type", "lastname", "firstname", "rating")
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()(contextExec)
     val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable",Seq())(actual)(df1)
+    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key with different schema
     // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
     // - column 'rating2' added -> existing records will get new column rating2 set to null
-    val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
+    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating2")
     targetDO.initSparkDataFrame(df2, Seq())
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()(contextExec)
-    val expected2 = Seq(("ext","doe","john",Some(5),Some(10)),("ext","smith","peter",Some(3),None),("int","emma","brown",None,Some(7)))
+    val expected2 = Seq(("ext", "doe", "john", Some(5), Some(10)), ("ext", "smith", "peter", Some(3), None), ("int", "emma", "brown", None, Some(7)))
       .toDF("type", "lastname", "firstname", "rating", "rating2")
     val resultat2 = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResult("SaveMode merge",Seq())(actual2)(expected2)
+    if (!resultat2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -283,11 +337,11 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     // create data object
     instanceRegistry.register(jdbcConnection)
     val targetTable = Table(db = Some("public"), name = "test_inc")
-    val targetDO = JdbcTableDataObject( "jdbcDO1", table = targetTable, connectionId = "jdbcCon1", incrementalOutputExpr = Some("id + 1"), saveMode = SDLSaveMode.Append)
+    val targetDO = JdbcTableDataObject("jdbcDO1", table = targetTable, connectionId = "jdbcCon1", incrementalOutputExpr = Some("id + 1"), saveMode = SDLSaveMode.Append)
     targetDO.dropTable
 
     // write test data 1
-    val df1 = Seq((1,"A",1),(2,"A",2),(3,"B",3),(4,"B",4)).toDF("id", "p", "value")
+    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
     targetDO.prepare
     targetDO.initSparkDataFrame(df1, Seq())
     targetDO.writeSparkDataFrame(df1)
@@ -298,7 +352,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     val newState1 = targetDO.getState
 
     // append test data 2
-    val df2 = Seq((5,"B",5)).toDF("id", "p", "value")
+    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
     targetDO.writeSparkDataFrame(df2)
 
     // test 2
@@ -316,9 +370,9 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
   test("write to jdbc table with different order of columns") {
     instanceRegistry.register(jdbcConnection)
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1")
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
     dataObject.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("type", "lastname", "firstname", "rating")
     val dfColumnsSwitched = df.select("type", "rating", "firstname", "lastname")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(dfColumnsSwitched, Seq())
@@ -330,9 +384,9 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
   test("write to jdbc table with directTableOverwrite=true") {
     instanceRegistry.register(jdbcConnection.copy(directTableOverwrite = true))
     val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject( "jdbcDO1", table = table, connectionId = "jdbcCon1", saveMode = SDLSaveMode.Overwrite)
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1", saveMode = SDLSaveMode.Overwrite)
     dataObject.dropTable
-    val df = Seq(("ext","doe","john",5),("ext","smith","peter",3),("int","emma","brown",7)).toDF("type", "lastname", "firstname", "rating")
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("type", "lastname", "firstname", "rating")
     dataObject.initSparkDataFrame(df, Seq())
     dataObject.writeSparkDataFrame(df, Seq())
     val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
@@ -342,16 +396,20 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
   test("write partitioned jdbc, copy to hive and delete partition") {
 
     instanceRegistry.register(jdbcConnection)
-    val srcTable = Table(Some("public"), "table1", None, Some(Seq("lastname","firstname")))
-    val srcDO = JdbcTableDataObject("jdbcDO1", table = srcTable, connectionId = "jdbcCon1", virtualPartitions = Seq("lastname"), jdbcOptions = Map("createTableColumnTypes"->"lastname varchar(255), firstname varchar(255), rating INTEGER"))
+    val srcTable = Table(Some("public"), "table1", None, Some(Seq("lastname", "firstname")))
+    val srcDO = JdbcTableDataObject(id="jdbcDO1", table = srcTable, connectionId = "jdbcCon1",
+      virtualPartitions = Seq("lastname"),
+      jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255), rating INTEGER"))
     srcDO.dropTable
     instanceRegistry.register(srcDO)
 
-    val tgtDO = MockSparkDataObject( "tgt", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname","firstname"))).register
+    val tgtDO = MockSparkDataObject(id = "tgt",
+      partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname")))
+      .register
 
     // prepare data
-    val dfSrc = Seq(("dau","bob",10),
-      ("doe","john",5))
+    val dfSrc = Seq(("dau", "bob", 10),
+      ("doe", "john", 5))
       .toDF("lastname", "firstname", "rating")
     srcDO.initSparkDataFrame(dfSrc, Seq())
     srcDO.writeSparkDataFrame(dfSrc, Seq())
@@ -360,9 +418,9 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     val srcSubFeed = SparkSubFeed(None, "jdbcDO1", Seq())
     action.exec(Seq(srcSubFeed))(contextExec).head
 
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("lastname"->"dau")), PartitionValues(Map("lastname"->"doe"))))
-    tgtDO.deletePartitions(Seq(PartitionValues(Map("lastname"->"doe"))))
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("lastname"->"dau"))))
+    assert(tgtDO.listPartitions.toSet == Set(PartitionValues(Map("lastname" -> "dau")), PartitionValues(Map("lastname" -> "doe"))))
+    tgtDO.deletePartitions(Seq(PartitionValues(Map("lastname" -> "doe"))))
+    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("lastname" -> "dau"))))
   }
 
 }

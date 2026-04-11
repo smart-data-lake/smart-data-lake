@@ -122,7 +122,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   @DeveloperApi
   val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
 
-  override val options = jdbcOptions ++ Map(
+  override val options: Map[String, String] = jdbcOptions ++ Map(
     "url" -> connection.url,
     "driver" -> connection.driver,
     "fetchSize" -> jdbcFetchSize.toString
@@ -180,6 +180,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
+    logger.debug(s"getSparkDataFrame: queryOrTable = $queryOrTable")
     var df = getSparkSession.read.format("jdbc")
       .options(options)
       .options(connection.getAuthModeSparkOptions)
@@ -200,7 +201,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head().get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
-        logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '$newHighWatermarkValue'")
+        logger.info(s"getSparkDataFrame: ($id) incremental output selected records with" +
+          s" '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}'" +
+          s" and <= '$newHighWatermarkValue'")
         df = df.where(expr(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
         lastHighWatermark.foreach { case (value, dataType) =>
           if (value == newHighWatermarkValue.toString) {
@@ -279,7 +282,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) schema evolution needed: newColumns=${newColumns.mkString(",")} missingNotNullColumns=${missingNotNullColumns.mkString(",")} changedDatatypeColumns=${changedDatatypeColumns.map(f => s"${f.name}:${f.dataType.sql}").mkString(",")}")
     newColumns.foreach{ col =>
       val field = newSchema.inner(col)
-      val sqlType = connection.catalog.getSqlType(field.dataType, isNullable = true) // new columns must be nullable because of existing data
+      val sqlType = connection.catalog.getSqlType(field.dataType) // new columns must be nullable because of existing data
       val sql = connection.catalog.getAddColumnSql(table.fullName, quoteCaseSensitiveColumn(col), sqlType)
       connection.execJdbcStatement(sql)
     }
@@ -358,7 +361,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     try {
       // cleanup existing data
       if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsStatement(partitionValues))
-      else transaction.execJdbcStatement(deleteAllDataStatement)
+      else transaction.execJdbcStatement(deleteAllDataStatement())
       // append into final table in one step, then commit
       transaction.execJdbcStatement(s"insert into ${table.fullName} select * from ${tmpTable.fullName}")
       transaction.commit()
@@ -386,7 +389,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)
+                                (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = getSparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
@@ -403,8 +407,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       // prepare SQL merge statement
       val mergeStmt = SQLUtil.createMergeStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       // execute
-      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
-      logger.debug(s"($id) merge statement: $mergeStmt")
+      logger.info(s"mergeDataFrameByPrimaryKey: ($id) executing merge statement with options:" +
+        s" ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
+      logger.debug(s"mergeDataFrameByPrimaryKey: ($id) merge statement: $mergeStmt")
       val rowAffected = connection.execJdbcDmlStatement(mergeStmt)
       metrics + ("rows_affected" -> rowAffected)
     } finally {
@@ -429,7 +434,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
       val preparedSql = ExpressionUtil.substitute(id, configName, sql, data)
-      logger.info(s"($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
+      logger.info(s"prepareAndExecSql: ($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
       connection.execJdbcStatement(preparedSql, logging = false)
     }
   }
@@ -519,7 +524,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
               def hasNext: Boolean = rs.next()
               def next(): ResultSet = rs
             }
-            logger.info(s"($id) get jdbc column metadata from database")
+            logger.info(s"jdbcColumnMetadata: ($id) get jdbc column metadata from database")
             new RsIterator(rs).map(JdbcColumn.from).toSeq
           } finally {
             if (rs != null) rs.close()
@@ -529,10 +534,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       // otherwise make empty query and use resultset metadata
       if (_cachedJdbcColumnMetadata.isEmpty) {
         val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
+        logger.info(s"jdbcColumnMetadata: ($id) get jdbc column metadata from metadataQuery: $metadataQuery")
         def evalColumnNames(rs: ResultSet): Seq[JdbcColumn] = {
           (1 to rs.getMetaData.getColumnCount).map(i => JdbcColumn.from(rs.getMetaData, i))
         }
-        logger.info(s"($id) get jdbc column metadata from query")
         _cachedJdbcColumnMetadata = Some(connection.execJdbcQuery(metadataQuery, evalColumnNames))
       }
     }

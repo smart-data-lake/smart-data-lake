@@ -23,16 +23,18 @@ import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
+import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.StateUploader
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaClassSparkDfsTransformer}
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -47,14 +49,16 @@ import org.apache.spark.sql.functions.{lit, raise_error, udf}
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
 /**
  * This tests use configuration test/resources/application.conf
  */
-class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
-
+class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.util.spark.dataset.Equality {
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -68,6 +72,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
+
+  loggEnv
 
   before {
     sdlb.instanceRegistry.clear()
@@ -92,6 +98,64 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val hoconConfig = appConfig.getHoconConfig()(session.sparkContext.hadoopConfiguration)
     assert(hoconConfig.getString("global.abc") == "def")
     assert(hoconConfig.getInt("global.synchronousStreamingTriggerIntervalSec") == 5)
+  }
+
+  test("Test custom transformation of jdbc table with query and where clause") {
+
+    // init sdlb
+    val appName = "filtered-jdbc-transformation"
+    val feedName = "add-rownumber"
+
+    // configure SDLPlugin for testing
+    Environment._sdlPlugins = Seq(new TestSDLPlugin)
+
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val contextExec = actionPipelineContext.copy(phase = ExecutionPhase.Exec)
+
+    // setup DataObjects
+    instanceRegistry.register(jdbcConnection)
+    // prepare data
+    val allData = Table(db = Some("public"), name = "allData")
+    val dataObjectAll = JdbcTableDataObject(id = "jdbcAll", table = allData, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "id int, text varchar(255)"))
+    dataObjectAll.dropTable
+    val dfAll = List((1, "abc"), (2, "def"), (3, "abc"), (4, "ghi"), (5, "abc"), (6, "def")).toDF("id", "text")
+    dataObjectAll
+      .initSparkDataFrame(df = dfAll, partitionValues = Nil)(actionPipelineContext)
+    dataObjectAll
+      .writeSparkDataFrame(df = dfAll, partitionValues = Nil)(contextExec)
+
+    // prepare view dataObject
+    val filteredData = Table(db = Some("public"), name = "filteredData",
+      query = Some("select id, text from public.allData where text<'g'"))
+    val srcDO = JdbcTableDataObject(id = "srcData", table = filteredData, connectionId = "jdbcCon1")
+    instanceRegistry.register(srcDO)
+
+    // prepare target
+    val targetTab = Table(db = Some("public"), name = "target")
+    val tgtDO = JdbcTableDataObject(id = "target", table = targetTab, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "id int, text varchar(255), _rnk int"))
+    tgtDO.dropTable
+    val expected = List((1, "abc", 1), (2, "def", 1), (3, "abc", 2), (5, "abc", 3), (6, "def", 2))
+      .toDF("id", "text", "_rnk")
+    tgtDO.initSparkDataFrame(expected.where($"id"===1), Nil)(actionPipelineContext)
+    tgtDO.writeSparkDataFrame(expected.where($"id"===1), Nil)(contextExec)
+    instanceRegistry.register(tgtDO)
+
+    // define and run the action
+    val action = CustomDataFrameAction(id = "add-rownumber",
+      inputIds = List(srcDO.id), outputIds = Seq(tgtDO.id),
+      metadata = Some(ActionMetadata(feed = Some("add-rownumber"))),
+      transformers = List(ScalaClassSparkDfsTransformer(className = classOf[TestCustomDfsTransformer].getName))
+    )
+    instanceRegistry.register(action.copy())
+
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"),
+      feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    sdlb.run(sdlConfig)
+    val actual = tgtDO.getSparkDataFrame(Nil)(contextExec).orderBy($"id")
+    assert(actual.equal(expected))
   }
 
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
@@ -173,7 +237,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
       val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == selectedPartitions)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -251,7 +316,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
       val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
       assert(resultActionsState == expectedActionsState)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
