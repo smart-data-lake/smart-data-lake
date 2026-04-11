@@ -28,9 +28,10 @@ import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.getCurrentV
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.HiveTableDataObject
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
 import org.apache.commons.io.FileUtils
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.json4s.jackson.{JsonMethods, Serialization}
 import org.json4s.{Formats, NoTypeHints, StringInput}
@@ -160,21 +161,21 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
   test("export statistics") {
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(Seq(configPath))
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(registry)
-    val session = SparkSubFeed.getSparkSession
+    val session: SparkSession = SparkSubFeed.getSparkSession
     import session.implicits._
     // prepare data object
-    val hiveDO = registry.get[HiveTableDataObject](DataObjectId("dataObjectHive14"))
-    hiveDO.dropTable
+    val testDO = registry.get[JdbcTableDataObject](DataObjectId("dataObjectHive14"))
+    testDO.dropTable
     val df = Seq(("ext", "doe", "john", ComplexTypeTest("a", 5)), ("ext", "smith", "peter", ComplexTypeTest("a", 3)), ("int", "emma", "brown", ComplexTypeTest("a", 7)))
       .toDF("type", "lastname", "firstname", "complex")
-    hiveDO.writeSparkDataFrame(df, Seq())
+    testDO.writeSparkDataFrame(df, Seq())
     // export
     val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectHive14", targets = Seq(target))
     DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
     // read stats and check
     implicit val formats: Formats = Serialization.formats(NoTypeHints)
     val writer = FileExportWriter(exportPath)
-    val latestStats = writer.getLatestData(hiveDO.id, "stats")
+    val latestStats = writer.getLatestData(testDO.id, "stats")
       .map(Serialization.read[Map[String, Any]]).get
     assert(latestStats.apply("columns").asInstanceOf[Map[String, Any]]
       .apply("lastname").asInstanceOf[Map[String, Any]]

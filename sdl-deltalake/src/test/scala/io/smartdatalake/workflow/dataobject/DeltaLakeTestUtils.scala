@@ -41,12 +41,8 @@ object DeltaLakeTestUtils {
       .foldLeft(TestUtil.sparkSessionBuilder()) {
         case (builder, config) => builder.config(config._1, config._2)
       }.getOrCreate()
-      .getOrElse {
-        val session = sparkSessionBuilder().getOrCreate()
-        SparkSubFeed._defaultSparkSession = Some(session)
-        session
-      }
-
+    SparkSubFeed._defaultSparkSession = Some(session)
+    session
   }
 
 }

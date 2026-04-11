@@ -79,7 +79,6 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
@@ -111,7 +110,6 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load

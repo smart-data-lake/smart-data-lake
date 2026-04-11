@@ -20,13 +20,11 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.custom.TestCustomDfCreator
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.{CopyAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.connection.{HadoopFileConnection, IcebergTableConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -64,11 +62,13 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
   test("Write data") {
 
     // setup DataObjects
-    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy", query = None)
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable)
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
     targetDO.prepare
 
@@ -93,12 +93,14 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
   test("Write data partitioned") {
 
     // setup DataObjects
-    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
     val targetDO = IcebergTableDataObject(id = "target", partitions = Seq("num"), path = Some(targetTablePath), table = targetTable)
     targetDO.dropTable
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
@@ -663,10 +665,12 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
   test("Write data with hadoop catalog to non-default db") {
 
     // setup DataObjects
-    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(catalog = Some("iceberg_hadoop"), db = Some("test"), name = "custom_df_copy", query = None)
     val targetDO = IcebergTableDataObject(id = "target", path = None, table = targetTable)
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // create hadoop catalog 'test' database

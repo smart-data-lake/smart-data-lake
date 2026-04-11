@@ -20,6 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
 
 object IcebergTestUtils {
@@ -37,12 +38,13 @@ object IcebergTestUtils {
     "spark.sql.catalog.iceberg_hadoop.type" -> "hadoop",
     "spark.sql.catalog.iceberg_hadoop.warehouse" -> "target/icebergHadoopWarehouse",
   )
-  def session : SparkSession = {
+  lazy val session : SparkSession = {
     val session = additionalSparkProperties
       .foldLeft(TestUtil.sparkSessionBuilder()) {
         case (builder, config) => builder.config(config._1, config._2)
       }.getOrCreate()
     session.sql("CREATE DATABASE IF NOT EXISTS iceberg1.default")
+    SparkSubFeed._defaultSparkSession = Some(session)
     session
   }
 }
