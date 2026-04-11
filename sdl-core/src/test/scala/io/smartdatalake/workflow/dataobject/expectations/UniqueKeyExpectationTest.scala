@@ -44,6 +44,7 @@ class UniqueKeyExpectationTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("succeed and fail primary key validation with scope=Job") {

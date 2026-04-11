@@ -22,6 +22,7 @@ import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -29,7 +30,7 @@ import org.scalatest.matchers.should.Matchers
 class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
   with TestToolDataset with Equality with HistorizeActionBehaviour {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
 
   testsFor(historizeWithMergeMode(
     (id, registry) => MockSparkDataObject(id)(registry),

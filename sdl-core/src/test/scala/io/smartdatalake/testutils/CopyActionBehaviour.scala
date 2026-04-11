@@ -26,6 +26,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer.ScalaClassGenericDfTransformer
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, TableDataObject}
@@ -43,6 +44,8 @@ trait CopyActionBehaviour {
   implicit private val implicitLogger: Logger = logger
   import TestUtil.registerDataObject
 
+  def defaultEngineConnection: Connection with EngineConnection
+
   def testCopyActionOffline(
                               createSrcDataObject: ((String, InstanceRegistry) => DataObject with CanCreateDataFrame),
                               createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => DataObject with CanCreateDataFrame with CanWriteDataFrame)
@@ -50,6 +53,7 @@ trait CopyActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
