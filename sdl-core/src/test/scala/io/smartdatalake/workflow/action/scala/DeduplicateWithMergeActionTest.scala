@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -29,15 +29,15 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogge
 
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(
-      (id, registry) => MockScalaDataObject(id),
-      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockScalaDataObject(id),
-      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
 
   }
@@ -45,8 +45,8 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogge
   // SQLDfTransformer does not yet work with ScalaSubFeed
   ignore("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockScalaDataObject(id),
-      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 }
