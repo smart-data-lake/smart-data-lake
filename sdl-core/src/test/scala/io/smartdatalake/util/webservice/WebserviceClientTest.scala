@@ -43,13 +43,11 @@ class WebserviceClientTest extends AnyFunSuite with BeforeAndAfter with BeforeAn
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  override protected def beforeAll(): Unit = {
+  override protected def beforeAll(): Unit =
     wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
-  }
 
-  override protected def afterAll(): Unit = {
+  override protected def afterAll(): Unit =
     wireMockServer.stop()
-  }
 
   before {
     wireMockServer.resetAll()
@@ -71,14 +69,19 @@ class WebserviceClientTest extends AnyFunSuite with BeforeAndAfter with BeforeAn
 
   // TODO: Get https calls working. Error: Failure(javax.net.ssl.SSLHandshakeException: Remote host closed connection during handshake)
   ignore("Call a URL with Basic authentication") {
-    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(BasicAuthMode(Some(StringOrSecret("testuser")), Some(StringOrSecret("abc")))))
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/",
+      authMode = Some(BasicAuthMode(user = StringOrSecret("testuser"), password = StringOrSecret("abc"))))
     val webserviceClient = SttpWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isSuccess)
   }
 
   test("Call webservice with invalid AuthHeader") {
-    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/", authMode = Some(AuthHeaderMode("auth-header", Some(StringOrSecret("Basic xxxxxxxxxxxxx")))))
+    val webserviceDO = WebserviceFileDataObject(
+      "do1",
+      url = s"http://$host:$port/good/basic_auth/",
+      authMode = Some(AuthHeaderMode(headerName = "auth-header", secret = StringOrSecret("Basic xxxxxxxxxxxxx")))
+    )
     val webserviceClient = SttpWebserviceClient(webserviceDO)
     val response = webserviceClient.get()
     assert(response.isFailure)
@@ -109,10 +112,9 @@ class WebserviceClientTest extends AnyFunSuite with BeforeAndAfter with BeforeAn
 private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
   var additionalHeaders: Map[String, StringOrSecret] = _
 
-  override def prepare(options: Map[String, StringOrSecret]): Unit = {
+  override def prepare(options: Map[String, StringOrSecret]): Unit =
     // add options as headers
     additionalHeaders = options
-  }
 
   override def getHeaders: Map[String, String] = additionalHeaders.view.mapValues(_.resolve()).toMap
 }

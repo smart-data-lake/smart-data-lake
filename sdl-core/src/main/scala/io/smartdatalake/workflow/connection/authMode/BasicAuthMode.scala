@@ -20,27 +20,23 @@ package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
+import io.smartdatalake.util.secrets.StringOrSecret
 
 import java.util.Base64
-
 
 /**
  * Authenticate using basic user/pwd authentication.
  *
  * For http connection this will create a basic authentication header.
  */
-case class BasicAuthMode(private val user: Option[StringOrSecret],
-                         private val password: Option[StringOrSecret],
-                         @Deprecated @deprecated("Use `user` instead", "2.5.0") private val userVariable: Option[String] = None,
-                         @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None)
-  extends HttpAuthMode {
-  private val _user: StringOrSecret = user.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(userVariable.get))
-  private val _password: StringOrSecret = password.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(passwordVariable.get))
+case class BasicAuthMode(
+    private val user: StringOrSecret,
+    private val password: StringOrSecret
+) extends HttpAuthMode {
 
-  def userSecret: StringOrSecret = _user
+  def userSecret: StringOrSecret = user
 
-  def passwordSecret: StringOrSecret = _password
+  def passwordSecret: StringOrSecret = password
 
   def basicAuthValue(user: String, password: String): String = {
     val c = new String(Base64.getEncoder.encode(s"$user:$password".getBytes("utf-8")), "utf-8")
@@ -53,7 +49,6 @@ case class BasicAuthMode(private val user: Option[StringOrSecret],
 }
 
 object BasicAuthMode extends FromConfigFactory[HttpAuthMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): BasicAuthMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): BasicAuthMode =
     extract[BasicAuthMode](config)
-  }
 }

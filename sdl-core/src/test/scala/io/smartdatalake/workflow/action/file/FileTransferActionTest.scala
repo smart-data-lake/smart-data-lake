@@ -67,7 +67,13 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(SFtpFileRefConnection("con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshUser))), ignoreHostKeyVerification = true))
+    instanceRegistry.register(SFtpFileRefConnection(
+        id = "con1",
+        host = "localhost",
+        port = sshPort,
+        authMode = BasicAuthMode(user = StringOrSecret(sshUser), password = StringOrSecret(sshUser)),
+        ignoreHostKeyVerification = true
+      ))
     wireMockServer.resetAll()
     TestUtil.setupWebserviceStubs()
   }
@@ -88,7 +94,6 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
-
 
     // prepare & start load
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
@@ -118,9 +123,8 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
-
     // prepare & start load
-    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, breakFileRefLineage = false, createFileRefLineage = false)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, createFileRefLineage = false)
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq())
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.asInstanceOf[FileSubFeed].fileRefMapping.isEmpty && tgtSubFeed.asInstanceOf[FileSubFeed].fileRefs.isEmpty)
@@ -143,15 +147,15 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
-    val srcDO = SFtpFileRefDataObject("src1"
-      , tempDir.resolve(ftpDir).toString.replace('\\', '/')
-      , connectionId = "con1"
-      , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
+    val srcDO = SFtpFileRefDataObject(
+      "src1",
+      tempDir.resolve(ftpDir).toString.replace('\\', '/'),
+      connectionId = "con1",
+      partitions = Seq("date", "town", "year"),
+      partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
     )
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/')
-      , partitions = Seq("date", "town", "year")
-      , csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), partitions = Seq("date", "town", "year"),
+      csvOptions = Map("header" -> "true"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -179,15 +183,15 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
-    val srcDO = SFtpFileRefDataObject("src1"
-      , tempDir.resolve(ftpDir).toString.replace('\\', '/')
-      , connectionId = "con1"
-      , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
+    val srcDO = SFtpFileRefDataObject(
+      "src1",
+      tempDir.resolve(ftpDir).toString.replace('\\', '/'),
+      connectionId = "con1",
+      partitions = Seq("date", "town", "year"),
+      partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
     )
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/')
-      , partitions = Seq("date", "town", "year")
-      , csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), partitions = Seq("date", "town", "year"),
+      csvOptions = Map("header" -> "true"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -216,15 +220,15 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
-    val srcDO = SFtpFileRefDataObject("src1"
-      , tempDir.resolve(ftpDir).toString.replace('\\', '/')
-      , connectionId = "con1"
-      , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
+    val srcDO = SFtpFileRefDataObject(
+      "src1",
+      tempDir.resolve(ftpDir).toString.replace('\\', '/'),
+      connectionId = "con1",
+      partitions = Seq("date", "town", "year"),
+      partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
     )
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/')
-      , partitions = Seq("date", "town", "year")
-      , csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), partitions = Seq("date", "town", "year"),
+      csvOptions = Map("header" -> "true"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -252,15 +256,15 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
-    val srcDO = SFtpFileRefDataObject("src1"
-      , tempDir.resolve(ftpDir).toString.replace('\\', '/')
-      , connectionId = "con1"
-      , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
+    val srcDO = SFtpFileRefDataObject(
+      "src1",
+      tempDir.resolve(ftpDir).toString.replace('\\', '/'),
+      connectionId = "con1",
+      partitions = Seq("date", "town", "year"),
+      partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
     )
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/')
-      , partitions = Seq("date", "town", "year")
-      , csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), partitions = Seq("date", "town", "year"),
+      csvOptions = Map("header" -> "true"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -289,22 +293,23 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
-    val srcDO = SFtpFileRefDataObject("src1"
-      , tempDir.resolve(ftpDir).toString.replace('\\', '/')
-      , connectionId = "con1"
-      , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
+    val srcDO = SFtpFileRefDataObject(
+      "src1",
+      tempDir.resolve(ftpDir).toString.replace('\\', '/'),
+      connectionId = "con1",
+      partitions = Seq("date", "town", "year"),
+      partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
     )
-    val srcDOdontExpectPartitions = SFtpFileRefDataObject("src1a"
-      , tempDir.resolve(ftpDir).toString.replace('\\', '/')
-      , connectionId = "con1"
-      , partitions = Seq("date", "town", "year")
-      , partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%")
-      , expectedPartitionsCondition = Some("false")
+    val srcDOdontExpectPartitions = SFtpFileRefDataObject(
+      "src1a",
+      tempDir.resolve(ftpDir).toString.replace('\\', '/'),
+      connectionId = "con1",
+      partitions = Seq("date", "town", "year"),
+      partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%"),
+      expectedPartitionsCondition = Some("false")
     )
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/')
-      , partitions = Seq("date", "town", "year")
-      , csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(hadoopDir).toString.replace('\\', '/'), partitions = Seq("date", "town", "year"),
+      csvOptions = Map("header" -> "true"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(srcDOdontExpectPartitions)
     instanceRegistry.register(tgtDO)
@@ -363,7 +368,8 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.Overwrite)
+    val tgtDO =
+      CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.Overwrite)
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -409,7 +415,8 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
-    val tgtDO = CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.Append)
+    val tgtDO =
+      CsvFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
@@ -472,8 +479,12 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
     // setup DataObjects
     // For testing we will read something from Spark UI API...
-    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
-      , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq("applications", "version"))), partitionLayout = Some("/%subject%?test")) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
+    val srcDO = WebserviceFileDataObject(
+      "src1",
+      url = session.sparkContext.uiWebUrl.get + "/api/v1",
+      partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq("applications", "version"))),
+      partitionLayout = Some("/%subject%?test")
+    ) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("subject"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -489,7 +500,6 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     assert(r1.map(_.fileName).toSet == Set("applications.test.json", "version.test.json"))
   }
 
-
   test("copy partitioned webservice output with input partition values to hadoop file") {
 
     val feed = "filetransfer"
@@ -498,15 +508,20 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
     // setup DataObjects
     // For testing we will read something from Spark UI API...
-    val srcDO = WebserviceFileDataObject("src1", url = session.sparkContext.uiWebUrl.get + "/api/v1"
-      , partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq())), partitionLayout = Some("/%subject%?test")) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
+    val srcDO = WebserviceFileDataObject(
+      "src1",
+      url = session.sparkContext.uiWebUrl.get + "/api/v1",
+      partitionDefs = Seq(WebservicePartitionDefinition("subject", Seq())),
+      partitionLayout = Some("/%subject%?test")
+    ) // "?test" is added to test cleaning of filenames created. It has no meaning in the Spark API.
     val tgtDO = JsonFileDataObject("tgt1", tempDir.resolve(tgtDir).toString.replace('\\', '/'), partitions = Seq("subject"))
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
 
     // prepare & start load
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
-    val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
+    val srcSubFeed =
+      FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed)).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
     assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("subject" -> "applications")), PartitionValues(Map("subject" -> "version"))))
@@ -523,10 +538,10 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
     // first response has a reference to the next page
     stubFor(get(urlEqualTo("/good/getWithPaging/1"))
-      .willReturn(aResponse().withBody(s"abc123\nlink=http://$host:$port/good/getWithPaging/2 olala"))
+        .willReturn(aResponse().withBody(s"abc123\nlink=http://$host:$port/good/getWithPaging/2 olala"))
     )
     stubFor(get(urlEqualTo("/good/getWithPaging/2"))
-      .willReturn(aResponse().withBody("def456"))
+        .willReturn(aResponse().withBody("def456"))
     )
 
     // setup DataObjects

@@ -36,8 +36,8 @@ class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("autocommit is disabled by default") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
-      "org.hsqldb.jdbcDriver")
+    val jdbcConnection = JdbcTableConnection(id = "jdbcCon1", url = "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+      driver = "org.hsqldb.jdbcDriver")
 
     // run
     val autoCommitEnabled = jdbcConnection.execWithJdbcConnection(_.getAutoCommit)

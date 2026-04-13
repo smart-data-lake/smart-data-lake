@@ -224,7 +224,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   private def enrichExceptionMessageConfigPath(e: Exception, configPath: Option[String]): Exception = {
     if (configPath.isDefined && !e.getMessage.contains(configPath.get)) e match {
       case c: ConfigurationException => c.copy(message = s"(${configPath.get}) ${c.getMessage}")
-      case e => ConfigurationException(s"(${configPath.get}) ${e.getMessage.stripPrefix("[]").trim}", configPath, e)
+      case e => ConfigurationException(message = s"(${configPath.get}) ${e.getMessage.stripPrefix("[]").trim}",
+        configurationPath = configPath, throwable = e)
     } else e
   }
 
