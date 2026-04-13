@@ -27,8 +27,8 @@ import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import org.eclipse.jetty.websocket.server.WebSocketHandler
-import org.eclipse.jetty.websocket.servlet.{ServletUpgradeRequest, ServletUpgradeResponse, WebSocketCreator, WebSocketServletFactory}
+import org.eclipse.jetty.websocket.server.{JettyServerUpgradeRequest, JettyServerUpgradeResponse, JettyWebSocketCreator}
+import org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerInitializer
 import org.glassfish.jersey.server.ServerProperties
 import org.glassfish.jersey.servlet.ServletContainer
 
@@ -65,16 +65,15 @@ object StatusInfoServer extends SmartDataLakeLogger {
   }
 
   private def createWebsocketHandler(stateListener: IncrementalStatusInfoListener): ContextHandler = {
-    val contextHandler = new ContextHandler("/ws")
-    val webSocketcreator: WebSocketCreator = new WebSocketCreator() {
-      override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new StatusInfoSocket(stateListener)
+    val contextHandler = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
+    contextHandler.setContextPath("/ws")
+    val webSocketCreator: JettyWebSocketCreator = new JettyWebSocketCreator {
+      override def createWebSocket(request: JettyServerUpgradeRequest, response: JettyServerUpgradeResponse): Object =
+        new StatusInfoSocket(stateListener)
     }
-    val webSocketHandler = new WebSocketHandler() {
-      override def configure(factory: WebSocketServletFactory): Unit = {
-        factory.setCreator(webSocketcreator)
-      }
-    }
-    contextHandler.setHandler(webSocketHandler)
+    JettyWebSocketServletContainerInitializer.configure(contextHandler, (_, container) => {
+      container.addMapping("/", webSocketCreator)
+    })
     contextHandler
   }
 

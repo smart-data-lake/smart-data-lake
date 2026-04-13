@@ -57,7 +57,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # to avoid running tests twice, phase 'compile' instead of 'test' is used, as tests are also executed by scoverage:report
-        run: mvn -P scala-2.13,test-sonar -B clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+        run: mvn -P test-sonar -B clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 
   deploy:
     needs: build
@@ -89,13 +89,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-2.13-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-2.13
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven
 
       - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
         if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
         run: |
-          MVN_CURRENT_VERSION=$(mvn -B -P scala-2.13 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+          MVN_CURRENT_VERSION=$(mvn -B -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
           BRANCH_ISSUE_NB_STR=$(echo $GITHUB_REF_NAME | sed -n 's/^.*\(feature\|bugfix\)\/\([0-9]*\).*$/-\2/p')
           MVN_NEW_VERSION=$(echo $MVN_CURRENT_VERSION | sed -n "s/-SNAPSHOT$/${BRANCH_ISSUE_NB_STR}-SNAPSHOT/p")
           if [ -z "$MVN_NEW_VERSION" ]; then exit -1; fi
@@ -103,14 +103,14 @@ jobs:
           mvn versions:set -B -DnewVersion=${MVN_NEW_VERSION} -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.13
-        run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+        run: mvn -P release-sonatype -B -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Maven Get Version
-        run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.13 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+        run: echo MVN_CURRENT_VERSION=$(mvn -B -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
 
       - name: Push new sdl-schema.json to documentation branch
         if: ${{ contains(github.base_ref, 'develop-spark') || contains(github.ref, 'develop-spark')}}

@@ -77,12 +77,6 @@
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-jms_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-kafka_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <optional>true</optional>
@@ -98,12 +92,6 @@
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-snowflake_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-splunk_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <optional>true</optional>
         </dependency>
