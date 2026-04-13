@@ -126,11 +126,6 @@
             <version>${scopt.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
-        </dependency>
-
         <!-- TEST dependencies -->
         <dependency>
             <groupId>org.scalatest</groupId>

@@ -195,10 +195,6 @@
             <groupId>com.github.kxbmap</groupId>
             <artifactId>configs_${scala.minor.version}</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>io.monix</groupId>
