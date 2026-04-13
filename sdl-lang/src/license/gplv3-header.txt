@@ -1,4 +1,4 @@
-${project.name} - ${project.description}
+Smart Data Lake Builder - ${project.description}
 
 Copyright © ${license.git.copyrightYears} ${copyright.name} (<${copyright.contact}>)
 
