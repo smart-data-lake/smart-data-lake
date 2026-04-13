@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,10 +24,10 @@ class EncryptColumn extends UDF with EncryptDecryptSupport {
   def evaluate(message: String, key: String, algorithm: String): String = {
     val keyBytes: Array[Byte] = key.getBytes
     val crypt: EncryptDecrypt = algorithm.toUpperCase() match {
-      case "GCM" => new EncryptDecryptGCM(keyBytes)
-      case "ECB" => new EncryptDecryptECB(keyBytes)
+      case "GCM"                                => new EncryptDecryptGCM(keyBytes)
+      case "ECB"                                => new EncryptDecryptECB(keyBytes)
       case classname if classname.contains(".") => loadEncryptDecryptClass(classname, keyBytes)
-      case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
+      case _                                    => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
     }
     crypt.encrypt(message)
   }
@@ -38,10 +38,10 @@ class DecryptColumn extends UDF with EncryptDecryptSupport {
   def evaluate(message: String, key: String, algorithm: String): String = {
     val keyBytes: Array[Byte] = key.getBytes
     val crypt: EncryptDecrypt = algorithm.toUpperCase() match {
-      case "GCM" => new EncryptDecryptGCM(keyBytes)
-      case "ECB" => new EncryptDecryptECB(keyBytes)
+      case "GCM"                                => new EncryptDecryptGCM(keyBytes)
+      case "ECB"                                => new EncryptDecryptECB(keyBytes)
       case classname if classname.contains(".") => loadEncryptDecryptClass(classname, keyBytes)
-      case _ => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
+      case _                                    => throw new UnsupportedOperationException(s"unsupported en/decryption algorithm ${algorithm}")
     }
     crypt.decrypt(message)
   }

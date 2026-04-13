@@ -51,7 +51,9 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
 
   override protected def beforeAll(): Unit = {
     sshd = TestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
-    con = SFtpFileRefConnection("con1", "localhost", sshPort, BasicAuthMode(Some(StringOrSecret(sshUser)), Some(StringOrSecret(sshPwd))), ignoreHostKeyVerification = true, maxParallelConnections = 10)
+    con = SFtpFileRefConnection("con1", "localhost", sshPort,
+      BasicAuthMode(user = StringOrSecret(sshUser), password = StringOrSecret(sshPwd)),
+      ignoreHostKeyVerification = true, maxParallelConnections = 10)
   }
 
   override protected def afterAll(): Unit = {

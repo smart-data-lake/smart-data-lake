@@ -20,27 +20,22 @@ package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
-
+import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
  * Authenticate using a custom HTTP header.
  */
 case class AuthHeaderMode(
-                           headerName: String,
-                           private val secret: Option[StringOrSecret],
-                           @Deprecated @deprecated("Use `secret` instead", "2.5.0") private val secretVariable: Option[String] = None
-                         ) extends HttpAuthMode {
-  private val _secret = secret.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(secretVariable.get))
-  private[smartdatalake] val stringOrSecret: StringOrSecret = _secret
+    headerName: String,
+    private val secret: StringOrSecret
+) extends HttpAuthMode {
 
-  override def getHeaders: Map[String, String] = Map(headerName -> stringOrSecret.resolve())
+  override def getHeaders: Map[String, String] = Map(headerName -> secret.resolve())
 
   override def factory: FromConfigFactory[HttpAuthMode] = AuthHeaderMode
 }
 
 object AuthHeaderMode extends FromConfigFactory[HttpAuthMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AuthHeaderMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AuthHeaderMode =
     extract[AuthHeaderMode](config)
-  }
 }

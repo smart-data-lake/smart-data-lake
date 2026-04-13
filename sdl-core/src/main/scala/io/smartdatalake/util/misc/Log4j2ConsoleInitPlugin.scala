@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,28 +30,23 @@ import org.apache.logging.log4j.{Level, LogManager}
 import scala.jdk.CollectionConverters._
 
 /**
- * This Plugin programmatically configures Log4j2 to write logs to Console.
- * This is needed if Log4j2 configuration file is managed by the environment, e.g. Databricks Cluster.
- * The Plugin creates an additional ConsoleAppender. Default logger configuration for the new appender is:
- * - io.smartdatalake -> INFO
- * - RootLogger -> ERROR
+ * This Plugin programmatically configures Log4j2 to write logs to Console. This is needed if Log4j2
+ * configuration file is managed by the environment, e.g. Databricks Cluster. The Plugin creates an
+ * additional ConsoleAppender. Default logger configuration for the new appender is:
+ *   - io.smartdatalake -> INFO
+ *   - RootLogger -> ERROR
  *
- * Enable the plugin by setting java property -Dsdl.pluginClassNames=io.smartdatalake.util.misc.Log4j2ConsoleInitPlugin
+ * Enable the plugin by setting java property
+ * -Dsdl.pluginClassNames=io.smartdatalake.util.misc.Log4j2ConsoleInitPlugin
  *
- * Configure options by adding the following section to global config:
- * global {
- * pluginOptions {
- * loggerNames = "io.smartdatalake,org.example"
- * loggerNamesToIgnore: "abc,def"
- * patternLayout: "log4j2 pattern"
- * }
- * }
+ * Configure options by adding the following section to global config: global { pluginOptions {
+ * loggerNames = "io.smartdatalake,org.example" loggerNamesToIgnore: "abc,def" patternLayout:
+ * "log4j2 pattern" } }
  */
 class Log4j2ConsoleInitPlugin extends SDLPlugin with SmartDataLakeLogger {
 
-  override def startup(): Unit = {
+  override def startup(): Unit =
     logger.info("Log4j2ConsoleInitPlugin startup finished")
-  }
 
   override def configure(options: Map[String, StringOrSecret]): Unit = {
 
@@ -111,9 +106,8 @@ class Log4j2ConsoleInitPlugin extends SDLPlugin with SmartDataLakeLogger {
  * A Log4j2 filter implementation to ignore a given list of logger names.
  */
 case class LoggerNameFilter(names: Set[String]) extends AbstractFilter {
-  override def filter(event: LogEvent): Filter.Result = {
+  override def filter(event: LogEvent): Filter.Result =
     // use "endsWith" to simplify filtering shaded classes (Databricks...)
     if (names.exists(event.getLoggerName.endsWith)) Filter.Result.DENY
     else Filter.Result.NEUTRAL
-  }
 }

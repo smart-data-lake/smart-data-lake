@@ -304,7 +304,6 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     assert(getFullPaths(PartitionValues(Map("b" -> 1)), true) == Set("a=1/b=1/c=1/abc.test"))
   }
 
-
   test("delete files only") {
 
     // create data object

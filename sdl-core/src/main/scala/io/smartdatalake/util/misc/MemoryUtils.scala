@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,31 +39,29 @@ object MemoryUtils extends SmartDataLakeLogger {
     timerStarted = true
     logger.info("Memory logger timer task started.")
   }
-  def stopMemoryLogger(): Unit = {
+  def stopMemoryLogger(): Unit =
     if (timerStarted) {
       timer.cancel()
       logger.info("Memory logger timer task stopped.")
     }
-  }
 
   private class MemoryLogTimerTask(logLinuxMem: Boolean, logLinuxCgroupMem: Boolean, logBuffers: Boolean) extends TimerTask {
-    override def run(): Unit = {
-      logHeapInfo( !EnvironmentUtil.isWindowsOS && logLinuxMem, !EnvironmentUtil.isWindowsOS && logLinuxCgroupMem, logBuffers)
-    }
+    override def run(): Unit =
+      logHeapInfo(!EnvironmentUtil.isWindowsOS && logLinuxMem, !EnvironmentUtil.isWindowsOS && logLinuxCgroupMem, logBuffers)
   }
 
   def logHeapInfo(logLinuxMem: Boolean, logLinuxCgroupMem: Boolean, logBuffers: Boolean): Unit = {
     val memStats = getMemoryUtilization ++ getThreadUtilization ++
-      (if(logBuffers) getDirectBufferPools ++ getMappedBufferPools else Seq()) ++
-      (if(logLinuxMem) getLinuxMem ++ getCGroupMem else Seq())
-    logger.info(s"memory info ${memStats.map{ case (k,v) => s"$k=$v"}.mkString(", ")}")
-    if(logLinuxCgroupMem) logger.debug("cgroup memory statistics", getCGroupMemStat)
+      (if (logBuffers) getDirectBufferPools ++ getMappedBufferPools else Seq()) ++
+      (if (logLinuxMem) getLinuxMem ++ getCGroupMem else Seq())
+    logger.info(s"memory info ${memStats.map { case (k, v) => s"$k=$v" }.mkString(", ")}")
+    if (logLinuxCgroupMem) logger.debug("cgroup memory statistics", getCGroupMemStat)
   }
 
   def logHeapInfoLegacy(): Unit = {
-    val total = Runtime.getRuntime.totalMemory()/1024/1024
-    val free = Runtime.getRuntime.freeMemory()/1024/1024
-    val max = Runtime.getRuntime.maxMemory()/1024/1024
+    val total = Runtime.getRuntime.totalMemory() / 1024 / 1024
+    val free = Runtime.getRuntime.freeMemory() / 1024 / 1024
+    val max = Runtime.getRuntime.maxMemory() / 1024 / 1024
     val used = total - free
     val available = max - used
     logger.info(s"heap info: used=${used}MB, max=${max}MB")
@@ -74,50 +72,52 @@ object MemoryUtils extends SmartDataLakeLogger {
   private lazy val bufferPools = ManagementFactory.getPlatformMXBeans(classOf[BufferPoolMXBean])
   private lazy val pid = ManagementFactory.getRuntimeMXBean.getName.split("@")(0)
 
-  private def getMemoryUtilization: Seq[(String,Any)] = {
+  private def getMemoryUtilization: Seq[(String, Any)] = {
     val heap = memoryMXBean.getHeapMemoryUsage
     val nonHeap = memoryMXBean.getNonHeapMemoryUsage
     Seq(
-      "heapMemoryUsed" -> formatBytesMB(heap.getUsed),
-      "heapMemoryCommitted" -> formatBytesMB(heap.getCommitted),
-      "heapMemoryMax" -> formatBytesMB(heap.getMax),
-      "nonheapMemoryUsed" -> formatBytesMB(nonHeap.getUsed),
+      "heapMemoryUsed"         -> formatBytesMB(heap.getUsed),
+      "heapMemoryCommitted"    -> formatBytesMB(heap.getCommitted),
+      "heapMemoryMax"          -> formatBytesMB(heap.getMax),
+      "nonheapMemoryUsed"      -> formatBytesMB(nonHeap.getUsed),
       "nonheapMemoryCommitted" -> formatBytesMB(nonHeap.getCommitted),
-      "nonheapMemoryMax" -> formatBytesMB(nonHeap.getMax)
+      "nonheapMemoryMax"       -> formatBytesMB(nonHeap.getMax)
     )
   }
 
-  private def getDirectBufferPools: Seq[(String,Any)] = {
+  private def getDirectBufferPools: Seq[(String, Any)] =
     bufferPools.asScala
-    .find(_.getName=="direct")
-    .map( bean => Seq(
-      "directBuffersCount" -> bean.getCount,
-      "directBuffersUsed" -> s"${bean.getMemoryUsed/1024/1024}MB",
-      "directBuffersCapacity" -> s"${bean.getTotalCapacity/1024/1024}MB"
-    )).getOrElse(Seq())
-  }
+      .find(_.getName == "direct")
+      .map(bean =>
+        Seq(
+          "directBuffersCount"    -> bean.getCount,
+          "directBuffersUsed"     -> s"${bean.getMemoryUsed / 1024 / 1024}MB",
+          "directBuffersCapacity" -> s"${bean.getTotalCapacity / 1024 / 1024}MB"
+        )
+      ).getOrElse(Seq())
 
-  private def getMappedBufferPools: Seq[(String,Any)] = {
+  private def getMappedBufferPools: Seq[(String, Any)] =
     bufferPools.asScala
-    .find(_.getName=="mapped")
-    .map( bean => Seq(
-      "mappedBuffersCount" -> bean.getCount,
-      "mappedBuffersUsed" -> formatBytesMB(bean.getMemoryUsed),
-      "mappedBuffersCapacity" -> formatBytesMB(bean.getTotalCapacity)
-    )).getOrElse(Seq())
-  }
+      .find(_.getName == "mapped")
+      .map(bean =>
+        Seq(
+          "mappedBuffersCount"    -> bean.getCount,
+          "mappedBuffersUsed"     -> formatBytesMB(bean.getMemoryUsed),
+          "mappedBuffersCapacity" -> formatBytesMB(bean.getTotalCapacity)
+        )
+      ).getOrElse(Seq())
 
-  private def getThreadUtilization: Seq[(String,Any)] = {
+  private def getThreadUtilization: Seq[(String, Any)] = {
     val totalThreads = threadMXBean.getThreadCount
     val daemonThreads = threadMXBean.getDaemonThreadCount
     Seq(
-      "totalThreads" -> totalThreads,
+      "totalThreads"  -> totalThreads,
       "daemonThreads" -> daemonThreads
     )
   }
 
-  private def getCGroupMem: Seq[(String,Any)] = try {
-    def getCGroupMem( key: String ) = {
+  private def getCGroupMem: Seq[(String, Any)] = try {
+    def getCGroupMem(key: String) = {
       val commandString = s"cat /sys/fs/cgroup/memory/$key"
       val cmd = Array("/bin/sh", "-c", commandString)
       val p = Runtime.getRuntime.exec(cmd)
@@ -132,20 +132,19 @@ object MemoryUtils extends SmartDataLakeLogger {
     )
   } catch {
     case e: Exception =>
-      logger.warn("could not get cGroup process memory: "+e.getMessage)
+      logger.warn("could not get cGroup process memory: " + e.getMessage)
       Seq()
   }
 
-  private def getCGroupMemStat: Map[String,String] = {
+  private def getCGroupMemStat: Map[String, String] = {
     val commandString = s"cat /sys/fs/cgroup/memory/memory.stat"
     val cmd = Array("/bin/sh", "-c", commandString)
     val p = Runtime.getRuntime.exec(cmd)
     val result = scala.io.Source.fromInputStream(p.getInputStream)
-    result.getLines().toSeq.map(_.split(" ")).filter(_.size>=2).map( v => v(0)->v(1)).toMap
+    result.getLines().toSeq.map(_.split(" ")).filter(_.size >= 2).map(v => v(0) -> v(1)).toMap
   }
 
-
-  private def getLinuxMem: Seq[(String,Any)] = try {
+  private def getLinuxMem: Seq[(String, Any)] = try {
     val commandString = s"ps -p $pid u"
     val cmd = Array("/bin/sh", "-c", commandString)
     val p = Runtime.getRuntime.exec(cmd)
@@ -156,20 +155,20 @@ object MemoryUtils extends SmartDataLakeLogger {
     val rss = resultParsed("rss").toLong
     val pctMem = resultParsed("%mem").toFloat
     Seq(
-      "linuxMemoryVsz" -> formatBytesMB(vsz*1024),
-      "linuxMemoryRss" -> formatBytesMB(rss*1024),
-      "linuxPctMem" -> pctMem
+      "linuxMemoryVsz" -> formatBytesMB(vsz * 1024),
+      "linuxMemoryRss" -> formatBytesMB(rss * 1024),
+      "linuxPctMem"    -> pctMem
     )
   } catch {
     case e: Exception =>
-      logger.warn("could not get linux process memory: "+e.getMessage)
+      logger.warn("could not get linux process memory: " + e.getMessage)
       Seq()
   }
 
   /**
    * Add shutdown hook to trace why the java application has stopped
    */
-  def addDebugShutdownHooks(): Unit = {
+  def addDebugShutdownHooks(): Unit =
 
     // add runtime shutdown hook to log memory and stacktrace
     Runtime.getRuntime.addShutdownHook(new Thread() {
@@ -178,9 +177,8 @@ object MemoryUtils extends SmartDataLakeLogger {
         logHeapInfo(true, false, false)
       }
     })
-  }
 
-  def formatBytesMB(bytes:Long): String = {
+  def formatBytesMB(bytes: Long): String = {
     val megaBytes = BigDecimal.decimal(bytes.toFloat / 1024 / 1024).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble
     s"${megaBytes}MB"
   }

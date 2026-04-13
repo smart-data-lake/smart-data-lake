@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,8 @@ import org.apache.hadoop.fs.FileSystem
 import scala.collection.mutable
 
 /**
- * Upload final state to given baseUrl. This is mainly used to upload state to the backend of the UI.
+ * Upload final state to given baseUrl. This is mainly used to upload state to the backend of the
+ * UI.
  */
 class StateUploader(backend: BackendClient, stagePath: Option[String], processUpdates: Boolean) extends StateListener with SmartDataLakeLogger {
 
@@ -49,14 +50,15 @@ class StateUploader(backend: BackendClient, stagePath: Option[String], processUp
       if (stagedStates.nonEmpty) {
         logger.info(s"Retry uploading ${stagedStates.size} failed uploads from previous runs")
         implicit val filesystem: FileSystem = stageStateStore.get.filesystem
-        try { // stop on first upload error
+        try // stop on first upload error
           stagedStates.foreach { file =>
             val body = HdfsUtil.readHadoopFile(file.path)
             backend.writeState(body)
             filesystem.delete(file.path, false)
           }
-        } catch {
-          case ex: Exception => logger.error(s"Retry uploading failed uploads from stagePath $path failed again. Will retry next time again. ${getExceptionSummary(ex)}")
+        catch {
+          case ex: Exception =>
+            logger.error(s"Retry uploading failed uploads from stagePath $path failed again. Will retry next time again. ${getExceptionSummary(ex)}")
         }
       }
     }
@@ -68,16 +70,20 @@ class StateUploader(backend: BackendClient, stagePath: Option[String], processUp
       // if first notification for executionId or final notification, upload full state to baseUrl or save to stagePath on failure
       uploadedExecutionIds.add(context.executionId)
       logger.info(s"Uploading ${if (isFirst) "first" else "final"} state for executionId=${context.executionId}")
-      try {
+      try
         backend.writeState(state.toJson)
-      } catch {
+      catch {
         case ex: Exception =>
           stageStateStore match {
             case Some(store) =>
-              logger.warn(s"Failed uploading final state for executionId=${context.executionId}. Saved it to stagePath for retrying with next run. ${getExceptionSummary(ex)}")
+              logger.warn(
+                s"Failed uploading final state for executionId=${context.executionId}. Saved it to stagePath for retrying with next run. ${getExceptionSummary(ex)}"
+              )
               store.saveStateToFile(state)
             case None =>
-              logger.error(s"Failed uploading final state for executionId=${context.executionId}. To avoid failing SDLB job on state upload configure global.uiBackend.stagePath. ${getExceptionSummary(ex)}")
+              logger.error(
+                s"Failed uploading final state for executionId=${context.executionId}. To avoid failing SDLB job on state upload configure global.uiBackend.stagePath. ${getExceptionSummary(ex)}"
+              )
               throw ex
           }
       }
@@ -87,9 +93,9 @@ class StateUploader(backend: BackendClient, stagePath: Option[String], processUp
         // upload changed action info
         val body = ActionDAGRunState.toJson(state.actionsState(changedActionId.get))
         logger.debug(s"Uploading state update for ${changedActionId.get} executionId=${context.executionId}")
-        try {
+        try
           backend.updateState(body, context.appConfig.applicationName.get, context.executionId, changedActionId.get)
-        } catch {
+        catch {
           // just warn if update fails
           case ex: Exception => logger.warn(s"Failed uploading state update for $changedActionId. ${getExceptionSummary(ex)}")
         }

@@ -43,20 +43,11 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   path = /path/to/foo
         |   partitions = []
         |   saveMode = Append
-        |   acl = {
-        |     permission="rwxr-x---"
-        |     acls = [
-        |       {
-        |         aclType="group"
-        |         name="test"
-        |         permission="r-x"
-        |       }
-        |     ]
-        |   }
         |   metadata = {name = test, description = "i am a test"}
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe AvroFileDataObject(
@@ -83,7 +74,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         | path = /path/to/foo
         | table = ${tableConf}
         |}}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe AccessTableDataObject(
@@ -124,19 +116,20 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   dateColumnType = string
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val dos = registry.instances.values
-    dos should contain allOf(
+    dos should contain allOf (
       CsvFileDataObject(
         id = "123",
         path = "/path/to/foo",
         csvOptions = Map("header" -> "false"),
         schema = Some(SparkSchema(StructType(Array(
-          StructField("first", StringType, nullable = true),
-          StructField("last", StringType, nullable = true)
-        )))),
+            StructField("first", StringType, nullable = true),
+            StructField("last", StringType, nullable = true)
+          )))),
         partitions = Seq("dt", "type"),
         saveMode = SDLSaveMode.Append
       ),
@@ -161,7 +154,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   }
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe ExcelFileDataObject(
@@ -196,7 +190,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   jdbcFetchSize = 5
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val registry2: InstanceRegistry = new InstanceRegistry()
@@ -232,7 +227,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   stringify = false
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe JsonFileDataObject(
@@ -254,7 +250,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   partitions = [one, two]
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe ParquetFileDataObject(
@@ -274,7 +271,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   partitions = [one, two]
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe RawFileDataObject(
@@ -298,13 +296,14 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |  }
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe WebserviceFileDataObject(
       id = "123",
       url = "http://test",
-      authMode = Some(BasicAuthMode(user = Some(StringOrSecret("###CLEAR#test###")), password = Some(StringOrSecret("###CLEAR#test###"))))
+      authMode = Some(BasicAuthMode(user = StringOrSecret("###CLEAR#test###"), password = StringOrSecret("###CLEAR#test###")))
     )
   }
 
@@ -334,7 +333,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |  connectionId = sftp
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.get[SFtpFileRefDataObject](DataObjectId("123")) shouldBe SFtpFileRefDataObject(
@@ -350,9 +350,9 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       """
         |connections = {
         | con1 = {
-        |  type = HiveTableConnection
-        |   pathPrefix = "file://c:/temp"
-        |   db = default
+        |  type = JdbcTableConnection
+        |  url = "abc"
+        |  driver = "my.little.jdbcDriver"
         | }
         |}
         |dataObjects = {
@@ -365,10 +365,9 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |  }
         | }
         |}
-        |""".stripMargin).resolve
-
+        |""".stripMargin
+    ).resolve
     val thrown = the[ConfigurationException] thrownBy ConfigParser.parse(config)
-
     thrown.getMessage should include("123")
     thrown.getMessage should include("con1")
   }
