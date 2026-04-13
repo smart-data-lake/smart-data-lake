@@ -43,16 +43,15 @@ private[smartdatalake] object AirbyteMessage extends SmartDataLakeLogger {
   }
 
   /**
-   * Parse stream of json lines as AirbyteMessages
-   * Non-Json lines will be logged with level INFO.
-   * Non valid messages are logged as ERROR and added to error buffer.
-   * AirbyteLogMessages are logged and filtered if filterLog=true. If log level is ERROR they are added to error buffer as well.
+   * Parse stream of json lines as AirbyteMessages Non-Json lines will be logged with level INFO.
+   * Non valid messages are logged as ERROR and added to error buffer. AirbyteLogMessages are logged
+   * and filtered if filterLog=true. If log level is ERROR they are added to error buffer as well.
    * Invalid
    */
-  def parseOutput(lines: Stream[String], errBuffer: mutable.Buffer[String], filterLog: Boolean = true): Stream[AirbyteMessage] = {
+  def parseOutput(lines: Stream[String], errBuffer: mutable.Buffer[String], filterLog: Boolean = true): Stream[AirbyteMessage] =
     lines
       // parse json
-      .flatMap( line =>
+      .flatMap(line =>
         try {
           logger.debug(line)
           if (line.trim.startsWith("{")) Some(parse(line))
@@ -65,10 +64,10 @@ private[smartdatalake] object AirbyteMessage extends SmartDataLakeLogger {
         }
       )
       // convert message
-      .flatMap( json =>
-        try {
+      .flatMap(json =>
+        try
           Some(extractObject(json))
-        } catch {
+        catch {
           case ex: Exception =>
             val logMsg = s"Json message conversion failed: ${ex.getMessage} data='$json''"
             logger.error(logMsg)
@@ -87,9 +86,8 @@ private[smartdatalake] object AirbyteMessage extends SmartDataLakeLogger {
         case _ =>
           true
       }
-  }
 
-  private def internalLog(msg: AirbyteLogMessage): Unit = {
+  private def internalLog(msg: AirbyteLogMessage): Unit =
     msg.level match {
       case AirbyteLogMessage.Level.FATAL => logger.error(msg.message)
       case AirbyteLogMessage.Level.ERROR => logger.error(msg.message)
@@ -98,20 +96,19 @@ private[smartdatalake] object AirbyteMessage extends SmartDataLakeLogger {
       case AirbyteLogMessage.Level.DEBUG => logger.debug(msg.message)
       case AirbyteLogMessage.Level.TRACE => logger.trace(msg.message)
     }
-  }
 
   private def extractObject(json: JValue): AirbyteMessage = {
     // extract object
-    val msgTypeField = (json \ "type")
+    val msgTypeField = json \ "type"
     if (msgTypeField.toOption.isEmpty) throw AirbyteConnectorException("Could not find field 'type' in message")
     val msgType = Type.withName(msgTypeField.extract[String])
     msgType match {
-      case Type.RECORD => (json \ "record").extract[AirbyteRecordMessage]
-      case Type.STATE => (json \ "state").extract[AirbyteStateMessage]
-      case Type.LOG => (json \ "log").extract[AirbyteLogMessage]
-      case Type.SPEC => (json \ "spec").extract[AirbyteConnectorSpecification]
+      case Type.RECORD            => (json \ "record").extract[AirbyteRecordMessage]
+      case Type.STATE             => (json \ "state").extract[AirbyteStateMessage]
+      case Type.LOG               => (json \ "log").extract[AirbyteLogMessage]
+      case Type.SPEC              => (json \ "spec").extract[AirbyteConnectorSpecification]
       case Type.CONNECTION_STATUS => (json \ "connectionStatus").extract[AirbyteConnectionStatus]
-      case Type.CATALOG => (json \ "catalog").extract[AirbyteCatalog]
+      case Type.CATALOG           => (json \ "catalog").extract[AirbyteCatalog]
     }
   }
 }
@@ -124,10 +121,10 @@ private[smartdatalake] sealed trait AirbyteMessage
 /**
  * Airbyte log message
  */
-private[smartdatalake] case class AirbyteLogMessage (
-                               level: AirbyteLogMessage.Level.Value,
-                               message: String
-                             ) extends AirbyteMessage
+private[smartdatalake] case class AirbyteLogMessage(
+    level: AirbyteLogMessage.Level.Value,
+    message: String
+) extends AirbyteMessage
 private[smartdatalake] object AirbyteLogMessage {
   object Level extends Enumeration {
     val FATAL, CRITICAL, ERROR, WARN, WARNING, INFO, DEBUG, TRACE = Value
@@ -137,24 +134,24 @@ private[smartdatalake] object AirbyteLogMessage {
 /**
  * Airbyte Connector specification message
  */
-private[smartdatalake] case class AirbyteConnectorSpecification (
-                                           documentationUrl: Option[String] = None,
-                                           changelogUrl: Option[String] = None,
-                                           connectionSpecification: JObject,
-                                           supportsIncremental: Option[Boolean] = None,
-                                           supportsNormalization: Boolean = false,
-                                           supportsDBT: Boolean = false,
-                                           supported_destination_sync_modes: Option[Seq[DestinationSyncModeEnum.Value]] = None,
-                                           authSpecification: Option[JObject] = None
-                                         ) extends AirbyteMessage
+private[smartdatalake] case class AirbyteConnectorSpecification(
+    documentationUrl: Option[String] = None,
+    changelogUrl: Option[String] = None,
+    connectionSpecification: JObject,
+    supportsIncremental: Option[Boolean] = None,
+    supportsNormalization: Boolean = false,
+    supportsDBT: Boolean = false,
+    supported_destination_sync_modes: Option[Seq[DestinationSyncModeEnum.Value]] = None,
+    authSpecification: Option[JObject] = None
+) extends AirbyteMessage
 
 /**
  * Airbyte Connection status message
  */
-private[smartdatalake] case class AirbyteConnectionStatus (
-                                     status: AirbyteConnectionStatus.Status.Value,
-                                     message: Option[String] = None
-                                   ) extends AirbyteMessage
+private[smartdatalake] case class AirbyteConnectionStatus(
+    status: AirbyteConnectionStatus.Status.Value,
+    message: Option[String] = None
+) extends AirbyteMessage
 private[smartdatalake] object AirbyteConnectionStatus {
   object Status extends Enumeration {
     val SUCCEEDED, FAILED = Value
@@ -164,53 +161,51 @@ private[smartdatalake] object AirbyteConnectionStatus {
 /**
  * Airbyte catalog message
  */
-private[smartdatalake] case class AirbyteCatalog (
-                            streams: Seq[AirbyteStream]
-                          ) extends AirbyteMessage
+private[smartdatalake] case class AirbyteCatalog(
+    streams: Seq[AirbyteStream]
+) extends AirbyteMessage
 
 /**
  * Airbyte state message
  */
-private[smartdatalake] case class AirbyteStateMessage (
-                                 data: JObject
-                               ) extends AirbyteMessage
+private[smartdatalake] case class AirbyteStateMessage(
+    data: JObject
+) extends AirbyteMessage
 
 /**
  * Airbyte data record message
  */
-private[smartdatalake] case class AirbyteRecordMessage (
-                                  stream: String,
-                                  data: JObject,
-                                  emitted_at: Long,
-                                  namespace: Option[String] = None
-                                ) extends AirbyteMessage
-
+private[smartdatalake] case class AirbyteRecordMessage(
+    stream: String,
+    data: JObject,
+    emitted_at: Long,
+    namespace: Option[String] = None
+) extends AirbyteMessage
 
 private[smartdatalake] case class AirbyteStream(
-                                                 name: String,
-                                                 json_schema: JObject,
-                                                 supported_sync_modes: Seq[SyncModeEnum.Value],
-                                                 source_defined_cursor: Boolean = false,
-                                                 default_cursor_field: Option[Seq[String]] = None,
-                                                 source_defined_primary_key: Option[Seq[Seq[String]]] = None,
-                                                 namespace: Option[String] = None
-                                               ) {
-  def getSparkSchema: StructType = {
+    name: String,
+    json_schema: JObject,
+    supported_sync_modes: Seq[SyncModeEnum.Value],
+    source_defined_cursor: Boolean = false,
+    default_cursor_field: Option[Seq[String]] = None,
+    source_defined_primary_key: Option[Seq[Seq[String]]] = None,
+    namespace: Option[String] = None
+) {
+  def getSparkSchema: StructType =
     JsonSchemaConverter.convertParsedSchemaToSpark(json_schema)
-  }
 }
 
-private[smartdatalake] case class ConfiguredAirbyteCatalog (
-                                      streams: Seq[ConfiguredAirbyteStream]
-                                    )
+private[smartdatalake] case class ConfiguredAirbyteCatalog(
+    streams: Seq[ConfiguredAirbyteStream]
+)
 
-private[smartdatalake] case class ConfiguredAirbyteStream (
-                              stream: AirbyteStream,
-                              sync_mode: SyncModeEnum.Value = SyncModeEnum.full_refresh,
-                              cursor_field: Option[Seq[String]] = None,
-                              destination_sync_mode: DestinationSyncModeEnum.Value = DestinationSyncModeEnum.append,
-                              primary_key: Option[Seq[String]] = None
-                            )
+private[smartdatalake] case class ConfiguredAirbyteStream(
+    stream: AirbyteStream,
+    sync_mode: SyncModeEnum.Value = SyncModeEnum.full_refresh,
+    cursor_field: Option[Seq[String]] = None,
+    destination_sync_mode: DestinationSyncModeEnum.Value = DestinationSyncModeEnum.append,
+    primary_key: Option[Seq[String]] = None
+)
 
 private[smartdatalake] object SyncModeEnum extends Enumeration {
   val full_refresh, incremental = Value

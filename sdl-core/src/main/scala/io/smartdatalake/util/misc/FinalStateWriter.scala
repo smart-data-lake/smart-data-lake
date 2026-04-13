@@ -25,10 +25,10 @@ import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, HadoopFileActionDAGRunStateStore}
 
 /**
- * Write final state to given hadoop path to be used as notification for succeeded runs, e.g. by an Azure Function.
- * Needs 'path' as option.
+ * Write final state to given hadoop path to be used as notification for succeeded runs, e.g. by an
+ * Azure Function. Needs 'path' as option.
  */
-class FinalStateWriter(options: Map[String,StringOrSecret]) extends StateListener with SmartDataLakeLogger {
+class FinalStateWriter(options: Map[String, StringOrSecret]) extends StateListener with SmartDataLakeLogger {
 
   private val path = options.getOrElse("path", throw new IllegalArgumentException("Option 'path' not defined")).resolve()
   private var stateStore: Option[HadoopFileActionDAGRunStateStore] = None
@@ -41,10 +41,9 @@ class FinalStateWriter(options: Map[String,StringOrSecret]) extends StateListene
     stateStore.get.getLatestRunId
   }
 
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[SdlConfigObject.ActionId]): Unit = {
+  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[SdlConfigObject.ActionId]): Unit =
     // write state file on final notification
     if (state.isFinal) {
       stateStore.get.saveState(state)
     }
-  }
 }
