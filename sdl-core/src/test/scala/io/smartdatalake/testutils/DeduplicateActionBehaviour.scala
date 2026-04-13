@@ -47,8 +47,8 @@ trait DeduplicateActionBehaviour {
   def defaultEngineConnection: Connection with EngineConnection
 
   def testDeduplicateTwoRuns(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
@@ -110,8 +110,8 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithFilter(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
@@ -145,8 +145,8 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithTransformerChangingSchema(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
@@ -253,8 +253,8 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithMergeMode(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
@@ -345,8 +345,8 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
@@ -446,8 +446,8 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithMergeModeSchemaEvolution(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
