@@ -54,13 +54,13 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
 
     // Create input data with unique keys
     val inputDf = Seq(
-      (1, "alice", 100),
-      (2, "bob", 200),
+      (1, "alice",   100),
+      (2, "bob",     200),
       (3, "charlie", 300)
     ).toDF("id", "name", "amount")
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha1", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
+    val action = HistorizeAction("ha1", srcDO.id, tgtDO.id, checkInputUnique = true)
 
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src1", Seq())
@@ -69,8 +69,8 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     action.prepare(contextPrepare)
     action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
-    val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec).head
-    
+    action.exec(Seq(srcSubFeed))(contextExec).head
+
     // Verify historized data was written
     val result = tgtDO.getSparkDataFrame()
     assert(result.count() == 3)
@@ -84,15 +84,15 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("id"))).register
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha2", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
+    val action = HistorizeAction("ha2", srcDO.id, tgtDO.id, checkInputUnique = true)
 
     // Create input data with duplicate keys
     val inputDf = Seq(
-      (1, "alice", 100),
-      (2, "bob", 200),
-      (1, "alice_duplicate", 150)  // Duplicate id=1
+      (1, "alice",           100),
+      (2, "bob",             200),
+      (1, "alice_duplicate", 150) // Duplicate id=1
     ).toDF("id", "name", "amount")
-    
+
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src2", Seq())
 
@@ -103,7 +103,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val ex = intercept[TaskFailedException] {
       action.exec(Seq(srcSubFeed))(contextExec)
     }.getCause
-    
+
     // Verify error message mentions uniqueness validation failure
     assert(ex.getMessage.contains("uniqueness validation failed"))
     assert(ex.getMessage.contains("duplicate"))
@@ -118,15 +118,15 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt3", primaryKey = Some(Seq("id"))).register
 
     // Prepare action with checkInputUnique disabled (default)
-    val action = HistorizeAction("ha3", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = false)
+    val action = HistorizeAction("ha3", srcDO.id, tgtDO.id)
 
     // Create input data with duplicate keys
     val inputDf = Seq(
-      (1, "alice", 100),
-      (2, "bob", 200),
-      (1, "alice_duplicate", 150)  // Duplicate id=1 - will be deduplicated
+      (1, "alice",           100),
+      (2, "bob",             200),
+      (1, "alice_duplicate", 150) // Duplicate id=1 - will be deduplicated
     ).toDF("id", "name", "amount")
-    
+
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src3", Seq())
 
@@ -134,11 +134,11 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     action.prepare(contextPrepare)
     action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
-    val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec).head
-    
+    action.exec(Seq(srcSubFeed))(contextExec).head
+
     // Verify historized data was written with only 2 unique records
     val result = tgtDO.getSparkDataFrame()
-    assert(result.count() == 2)  // Duplicates were dropped
+    assert(result.count() == 2) // Duplicates were dropped
   }
 
   test("HistorizeAction with checkInputUnique=true and composite primary key") {
@@ -147,15 +147,15 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt5", primaryKey = Some(Seq("country", "city"))).register
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha5", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
+    val action = HistorizeAction("ha5", srcDO.id, tgtDO.id, checkInputUnique = true)
 
     // Create input data with unique composite keys
     val inputDf = Seq(
-      ("USA", "New York", 1000),
+      ("USA", "New York",    1000),
       ("USA", "Los Angeles", 800),
-      ("UK", "London", 900)
+      ("UK",  "London",      900)
     ).toDF("country", "city", "population")
-    
+
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src5", Seq())
 
@@ -163,8 +163,8 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     action.prepare(contextPrepare)
     action.preInit(Seq(srcSubFeed), Seq())(contextInit)
     action.init(Seq(srcSubFeed))(contextInit)
-    val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec).head
-    
+    action.exec(Seq(srcSubFeed))(contextExec).head
+
     // Verify historized data was written
     val result = tgtDO.getSparkDataFrame()
     assert(result.count() == 3)
@@ -176,15 +176,15 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val tgtDO = MockSparkDataObject("tgt6", primaryKey = Some(Seq("country", "city"))).register
 
     // Prepare action with checkInputUnique enabled
-    val action = HistorizeAction("ha6", srcDO.id, tgtDO.id, mergeModeEnable = true, checkInputUnique = true)
+    val action = HistorizeAction("ha6", srcDO.id, tgtDO.id, checkInputUnique = true)
 
     // Create input data with duplicate composite keys
     val inputDf = Seq(
-      ("USA", "New York", 1000),
+      ("USA", "New York",    1000),
       ("USA", "Los Angeles", 800),
-      ("USA", "New York", 1100)  // Duplicate (USA, New York)
+      ("USA", "New York",    1100) // Duplicate (USA, New York)
     ).toDF("country", "city", "population")
-    
+
     srcDO.writeSparkDataFrame(inputDf, Seq())
     val srcSubFeed = SparkSubFeed(None, "src6", Seq())
 
@@ -195,7 +195,7 @@ class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfte
     val ex = intercept[TaskFailedException] {
       action.exec(Seq(srcSubFeed))(contextExec)
     }.getCause
-    
+
     // Verify error message mentions uniqueness validation failure and both key columns
     assert(ex.getMessage.contains("uniqueness validation failed"))
     assert(ex.getMessage.contains("duplicate"))

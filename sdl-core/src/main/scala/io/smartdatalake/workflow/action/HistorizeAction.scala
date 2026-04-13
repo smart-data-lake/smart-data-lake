@@ -36,90 +36,97 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataO
 import java.sql.Timestamp
 import java.time.{Duration, LocalDateTime}
 import scala.reflect.runtime.universe.Type
-import scala.util.{Failure, Success, Try}
 
 /**
  * This [[Action]] historizes data between an input and output DataObject using DataFrames.
- * Historization creates a technical history of data by creating valid-from/to columns.
- * The DataFrame might be transformed using SQL or DataFrame transformations. These transformations are applied before the deduplication.
+ * Historization creates a technical history of data by creating valid-from/to columns. The
+ * DataFrame might be transformed using SQL or DataFrame transformations. These transformations are
+ * applied before the deduplication.
  *
- * By default, a history with closed intervals is created, e.g. valid-from and valid-to is inclusive.
- * The time axis unit can be set by configuration attribute `timeAxisUnit`. It is used as the offset between valid-to of the previous record and valid-from of the current record.
- * A history with half-open intervals can be created by setting timeAxisUnit=0. In a half-open interval valid-from is inclusive and valid-to is exclusive.
+ * By default, a history with closed intervals is created, e.g. valid-from and valid-to is
+ * inclusive. The time axis unit can be set by configuration attribute `timeAxisUnit`. It is used as
+ * the offset between valid-to of the previous record and valid-from of the current record. A
+ * history with half-open intervals can be created by setting timeAxisUnit=0. In a half-open
+ * interval valid-from is inclusive and valid-to is exclusive.
  *
- * HistorizeAction needs a transactional table (e.g. implementation of [[TransactionalTableDataObject]]) as output with defined primary keys.
+ * HistorizeAction needs a transactional table (e.g. implementation of
+ * [[TransactionalTableDataObject]]) as output with defined primary keys.
  *
- * Normal historization join new with all existing data, and rewrites all data in output table. This is not optimal from
- * a performance perspective.
- * It can be optimized if output object supports [[CanMergeDataFrame]]. In that case you can
- * set mergeModeEnable=true to use incremental historization, which does not rewrite all data in output table. It still needs to
- * join new data with all existing data, but uses hash values to minimize data transfer.
- * If you have change-data-capture (CDC) information available to identify deleted records, you can set
- * mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join between new and existing data. This is optimal from
- * a performance perspective.
+ * Incremental historization is used always, which does not rewrite all data in output table. It
+ * still needs to join new data with all existing data, but uses hash values to minimize data
+ * transfer. If you have change-data-capture (CDC) information available to identify deleted
+ * records, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join
+ * between new and existing data. This is optimal from a performance perspective.
  *
- * @param inputId inputs DataObject
- * @param outputId output DataObject
- * @param filterClause Filter of data to be processed by historization. It can be used to exclude historical data not needed to create new history, for performance reasons.
- *                     Note that filterClause is only applied if mergeModeEnable=false. Use mergeModeAdditionalJoinPredicate if mergeModeEnable=true to achieve a similar performance tuning.
- * @param historizeBlacklist optional list of columns to ignore when comparing two records in historization. Can not be used together with [[historizeWhitelist]].
- * @param historizeWhitelist optional final list of columns to use when comparing two records in historization. Can not be used together with [[historizeBlacklist]].
- * @param ignoreOldDeletedColumns if true, remove no longer existing columns in Schema Evolution
- * @param ignoreOldDeletedNestedColumns if true, remove no longer existing columns from nested data types in Schema Evolution.
- *                                      Keeping deleted columns in complex data types has performance impact as all new data
- *                                      in the future has to be converted by a complex function.
- * @param transformers optional list of transformations to apply before historization. The transformations are applied according to the lists ordering.
- * @param mergeModeEnable Set to true to use saveMode.Merge for much better performance by using incremental historization.
- *                        Output DataObject must implement [[CanMergeDataFrame]] if enabled (default = false).
- *                        Incremental historization will add an additional "dl_hash" column which is used for change detection between
- *                        existing and new data.
- *                        Note that enabling mergeMode on an existing HistorizeAction will create a new version for every
- *                        new record in the output table, as "dl_hash" column is initially null.
- * @param mergeModeAdditionalJoinPredicate To optimize performance it might be interesting to limit the records read from the existing table data, e.g. it might be sufficient to use only the last 7 days.
- *                                         Specify a condition to select existing data to be used in transformation as Spark SQL expression.
- *                                         Use table alias 'existing' to reference columns of the existing table data.
- * @param mergeModeCDCColumn Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information is available from the source
- *                           incremental historization can be further optimized, as the join with existing data can be omitted.
- *                           Note that this should be enabled only, if input data contains just inserted, updated and deleted records.
- *                           HistorizeAction in mergeModeCDC will make *no* change detection on its own, and create a new version for every inserted/updated record it receives!
- *                           You will also need to specify parameter mergeModeCDCDeletedValue to use this and mergeModeEnable=true.
- *                           Increment CDC historization will add an additional column "dl_dummy" to the target table,
- *                           which is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode is no longer needed.
- * @param mergeModeCDCDeletedValue Optional value of mergeModeCDCColumn that marks a record as deleted.
- * @param checkInputUnique If true, validates that input records have unique primary keys according to output DataObject primary key before historization.
- *                         This is a fail-fast mechanism to detect data quality issues early and prevent incorrect historization.
- *                         If duplicate keys are found, the job will fail with details about the duplicate records.
- *                         Default is false to maintain backward compatibility. In that case dropDuplicate(primary key columns) is applied on input DataFrame.
- * @param timeAxisUnit             Time between ticks on the time axis. Used to create valid to timestamp for existing/old records.
- *                                 Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is exclusive).
- *                                 Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d.
- *                                 Default is 1ms.
+ * @param inputId
+ *   inputs DataObject
+ * @param outputId
+ *   output DataObject
+ * @param historizeBlacklist
+ *   optional list of columns to ignore when comparing two records in historization. Can not be used
+ *   together with [[historizeWhitelist]].
+ * @param historizeWhitelist
+ *   optional final list of columns to use when comparing two records in historization. Can not be
+ *   used together with [[historizeBlacklist]].
+ * @param ignoreOldDeletedColumns
+ *   if true, remove no longer existing columns in Schema Evolution
+ * @param ignoreOldDeletedNestedColumns
+ *   if true, remove no longer existing columns from nested data types in Schema Evolution. Keeping
+ *   deleted columns in complex data types has performance impact as all new data in the future has
+ *   to be converted by a complex function.
+ * @param transformers
+ *   optional list of transformations to apply before historization. The transformations are applied
+ *   according to the lists ordering.
+ * @param mergeModeAdditionalJoinPredicate
+ *   To optimize performance it might be interesting to limit the records read from the existing
+ *   table data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to
+ *   select existing data to be used in transformation as Spark SQL expression. Use table alias
+ *   'existing' to reference columns of the existing table data.
+ * @param mergeModeCDCColumn
+ *   Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information
+ *   is available from the source incremental historization can be further optimized, as the join
+ *   with existing data can be omitted. Note that this should be enabled only, if input data
+ *   contains just inserted, updated and deleted records. HistorizeAction in mergeModeCDC will make
+ *   *no* change detection on its own, and create a new version for every inserted/updated record it
+ *   receives! You will also need to specify parameter mergeModeCDCDeletedValue to use this.
+ *   Increment CDC historization will add an additional column "dl_dummy" to the target table, which
+ *   is used to work around limitations of SQL merge statement, but "dl_hash" column from mergeMode
+ *   is no longer needed.
+ * @param mergeModeCDCDeletedValue
+ *   Optional value of mergeModeCDCColumn that marks a record as deleted.
+ * @param checkInputUnique
+ *   If true, validates that input records have unique primary keys according to output DataObject
+ *   primary key before historization. This is a fail-fast mechanism to detect data quality issues
+ *   early and prevent incorrect historization. If duplicate keys are found, the job will fail with
+ *   details about the duplicate records. Default is false to maintain backward compatibility. In
+ *   that case dropDuplicate(primary key columns) is applied on input DataFrame.
+ * @param timeAxisUnit
+ *   Time between ticks on the time axis. Used to create valid to timestamp for existing/old
+ *   records. Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is
+ *   exclusive). Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d. Default is 1ms.
  */
 case class HistorizeAction(
-                            override val id: ActionId,
-                            inputId: DataObjectId,
-                            outputId: DataObjectId,
-                            transformers: Seq[GenericDfTransformer] = Seq(),
-                            filterClause: Option[String] = None,
-                            historizeBlacklist: Option[Seq[String]] = None,
-                            historizeWhitelist: Option[Seq[String]] = None,
-                            ignoreOldDeletedColumns: Boolean = false,
-                            ignoreOldDeletedNestedColumns: Boolean = true,
-                            @Deprecated @deprecated("mergeModeEnable will be always true in future - make sure to use a DataObject with Implementation of CanMergeDataFrame.", "2.0.8")
-                            mergeModeEnable: Boolean = false,
-                            mergeModeAdditionalJoinPredicate: Option[String] = None,
-                            mergeModeCDCColumn: Option[String] = None,
-                            mergeModeCDCDeletedValue: Option[String] = None,
-                            checkInputUnique: Boolean = false,
-                            timeAxisUnit: Duration = Duration.ofMillis(1),
-                            override val breakDataFrameLineage: Boolean = false,
-                            override val persist: Boolean = false,
-                            override val executionMode: Option[ExecutionMode] = None,
-                            override val executionCondition: Option[Condition] = None,
-                            override val metricsFailCondition: Option[String] = None,
-                            override val metadata: Option[ActionMetadata] = None,
-                            override val engineConnectionId: Option[ConnectionId] = None
-                          )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
+    override val id: ActionId,
+    inputId: DataObjectId,
+    outputId: DataObjectId,
+    transformers: Seq[GenericDfTransformer] = Seq(),
+    historizeBlacklist: Option[Seq[String]] = None,
+    historizeWhitelist: Option[Seq[String]] = None,
+    ignoreOldDeletedColumns: Boolean = false,
+    ignoreOldDeletedNestedColumns: Boolean = true,
+    mergeModeAdditionalJoinPredicate: Option[String] = None,
+    mergeModeCDCColumn: Option[String] = None,
+    mergeModeCDCDeletedValue: Option[String] = None,
+    checkInputUnique: Boolean = false,
+    timeAxisUnit: Duration = Duration.ofMillis(1),
+    override val breakDataFrameLineage: Boolean = false,
+    override val persist: Boolean = false,
+    override val executionMode: Option[ExecutionMode] = None,
+    override val executionCondition: Option[Condition] = None,
+    override val metricsFailCondition: Option[String] = None,
+    override val metadata: Option[ActionMetadata] = None,
+    override val engineConnectionId: Option[ConnectionId] = None
+)(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalTableDataObject = getOutputDataObject[TransactionalTableDataObject](outputId)
@@ -130,11 +137,15 @@ case class HistorizeAction(
     implicit val f: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     mergeModeAdditionalJoinPredicate.map(f.expr)
   } catch {
-    case ex: Exception => throw new ConfigurationException(s"($id) Cannot parse mergeModeAdditionalJoinPredicate as Spark expression: ${ex.getClass.getSimpleName} ${ex.getMessage}", Some(s"{$id.id}.mergeModeAdditionalJoinPredicate"), ex)
+    case ex: Exception => throw new ConfigurationException(
+        s"($id) Cannot parse mergeModeAdditionalJoinPredicate as Spark expression: ${ex.getClass.getSimpleName} ${ex.getMessage}",
+        Some(s"{$id.id}.mergeModeAdditionalJoinPredicate"),
+        ex
+      )
   }
   private lazy val mergeModeDeletedRecordsConditionExpr: Option[GenericColumn] = {
     implicit val f: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
-    mergeModeCDCColumn.map{ x =>
+    mergeModeCDCColumn.map { x =>
       assert(mergeModeCDCDeletedValue.isDefined, s"($id) mergeModeCDCDeletedValue must be set when mergeModeCDCColumn is defined")
       assert(historizeWhitelist.isEmpty, s"($id) historizeWhitelist cannot be set when mergeModeCDCColumn is defined")
       f.col(x) === f.lit(mergeModeCDCDeletedValue.get)
@@ -147,8 +158,8 @@ case class HistorizeAction(
     assert(_saveModeOptions.isDefined, s"($id) SaveModeOptions not initialized")
     _saveModeOptions
   }
-  def initSaveModeOptions(implicit context: ActionPipelineContext): Unit = {
-    _saveModeOptions = if (mergeModeEnable && mergeModeDeletedRecordsConditionExpr.isDefined) {
+  def initSaveModeOptions(implicit context: ActionPipelineContext): Unit =
+    _saveModeOptions = if (mergeModeDeletedRecordsConditionExpr.isDefined) {
       // customize update/insert condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
       val updateCols = Seq(Environment.delimitedColumnName)
@@ -157,43 +168,65 @@ case class HistorizeAction(
       val insertValuesOverride = Map(Historization.historizeDummyColName -> "true")
       val sqlReferenceTimestamp = Timestamp.valueOf(getReferenceTimestamp)
       // different condition for closed and half-closed intervals
-      val mergeTimePredicate = if (timeAxisUnitOpt.isDefined) s"timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName} AND existing.${Environment.delimitedColumnName}"
-      else s"existing.${Environment.capturedColumnName} <= timestamp'$sqlReferenceTimestamp' AND timestamp'$sqlReferenceTimestamp' < existing.${Environment.delimitedColumnName}"
-      val additionalMergePredicate = Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND $mergeTimePredicate" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, insertValuesOverride = insertValuesOverride, additionalMergePredicate = additionalMergePredicate))
+      val mergeTimePredicate = if (timeAxisUnitOpt.isDefined)
+        s"timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName}" +
+          s" AND existing.${Environment.delimitedColumnName}"
+      else
+        s"existing.${Environment.capturedColumnName} <= timestamp'$sqlReferenceTimestamp'" +
+          s" AND timestamp'$sqlReferenceTimestamp' < existing.${Environment.delimitedColumnName}"
+      val additionalMergePredicate =
+        Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND $mergeTimePredicate" +:
+            mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
+      Some(SaveModeMergeOptions(
+          updateCondition = updateCondition,
+          updateColumns = updateCols,
+          insertCondition = insertCondition,
+          insertColumnsToIgnore = insertColsToIgnore,
+          insertValuesOverride = insertValuesOverride,
+          additionalMergePredicate = additionalMergePredicate
+        ))
 
-    } else if (mergeModeEnable) {
+    } else {
       // customize update condition
       val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = if (output.isTableExisting && output.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName)) Seq(Environment.delimitedColumnName)
+      val updateCols = if (output.isTableExisting && output.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName))
+        Seq(Environment.delimitedColumnName)
       else Seq(Environment.delimitedColumnName, Historization.historizeHashColName)
       val updateExistingCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateExisting}'")
-      val insertCondition =  Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
+      val insertCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
       val insertColsToIgnore = Seq(Historization.historizeOperationColName)
-      val additionalMergePredicate = Some((s"new.${Environment.capturedColumnName} = existing.${Environment.capturedColumnName}" +: mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      Some(SaveModeMergeOptions(updateCondition = updateCondition, updateColumns = updateCols, updateExistingCondition = updateExistingCondition, insertCondition = insertCondition, insertColumnsToIgnore = insertColsToIgnore, additionalMergePredicate = additionalMergePredicate))
-    } else {
-      // force SDLSaveMode.Overwrite otherwise
-      Some(SaveModeGenericOptions(SDLSaveMode.Overwrite))
+      val additionalMergePredicate = Some((s"new.${Environment.capturedColumnName} = existing.${Environment.capturedColumnName}" +:
+          mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
+      Some(SaveModeMergeOptions(
+          updateCondition = updateCondition,
+          updateColumns = updateCols,
+          updateExistingCondition = updateExistingCondition,
+          insertCondition = insertCondition,
+          insertColumnsToIgnore = insertColsToIgnore,
+          additionalMergePredicate = additionalMergePredicate
+        ))
     }
-  }
 
-  // Output is used as recursive input in DeduplicateAction to get existing data. This override is needed to force tick-tock write operation.
+  // Output is used as recursive input in DeduplicateAction to get existing data.
+  // This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
-  // DataFrame created by HistorizeAction should not be passed on to the next Action, but must be recreated from the DataObject.
+  // DataFrame created by HistorizeAction should not be passed on to the next Action,
+  // but must be recreated from the DataObject.
   override val breakDataFrameOutputLineage: Boolean = true
 
   // historize black/white list
-  require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty, s"($id) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
+  require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty,
+    s"($id) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
   // primary key
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
 
   private val transformerDefs: Seq[GenericDfTransformerDef] = transformers
 
-  override val transformerSubFeedSupportedTypes: Seq[Type] = transformerDefs.map(_.getSubFeedSupportedType) // historize transformer can be ignored as it is generic
+  override val transformerSubFeedSupportedTypes: Seq[Type] =
+    transformerDefs.map(_.getSubFeedSupportedType) // historize transformer can be ignored as it is generic
 
   private val timeAxisUnitOpt = {
     assert(!timeAxisUnit.isNegative, s"($id) timeAxisUnit must be 0 or a positive duration, but is $timeAxisUnit")
@@ -204,9 +237,10 @@ case class HistorizeAction(
 
   override def validateConfig(): Unit = {
     super.validateConfig()
-    if (!mergeModeEnable) logger.warn(s"($id) mergeModeEnable = false will not be supported in future anymore, please change to a DataObject with Implementation of CanMergeDataFrame otherwise your code will fail at some point.")
-    if (mergeModeEnable) assert(output.isInstanceOf[CanMergeDataFrame], s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame) if mergeModeEnable = true")
-    if (!mergeModeEnable && mergeModeAdditionalJoinPredicateExpr.nonEmpty) logger.warn(s"($id) Configuration of mergeModeAdditionalJoinPredicate has no effect if mergeModeEnable = false")
+    assert(
+      output.isInstanceOf[CanMergeDataFrame],
+      s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame)"
+    )
   }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
@@ -224,55 +258,53 @@ case class HistorizeAction(
     val pks = output.table.primaryKey.get // existance is validated earlier
 
     // get existing data
-    // Note that HistorizeAction with mergeModeEnabled=false needs to read/write all existing data for tick-tock operation, even if only specific partitions have changed
+    // Note that HistorizeAction with mergeModeEnabled=false needs to read/write all existing data for tick-tock operation,
+    // even if only specific partitions have changed
     val existingDf = if (output.isTableExisting) Some(output.getDataFrame(Seq(), subFeedType)) else None
 
     // historize
-    val historizeTransformer = if (mergeModeEnable && mergeModeDeletedRecordsConditionExpr.isDefined) {
+    val historizeTransformer = if (mergeModeDeletedRecordsConditionExpr.isDefined) {
       new GenericDfTransformerDef {
         override val name = "incrementalCDCHistorize"
 
-        override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+        override def transform(
+            actionId: ActionId,
+            partitionValues: Seq[PartitionValues],
+            df: GenericDataFrame,
+            dataObjectId: DataObjectId,
+            previousTransformerName: Option[String],
+            executionModeResultOptions: Map[String, String]
+        )(implicit context: ActionPipelineContext): GenericDataFrame =
           incrementalCDCHistorizeDataFrame(existingDf, pks, mergeModeDeletedRecordsConditionExpr.get, capturedTs, df)
-        }
-      }
-    } else if (mergeModeEnable) {
-      new GenericDfTransformerDef {
-        override val name = "incrementalHistorize"
-
-        override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-          incrementalHistorizeDataFrame(existingDf, pks, capturedTs, df)
-        }
       }
     } else {
       new GenericDfTransformerDef {
-        override val name = "fullHistorize"
+        override val name = "incrementalHistorize"
 
-        override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-          fullHistorizeDataFrame(existingDf, pks, capturedTs, df)
-        }
+        override def transform(
+            actionId: ActionId,
+            partitionValues: Seq[PartitionValues],
+            df: GenericDataFrame,
+            dataObjectId: DataObjectId,
+            previousTransformerName: Option[String],
+            executionModeResultOptions: Map[String, String]
+        )(implicit context: ActionPipelineContext): GenericDataFrame =
+          incrementalHistorizeDataFrame(existingDf, pks, capturedTs, df)
       }
     }
     transformerDefs :+ historizeTransformer
   }
 
-  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed =
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
-  }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] =
     applyTransformers(getTransformers, partitionValues)
-  }
 
-  protected def fullHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  protected def fullHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit
+      context: ActionPipelineContext
+  ): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
-    import functions._
-
-    // parse filter clause
-    val filterClauseExpr = Try(filterClause.map(expr)) match {
-      case Success(result) => result
-      case Failure(e) => throw new ConfigurationException(s"($id) Error parsing filterClause parameter as expression: ${e.getClass.getSimpleName}: ${e.getMessage}")
-    }
 
     // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
     // Note that drop duplicate might be non deterministic and cause attributes switching in history with every run.
@@ -283,27 +315,41 @@ case class HistorizeAction(
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
     if (existingDf.isDefined) {
-      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get.where(filterClauseExpr.getOrElse(lit(true))), Environment.capturedColumnName)
+      if (context.isExecPhase)
+        ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, Environment.capturedColumnName)
       // apply schema evolution
-      val (modifiedExistingDf, modifiedNewFeedDf) = SchemaEvolution.process(existingDf.get, newFeedDf,
-        ignoreOldDeletedColumns = ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns,
+      val (modifiedExistingDf, modifiedNewFeedDf) = SchemaEvolution.process(
+        existingDf.get,
+        newFeedDf,
+        ignoreOldDeletedColumns = ignoreOldDeletedColumns,
+        ignoreOldDeletedNestedColumns = ignoreOldDeletedNestedColumns,
         colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName)
       )
       // filter existing data to be excluded from historize operation
-      val (filteredExistingDf, filteredExistingRemainingDf) =
-        filterClauseExpr match {
-          case Some(expr) => (modifiedExistingDf.where(expr), Some(modifiedExistingDf.where(not(expr))))
-          case None => (modifiedExistingDf, None)
-        }
+      val (filteredExistingDf, filteredExistingRemainingDf) = (modifiedExistingDf, None)
       // historize
-      val historizedDf = Historization.fullHistorize(filteredExistingDf, modifiedNewFeedDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist)
+      val historizedDf = Historization
+        .fullHistorize(
+          dfHistory = filteredExistingDf,
+          dfNew = modifiedNewFeedDf,
+          primaryKeyColumns = pks,
+          referenceTimestamp = refTimestamp,
+          timeAxisUnit = timeAxisUnitOpt,
+          historizeWhitelist = historizeWhitelist,
+          historizeBlacklist = historizeBlacklist
+        )
       // union with filter remaining df and return
       if (filteredExistingRemainingDf.isDefined) historizedDf.unionByName(filteredExistingRemainingDf.get)
       else historizedDf
     } else Historization.getInitialHistory(newFeedDf, refTimestamp)
   }
 
-  protected def incrementalHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  protected def incrementalHistorizeDataFrame(
+      existingDf: Option[GenericDataFrame],
+      pks: Seq[String],
+      refTimestamp: Timestamp,
+      newDf: GenericDataFrame
+  )(implicit context: ActionPipelineContext): GenericDataFrame = {
 
     // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
     // Note that drop duplicate might be non deterministic and cause attributes switching in history with every run.
@@ -315,7 +361,7 @@ case class HistorizeAction(
     // if context is init, check if column needs to be added -> save in needsHashColumn
     if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
       case Some(df) => Some(!GenericSchemaUtil.columnExists(df.schema, Historization.historizeHashColName))
-      case _ => Some(false)
+      case _        => Some(false)
     }
 
     // if output exists we have to do historization, otherwise we just transform the new data into historized form
@@ -325,13 +371,20 @@ case class HistorizeAction(
 
       val addExistingDfHashColumn = existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
       // note that schema evolution is done by output DataObject
-      Historization.incrementalHistorize(existingDf.get, newFeedDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist, addExistingDfHashColumn)
+      Historization.incrementalHistorize(existingDf.get, newFeedDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist, historizeBlacklist,
+        addExistingDfHashColumn)
     } else Historization.getInitialHistoryWithHashCol(newFeedDf, refTimestamp, historizeWhitelist, historizeBlacklist)
   }
 
   private var existingDfNeedsHashColumn: Option[Boolean] = None
 
-  protected def incrementalCDCHistorizeDataFrame(existingDf: Option[GenericDataFrame], pks: Seq[String], mergeModeDeletedRecordsConditionExpr: GenericColumn, refTimestamp: Timestamp, newDf: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  protected def incrementalCDCHistorizeDataFrame(
+      existingDf: Option[GenericDataFrame],
+      pks: Seq[String],
+      mergeModeDeletedRecordsConditionExpr: GenericColumn,
+      refTimestamp: Timestamp,
+      newDf: GenericDataFrame
+  )(implicit context: ActionPipelineContext): GenericDataFrame = {
 
     // Check input uniqueness if requested (excluding deleted records)
     if (checkInputUnique && context.isExecPhase) {
@@ -352,33 +405,32 @@ case class HistorizeAction(
   }
 
   /**
-   * Validates that the input DataFrame has unique primary keys.
-   * Throws an exception with details about duplicate records if uniqueness is violated.
+   * Validates that the input DataFrame has unique primary keys. Throws an exception with details
+   * about duplicate records if uniqueness is violated.
    */
   private def validateInputUniqueness(df: GenericDataFrame, pks: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
-    
+
     // Get duplicate records
     val duplicates = df.getNonuniqueRows(pks)
     val duplicateCount = duplicates.count
-    
+
     if (duplicateCount > 0) {
       // Collect a sample of duplicate records for error message
       val sampleSize = math.min(10, duplicateCount.toInt)
       val pkColsStr = pks.mkString(", ")
       val duplicateSample = duplicates.limit(sampleSize).showString()
-      
-      throw new DuplicateInputDataException(
+
+      throw DuplicateInputDataException(
         s"($id) Input data uniqueness validation failed: Found $duplicateCount duplicate records based on primary key [$pkColsStr]. " +
-        s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness.\n" +
-        s"Sample of duplicate records:\n$duplicateSample"
+          s"Set checkInputUnique=false to disable this check or fix the source data to ensure uniqueness.\n" +
+          s"Sample of duplicate records:\n$duplicateSample"
       )
     }
   }
 
-  private def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime = {
+  private def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime =
     context.referenceTimestamp.getOrElse(LocalDateTime.now)
-  }
 
   override private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
     super.reset
@@ -389,10 +441,10 @@ case class HistorizeAction(
 }
 
 object HistorizeAction extends FromConfigFactory[Action] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): HistorizeAction = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): HistorizeAction =
     extract[HistorizeAction](config)
-  }
 }
+
 /**
  * Exception to signal that input data contains duplicate records based on primary key constraints.
  * This is a data quality issue rather than a configuration problem.
