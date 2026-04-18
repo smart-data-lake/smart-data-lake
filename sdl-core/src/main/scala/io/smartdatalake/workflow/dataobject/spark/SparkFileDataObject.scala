@@ -546,11 +546,13 @@ trait SparkFileDataObject extends HadoopFileDataObject
       .getOrElse(dfPrepared)
 
     // apply special save modes
-    val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+    var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     finalSaveMode match {
       case SDLSaveMode.Overwrite =>
         if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
           deletePartitions(filterPartitionsExisting(partitionValues))
+          // Avoid exception with Spark 4 and dynamic partition override: "IOException: PathOutputCommitProtocol does not support dynamicPartitionOverwrite"
+          finalSaveMode = SDLSaveMode.Append
         } else {
           // SDLSaveMode.Overwrite: Workaround ADLSv2: overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)
           if (Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
@@ -560,6 +562,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
       case SDLSaveMode.OverwriteOptimized =>
         if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
           deletePartitions(filterPartitionsExisting(partitionValues))
+          // Avoid exception with Spark 4 and dynamic partition override: "IOException: PathOutputCommitProtocol does not support dynamicPartitionOverwrite"
+          finalSaveMode = SDLSaveMode.Append
         } else if (partitions.isEmpty || context.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
           deleteAll
         } else {
@@ -568,6 +572,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
       case SDLSaveMode.OverwritePreserveDirectories => // only delete files but not directories
         if (partitionValues.nonEmpty) { // delete concerned partitions files if existing, as append mode is used later
           deletePartitionsFiles(filterPartitionsExisting(partitionValues))
+          // Avoid exception with Spark 4 and dynamic partition override: "IOException: PathOutputCommitProtocol does not support dynamicPartitionOverwrite"
+          finalSaveMode = SDLSaveMode.Append
         } else if (partitions.isEmpty || context.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
           deleteAllFiles(hadoopPath)
         } else {

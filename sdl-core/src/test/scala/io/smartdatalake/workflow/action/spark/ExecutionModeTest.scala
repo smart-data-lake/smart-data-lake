@@ -28,7 +28,7 @@ import io.smartdatalake.util.spark.SparkExpressionUtil
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.spark.customlogic.{SparkUDFCreator, SparkUDFCreatorConfig}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping, FileSubFeed}
@@ -70,13 +70,14 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
   override def beforeAll(): Unit = {
     srcDO.dropTable
     val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())
+    srcDO.writeSparkDataFrame(l1)
     tgt1DO.dropTable
     tgt2DO.dropTable
     tgt2DO.writeSparkDataFrame(l1.where($"rating" <= 2), Seq())
     tgt3DO.dropTable
     tgt3DO.writeSparkDataFrame(l1.where($"rating" <= 2).withColumnRenamed("rating", "Rating"), Seq())
-    fileSrcDO.writeSparkDataFrame(l1, Seq())
+    fileSrcDO.writeSparkDataFrame(l1, PartitionValues.fromDataFrame(SparkDataFrame(l1.select($"lastname"))))
+    println("Test data setup completed")
   }
 
   test("PartitionDiffMode default") {
@@ -259,7 +260,7 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
     srcDOArchive.deleteAll
     instanceRegistry.register(srcDOArchive)
     val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
-    srcDOArchive.writeSparkDataFrame(l1, Seq())
+    srcDOArchive.writeSparkDataFrame(l1, PartitionValues.fromDataFrame(SparkDataFrame(l1.select($"lastname"))))
 
     val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"))
     executionMode.prepare(ActionId("test"))
@@ -278,7 +279,7 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
     srcDOArchive.deleteAll
     instanceRegistry.register(srcDOArchive)
     val l1 = Seq(("doe", "john", 5), ("einstein", "albert", 2)).toDF("lastname", "firstname", "rating")
-    srcDOArchive.writeSparkDataFrame(l1, Seq())
+    srcDOArchive.writeSparkDataFrame(l1, PartitionValues.fromDataFrame(SparkDataFrame(l1.select($"lastname"))))
 
     val executionMode = FileIncrementalMoveMode(archivePath = Some("archive"), archiveInsidePartition = true)
     executionMode.prepare(ActionId("test"))
