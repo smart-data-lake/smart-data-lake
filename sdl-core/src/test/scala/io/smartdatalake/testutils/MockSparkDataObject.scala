@@ -71,7 +71,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     if (partitions.nonEmpty) {
       partitionedDataFrameMock
-        .map(_.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).values.reduce(_ unionAll _))
+        .flatMap(_.view.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).values.reduceOption(_ unionAll _))
         .orElse(dataFrameMock) // dataFrameMock can be initialized with an empty DataFrame for partitioned MockDataObject if no partitionValues are provided in initSparkDataFrame
         .orElse(schemaMin.map(subFeedCompanion.getEmptyDataFrame(_, id).asInstanceOf[SparkDataFrame].inner))
         .getOrElse(throw NoDataToProcessWarning("mock", s"($id) partitionedDataFrameMock not initialized"))

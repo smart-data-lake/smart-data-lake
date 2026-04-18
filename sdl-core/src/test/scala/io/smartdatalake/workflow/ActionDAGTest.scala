@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, 
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.conf.Configuration
@@ -636,7 +636,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     dag.exec(contextExec)
 
     // check
-    assert(tgt1DO.getSparkDataFrame().count() == 0) // this should be empty because of tgt2DO.deleteDataAfterRead = true
+    intercept[NoDataToProcessWarning](tgt1DO.getSparkDataFrame()) // this should be empty because of tgt2DO.deleteDataAfterRead = true
     assert(tgt1DO.listPartitions.isEmpty)
     val r2 = tgt2DO.getSparkDataFrame()
       .select($"rating")
@@ -1087,7 +1087,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val df1 = Seq(("doe", "john", 5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeSparkDataFrame(df1, Seq())
 
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and value > 0"))
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'count' and value > 0"))
     val dag = ActionDAGRun(Seq(action1))
 
     // first dag run, first file processed
@@ -1121,7 +1121,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
     val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
-    val srcDO = JsonFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(SparkSchema(schema)), partitions = Seq("lastname"))
+    val srcDO = JsonFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(SparkSchema(schema)), partitions = Seq("lastname"), saveMode = SDLSaveMode.OverwriteOptimized)
     instanceRegistry.register(srcDO)
     val tgt1DO = ParquetFileDataObject("tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SDLSaveMode.Append)
     instanceRegistry.register(tgt1DO)
@@ -1130,7 +1130,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare DAG
     val df1 = Seq(("doe", "john", 5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
-    srcDO.writeSparkDataFrame(df1, Seq())
+    srcDO.writeSparkDataFrame(df1, PartitionValues.fromDataFrame(SparkDataFrame(df1.select(col("lastname")))))
 
     // dag1 run fails in init-phase because action1 fails and there is no other action to execute
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(failConditions = Seq(Condition(expression = "year(runStartTime) > 2000", Some("testing"))))))
