@@ -18,7 +18,6 @@
  */
 package io.smartdatalake.util.spark
 
-import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Collect, ImperativeAggregate}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeArrayData}
@@ -86,12 +85,13 @@ case class CollectSetDeterministic(
 
   override def createAggregationBuffer(): mutable.HashSet[Any] = mutable.HashSet.empty
 
-  override protected def withNewChildInternal(newChild: Expression): CollectSetDeterministic =
-    copy(child = newChild)
+  override def children: Seq[Expression] = Seq(child)
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): CollectSetDeterministic = copy(child = newChildren.head)
 }
 
 object CollectSetDeterministic {
-  def collect_set_deterministic(e: Column): Column = new Column(CollectSetDeterministic(e.expr).toAggregateExpression(false))
+  def collect_set_deterministic(e: Expression): Expression = CollectSetDeterministic(e).toAggregateExpression(false)
 }
 
 /*

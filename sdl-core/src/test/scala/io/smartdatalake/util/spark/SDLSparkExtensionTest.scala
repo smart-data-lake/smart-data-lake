@@ -33,10 +33,11 @@ class SDLSparkExtensionTest extends AnyFunSuite with StructTypeUtil {
 
   private implicit val session: SparkSession = TestUtil.session
   private val emptyDf = getEmptyDataFrame(scheme = createStruct(fieldName = "value"))
+  import org.apache.spark.sql.classic.ClassicConversions._
 
   test("fail on assertNonEmpty with empty DataFrame") {
     // fail after applying assertNonEmpty
-    val dfWithAssert: DataFrame = SDLSparkExtension.assertNotEmpty(df = emptyDf)
+    val dfWithAssert = SDLSparkExtension.assertNotEmpty(df = emptyDf)
     intercept[AssertNotEmptyFailure](dfWithAssert.count)
   }
 

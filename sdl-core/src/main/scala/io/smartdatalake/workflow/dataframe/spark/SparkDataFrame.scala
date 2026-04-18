@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
+import org.apache.spark.sql.classic.{ClassicConversions, ColumnConversions}
 import org.apache.spark.sql.execution.ExplainMode
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -155,6 +156,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     val numRows = options.get("numRows").map(_.toInt).getOrElse(10)
     val truncate = options.get("truncate").map(_.toInt).getOrElse(20)
     val vertical = options.get("vertical").exists(_.toBoolean)
+    import ClassicConversions._
     DatasetHelper.showString(inner, numRows, truncate, vertical)
   }
 
@@ -369,15 +371,21 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
 
-  override def exprSql: String = inner.expr.sql
+  override def exprSql: String = {
+    import ColumnConversions._
+    inner.expr.sql
+  }
 
   override def desc: GenericColumn = SparkColumn(inner.desc)
 
   override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
 
-  override def getName: Option[String] = inner.expr match {
-    case c: NamedExpression => Some(c.name)
-    case _ => None
+  override def getName: Option[String] = {
+    import ColumnConversions._
+    inner.expr match {
+      case c: NamedExpression => Some(c.name)
+      case _ => None
+    }
   }
 }
 

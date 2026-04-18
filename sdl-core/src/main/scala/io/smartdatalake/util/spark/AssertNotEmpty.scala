@@ -19,10 +19,10 @@
 package io.smartdatalake.util.spark
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, UnaryNode}
+import org.apache.spark.sql.classic.Strategy
 import org.apache.spark.sql.execution.{SparkPlan, UnaryExecNode}
 
 

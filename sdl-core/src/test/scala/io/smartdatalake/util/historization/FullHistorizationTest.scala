@@ -18,14 +18,15 @@
  */
 package io.smartdatalake.util.historization
 
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSimpleDataType, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
@@ -40,14 +41,16 @@ import java.time.Duration
  *
  */
 class FullHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
+  with TestToolDataset {
 
   private implicit val loggerImpl: Logger = logger
   private implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
 
-  implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
+  implicit val functions: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
+  implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   import functions._
 
   test("History unchanged with new columns but unchanged data") {

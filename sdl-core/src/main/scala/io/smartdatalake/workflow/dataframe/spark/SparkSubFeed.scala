@@ -29,14 +29,17 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.connection.{HadoopFileConnection, SparkClassicConnection}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Encoder, Encoders, Row, SparkSession, functions}
+import org.apache.spark.sql.{Column, DataFrame, DatasetHelper, Encoder, Encoders, Row, SparkSession, functions}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 import scala.reflect.runtime.universe.TypeTag
+import org.apache.spark.sql.classic.ClassicConversions._
 
 /**
  * A SparkSubFeed is used to transport [[DataFrame]]'s between Actions.
@@ -300,8 +303,9 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
    * This method will treat null values as regular values, which influence hash value of the row.
    */
   def nullAwareHash(cols: Column*): Column = {
+    import org.apache.spark.sql.classic.ColumnConversions._
     val expr = new NullAwareMurmur3HashExpr(cols.map(_.expr))
-    new Column(expr)
+    DatasetHelper.toCol(expr)
   }
 
   override def hash(column: GenericColumn): GenericColumn = {
@@ -377,7 +381,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = (srcType, tgtType) match {
     case (srcType, tgtType) if srcType.isSameType(tgtType) => SparkUnaryUdf(x => x)
     case (srcType: SparkSimpleDataType, tgtType: SparkSimpleDataType) => SparkUnaryUdf(x => x.cast(tgtType.inner))
-    case (srcType: SparkStructDataType, tgtType: SparkStructDataType) => SparkUnaryUdf(TypeEvolutionUtil.schemaEvolutionUdf(srcType.inner, tgtType.inner))
+    case (srcType: SparkStructDataType, tgtType: SparkStructDataType) => SparkUnaryUdf(x => DatasetHelper.toCol(TypeEvolutionUtil.schemaEvolutionUdf(srcType.inner, tgtType.inner)(x.expr)))
     case (srcType: SparkArrayDataType, tgtType: SparkArrayDataType) => new GenericUnaryUdf {
       override def subFeedType: universe.Type = SparkSubFeed.subFeedType
 
@@ -423,7 +427,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     implicit val encoder: Encoder[A] = Encoders.product[A]
     val session = getSparkSession
     import session.implicits._
-    SparkDataFrame(rows.toDF)
+    SparkDataFrame(rows.toDF())
   }
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {

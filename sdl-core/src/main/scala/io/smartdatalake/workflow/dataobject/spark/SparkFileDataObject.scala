@@ -37,6 +37,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, Proce
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
+import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
 import org.apache.spark.sql.functions.{col, input_file_name, lit}
@@ -674,9 +675,10 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
 private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+  import org.apache.spark.sql.classic.ClassicConversions._
   def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
     logger.debug(s"($name) add files observation to Dataset")
-    on(ds, true, collect_set_deterministic(col(filenameColumnName)).as("filesProcessed"))
+    on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
   }
 
   def getFilesProcessed: Seq[String] = {

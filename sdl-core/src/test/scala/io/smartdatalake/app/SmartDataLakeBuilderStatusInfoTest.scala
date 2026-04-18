@@ -23,9 +23,9 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
+import org.apache.hadoop.shaded.org.eclipse.jetty.websocket.client.WebSocketClient
 import org.apache.spark.sql.SparkSession
 import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
-import org.eclipse.jetty.websocket.client.WebSocketClient
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 

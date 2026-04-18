@@ -22,6 +22,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.evolution.SchemaEvolutionException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataframe.spark.SparkDataType
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.custom.UnsafeUnaryUdf
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{Column, Row}
@@ -48,14 +49,14 @@ object TypeEvolutionUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Creates a Spark udf to convert a [[org.apache.spark.sql.Column]] from one schema to another.
+   * Creates a Spark udf to convert an Expression from one schema to another.
    *
    * @param srcType DataType of the column to be converted
    * @param tgtType target DataType
-   * @return udf to convert a [[org.apache.spark.sql.Column]] to the target DataType
+   * @return udf to convert an Expression to the target DataType
    * @throws SchemaEvolutionException if conversion is not possible
    */
-  def schemaEvolutionUdf(srcType: StructType, tgtType: StructType): Column => Column = {
+  def schemaEvolutionUdf(srcType: StructType, tgtType: StructType): Expression => Expression = {
     val projector = ValueProjector.getProjection(srcType, tgtType, Seq())
     UnsafeUnaryUdf((row: Any) => projector.getWithCast(row), srcType, tgtType)
   }

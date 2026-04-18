@@ -21,6 +21,7 @@ package io.smartdatalake.util.spark
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
 import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.expr
 import org.apache.spark.sql.types.StructType
@@ -28,7 +29,8 @@ import org.apache.spark.sql.types.StructType
 object SparkExpressionUtil {
 
   def resolveExpression(exprStr: String, schema: StructType): Expression = {
-    resolveExpression(expr(exprStr).expr, schema)
+    val expr = SparkExpressionEvaluatorFactory.parseExpression(exprStr)
+    resolveExpression(expr, schema)
   }
 
   def resolveExpression(exprCol: Expression, schema: StructType): Expression = {

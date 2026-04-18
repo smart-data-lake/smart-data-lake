@@ -35,7 +35,7 @@ class JettyAgentServerSocket(agentConfig: LocalJettyAgentSmartDataLakeBuilderCon
       messageMetadata = Some(SDLMessageMetadata(this.toString, sess.getRemoteAddress.toString))
     )
     sess.getRemote.sendString(message.toJson)
-    sess.getPolicy.setMaxTextMessageBufferSize(1000000)
+    sess.getPolicy.setMaxTextMessageSize(1000000)
   }
 
 

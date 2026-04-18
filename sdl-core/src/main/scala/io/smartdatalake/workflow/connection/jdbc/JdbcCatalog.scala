@@ -116,8 +116,11 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
   }
 
   def getSchemaFromTable(table: String): StructType = {
-    val schemaQuery = jdbcDialect.getSchemaQuery(table)
-    connection.execJdbcQuery(schemaQuery, JdbcUtils.getSchema(_, jdbcDialect))
+    connection.execWithJdbcConnection { c =>
+      val schemaQuery = jdbcDialect.getSchemaQuery(table)
+      val rs = c.prepareStatement(schemaQuery).executeQuery()
+      JdbcUtils.getSchema(c, rs, jdbcDialect)
+    }
   }
 
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {

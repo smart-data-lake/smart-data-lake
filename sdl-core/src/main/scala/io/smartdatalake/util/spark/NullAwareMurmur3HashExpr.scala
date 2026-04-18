@@ -44,6 +44,8 @@ case class NullAwareMurmur3HashExpr(children: Seq[Expression], seed: Int) extend
 
   override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): NullAwareMurmur3HashExpr =
     copy(children = newChildren)
+
+  override protected def isCollationAware: Boolean = true
 }
 
 object NullAwareMurmur3HashExpr extends InterpretedHashFunction {

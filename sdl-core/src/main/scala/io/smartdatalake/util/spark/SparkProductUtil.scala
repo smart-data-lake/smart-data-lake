@@ -57,7 +57,7 @@ object SparkProductUtil {
     val encoder = ScalaReflection.encoderFor(tpe)
     val serializer = SerializerBuildHelper.createSerializer(encoder)
     val deserializer = DeserializerBuildHelper.createDeserializer(encoder)
-    new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
+    ExpressionEncoder(encoder, serializer, deserializer)
   }
 
   /**

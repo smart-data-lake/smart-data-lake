@@ -19,12 +19,15 @@
 package io.smartdatalake.util.historization
 
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeedCompanion}
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import org.apache.spark.sql.{Encoder, SparkSession}
 
 import java.sql.Timestamp
 import java.time.{Duration, LocalDateTime}
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe.TypeTag
 
 object HistorizationTestUtils {
 
@@ -56,8 +59,8 @@ object HistorizationTestUtils {
 
   private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit) = Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
 
-  def toHistorizedDf[T <: Product : Encoder](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false, timeUnitAxis: Option[Duration] = defaultTimeAxisUnit)
-                                            (implicit session: SparkSession, functions: DataFrameFunctions): GenericDataFrame = {
+  def toHistorizedDf[T <: Product: ClassTag: TypeTag](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false, timeUnitAxis: Option[Duration] = defaultTimeAxisUnit)
+                                            (implicit actionPipelineContext: ActionPipelineContext, functions: DataFrameSubFeedCompanion): GenericDataFrame = {
     import functions._
     val referenceTimestampOldTs = getReferenceTimestampOldTs(timeUnitAxis)
     var operation: Option[String] = None
@@ -92,10 +95,10 @@ object HistorizationTestUtils {
     dfHist
   }
 
-  def toDataDf[T <: Product : Encoder](records: Seq[T], colNames: Seq[String] = this.colNames)
-                                      (implicit session: SparkSession): GenericDataFrame = {
-    import session.sqlContext.implicits._
-    SparkDataFrame(records.toDF(colNames: _*))
+  def toDataDf[T <: Product : ClassTag: TypeTag](records: Seq[T], colNames: Seq[String] = this.colNames)
+                                      (implicit functions: DataFrameSubFeedCompanion, actionPipelineContext: ActionPipelineContext): GenericDataFrame = {
+    functions.createDataFrame(records)
+
   }
 
 }

@@ -578,7 +578,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
       .select($"rating")
       .as[Int].collect().toSet
     assert(r2 == Set(2, 5))
-    assert(tgt2DO.listPartitions == Seq(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "einstein"))))
+    assert(tgt2DO.listPartitions.toSet == Set(PartitionValues(Map("lastname" -> "doe")), PartitionValues(Map("lastname" -> "einstein"))))
 
     // third dag run - skip action execution because there are no new partitions to process
     dag.prepare(contextPrep)

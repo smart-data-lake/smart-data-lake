@@ -648,7 +648,7 @@ class TransformTest extends AnyFlatSpec with Matchers
   }
 
   "transpose" should "transpose empty DataFrame" in {
-    val actual = dfSnapshotsWithGaps.where(lit(false)).transpose(11)
+    val actual = dfSnapshotsWithGaps.where(lit(false)).transpose(lit(11))
     val expectedSchema: StructType = createStruct(Array[(String, DataType, Boolean)](("_column", StringType, false)))
     val rowsExpected: java.util.List[Row] = ArrayBuffer(
       Row("id"), Row("dt"), Row("x"), Row("y")).asJava
@@ -657,7 +657,7 @@ class TransformTest extends AnyFlatSpec with Matchers
   }
 
   "transpose" should "transpose the first 11 rows of a DataFrame" in {
-    val actual = dfSnapshotsWithGaps.transpose(11)
+    val actual = dfSnapshotsWithGaps.transpose(lit(11))
     val expectedSchema: StructType = createStruct(Array[(String, DataType, Boolean)](
       ("_column", StringType, false),
       ("_000", DoubleType, true),

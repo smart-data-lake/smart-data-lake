@@ -20,7 +20,7 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.util.LogUtils.{debLogFun, debugLog}
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.expressions.NamedExpression
+import org.apache.spark.sql.catalyst.expressions.{Alias, NamedExpression}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
@@ -39,11 +39,9 @@ trait Quality extends Transform {
   final def withComment(colName: String, commentText: String): Column = withComment(colName.split('.').last, col(colName), commentText)
 
   final def withComment(column: Column, commentText: String): Column = {
-    val colName = column.expr match {
-      case c: NamedExpression => c.name
-      case _ => throw new IllegalArgumentException(s"Cannot extract name from Column $column," +
-        s" as it is not a NamedExpression." +
-        s" use withComment(colName: String, column: Column, commentText: String) instead.")
+    val colName = column.node match {
+      case a: Alias => a.name
+      case _ => throw new IllegalArgumentException(s"Cannot extract name from Column $column, as it has no direct alias. Use withComment(colName: String, column: Column, commentText: String) instead.")
     }
     withComment(colName, commentText)
   }

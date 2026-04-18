@@ -22,7 +22,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.adaptive.AQEPropagateEmptyRelation
-import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSessionExtensions}
+import org.apache.spark.sql.{DataFrame, Dataset, DatasetHelper, SparkSessionExtensions, classic}
 
 /**
  * Custom extensions for the Spark Session, e.g. optimizer rules or additional plan strategies.
@@ -48,7 +48,7 @@ object SDLSparkExtension {
   /**
    * Fail on evaluation of DataFrame if it is empty.
    */
-  def assertNotEmpty(df: DataFrame): DataFrame = {
+  def assertNotEmpty(df: classic.Dataset[_]): classic.Dataset[_] = {
     if (Environment.enableSparkPlanNoDataCheck) DatasetHelper.modifyPlan(df, plan => AssertNotEmpty(plan))
     else df
   }

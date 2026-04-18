@@ -18,11 +18,12 @@
  */
 package io.smartdatalake.util.historization
 
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.{SparkSimpleDataType, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -43,7 +44,9 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
 
   import session.implicits._
 
-  implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
+  implicit val functions: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
+  implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   import functions._
 
   test("New/updated record creates updateClose and insertNew records for merge statement") {

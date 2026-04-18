@@ -244,6 +244,12 @@ case class MockSparkDataObject(override val id: DataObjectId,
     partitionedDataFrameMock = None
   }
 
+  override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    assert(partitions.nonEmpty)
+    partitionedDataFrameMock = partitionedDataFrameMock.map(_.view.filterKeys(pv => !partitionValues.contains(pv)).toMap)
+    partitionValuesMock = partitionValuesMock.filter(pv => !partitionValues.contains(pv))
+  }
+
   private implicit val subFeedCompanion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
 
   private def getPartitionValueFilter(pv: PartitionValues) = pv.getFilterExpr.asInstanceOf[SparkColumn].inner

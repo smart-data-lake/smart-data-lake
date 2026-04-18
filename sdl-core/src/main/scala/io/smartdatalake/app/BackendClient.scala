@@ -69,7 +69,6 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Smar
   }
 
   override def readLatestSchema(dataObjectId: DataObjectId): Option[String] = {
-    import scala.collection.compat._
     val tpe = "schema"
     val subPath = s"dataobject/$tpe/${dataObjectId.id}"
     val tstampsSubPath = s"$subPath/tstamps"
@@ -103,6 +102,7 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Smar
     uploader.send(subPath, body = Some(content), method = method, additionalParams = additionalParams)
   }
 
+  org.json4s.ext.JavaTimeSerializers.all
   implicit private val formats: Formats = DefaultFormats + Json4sCompat.getCustomSerializer[Timestamp](_ => ( {
     case json: JString => Timestamp.from(OffsetDateTime.parse(json.s).toInstant)
   }, {
