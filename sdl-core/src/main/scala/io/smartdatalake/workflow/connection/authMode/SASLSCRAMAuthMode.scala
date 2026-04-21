@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
+import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
  * Authenticate using SASL_SSL Authentication.
@@ -28,24 +28,19 @@ import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
  * Configuration needed are user, password and a Java truststore.
  */
 case class SASLSCRAMAuthMode(
-                              username: StringOrSecret,
-                              @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None,
-                              private val password: Option[StringOrSecret],
-                              sslMechanism: String,
-                              truststorePath: Option[String],
-                              truststoreType: String = "JKS",
-                              @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
-                              private val truststorePass: Option[StringOrSecret],
-                            ) extends AuthMode {
-  private[smartdatalake] val passwordSecret: StringOrSecret = password.orElse(passwordVariable.map(SecretsUtil.convertSecretVariableToStringOrSecret))
-    .getOrElse(throw ConfigurationException(s"password or passwordVariable must be defined."))
-  private[smartdatalake] val truststorePassSecret: Option[StringOrSecret] = truststorePass.orElse(truststorePassVariable.map(SecretsUtil.convertSecretVariableToStringOrSecret))
-
+    username: StringOrSecret,
+    private val password: Option[StringOrSecret],
+    sslMechanism: String,
+    truststorePath: Option[String],
+    truststoreType: String = "JKS",
+    private[smartdatalake] val truststorePassSecret: Option[StringOrSecret]
+) extends AuthMode {
+  private[smartdatalake] val passwordSecret: StringOrSecret = password
+    .getOrElse(throw ConfigurationException(s"password must be defined."))
   override def factory: FromConfigFactory[AuthMode] = SASLSCRAMAuthMode
 }
 
 object SASLSCRAMAuthMode extends FromConfigFactory[AuthMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SASLSCRAMAuthMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SASLSCRAMAuthMode =
     extract[SASLSCRAMAuthMode](config)
-  }
 }

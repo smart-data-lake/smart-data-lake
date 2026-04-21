@@ -59,14 +59,14 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
     dbEngine = "mysql",
     hostname = sys.env("MYSQL_HOSTNAME"),
     port = sys.env("MYSQL_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("MYSQL_USER")), password = StringOrSecret(sys.env("MYSQL_PASSWORD")))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "mysqlCon",
     url = s"jdbc:mysql://${sys.env("MYSQL_HOSTNAME")}:${sys.env("MYSQL_PORT").toInt}",
     driver = "com.mysql.cj.jdbc.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))),
+    authMode = Some(BasicAuthMode(user = StringOrSecret(sys.env("MYSQL_USER")), password = StringOrSecret(sys.env("MYSQL_PASSWORD")))),
     db = Some("demo")
   )
 

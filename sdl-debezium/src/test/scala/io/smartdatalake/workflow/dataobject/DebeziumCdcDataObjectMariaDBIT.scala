@@ -43,7 +43,6 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
    * Integration test to test basic debezium source db operations (initial read, insert, update, delete, no changes).
    */
 
-
   /**
    * Init tests
    */
@@ -63,16 +62,16 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
     id = "dbzCon",
     dbEngine = "mariadb",
     hostname = sys.env("MARIADB_HOSTNAME"),
-    //db = Some("test"),
+    // db = Some("test"),
     port = sys.env("MARIADB_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("MARIADB_USER")), password = StringOrSecret(sys.env("MARIADB_PASSWORD")))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "psqlCon",
     url = s"jdbc:mariadb://${sys.env("MARIADB_HOSTNAME")}:${sys.env("MARIADB_PORT")}",
     driver = "org.mariadb.jdbc.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))),
+    authMode = Some(BasicAuthMode(user = StringOrSecret(sys.env("MARIADB_USER")), password = StringOrSecret(sys.env("MARIADB_PASSWORD"))))
   )
 
   val appName = "sdlb-debezium-sequential-integration-test"
@@ -90,7 +89,17 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "plugin.name" -> "pgoutput", "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat")))
+  val srcDO1 = DebeziumCdcDataObject(
+    "src1",
+    connectionId = "dbzCon",
+    Table(Some("demo"), "test"),
+    debeziumProperties = Some(Map(
+        "database.server.id"                    -> "1234345345",
+        "plugin.name"                           -> "pgoutput",
+        "schema.history.internal"               -> "io.debezium.storage.file.history.FileSchemaHistory",
+        "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat"
+      ))
+  )
   instanceRegistry.register(srcDO1)
 
   val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
@@ -101,7 +110,8 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   val action1 = CopyAction("copyAction1", srcDO1.id, tgtDO1.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
   instanceRegistry.register(action1)
 
-  val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+  val sdlConfig =
+    SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
 
   // 1. Initial READ test
 
@@ -168,7 +178,6 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   sdlb.run(sdlConfig)
 
   df = srcDO1.getSparkDataFrame() // check src because copyAction will be skipped and target will contain the data from previous test step
-
 
   assert(df.columns.contains("id") &&
     df.columns.contains("value") &&

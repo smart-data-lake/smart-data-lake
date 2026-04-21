@@ -30,13 +30,10 @@ import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlIT.sparkSession
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import java.nio.file.Files
 
@@ -46,7 +43,6 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
    * Integration test to test read of an empty and a huge table.
    * Make sure you setup the db according to the TEST_DB_SETUP.md
    */
-
 
   /**
    * Init tests
@@ -70,14 +66,14 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
     hostname = sys.env("PSQL_HOSTNAME"),
     db = Some(sys.env("PSQL_DB")),
     port = sys.env("PSQL_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("PSQL_USER"))), Some(StringOrSecret(sys.env("PSQL_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("PSQL_USER")), password = StringOrSecret(sys.env("PSQL_PASSWORD")))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "psqlCon",
     url = s"jdbc:postgresql://${sys.env("PSQL_HOSTNAME")}:${sys.env("PSQL_PORT").toInt}/${sys.env("PSQL_DB")}",
     driver = "org.postgresql.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("PSQL_USER"))), Some(StringOrSecret(sys.env("PSQL_PASSWORD"))))),
+    authMode = Some(BasicAuthMode(user = StringOrSecret(sys.env("PSQL_USER")), password = StringOrSecret(sys.env("PSQL_PASSWORD")))),
     db = Some("demo")
   )
 
@@ -100,14 +96,16 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1",
+  val srcDO1 = DebeziumCdcDataObject(
+    "src1",
     connectionId = "dbzCon",
     Table(Some("demo"), "big_table"),
-    debeziumProperties = Some(Map("database.server.id" -> "12343453455",
-      "plugin.name" -> "pgoutput",
-      "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory",
-      "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat"
-    ))
+    debeziumProperties = Some(Map(
+        "database.server.id"                    -> "12343453455",
+        "plugin.name"                           -> "pgoutput",
+        "schema.history.internal"               -> "io.debezium.storage.file.history.FileSchemaHistory",
+        "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat"
+      ))
   )
   instanceRegistry.register(srcDO1)
 
@@ -119,7 +117,8 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
   val action1 = CopyAction("copyAction1", srcDO1.id, tgtDO1.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
   instanceRegistry.register(action1)
 
-  val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+  val sdlConfig =
+    SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
 
   // 1. READ test
 
@@ -134,6 +133,5 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
   )
 
   assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
-
 
 }

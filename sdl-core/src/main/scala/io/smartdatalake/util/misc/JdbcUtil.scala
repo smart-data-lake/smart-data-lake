@@ -208,13 +208,6 @@ case class ConnectionPoolConfig (
                                   testWhileIdle: Boolean = false,
                                   testTimeoutSec: Int = 3,
                                 ) {
-  /**
-   * Override with deprecated configuration values.
-   * This can be removed once deprecated properties are removed...
-   */
-  def withOverride(maxIdleTimeSec: Option[Int], maxWaitTimeSec: Option[Int]): ConnectionPoolConfig = {
-    this.copy(maxIdleTimeSec = maxIdleTimeSec.getOrElse(this.maxIdleTimeSec), maxWaitTimeSec = maxWaitTimeSec.getOrElse(this.maxWaitTimeSec))
-  }
 
   /**
    * Create a JDBC Connection Pool using this configuration.
@@ -222,7 +215,6 @@ case class ConnectionPoolConfig (
    * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
    * @param factoryFun factory method for JDBC Connections
    * @param initSql sql statement to be executed on new connections
-   * @param autoCommit if auto-commit should be enabled
    * @return the created {@code GenericObjectPool} object
    */
   def create(maxParallelConnections: Int,

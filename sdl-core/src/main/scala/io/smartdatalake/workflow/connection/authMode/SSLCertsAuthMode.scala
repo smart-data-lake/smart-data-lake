@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
  * Authenticate using SSL Certificates.
@@ -28,26 +28,21 @@ import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
  * Configuration needed are a Java keystore and truststore.
  */
 case class SSLCertsAuthMode(
-                             keystorePath: String,
-                             keystoreType: String = "JKS",
-                             @Deprecated @deprecated("Use `keystorePass` instead", "2.5.0") private val keystorePassVariable: Option[String] = None,
-                             private val keystorePass: Option[StringOrSecret],
-                             truststorePath: String,
-                             truststoreType: String = "JKS",
-                             @Deprecated @deprecated("Use `truststorePass` instead", "2.5.0") private val truststorePassVariable: Option[String] = None,
-                             private val truststorePass: Option[StringOrSecret]
-                           ) extends AuthMode {
-  private val _keystorePass = keystorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(keystorePassVariable.get))
-  private val _truststorePass = truststorePass.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(truststorePassVariable.get))
-
-  private[smartdatalake] val truststorePassSecret: StringOrSecret = _keystorePass
-  private[smartdatalake] val keystorePassSecret: StringOrSecret = _truststorePass
-
+    keystorePath: String,
+    keystoreType: String = "JKS",
+    private val keystorePass: Option[StringOrSecret],
+    truststorePath: String,
+    truststoreType: String = "JKS",
+    private val truststorePass: Option[StringOrSecret]
+) extends AuthMode {
+  private[smartdatalake] val truststorePassSecret: StringOrSecret = truststorePass
+    .getOrElse(throw ConfigurationException(s"truststorePass must be defined."))
+  private[smartdatalake] val keystorePassSecret: StringOrSecret = keystorePass
+    .getOrElse(throw ConfigurationException(s"keystorePass must be defined."))
   override def factory: FromConfigFactory[AuthMode] = SSLCertsAuthMode
 }
 
 object SSLCertsAuthMode extends FromConfigFactory[AuthMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SSLCertsAuthMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SSLCertsAuthMode =
     extract[SSLCertsAuthMode](config)
-  }
 }

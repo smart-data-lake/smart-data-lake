@@ -27,7 +27,6 @@ import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.generic.PrimaryKeyDefinition
 import org.apache.commons.pool2.impl.GenericObjectPool
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
@@ -41,25 +40,21 @@ import java.sql.{DatabaseMetaData, DriverManager, ResultSet, Connection => SqlCo
  * Connection information for JDBC tables.
  * If authentication is needed, user and password must be provided.
  *
- * @param id unique id of this connection
- * @param url jdbc connection url
- * @param driver class name of jdbc driver
- * @param authMode optional authentication information: for now BasicAuthMode is supported.
- * @param db optional jdbc database to be used by tables having this connection assigned.
+ * @param id                     unique id of this connection
+ * @param url                    jdbc connection url
+ * @param driver                 class name of jdbc driver
+ * @param authMode               optional authentication information: for now BasicAuthMode is supported.
+ * @param db                     optional jdbc database to be used by tables having this connection assigned.
  * @param maxParallelConnections max number of parallel jdbc connections created by an instance of this connection, default is 3
  *                               Note that Spark manages JDBC Connections on its own. This setting only applies to JDBC connection
  *                               used by SDL for validating metadata or pre/postSQL.
- * @param connectionPoolMaxIdleTimeSec timeout to close unused connections in the pool. Deprecated: Use connectionPool.maxIdleTimeSec instead.
- * @param connectionPoolMaxWaitTimeSec timeout when waiting for connection in pool to become available. Deprecated: Use connectionPool.maxWaitTimeSec instead.
- * @param autoCommit flag to enable or disable the auto-commit behaviour. When autoCommit is enabled, each database request is executed in its own transaction.
- *                   Default is autoCommit = false. It is not recommended to enable autoCommit as it will deactivate any transactional behaviour.
- * @param connectionInitSql SQL statement to be executed every time a new connection is created, for example to set session parameters
- * @param directTableOverwrite flag to enable overwriting target tables directly without creating temporary table.
- *                         Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
- *                         For SaveMode.Append this is ok, but it is problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
- *                         Default is directTableWrite=false, this will write data first into a temporary table, and then use
- *                         a "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
- *                         Also note that SDLSaveMode.Merge always creates a temporary table.
+ * @param connectionInitSql      SQL statement to be executed every time a new connection is created, for example to set session parameters
+ * @param directTableOverwrite   flag to enable overwriting target tables directly without creating temporary table.
+ *                               Background: Spark uses multiple JDBC connections from different workers, this is done using multiple transactions.
+ *                               For SaveMode.Append this is ok, but it is problematic with SaveMode.Overwrite, where the table is truncated in a first transaction.
+ *                               Default is directTableWrite=false, this will write data first into a temporary table, and then use
+ *                               a "DELETE" + "INSERT INTO SELECT" statement to overwrite data in the target table within one transaction.
+ *                               Also note that SDLSaveMode.Merge always creates a temporary table.
  */
 case class JdbcTableConnection(override val id: ConnectionId,
                                url: String,
@@ -67,10 +62,6 @@ case class JdbcTableConnection(override val id: ConnectionId,
                                authMode: Option[AuthMode] = None,
                                db: Option[String] = None,
                                maxParallelConnections: Int = 3,
-                               @Deprecated @deprecated("Use connectionPool.maxIdleTimeSec instead.", "2.6.1")
-                               connectionPoolMaxIdleTimeSec: Option[Int] = None,
-                               @Deprecated @deprecated("Use connectionPool.maxWaitTimeSec instead.", "2.6.1")
-                               connectionPoolMaxWaitTimeSec: Option[Int] = None,
                                connectionInitSql: Option[String] = None,
                                directTableOverwrite: Boolean = false,
                                connectionPool: ConnectionPoolConfig = ConnectionPoolConfig(),
@@ -85,7 +76,6 @@ case class JdbcTableConnection(override val id: ConnectionId,
   val catalog: JdbcCatalog = JdbcCatalog.fromJdbcDriver(driver, this)
   // setup connection pool
   override val pool: GenericObjectPool[SqlConnection] = connectionPool
-    .withOverride(connectionPoolMaxIdleTimeSec, connectionPoolMaxWaitTimeSec)
     .create(maxParallelConnections, getConnection _, connectionInitSql)
   override val jdbcDialect: JdbcDialect = JdbcDialects.get(url)
 
@@ -109,9 +99,10 @@ case class JdbcTableConnection(override val id: ConnectionId,
   }
 
   /**
-   * Code partly copied from Spark:JdbcUtils to adapt schemaString method to not quote identifiers if Spark is in case-insensitive mode.
+   * Code partly copied from Spark:
+   * JdbcUtils to adapt schemaString method to not quote identifiers if Spark is in case-insensitive mode.
    */
-  def createTableFromSchema(tableName: String, schema: StructType, rawOptions: Map[String,String])(implicit session: SparkSession): Unit = {
+  def createTableFromSchema(tableName: String, schema: StructType, rawOptions: Map[String,String]): Unit = {
     def schemaString(
                       schema: StructType,
                       caseSensitive: Boolean,
@@ -120,7 +111,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
       val sb = new StringBuilder()
       val dialect = JdbcDialects.get(url)
       val userSpecifiedColTypesMap = createTableColumnTypes
-        .map(parseUserSpecifiedCreateTableColumnTypes(schema, caseSensitive, _))
+        .map(parseUserSpecifiedCreateTableColumnTypes(caseSensitive, _))
         .getOrElse(Map.empty[String, String])
       schema.fields.foreach { field =>
         // Change is here - dont quote if not case-sensitive and normal characters used:
@@ -133,7 +124,7 @@ case class JdbcTableConnection(override val id: ConnectionId,
       }
       if (sb.length < 2) "" else sb.substring(2)
     }
-    def parseUserSpecifiedCreateTableColumnTypes(schema: StructType, caseSensitive: Boolean, createTableColumnTypes: String): Map[String, String] = {
+    def parseUserSpecifiedCreateTableColumnTypes(caseSensitive: Boolean, createTableColumnTypes: String): Map[String, String] = {
       val userSchema = CatalystSqlParser.parseTableSchema(createTableColumnTypes)
       val userSchemaMap = userSchema.fields.map(f => f.name -> f.dataType.catalogString).toMap
       if (caseSensitive) userSchemaMap else CaseInsensitiveMap(userSchemaMap)
@@ -169,4 +160,3 @@ object JdbcTableConnection extends FromConfigFactory[Connection] {
     extract[JdbcTableConnection](config)
   }
 }
-
