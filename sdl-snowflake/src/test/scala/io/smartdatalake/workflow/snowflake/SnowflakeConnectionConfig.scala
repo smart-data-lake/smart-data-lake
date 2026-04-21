@@ -23,9 +23,9 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 
 /**
- * Configuration of Snowflake connection for integration tests
- * Please ensure that the environment Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE,
- * SNOWFLAKE_USER and SNOWFLAKE_PASSWORD are set in order to connect to Snowflake.
+ * Configuration of Snowflake connection for integration tests Please ensure that the environment
+ * Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE, SNOWFLAKE_USER
+ * and SNOWFLAKE_PASSWORD are set in order to connect to Snowflake.
  */
 object SnowflakeConnectionConfig {
   val sfConnection: SnowflakeConnection = SnowflakeConnection(
@@ -34,10 +34,11 @@ object SnowflakeConnectionConfig {
     warehouse = sys.env("SNOWFLAKE_WAREHOUSE"),
     database = sys.env("SNOWFLAKE_DATABASE"),
     role = sys.env("SNOWFLAKE_ROLE"),
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("SNOWFLAKE_USER"))), Some(StringOrSecret(sys.env("SNOWFLAKE_PASSWORD")))),
-    //authMode = OAuthMode(oauthUrl=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_URL")),
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("SNOWFLAKE_USER")),
+      password = StringOrSecret(sys.env("SNOWFLAKE_PASSWORD")))
+    // authMode = OAuthMode(oauthUrl=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_URL")),
     //  clientId=StringOrSecret(sys.env("SNOWFLAKE_CLIENTID")), clientSecret=StringOrSecret(sys.env("SNOWFLAKE_SECRET")),
     //  oauthScope=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_SCOPE")))
-    //proxy = Some(HttpProxyConfig(host = "<host>", port = <port>))
+    // proxy = Some(HttpProxyConfig(host = "<host>", port = <port>))
   )
 }

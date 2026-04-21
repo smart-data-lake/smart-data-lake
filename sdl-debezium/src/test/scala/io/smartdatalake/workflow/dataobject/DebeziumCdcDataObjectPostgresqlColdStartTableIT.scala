@@ -62,7 +62,7 @@ object DebeziumCdcDataObjectPostgresqlColdStartTableIT extends App with SmartDat
     hostname = sys.env("PSQL_HOSTNAME"),
     db = Some(sys.env("PSQL_DB")),
     port = sys.env("PSQL_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("PSQL_USER"))), Some(StringOrSecret(sys.env("PSQL_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("PSQL_USER")), password = StringOrSecret(sys.env("PSQL_PASSWORD")))
   )
 
   val appName = "sdlb-debezium-empty-table-test"
