@@ -35,7 +35,7 @@ trait ReadWrite extends Serializable {
 
   implicit class DataFrameWriterUtils[T](writer: DataFrameWriter[T]) {
     final def optionalPartitionBy(partitions: Seq[String]): DataFrameWriter[T] = {
-      if (partitions.nonEmpty) writer.partitionBy(partitions: _*) else writer
+      if (partitions.nonEmpty) writer.partitionBy(partitions.toIndexedSeq: _*) else writer
     }
 
     final def optionalOption(key: String, value: Option[String]): DataFrameWriter[T] = {

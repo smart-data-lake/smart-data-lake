@@ -73,8 +73,8 @@ class EncryptColumnsTransformerTest extends AnyFunSuite {
         |     transformers = [{
         |       type = EncryptColumnsTransformer
         |       encryptColumns = ["c2","c3"]
-        |       key = "${test_key}"
-        |       algorithm = ${enc_type}
+        |       key = "$test_key"
+        |       algorithm = $enc_type
         |     }]
         |   }
         |   actdec = {
@@ -87,8 +87,8 @@ class EncryptColumnsTransformerTest extends AnyFunSuite {
         |     transformers = [{
         |       type = DecryptColumnsTransformer
         |       decryptColumns = ["c2","c3"]
-        |       key = "${test_key}"
-        |       algorithm = ${enc_type}
+        |       key = "$test_key"
+        |       algorithm = $enc_type
         |     }]
         |   }
         |}
@@ -133,7 +133,7 @@ class EncryptColumnsTransformerTest extends AnyFunSuite {
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
     val testCol = dfEnc.select("c2").map(f => f.getString(0)).collect().toList
     dfEnc.show(false)
-    print(s"### ${enc_type} encrypted dataFrame")
+    print(s"### $enc_type encrypted dataFrame")
     assert(testCol != Seq("Foo", "Space", "Space"))
     if (enc_type === "GCM") {
       assert(testCol(1) !== testCol(2), "2 encrypted items should not result in the same ciphertext with GCM")
@@ -145,7 +145,7 @@ class EncryptColumnsTransformerTest extends AnyFunSuite {
     val dec = instanceRegistry.get[ParquetFileDataObject]("dec")
     val dfDec = dec.getSparkDataFrame()
     dfDec.show(false)
-    print(s"### ${enc_type} decrypted dataFrame")
+    print(s"### $enc_type decrypted dataFrame")
 
     val colDecName = dfDec.columns
     assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
@@ -199,8 +199,8 @@ class EncryptColumnsTransformerTest extends AnyFunSuite {
     val file = "./test_enc.parquet"
 
     // write/read to CSV file -> would result in String columns, since CSV does not store Metadata
-    //df_enc.write.mode(SaveMode.Overwrite).format("csv").option("header", true).save(file)
-    //val df_enc_file = session.read.format("csv").option("header", true).load(file)
+    //df_enc.write.mode(SaveMode.Overwrite).format("csv").option(key = "header", value = true).save(file)
+    //val df_enc_file = session.read.format("csv").option(key = "header", value = true).load(file)
 
     // write/read to parquet file
     df_enc.write.mode(SaveMode.Overwrite).parquet(file)

@@ -114,12 +114,12 @@ object SparkRepartitionDef extends SmartDataLakeLogger {
     if (numberOfTasksPerPartition > 1 && keyCols.isEmpty) logger.info(s"($configObjectId) SparkRepartitionDef: distribution of records over Spark tasks within Hadoop partitions not defined, using random value now. Define keyCols to have better control over the distribution.")
     // to distribute records across tasks within partitions, we need calculate a task number from keyCols
     val repartitionCols = if (numberOfTasksPerPartition == 1) partitions.map(col)
-    else if (keyCols.nonEmpty) partitions.map(col) :+ pmod(hash(keyCols.map(col): _*), lit(numberOfTasksPerPartition))
+    else if (keyCols.nonEmpty) partitions.map(col) :+ pmod(hash(keyCols.map(col).toIndexedSeq: _*), lit(numberOfTasksPerPartition))
     else partitions.map(col) :+ floor(rand() * numberOfTasksPerPartition).cast(IntegerType)
     if (nbOfPartitionValues.isDefined) {
-      df.repartition(numberOfTasksPerPartition * nbOfPartitionValues.get, repartitionCols: _*)
+      df.repartition(numberOfTasksPerPartition * nbOfPartitionValues.get, repartitionCols.toIndexedSeq: _*)
     } else {
-      df.repartition(repartitionCols: _*)
+      df.repartition(repartitionCols.toIndexedSeq: _*)
     }
   }
 
@@ -135,7 +135,7 @@ object SparkRepartitionDef extends SmartDataLakeLogger {
         case sortColRegex(colName) => col(colName).asc
         case entry => throw new ConfigurationException(s"""($configObjectId) Too many arguments provided in [sparkRepartition.sortCols] entry "$entry". Just provide colName or colName and sortDir separated by whitespace.""")
       }
-      df.sortWithinPartitions(sortExprs: _*)
+      df.sortWithinPartitions(sortExprs.toIndexedSeq: _*)
     }
     else df
   }

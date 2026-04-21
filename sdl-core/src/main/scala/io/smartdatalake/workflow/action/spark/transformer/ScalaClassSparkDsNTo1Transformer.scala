@@ -126,7 +126,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
     val columnsFromCaseClass = ProductUtil.classAccessorNames(outputClassType)
 
     val resAsDF = resDs.toDF()
-    val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columnsFromCaseClass.map(col): _*) else resAsDF
+    val resWithSelect = if (outputColumnAutoSelect) resAsDF.select(columnsFromCaseClass.map(col).toIndexedSeq: _*) else resAsDF
 
     if (addPartitionValuesToOutput) {
       assert(partitionValues.size == 1, s"When using addPartitionValuesToOutput you can only process one partition-value at a time, but ${partitionValues.size} where given: {${partitionValues.mkString(";")}}")
@@ -162,7 +162,7 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         val dfWithSelect =
           if (inputColumnAutoSelect) {
             val columnNames = ProductUtil.classAccessorNames(dsType)
-            df.select(columnNames.map(col): _*)
+            df.select(columnNames.map(col).toIndexedSeq: _*)
           } else {
             df
           }

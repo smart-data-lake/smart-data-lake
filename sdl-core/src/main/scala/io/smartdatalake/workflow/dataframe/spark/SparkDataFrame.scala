@@ -60,19 +60,19 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def select(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
-    SparkDataFrame(inner.select(columns.map(_.asInstanceOf[SparkColumn].inner): _*))
+    SparkDataFrame(inner.select(columns.map(_.asInstanceOf[SparkColumn].inner).toIndexedSeq: _*))
   }
 
   override def groupBy(columns: Seq[GenericColumn]): SparkGroupedDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkGroupedDataFrame(inner.groupBy(sparkCols: _*))
+    SparkGroupedDataFrame(inner.groupBy(sparkCols.toIndexedSeq: _*))
   }
 
   override def agg(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail: _*))
+    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail.toIndexedSeq: _*))
   }
 
   override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): SparkDataFrame = {
@@ -103,10 +103,10 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def orderBy(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkDataFrame(inner.orderBy(sparkCols: _*))
+    SparkDataFrame(inner.orderBy(sparkCols.toIndexedSeq: _*))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
+  override def collect: Seq[GenericRow] = inner.collect.map(SparkRow)
 
   override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
 
@@ -169,13 +169,13 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
     // Some Spark data sources dont execute observations, e.g. jdbc. The generic observation can be forced for these cases.
     if (forceGenericObservation) {
-      val observation = GenericCalculatedObservation(this, aggregateColumns: _*)
+      val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
       // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
       (this.cache, observation)
     } else {
       val observation = new SparkObservation(name)
       val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
-      val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns: _*)
+      val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns.toIndexedSeq: _*)
       (SparkDataFrame(dfObserved), observation)
     }
   }
@@ -183,7 +183,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
     val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
-    val dfObserved = inner.observe(name, sparkAggregatedColumns.head, sparkAggregatedColumns.tail: _*)
+    val dfObserved = inner.observe(name, sparkAggregatedColumns.head, sparkAggregatedColumns.tail.toIndexedSeq: _*)
     SparkDataFrame(dfObserved)
   }
 
@@ -198,7 +198,7 @@ case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends Generi
   override def agg(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail: _*))
+    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail.toIndexedSeq: _*))
   }
 }
 
@@ -356,7 +356,7 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
 
-  override def isin(list: Any*): GenericColumn = SparkColumn(inner.isin(list: _*))
+  override def isin(list: Any*): GenericColumn = SparkColumn(inner.isin(list.toIndexedSeq: _*))
 
   override def isNull: GenericColumn = SparkColumn(inner.isNull)
 

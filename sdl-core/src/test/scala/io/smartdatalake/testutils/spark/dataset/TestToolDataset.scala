@@ -25,13 +25,11 @@ import org.slf4j.Logger
 
 trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
 
-  def printFailedTestResult[T](testName: String, arguments: Seq[Dataset[T]] = Nil)
-                              (actual: Dataset[T])(expected: Dataset[T])
-                              (implicit logger: Logger): Unit = {
+  def printFailedTestResult[T](testName: String, arguments: Seq[Dataset[T]] = Nil)(actual: Dataset[T])(expected: Dataset[T])(implicit logger: Logger): Unit = {
     def printDf(df: Dataset[T]): Unit = {
       logger.error(df.schema.simpleString)
       df.printSchema()
-      df.orderBy(df.columns.head, df.columns.tail: _*).show(false)
+      df.orderBy(df.columns.head, df.columns.tail.toIndexedSeq: _*).show(false)
     }
 
     logger.error(s"!!!! Test $testName Failed !!!")
@@ -47,14 +45,13 @@ trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
     actual.getSymmetricDifference(expected).show(false)
   }
 
-  def printFailedTestResultGeneric(testName: String, arguments: Seq[GenericDataFrame] = Seq())
-                                  (actual: GenericDataFrame)(expected: GenericDataFrame)
-                                  (implicit logger: Logger): Unit = {
+  def printFailedTestResultGeneric(testName: String, arguments: Seq[GenericDataFrame] = Seq())(actual: GenericDataFrame)(expected: GenericDataFrame)(implicit
+      logger: Logger
+  ): Unit =
     (actual, expected) match {
       case (actual: SparkDataFrame, expected: SparkDataFrame) =>
         assert(arguments.forall(_.isInstanceOf[SparkDataFrame]))
         printFailedTestResult(testName, arguments.map(_.asInstanceOf[SparkDataFrame].inner))(actual.inner)(expected.inner)
     }
-  }
 
 }

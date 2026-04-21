@@ -141,7 +141,7 @@ object TestUtil extends SmartDataLakeLogger with Equality {
   // write DataFrame to table
   def prepareHiveTable(table: Table, path: String, df: DataFrame, partitionCols: Seq[String] = Seq()): Unit =
     if (partitionCols.isEmpty) df.write.mode(SaveMode.Overwrite).option("path", path).saveAsTable(s"${table.fullName}")
-    else df.write.mode(SaveMode.Overwrite).option("path", path).partitionBy(partitionCols: _*).saveAsTable(s"${table.fullName}")
+    else df.write.mode(SaveMode.Overwrite).option("path", path).partitionBy(partitionCols.toIndexedSeq: _*).saveAsTable(s"${table.fullName}")
 
   def copyResourceToFile(resource: String, tgtFile: File): Unit = {
     val inputStream = this.getClass.getClassLoader.getResourceAsStream(resource)

@@ -152,7 +152,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
           parseCsvContent(content, parserOptions, filename)
             .map { parsedRow =>
               val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // value column is at pos 0, partition columns (if any) and filename column are after that
-              Row(values: _*)
+              Row(values.toIndexedSeq: _*)
             }
         }
       }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // value column is at pos 0, partition columns (if any) and filename column are after that

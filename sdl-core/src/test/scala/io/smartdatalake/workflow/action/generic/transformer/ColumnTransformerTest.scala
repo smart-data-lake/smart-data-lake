@@ -35,7 +35,7 @@ class ColumnTransformerTest extends AnyFunSuite with BeforeAndAfter {
   import session.implicits._
 
 
-  val sdlb = DefaultSmartDataLakeBuilder
+  val sdlb: DefaultSmartDataLakeBuilder.type = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
   implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 

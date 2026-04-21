@@ -205,16 +205,16 @@ object ProductUtil {
   /**
    * Extract case class attributes with values through reflection
    */
-  def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
+  def attributesWithValuesForCaseClass(obj: Any): List[(String, Any)] = {
     val clsSym = currentMirror.classSymbol(obj.getClass)
     val inst = currentMirror.reflect(obj)
 
-    val attributes = classAccessors(clsSym.toType)
+    val attributes: List[MethodSymbol] = classAccessors(clsSym.toType)
     attributes.map { m =>
       val key = m.name.toString
       val value = inst.reflectMethod(m).apply()
       (key, value)
-    }.toSeq
+    }
   }
 
   /**
@@ -226,12 +226,12 @@ object ProductUtil {
     val inst = currentMirror.reflect(obj)
     val copyConstructor = inst.symbol.toType.decls.find(_.name.toString == "copy")
       .getOrElse(throw new IllegalStateException(s"copy constructor method not found in object of type ${obj.getClass.getSimpleName}"))
-    val attributes = classAccessors(clsSym.toType)
+    val attributes: List[(String, Any)] = classAccessors(clsSym.toType)
       .map { m =>
         val key = m.name.toString
         val value = if (key == fieldName) newValue else inst.reflectMethod(m).apply()
         (key, value)
-      }.toSeq
-    inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2): _*).asInstanceOf[T]
+      }
+    inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2).toIndexedSeq: _*).asInstanceOf[T]
   }
 }

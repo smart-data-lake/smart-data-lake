@@ -120,7 +120,7 @@ case class SmartDataLakeBuilderLab[D,A](
     }
 
     // transform
-    val optionsPrep = mutable.Map(options.toSeq: _*)
+    val optionsPrep = mutable.Map(options.toSeq.toIndexedSeq: _*)
     if (transformer.isSingleOutput) optionsPrep += (OPTION_OUTPUT_DATAOBJECT_ID -> DEFAULT_DATAOBJECT_ID)
     transformer.transform(session, optionsPrep.toMap, dfs)
   }

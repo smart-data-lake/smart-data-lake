@@ -49,7 +49,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
     if (ds.isStreaming) throw new IllegalArgumentException("SparkObservation does not yet support streaming Datasets")
     sparkSession = Some(ds.sparkSession)
     if (registerListener) ds.sparkSession.listenerManager.register(listener)
-    ds.observe(name, exprs.head, exprs.tail: _*)
+    ds.observe(name, exprs.head, exprs.tail.toIndexedSeq: _*)
   }
 
   /**

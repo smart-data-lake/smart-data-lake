@@ -304,7 +304,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     aggFunction.apply() match {
       case snowparkAggFunctionColumn: SnowparkColumn => SnowparkColumn(snowparkAggFunctionColumn
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner).toIndexedSeq: _*)
             .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
       )
       case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
@@ -326,7 +326,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
   }
 
   override def rowFromSeq(values: Seq[Any]): GenericRow = {
-    SnowparkRow(Row(values: _*))
+    SnowparkRow(Row(values.toIndexedSeq: _*))
   }
 
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = {

@@ -317,7 +317,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
         .optionalSchema(schema)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       val pathsToRead = partitionValues.flatMap(getConcreteInitPaths).map(_.toString)
-      val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead: _*)) else None
+      val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead.toIndexedSeq: _*)) else None
       df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
         .getOrElse {
           // if there are no paths to read for given partition values, handle no data

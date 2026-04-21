@@ -88,13 +88,13 @@ case class PKViolatorsDataObject(id: DataObjectId,
         val dataColumns = dfPKViolators.schema.columns.diff(pkColNames)
         val colSchema = lit(dfTable.schema.sql).as("schema")
         val keyCol = optionalCastColToString(flattenOutput) {
-          array(pkColNames.map(colName2colRepresentation): _*).as("key")
+          array(pkColNames.map(colName2colRepresentation).toIndexedSeq: _*).as("key")
         }
         val dataCol = optionalCastColToString(flattenOutput) {
           if (dataColumns.isEmpty) {
             lit(null).cast(arrayType(structType(Map(columnNameName -> stringType, columnValueName -> stringType))))
           } else {
-            array(dataColumns.map(colName2colRepresentation): _*)
+            array(dataColumns.map(colName2colRepresentation).toIndexedSeq: _*)
           }
         }.as("data")
         Some( dfPKViolators.select( Seq(

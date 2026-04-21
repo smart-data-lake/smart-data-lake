@@ -204,10 +204,10 @@ trait Equality extends StructTypeUtil with Transform {
       LogUtils.debugLog(s"hasAlmostEqualRows: rowDiffCols = ${rowDiffCols.headOption.map(_.mkString(","))}")
 
       lazy val preciseRowDiff: List[DataFrame] = symDiffCols.map { x =>
-        thiss.select(x: _*).getSymmetricDifference(thatt.select(x: _*))
+        thiss.select(x.toIndexedSeq: _*).getSymmetricDifference(thatt.select(x.toIndexedSeq: _*))
       }
       lazy val impreciseRowDiff: List[DataFrame] = rowDiffCols.map { x =>
-        thiss.select(x: _*).getRowDifferences(thatt.select(x: _*), precisionMap)
+        thiss.select(x.toIndexedSeq: _*).getRowDifferences(thatt.select(x.toIndexedSeq: _*), precisionMap)
       }
 
       val result = equinumerous && (preciseRowDiff ++ impreciseRowDiff).forall(_.isEmpty)
@@ -246,8 +246,8 @@ trait Equality extends StructTypeUtil with Transform {
                           showDiff: Boolean,
                           pk: Iterable[String])(implicit logger: Logger): Boolean = {
       ds.schema.equal(that.schema, ignoreColumnOrder, ignoreNullability, showDiff) &&
-        ds.select(ds.columns.map(col): _*)
-          .hasAlmostEqualRows(that.select(ds.columns.map(col): _*), precisionMap, showDiff, pk)
+        ds.select(ds.columns.map(col).toIndexedSeq: _*)
+          .hasAlmostEqualRows(that.select(ds.columns.map(col).toIndexedSeq: _*), precisionMap, showDiff, pk)
     }
 
     /**

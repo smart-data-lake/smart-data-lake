@@ -56,12 +56,12 @@ object SttpUtil extends SmartDataLakeLogger {
 
   def getContent[T](response: Response[Either[String, T]], context: String): T = {
     validateResponse(response, context)
-    response.body.right.get
+    response.body.toOption.get
   }
 
   private[smartdatalake] def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
     if (response.body.isLeft) {
-      throw HttpRequestError(context, response.code.code, response.body.left.get)
+      throw HttpRequestError(context, response.code.code, response.body.swap.toOption.get)
     }
     assert(response.isSuccess, throw HttpRequestError(context, response.code.code, "StatusCode is not successfull, but there is no error message!"))
   }
@@ -71,7 +71,7 @@ object SttpUtil extends SmartDataLakeLogger {
       .orElse {
         // manually detect type as guessContentTypeFromStream doesnt work for Json and Text...
         val str = new String(content)
-        if (str.take(100).matches("(?:\\P{Cntrl}|\\p{Space})+")) { // is text
+        if (str.take(100).matches("(?:\\P{Cntrl}|\\s)+")) { // is text
           if (str.matches("\\s*[{\\[]")) Some(MediaType.ApplicationJson.toString())
           else Some(MediaType.TextPlain.toString())
         } else None

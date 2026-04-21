@@ -292,7 +292,7 @@ object ExpressionParser {
       val resolved = candidates.view.flatMap(method => buildInvocationArguments(method, args).map(method -> _)).headOption
       resolved match {
         case Some((method, invocationArgs)) =>
-          val result = method.invoke(functions, invocationArgs: _*)
+          val result = method.invoke(functions, invocationArgs.toIndexedSeq: _*)
           result match {
             case col: GenericColumn => col
             case _ => throw ExpressionParserException(s"Function '$functionName' does not return a column", position)

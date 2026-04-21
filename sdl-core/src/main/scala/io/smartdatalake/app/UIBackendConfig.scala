@@ -107,7 +107,7 @@ case class UIBackendConfig(
           .readTimeout(FiniteDuration(timeouts.readTimeoutMs, TimeUnit.MILLISECONDS))
           .followRedirects(true)
         body.foreach(b => request = request.body(b))
-        multipartBody.foreach(mp => request = request.multipartBody(mp.head, mp.tail: _*))
+        multipartBody.foreach(mp => request = request.multipartBody(mp.head, mp.tail.toIndexedSeq: _*))
         val response = request.send(httpBackend)
         Option(getContent(response, s"$method $operation")).filter(_.nonEmpty)
       }

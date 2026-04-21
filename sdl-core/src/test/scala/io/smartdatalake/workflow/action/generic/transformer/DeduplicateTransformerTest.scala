@@ -188,7 +188,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
     val transformedDf = tgtDO.getSparkDataFrame()
 
-    assert(transformedDf.collect sameElements resultDf.inner.collect)
+    assert(transformedDf.collect() sameElements resultDf.inner.collect())
   }
 
 }

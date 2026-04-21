@@ -189,7 +189,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
           .getOrElse(throw NotFoundError(s"No DataFrame found with name $dsName for parameter $paramName. DataFrames available are ${dfs.keys.mkString(", ")}."))
         val dfWithSelect = {
           val columnNames = ProductUtil.classAccessorNames(dsType)
-          df.select(columnNames.map(col): _*)
+          df.select(columnNames.map(col).toIndexedSeq: _*)
         }
         val ds = SparkProductUtil.createDataset(dfWithSelect, dsType)
         (dsParam, ds)
@@ -200,7 +200,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
         val optionVal = try {
           Some(extractOptionVal(options, optionalParam, getConverterFor(optionalParam.tpe.typeArgs.head)))
         } catch {
-          case _: NotFoundError => optionalParam.defaultValue.map(_.asInstanceOf[Option[Any]]).flatten
+          case _: NotFoundError => optionalParam.defaultValue.flatMap(_.asInstanceOf[Option[Any]])
         }
         (optionalParam, optionVal)
       case seqParam if seqParam.tpe <:< typeOf[Seq[_]] =>
@@ -235,13 +235,13 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
     if (returnType =:= typeOf[Map[String, DataFrame]]) {
       transformResult.asInstanceOf[Map[String, DataFrame]]
     } else if (returnType <:< typeOf[Map[String, Dataset[_]]]) {
-      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF).toMap
+      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF()).toMap
     } else if (returnType =:= typeOf[DataFrame]) {
       require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambiguous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
       Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
     } else if (returnType <:< typeOf[Dataset[_]]) {
       require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
-      Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[Dataset[_]].toDF)
+      Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[Dataset[_]].toDF())
     } else {
       throw new IllegalStateException(s"Custom transform function has unsupported return type $returnType")
     }

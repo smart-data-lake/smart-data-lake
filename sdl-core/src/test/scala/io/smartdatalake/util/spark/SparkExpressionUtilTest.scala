@@ -56,7 +56,7 @@ class SparkExpressionUtilTest extends AnyFunSuite {
     if (!result) {
       println(s"Test Failed for the following rows:")
       resultDf.where($"actual" =!= $"expected")
-        .orderBy(resultDf.columns.map(col): _*).show(false)
+        .orderBy(resultDf.columns.map(col).toIndexedSeq: _*).show(false)
     }
     assert(result)
   }

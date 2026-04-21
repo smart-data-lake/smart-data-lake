@@ -297,10 +297,10 @@ class CsvFileDataObjectTest extends DataObjectTestSuite
     val dataObj = CsvFileDataObject(id = "test1", path = tempDir.toFile.getPath, partitions = Seq("h1"), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
     dataObj.writeSparkDataFrame(df1, pv1)
 
-    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache
+    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache()
 
     assert(dfResult.columns.toSet == Set("h2", "h3", "h1", "_filename"))
-    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == data1.toSet)
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == data1.toSet)
     assert(dfResult.where($"_filename".isNull).isEmpty)
   }
 
@@ -315,10 +315,10 @@ class CsvFileDataObjectTest extends DataObjectTestSuite
       schema = Some(SparkSchema(df1.drop("h1").schema)), filenameColumn = Some("_filename"))
     dataObj.writeSparkDataFrame(df1, pv1)
 
-    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache
+    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache()
 
     assert(dfResult.columns.toSet == Set("h2", "h3", "h1", "_filename"))
-    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect.toSet == data1.toSet)
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == data1.toSet)
     assert(dfResult.where($"_filename".isNull).isEmpty)
   }
 

@@ -69,7 +69,7 @@ class OpenApiDataObjectTest extends AnyFunSuite {
     )
     do1.prepare
     val df = do1.getSparkDataFrame()(contextExec)
-    val result = df.as[(Long, String)].collect.toSeq
+    val result = df.as[(Long, String)].collect().toSeq
     assert(result == Seq((123L, "john")))
 
     wireMockServer.stop()
@@ -97,7 +97,7 @@ class OpenApiDataObjectTest extends AnyFunSuite {
     do1.prepare
     val df = do1.getSparkDataFrame()(contextExec)
       .drop("nextLink")
-    val result = df.as[(Long, String)].collect.toSeq
+    val result = df.as[(Long, String)].collect().toSeq
     assert(result == Seq((123L, "john"), (456L, "peter")))
 
     wireMockServer.stop()

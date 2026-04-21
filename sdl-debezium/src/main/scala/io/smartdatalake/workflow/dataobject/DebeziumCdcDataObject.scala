@@ -116,7 +116,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     // Always overwrite table.include.list property to include only the changes of the table specified in the data object
     props = props ++ Map("table.include.list" -> table.fullName)
 
-    val propsForEngine = new Properties();
+    val propsForEngine = new Properties()
     props.foreach { case (key, value) => propsForEngine.setProperty(key, value) }
     propsForEngine
   }
@@ -319,17 +319,15 @@ private object DebeziumEventConverter {
         case Type.BOOLEAN => BooleanType
         case Type.STRING => StringType
         case Type.BYTES => BinaryType
-        case Type.MAP => {
+        case Type.MAP =>
           // Infer key and value types for MapType
           val keyType = inferSparkSchema(field.schema().keySchema())
           val valueType = inferSparkSchema(field.schema().valueSchema())
           MapType(keyType, valueType)
-        }
-        case Type.ARRAY => {
+        case Type.ARRAY =>
           // Infer the element type for ArrayType
           val elementType = inferSparkSchema(field.schema().valueSchema())
           ArrayType(elementType)
-        }
         case Type.STRUCT => inferSparkSchema(field.schema())
         case _ => StringType
       }
@@ -355,7 +353,7 @@ private object DebeziumEventConverter {
       }
     }.toSeq
 
-    Row(values: _*)
+    Row(values.toIndexedSeq: _*)
 
   }
 
@@ -387,7 +385,7 @@ private object DebeziumEventConverter {
     val newColumnOrder = remainingColumns ++ colsToMove
 
     // Reorder DataFrame by selecting columns in the new order
-    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail: _*)
+    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail.toIndexedSeq: _*)
 
     reorderedDF
   }
