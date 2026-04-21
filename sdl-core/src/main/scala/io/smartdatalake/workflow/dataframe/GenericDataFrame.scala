@@ -53,6 +53,8 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def select(column: GenericColumn): GenericDataFrame = select(Seq(column))
 
+  def select(column: String, columns: String*): GenericDataFrame = select((column +: columns).map(functions.col))
+
   def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame
 
   def agg(columns: Seq[GenericColumn]): GenericDataFrame
@@ -74,6 +76,8 @@ trait GenericDataFrame extends GenericTypedObject {
   def orderBy(columns: Seq[GenericColumn]): GenericDataFrame
 
   def collect: Seq[GenericRow]
+
+  def collect[A: ClassTag]: Seq[A] = collect.map(_.getAs[A](0))
 
   def distinct: GenericDataFrame
 

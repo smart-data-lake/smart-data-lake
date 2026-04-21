@@ -26,7 +26,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.Connection
-import org.apache.hadoop.shaded.org.eclipse.jetty.websocket.client.WebSocketClient
+import org.eclipse.jetty.websocket.client.WebSocketClient
 
 import java.net.URI
 

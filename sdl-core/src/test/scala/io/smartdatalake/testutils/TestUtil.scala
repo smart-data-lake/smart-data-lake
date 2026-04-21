@@ -118,7 +118,6 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     ConfigParser.parseConfigObject[Connection](
       ConfigFactory.parseString(s"type = ScalaConnection, id = ${Environment.defaultEngineConnectionId}")
     ).asInstanceOf[ScalaConnection]
-    ScalaConnection(id = Environment.defaultEngineConnectionId)
   }
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {

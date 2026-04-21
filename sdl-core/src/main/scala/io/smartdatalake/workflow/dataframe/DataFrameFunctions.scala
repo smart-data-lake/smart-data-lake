@@ -43,6 +43,7 @@ trait DataFrameFunctions {
   def abs(column: GenericColumn): GenericColumn
   def least(columns: GenericColumn*): GenericColumn
   def greatest(columns: GenericColumn*): GenericColumn
+  def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn
 
   /**
    * Construct array from given columns and removing null values

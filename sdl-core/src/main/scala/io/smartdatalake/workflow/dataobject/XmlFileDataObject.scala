@@ -21,9 +21,10 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.SDLSaveMode
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.spark.SparkRepartitionDef
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.{SparkRepartitionDef, WoodstoxXMLOutputFactory}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -73,6 +74,8 @@ case class XmlFileDataObject(override val id: DataObjectId,
 
   override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
+    // Needed in Spark 4.1, see WoodstoxXMLOutputFactory for details
+    System.setProperty("javax.xml.stream.XMLOutputFactory", classOf[WoodstoxXMLOutputFactory].getName)
     val metrics = super.writeSparkDataFrameToPath(df, path, finalSaveMode)
     // add file extension to files, as spark-xml does not out-of-the-box
     filesystem.globStatus(new Path(path, "part-*"), (path: Path) => !path.getName.contains("."))

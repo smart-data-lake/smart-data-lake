@@ -20,17 +20,19 @@ package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
-import io.smartdatalake.util.hdfs.HdfsUtil
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{PartitionDiffMode, SparkStreamingMode}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
+import io.smartdatalake.workflow.action.spark.customlogic.SparkUDFCreatorConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.connection.SparkClassicConnection
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -60,9 +62,15 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
   private val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
 
+  val sparkClassicConnection = SparkClassicConnection(
+    id = Environment.defaultEngineConnectionId,
+    master = Some("local"),
+    sparkUDFs = Some(Map("udfAddX" -> SparkUDFCreatorConfig(className = classOf[TestUDFAddXCreator].getName, options = Some(Map("x" -> "1")))))
+  )
+
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(sparkClassicConnection)
   }
 
   after {
@@ -169,14 +177,14 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with SmartDataLakeLo
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type")
+    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type"), saveMode = SDLSaveMode.OverwriteOptimized
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
 
     // fill src with first files
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(dfSrc1, Seq())
+    srcDO.writeSparkDataFrame(dfSrc1, PartitionValues.fromDataFrame(SparkDataFrame(dfSrc1.select($"dt", $"type"))))
 
     // prepare streaming action
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))

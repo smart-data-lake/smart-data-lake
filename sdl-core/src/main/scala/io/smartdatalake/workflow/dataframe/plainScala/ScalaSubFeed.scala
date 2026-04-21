@@ -266,6 +266,18 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case sparkColumn: ScalaAbstractColumn =>
+        if (sparkColumn.dataType == ScalaStringDataType) {
+          ScalaUnaryExpr(sparkColumn, "substring", str => str.map(_.asInstanceOf[String].substring(pos, pos + len)), Some(ScalaStringDataType))
+        } else {
+          throw new IllegalStateException(s"Invalid data type for 'substring' function: ${sparkColumn.dataType.getClass.getSimpleName}. Only String data type is supported.")
+        }
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
   def not(column: GenericColumn): ScalaAbstractColumn = {
     column match {
       case c: ScalaAbstractColumn if c.dataType == ScalaBooleanDataType =>

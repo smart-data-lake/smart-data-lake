@@ -25,8 +25,7 @@ import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{udf, lit, when}
 
-// TODO: please specify what shall be used instead
-@deprecated(since = "2.9.0")
+@deprecated(since = "2.9.0", message = "use SparkFlattenDfTransformer instead")
 private[smartdatalake] class DefaultFlatteningParser {
 
   def parse(nestedJsonDf: DataFrame): DataFrame = {

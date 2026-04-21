@@ -85,6 +85,21 @@
 			<groupId>io.delta</groupId>
 			<artifactId>delta-spark_${spark.minor.version}_${scala.minor.version}</artifactId>
 			<version>${delta.version}</version>
+			<exclusions>
+				<!--
+                  Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
+                  We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                  hadoop-client library is not shaded and included below.
+                -->
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client-runtime</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client-api</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
