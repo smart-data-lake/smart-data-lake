@@ -92,7 +92,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dataObj = XmlFileDataObject(id = "test1", path = tempDir.toFile.getPath,
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("entry"),
+      xmlOptions = Some(Map("rowTag" -> "entry"))
     )
     assert(dataObj.getFileRefs(Seq()).size == 1)
 
@@ -117,7 +117,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("node")
+      xmlOptions = Some(Map("rowTag" -> "node"))
     )
 
     // read
@@ -158,7 +158,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("node")
+      xmlOptions = Some(Map("rowTag" -> "node"))
     )
 
     // read and check

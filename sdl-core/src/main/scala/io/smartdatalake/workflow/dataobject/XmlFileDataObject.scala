@@ -24,7 +24,6 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.spark.SparkRepartitionDef
-import io.smartdatalake.util.spark.json.DefaultFlatteningParser
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -46,22 +45,15 @@ import org.apache.spark.sql.DataFrame
  * Note that writing XML-file partitioned is not supported by spark-xml.
  *
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param rowTag Define rowTag in xmlOptions instead
- * @param flatten Use action/transformers instead
- * @see [[org.apache.spark.sql.DataFrameReader]]
- * @see [[org.apache.spark.sql.DataFrameWriter]]
  */
 case class XmlFileDataObject(override val id: DataObjectId,
                              override val path: String,
-                             @Deprecated @deprecated("Define rowTag in xmlOptions instead", "2.6.0")
-                             rowTag: Option[String] = None,
                              xmlOptions: Option[Map[String,String]] = None,
                              override val partitions: Seq[String] = Seq(),
                              override val schema: Option[GenericSchema] = None,
                              override val schemaMin: Option[GenericSchema] = None,
                              override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
-                             @Deprecated @deprecated("Use action/transformers instead", "2.6.0") flatten: Boolean = false,
                              override val connectionId: Option[ConnectionId] = None,
                              override val filenameColumn: Option[String] = None,
                              override val expectedPartitionsCondition: Option[String] = None,
@@ -77,15 +69,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
   // this is only needed for FileRef actions
   override val fileName: String = "*.xml*"
 
-  override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ xmlOptions.getOrElse(Map()) ++ Seq(rowTag.map("rowTag" -> _)).flatten
-
-  override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
-    val dfSuper = super.afterRead(df)
-    if (flatten) {
-      val parser = new DefaultFlatteningParser()
-      parser.parse(dfSuper)
-    } else dfSuper
-  }
+  override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ xmlOptions.getOrElse(Map())
 
   override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
