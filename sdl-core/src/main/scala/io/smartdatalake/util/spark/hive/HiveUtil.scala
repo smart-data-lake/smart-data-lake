@@ -132,11 +132,11 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
       partitions.split(Path.SEPARATOR_CHAR).map(_.split("=")).map( e => (e(0), e(1))).toMap
     } catch {
       case ex : Throwable =>
-        println(s"partition doesnt follow structure (<key1>=<value1>[/<key2>=<value2>]...): $partitions")
+        println(s"partition does not follow structure (<key1>=<value1>[/<key2>=<value2>]...): $partitions")
         throw ex
     }
 
-    session.sql(s"show partitions ${table.fullName}").as[String].collect.map( parseHDFSPartitionString).toSeq
+    session.sql(s"show partitions ${table.fullName}").as[String].collect().map( parseHDFSPartitionString).toSeq
   }
 
   // get partition columns for specified table from DDL

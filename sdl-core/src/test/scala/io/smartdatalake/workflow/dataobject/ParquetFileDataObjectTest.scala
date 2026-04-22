@@ -129,10 +129,10 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     jsonDO.writeSparkDataFrame(testDf, Seq())
     val resultParquet = parquetDO.getSparkDataFrame()(contextExec)
     resultParquet.show(false)
-    assert(resultParquet.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("parquet", "parquet", "parquet"))
+    assert(resultParquet.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("parquet", "parquet", "parquet"))
     val resultJson = jsonDO.getSparkDataFrame()(contextExec)
     resultJson.show(false)
-    assert(resultJson.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+    assert(resultJson.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("json", "json", "json"))
   }
 
   test("incremental output mode") {

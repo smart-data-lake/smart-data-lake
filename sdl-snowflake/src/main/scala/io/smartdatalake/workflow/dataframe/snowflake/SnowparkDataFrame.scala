@@ -98,7 +98,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     SnowparkDataFrame(inner.sort(snowparkCols))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect.map(SnowparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
   override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
     SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
