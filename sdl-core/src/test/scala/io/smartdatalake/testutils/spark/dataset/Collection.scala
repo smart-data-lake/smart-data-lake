@@ -325,10 +325,11 @@ object Collection extends StructTypeUtil {
     ("4let", "quatriplet")
   )
 
-  def dsNonUnique: Dataset[(String, String)] = rowsNonUnique.toDF("id", "value").as[(String, String)]
+  def dfNonUnique: DataFrame = rowsNonUnique.toDF("id", "value")
+  def dsNonUnique: Dataset[(String, String)] = dfNonUnique.as[(String, String)]
 
-  def dsNonUniqueWithNull: Dataset[(String, String)] = rowsNonUnique.map { case (id, v) => (id, Some(v)) }
-    .toDF("id", "value").as[(String, String)]
+  def dfNonUniqueWithNull: DataFrame = rowsNonUnique.map { case (id, v) => (id, Some(v)) }.toDF("id", "value")
+  def dsNonUniqueWithNull: Dataset[(String, Option[String])] = dfNonUniqueWithNull.as[(String, Option[String])]
 
   val rowsTwoCandidateKeys: List[(String, String, Int, Int, Int, Double)] = List(
     ("a", "a", 1, 1, 1, 17.3),

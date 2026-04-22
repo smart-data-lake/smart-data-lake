@@ -196,10 +196,8 @@ object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDa
       .optionalMaster(masterOpt)
       .appName(name)
       .config("hive.exec.dynamic.partition", value = true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
-      .config("hive.exec.dynamic.partition.mode",
-        "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
-      .config("spark.sql.sources.partitionOverwriteMode",
-        "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
+      .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
+      .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .optionalConfig("deploy-mode", deployModeOpt)
       .optionalConfig("spark.kryo.classesToRegister", kryoClassNamesOpt.map(_.mkString(",")))
       .optionalConfigs(sparkOptionsOpt)

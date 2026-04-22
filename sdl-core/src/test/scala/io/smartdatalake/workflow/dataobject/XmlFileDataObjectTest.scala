@@ -29,7 +29,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.explode
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.xml.XsdSchemaConverter
-import org.apache.spark.sql.{DataFrame, functions}
+import org.apache.spark.sql.{functions, DataFrame}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
@@ -92,7 +92,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dataObj = XmlFileDataObject(id = "test1", path = tempDir.toFile.getPath,
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("entry")
+      xmlOptions = Some(Map("rowTag" -> "entry"))
     )
     assert(dataObj.getFileRefs(Seq()).size == 1)
 
@@ -117,7 +117,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("node")
+      xmlOptions = Some(Map("rowTag" -> "node"))
     )
 
     // read
@@ -158,7 +158,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
-      rowTag = Some("node")
+      xmlOptions = Some(Map("rowTag" -> "node"))
     )
 
     // read and check

@@ -21,18 +21,14 @@ sdl-{connector}/    # Specialized connectors (kafka, deltalake, snowflake, etc.)
 ### Build Commands
 ```bash
 # Fast development build (excludes slow Debezium shaded modules)
-mvn -P scala-2.13 -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+mvn -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
 
 # Build specific module
-mvn -P scala-2.13 clean install -pl sdl-core
+mvn clean install -pl sdl-core
 
 # Run specific test
-mvn -P scala-2.13 test -Dtest=MyTest -pl sdl-core
+mvn test -Dtest=MyTest -pl sdl-core
 ```
-
-### Scala Versions
-- **Primary**: Scala 2.13.x (preferred for new development)
-- **Legacy**: Scala 2.12.x (supported for compatibility)
 
 ## Configuration Patterns
 

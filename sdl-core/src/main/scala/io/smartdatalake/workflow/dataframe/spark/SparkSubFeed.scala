@@ -41,6 +41,8 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 import scala.reflect.runtime.universe.TypeTag
 import org.apache.spark.sql.classic.ClassicConversions._
 
+import scala.util.Try
+
 /**
  * A SparkSubFeed is used to transport [[DataFrame]]'s between Actions.
  *
@@ -192,6 +194,12 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   override def greatest(columns: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.greatest(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
+  }
+  override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.substring(sparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
   }
   override def explode(column: GenericColumn): GenericColumn = {
     column match {
@@ -441,8 +449,11 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     context.engineConnection match {
       case Some(connection) if connection.isInstanceOf[SparkClassicConnection] => connection.asInstanceOf[SparkClassicConnection].sparkSession
       case Some(connection) => throw new IllegalStateException(s"Spark connection is required to create DataFrame, but got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
-      case _ => _defaultSparkSession // for testing only
-        .getOrElse(throw new IllegalStateException("No connection available in context. Spark connection is required to create DataFrame."))
+      case _ =>
+        Try(context.instanceRegistry.get[SparkClassicConnection](ConnectionId(Environment.defaultEngineConnectionId)))
+          .toOption.map(_.sparkSession)
+          .orElse(_defaultSparkSession) // for testing only
+          .getOrElse(throw new IllegalStateException("No connection available in context. Spark connection is required to create DataFrame."))
     }
   }
 

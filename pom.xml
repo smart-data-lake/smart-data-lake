@@ -546,7 +546,6 @@
 
         <!-- other dependency versions -->
         <scopt.version>4.1.0</scopt.version>
-        <databricks.spark-xml.version>0.18.0</databricks.spark-xml.version>
         <spark.excel.version>4.1.1_0.34.1-prerelease0</spark.excel.version>
         <hsqldb.version>2.7.2</hsqldb.version>
         <jackcess.version>4.0.5</jackcess.version>
@@ -2738,7 +2737,7 @@
                 <scope>${spark.deps.scope}</scope>
                 <exclusions>
                     <!--
-                      Exclude hadoop-client-runtime from spark-core 3.4, as this is a shaded version with relocation.
+                      Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
                       We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
                       hadoop-client library is not shaded and included below.
                     -->
@@ -2757,12 +2756,48 @@
                 <artifactId>spark-sql_${scala.minor.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
+                <exclusions>
+                    <!--
+                      Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
+                      We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                      hadoop-client library is not shaded and included below.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-hadoop-cloud_${scala.minor.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.deps.scope}</scope>
+                <exclusions>
+                    <!--
+                      Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
+                      We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                      hadoop-client library is not shaded and included below.
+                    -->
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -2881,43 +2916,6 @@
                 <scope>test</scope>
             </dependency>
 
-
-            <!-- Vulnerable Dependencies Upgrades -->
-            <dependency>
-                <groupId>com.fasterxml.woodstox</groupId>
-                <artifactId>woodstox-core</artifactId>
-                <version>6.5.1</version>
-            </dependency>
-            <dependency>
-                <groupId>org.yaml</groupId>
-                <artifactId>snakeyaml</artifactId>
-                <version>2.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.json</groupId>
-                <artifactId>json</artifactId>
-                <version>20231013</version>
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.jettison</groupId>
-                <artifactId>jettison</artifactId>
-                <version>1.5.4</version>
-            </dependency>
-            <dependency>
-                <groupId>com.h2database</groupId>
-                <artifactId>h2</artifactId>
-                <version>2.2.220</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm</artifactId>
-                <version>${asm.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.ow2.asm</groupId>
-                <artifactId>asm-commons</artifactId>
-                <version>${asm.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>
