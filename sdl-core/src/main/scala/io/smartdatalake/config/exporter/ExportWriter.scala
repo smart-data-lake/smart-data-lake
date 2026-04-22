@@ -72,7 +72,7 @@ object ExportWriter {
       info.toSeq.map("info" -> JString(_)),
       schema.toSeq.map("schema" -> _.toJson),
       schema.toSeq.map(s => "subFeedType" -> JString(s.subFeedType.typeSymbol.name.toString))
-    ).flatten: _*)
+    ).flatten.toIndexedSeq: _*)
     pretty(contentJson)
   }
 
@@ -83,7 +83,7 @@ object ExportWriter {
     }
     val schema = json \ "schema" match {
       case jsonSchema: JArray =>
-        val subFeedType = (json \ "subFeedType") match {
+        val subFeedType = json \ "subFeedType" match {
           case JString(tpe) =>
             DataFrameSubFeed.getKnownSubFeedTypes.find(_.typeSymbol.name.toString.endsWith(tpe))
               .getOrElse(throw new IllegalStateException(s"Could not find SubFeedType $tpe"))
@@ -92,7 +92,7 @@ object ExportWriter {
         GenericSchema.fromJson(jsonSchema, subFeedType)
       case _ => throw new IllegalStateException(s"Attribute 'schema' not found")
     }
-    val info = (json \ "info") match {
+    val info = json \ "info" match {
       case JString(s) => Some(s)
       case _ => None
     }

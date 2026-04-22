@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.jayway.jsonpath.PathNotFoundException
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
@@ -29,7 +29,6 @@ import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
 import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend}
 import io.smartdatalake.util.webservice._
-import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -109,7 +108,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
                             )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SmartDataLakeLogger {
 
-  private val mediaType = MediaType.parse(responseContentType).right.get
+  private val mediaType = MediaType.parse(responseContentType).toOption.get
   assert(pagingLinkJsonPath.isEmpty || mediaType.equalsIgnoreParameters(MediaType.ApplicationJson), "PagingLinkRegex can only be used when responseContentType=application/json")
   private val specUrl = {
     if (apiDocsUrl.startsWith("./")) apiDocsUrl
@@ -203,11 +202,11 @@ case class OpenApiDataObject(override val id: DataObjectId,
             case StringType =>
               val data = new String(getContent(targetUrl, responseContentTypeEvaluated.get))
               if (logger.isDebugEnabled) logger.debug(s"response: $data")
-              Seq(new String(data)).toDF(schema.get.fieldNames: _*)
+              Seq(new String(data)).toDF(schema.get.fieldNames.toIndexedSeq: _*)
             case BinaryType =>
               val data = getContent(targetUrl, responseContentTypeEvaluated.get)
               if (logger.isDebugEnabled) logger.debug(s"response: binary length=${data.length}")
-              Seq(data).toDF(schema.get.fieldNames: _*)
+              Seq(data).toDF(schema.get.fieldNames.toIndexedSeq: _*)
           }
         }
     }

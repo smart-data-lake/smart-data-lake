@@ -83,7 +83,7 @@ trait Quality extends Transform {
       val superfluousComments = commentMap.keys.toSeq.diff(ds.columns)
       if (superfluousComments.nonEmpty) logger.warn(s"Superfluous comment detected for columns ${superfluousComments.mkString(", ")}")
       val commentedCols = ds.schema.map(f => col(f.name).as(f.name, commentField(f).metadata))
-      ds.select(commentedCols: _*).as[T](ds.encoder)
+      ds.select(commentedCols.toIndexedSeq: _*).as[T](ds.encoder)
     }
 
     /**
@@ -162,7 +162,7 @@ trait Quality extends Transform {
       val statCols = ds.columns.flatMap { cn =>
         List(countDistinct(cn).as(s"cnt_$cn"), min(cn).as(s"min_$cn"), max(cn).as(s"max_$cn"))
       }
-      ds.agg(count("*").as("cnt_rows"), statCols: _*)
+      ds.agg(count("*").as("cnt_rows"), statCols.toIndexedSeq: _*)
     }
 
 
@@ -182,8 +182,8 @@ trait Quality extends Transform {
      */
     final def fillGaps(keyColNames: Iterable[String], dataColNames: Iterable[String],
                        orderColName: String, takeNextValueFirst: Boolean = true): DataFrame = {
-      val fenestra_next = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.currentRow, Window.unboundedFollowing)
-      val fenestra_prev = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq: _*).orderBy(orderColName).rangeBetween(Window.unboundedPreceding, Window.currentRow)
+      val fenestra_next = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq.toIndexedSeq: _*).orderBy(orderColName).rangeBetween(Window.currentRow, Window.unboundedFollowing)
+      val fenestra_prev = Window.partitionBy(keyColNames.head, keyColNames.tail.toSeq.toIndexedSeq: _*).orderBy(orderColName).rangeBetween(Window.unboundedPreceding, Window.currentRow)
 
       def newColumn(colName: String): Column = if (colName.contains(colName)) {
         if (takeNextValueFirst) coalesce(first(col(colName), ignoreNulls = true).over(fenestra_next), last(col(colName), ignoreNulls = true).over(fenestra_prev)).as(colName) else {
@@ -193,7 +193,7 @@ trait Quality extends Transform {
         col(colName)
       }
       // TODO: find a way to declare columns as not-nullable
-      ds.select(ds.columns.map(newColumn): _*)
+      ds.select(ds.columns.map(newColumn).toIndexedSeq: _*)
     }
 
     /**
@@ -220,7 +220,7 @@ trait Quality extends Transform {
                       fromColName: String, toColName: String,
                       orderColNames: Iterable[String], gapIndicatorName: String = "_is_adjacent"): DataFrame = {
       val nextFromColName = s"_next_$fromColName"
-      val fenestra = Window.partitionBy(keyColNames.map(col).toSeq: _*).orderBy(orderColNames.map(col).toSeq: _*)
+      val fenestra = Window.partitionBy(keyColNames.map(col).toSeq.toIndexedSeq: _*).orderBy(orderColNames.map(col).toSeq.toIndexedSeq: _*)
 
       ds.withColumn("_islastrow", lead(col(keyColNames.head), 1).over(fenestra).isNull)
         .withColumn(nextFromColName, lead(col(fromColName), 1).over(fenestra))
@@ -266,7 +266,7 @@ trait Quality extends Transform {
       val colsInDs: Array[String] = if (cols.isEmpty) cols else cols.intersect(cols)
       if (colsInDs.isEmpty) throw new IllegalArgumentException(s"Argument cols must contain at least 1 name" +
         s" of a column of your dataset.\n   cols = ${cols.mkString(",")}\n   cols = ${cols.mkString(",")} ")
-      val dfProjected: DataFrame = ds.select(colsInDs.map(col): _*)
+      val dfProjected: DataFrame = ds.select(colsInDs.map(col).toIndexedSeq: _*)
       val dfColumns: Array[String] = dfProjected.columns
       // If df contains forbidden column then the result contains two columns with the same name
       forbiddenColumnNames.foreach(str =>
@@ -274,7 +274,7 @@ trait Quality extends Transform {
           s"data frame df must not contain column named $str. cols = ${dfColumns.mkString(",")}")
       )
 
-      dfProjected.groupBy(dfColumns.head, dfColumns.tail: _*)
+      dfProjected.groupBy(dfColumns.head, dfColumns.tail.toIndexedSeq: _*)
         .count().withColumnRenamed("count", countColname)
         .where(col(countColname) > 1)
     }
@@ -297,7 +297,7 @@ trait Quality extends Transform {
      */
     def getNonuniqueRows(cols: Array[String] = ds.columns): Dataset[T] = {
       val dfNonUnique = getNonuniqueStats(cols, "_duplicationCount_").drop("_duplicationCount_")
-      ds.join(dfNonUnique, cols).select(ds.columns.head, ds.columns.tail: _*).as[T](ds.encoder)
+      ds.join(dfNonUnique, cols).select(ds.columns.head, ds.columns.tail.toIndexedSeq: _*).as[T](ds.encoder)
     }
 
     /**
@@ -306,7 +306,7 @@ trait Quality extends Transform {
      * @param cols : names of columns on which the data frame is to be projected
      * @return projection of data frame df
      */
-    def project(cols: Array[String] = ds.columns): DataFrame = ds.select(cols.map(col): _*)
+    def project(cols: Array[String] = ds.columns): DataFrame = ds.select(cols.map(col).toIndexedSeq: _*)
 
     /**
      * Checks whether the specified columns satisfy uniqueness within the data frame

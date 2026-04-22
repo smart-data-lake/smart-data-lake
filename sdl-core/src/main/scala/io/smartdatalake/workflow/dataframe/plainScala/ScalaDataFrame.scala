@@ -24,7 +24,6 @@ import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.DataFrameSubFeed.assertCorrectSubFeedType
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataframe.plainScala.ScalaDataFrameImplicits.OrderingOps
 
 import scala.collection.immutable.Queue
 import scala.reflect.ClassTag
@@ -54,7 +53,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       case Array(_, "*") => ScalaColumnReference(columnName)
       case Array("*") => throw new IllegalArgumentException(s"Star expand without alias to get Columns from DataFrame is not supported. Use select(*) instead.")
       case _ => cols.find(_.definition.name == columnName)
-        .getOrElse(throw new IllegalArgumentException(s"column name ${columnName} does not exist in the dataframe"))
+        .getOrElse(throw new IllegalArgumentException(s"column name $columnName does not exist in the dataframe"))
 
     }
   }
@@ -86,7 +85,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   override def schema: ScalaSchema = ScalaSchema(cols.map(_.definition))
 
   override def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String = "inner"): ScalaDataFrame = other match {
-    case otherScala: ScalaDataFrame => {
+    case otherScala: ScalaDataFrame =>
       checkColumnsExist(this, joinCols)
       checkColumnsExist(otherScala, joinCols)
 
@@ -96,6 +95,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       val indicesThatJoinCol = joinColumnIndices(otherScala)
       val indicesThisNonJoinCol = (this.cols.indices.toSet -- indicesThisJoinCol.toSet).toSeq
       val indicesThatNonJoinCol = (otherScala.cols.indices.toSet -- indicesThatJoinCol.toSet).toSeq
+
       def filterRow(row: ScalaRow, indices: Iterable[Int]) = indices.map(row.values)
 
       val newSchema = ScalaSchema(indicesThisJoinCol.map(this.schema.fields) ++ indicesThisNonJoinCol.map(this.schema.fields) ++ indicesThatNonJoinCol.map(otherScala.schema.fields))
@@ -143,7 +143,6 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
         case _ => throw new IllegalArgumentException(s"Join type $joinType is not supported. Supported join types are: inner, left, right, full")
       }
       ScalaDataFrame.fromRows(rows = rows, schemaIn = Some(newSchema))
-    }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
@@ -209,14 +208,13 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   //override in order to avoid Spark col() expression
   override def symmetricDifference(other: GenericDataFrame, diffColName: String): GenericDataFrame = {
     other match {
-      case otherScala: ScalaDataFrame => {
+      case otherScala: ScalaDataFrame =>
         require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
         val otherReordered: ScalaDataFrame = otherScala.select(this.schema.columns.toList)
         val df1 = this.except(otherReordered)
         val df2 = otherReordered.except(this)
-        val newCol: Seq[Boolean] = (0 until(df1.count.toInt)).map(_ => true).toSeq ++ (0 until(df1.count.toInt)).map(_ => false).toSeq
+        val newCol: Seq[Boolean] = (0 until df1.count.toInt).map(_ => true) ++ (0 until df1.count.toInt).map(_ => false)
         df1.unionByName(df2).withColumn(diffColName, ScalaColumn(diffColName, newCol))
-      }
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
 
     }
@@ -311,10 +309,9 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   }
 
   override def except(other: GenericDataFrame): ScalaDataFrame = other match {
-    case otherScala: ScalaDataFrame => {
+    case otherScala: ScalaDataFrame =>
       require(schema.columns == otherScala.columns, "The except operation can only be carried out with two dataframes with the same columns")
       ScalaDataFrame.fromRows(rows = (rows.toSet -- otherScala.rows.toSet).toSeq, schemaIn = Some(schema))
-    }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
@@ -375,7 +372,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
 
   override def drop(col: GenericColumn): ScalaDataFrame = col match {
     case sc: ScalaColumn[_] => drop(sc.definition.getFullName())
-    case sc: ScalaAbstractColumn => drop(sc.getName.getOrElse(throw new IllegalArgumentException(s"Cannot drop column ${sc}, because it does not have a name. Make sure to use a column reference with a name.")))
+    case sc: ScalaAbstractColumn => drop(sc.getName.getOrElse(throw new IllegalArgumentException(s"Cannot drop column $sc, because it does not have a name. Make sure to use a column reference with a name.")))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(col)
   }
 
@@ -419,7 +416,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
    * @return an Observation object which can return observed metrics after execution
    */
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (GenericDataFrame, DataFrameObservation) = {
-    val observation = GenericCalculatedObservation(this, aggregateColumns: _*)
+    val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this, observation)
   }

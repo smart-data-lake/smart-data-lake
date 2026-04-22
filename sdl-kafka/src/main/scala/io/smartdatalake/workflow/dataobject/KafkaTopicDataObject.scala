@@ -232,7 +232,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     dfRaw
       .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
       .as("kafka")
-      .select(colsToSelect: _*)
+      .select(colsToSelect.toIndexedSeq: _*)
   }
 
   private def decodeKeyValue(dfRaw: DataFrame): DataFrame = {
@@ -487,7 +487,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // search how many partitions / chrono units back of data we have
     var cntEmptyConsecutive = 0
     // TODO: once Scala 2.12 has been reomved replace Stream by LazyList
-    val detectedPartitions = Stream.from(0).map {
+    val detectedPartitions = LazyList.from(0).map {
       unitsBack =>
         val startTimeIncl = datePartitionCol.get.previous(lastCompletedPartitionStartTime, unitsBack)
         val endTimeExcl = datePartitionCol.get.next(startTimeIncl)

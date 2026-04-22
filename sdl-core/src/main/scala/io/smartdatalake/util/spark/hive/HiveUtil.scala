@@ -19,21 +19,16 @@
 package io.smartdatalake.util.spark.hive
 
 import io.smartdatalake.definitions._
-import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.PerformanceUtils.measureTime
-import io.smartdatalake.util.misc.{EnvironmentUtil, SchemaUtil, SmartDataLakeLogger}
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.functions.{array, col}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-
-import java.net.URI
-import java.time.Instant
-import scala.sys.process.{ProcessLogger, _}
-import scala.util.{Failure, Success, Try}
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.generic.Table
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import java.time.Instant
+import scala.util.{Failure, Success, Try}
 
 /**
  * Provides utility functions for Hive.
@@ -141,7 +136,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
         throw ex
     }
 
-    session.sql(s"show partitions ${table.fullName}").as[String].collect().map( parseHDFSPartitionString).toSeq
+    session.sql(s"show partitions ${table.fullName}").as[String].collect.map( parseHDFSPartitionString).toSeq
   }
 
   // get partition columns for specified table from DDL
@@ -152,13 +147,14 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val tableDDL = session.sql(s"show create table ${table.fullName}").as[String].collect().mkString(" ").replace("\n"," ")
 
     // extract partition by declaration
-    val regexPartitionBy = raw"PARTITIONED BY\s+\(([^\)]+)\)".r.unanchored
+    val regexPartitionBy = raw"PARTITIONED BY\s+\(([^)]+)\)".r.unanchored
     val partitionColsAndDatatypes = tableDDL match {
-      case regexPartitionBy( partitionByDDL ) => {
-        val columnNameAllowedChars = (('a' to 'z') ++ ('A' to 'Z') ++ ( '0' to '9' ) :+ '_' :+ ' ' :+ ',')
+      case regexPartitionBy( partitionByDDL ) =>
+        val columnNameAllowedChars = {
+          ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_' :+ ' ' :+ ','
+        }
         // first split partition columns definition separated by comma, then split column name and type separated by whitespace
-        Some(partitionByDDL.trim.split(',').map(_.trim.filter(columnNameAllowedChars.contains(_)).split(' ').filter(!_.isEmpty)))
-      }
+        Some(partitionByDDL.trim.split(',').map(_.trim.filter(columnNameAllowedChars.contains(_)).split(' ').filter(_.nonEmpty)))
       case _ => None
     }
 
@@ -262,7 +258,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val partitionPath = new Path(tablePath, partition.getPartitionString(partitionLayout))
     val partitionDef = partition.elements.map{ case (k,v) => s"$k='$v'"}.mkString(", ")
     execSqlStmt(s"ALTER TABLE ${table.fullName} DROP IF EXISTS PARTITION ($partitionDef)")
-    HdfsUtil.deletePath(partitionPath, false)(filesystem)
+    HdfsUtil.deletePath(path = partitionPath, doWarn = false)(filesystem)
   }
 
   def movePartition(table: Table, tablePath: Path, existingPartition: PartitionValues, newPartition: PartitionValues, filenameWithGlobs: String, filesystem: FileSystem)(implicit session: SparkSession): Unit = {
@@ -306,7 +302,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    */
   def getCatalogColumnStats(table: Table)(implicit session: SparkSession): Map[String, Map[String, Any]] = {
     session.sessionState.catalog.getTableMetadata(table.tableIdentifier).stats.toSeq.flatMap(_.colStats).toMap
-      .mapValues (
+      .view.mapValues (
         stats => Seq(
           stats.distinctCount.map(ColumnStatsType.DistinctCount.toString -> _),
           stats.nullCount.map(ColumnStatsType.NullCount.toString -> _),
@@ -323,7 +319,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    */
   def getCatalogPartitionColumnStats(table: Table, partitionValues: PartitionValues)(implicit session: SparkSession): Map[String, Map[String, Any]] = {
     session.sessionState.catalog.getPartition(table.tableIdentifier, partitionValues.getMapString).stats.toSeq.flatMap(_.colStats).toMap
-      .mapValues(
+      .view.mapValues(
         stats => Seq(
           stats.distinctCount.map(ColumnStatsType.DistinctCount.toString -> _),
           stats.nullCount.map(ColumnStatsType.NullCount.toString -> _),

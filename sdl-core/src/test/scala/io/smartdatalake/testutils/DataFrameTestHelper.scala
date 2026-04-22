@@ -46,7 +46,7 @@ object DataFrameTestHelper extends Equality {
   def emptyDf()(implicit session: SparkSession): DataFrame = createDf(Map[String, TypedValue]())
 
   def createDf(input: Map[String, TypedValue]*)(implicit session: SparkSession): DataFrame = {
-    createDfWithDefaultValues(input: _*)()
+    createDfWithDefaultValues(input.toIndexedSeq: _*)()
   }
 
   private def createDfWithDefaultValues(input: Map[String, TypedValue]*)(defaultValues: Map[String, TypedValue] = Map())(implicit session: SparkSession): DataFrame = {
@@ -113,7 +113,7 @@ object DataFrameTestHelper extends Equality {
 
     // Convert rows to spark rows
     val rowData: Seq[Row] =
-      rowValues.map(row => Row(row: _*))
+      rowValues.map(row => Row(row.toIndexedSeq: _*))
 
     // Initialize test spark session and create DataFrame with the values and schema
     val rdd: RDD[Row] = session.sparkContext.parallelize(rowData)
@@ -157,7 +157,7 @@ object DataFrameTestHelper extends Equality {
   }
 
   def createDefaultDf(defaultValues: Map[String, TypedValue] = Map())(input: Map[String, TypedValue]*)(implicit session: SparkSession): DataFrame = {
-    createDfWithDefaultValues(input: _*)(defaultValues)
+    createDfWithDefaultValues(input.toIndexedSeq: _*)(defaultValues)
   }
 
   implicit def valueToTypedValue[T](value: T): TypedValue = value match {

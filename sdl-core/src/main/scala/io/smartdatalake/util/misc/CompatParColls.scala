@@ -18,12 +18,14 @@
  */
 package io.smartdatalake.util.misc
 
+import scala.collection.parallel.CollectionConverters
+
 /**
- * Workaround to use scala.collection.parallel.CollectionConverters in Scala 2.12 and Scala 2.13,
+ * Workaround to use scala.collection.parallel.collectionConverters in Scala 2.12 and Scala 2.13,
  * see also https://github.com/scala/scala-parallel-collections/issues/22
  */
 object CompatParColls {
-  val Converters = {
+  val Converters: CollectionConverters.type = {
     import Compat._
     {
       import scala.collection.parallel._

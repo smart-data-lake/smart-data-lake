@@ -110,12 +110,12 @@ class EqualityTest extends AnyFlatSpec with Matchers with ScalaCheckPropertyChec
   }
 
   "DataFrames almost equals" should "ignore column order by default" in {
-    val dfReversed = dsSimple1.select(dsSimple1.columns.reverse.map(col): _*)
+    val dfReversed = dsSimple1.select(dsSimple1.columns.reverse.map(col).toIndexedSeq: _*)
     dfSimple1.almostEqual(dfReversed) shouldBe true
   }
 
   "DataFrames almost equals" should "consider column order when asked" in {
-    dfSimple1.almostEqual(dsSimple1.select(dsSimple1.columns.reverse.map(col): _*), ignoreColumnOrder = false) shouldBe false
+    dfSimple1.almostEqual(dsSimple1.select(dsSimple1.columns.reverse.map(col).toIndexedSeq: _*), ignoreColumnOrder = false) shouldBe false
   }
 
   "DataFrames almost equals" should "fail when some cols are compared precisely" in {

@@ -31,7 +31,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import java.nio.file.Files
 
 class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
-  with SmartDataLakeLogger with DeduplicateActionBehaviour {
+    with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
 
@@ -42,7 +42,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
 
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(
-      (id, registry) => MockSparkDataObject(id),
+      (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
         DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
@@ -52,7 +52,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockSparkDataObject(id),
+      (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
         DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
@@ -62,7 +62,7 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
 
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockSparkDataObject(id),
+      (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
         DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)

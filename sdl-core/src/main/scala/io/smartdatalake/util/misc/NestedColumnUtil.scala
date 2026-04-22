@@ -46,7 +46,7 @@ object NestedColumnUtil extends SmartDataLakeLogger {
             if (logger.isDebugEnabled) logger.debug(s"selecting column ${f.name}: currentDataType=${currentFieldTypes(f.name)} tgtDataType=${f.dataType}")
             selectColumn(column(f.name), currentFieldTypes(f.name), f.dataType).as(f.name)
           }
-          functions.struct(columns: _*)
+          functions.struct(columns.toIndexedSeq: _*)
         } else column
       case (ct: GenericArrayDataType, tt: GenericArrayDataType) =>
         functions.transform(column, c => selectColumn(c, ct.elementDataType, tt.elementDataType))
@@ -107,7 +107,7 @@ object NestedColumnUtil extends SmartDataLakeLogger {
                 case (f, t: TransformColumn) => Some(t.newColumn.as(f.name))
                 case (_, RemoveColumn)       => None
               }
-              TransformColumn(functions.struct(selFields: _*))
+              TransformColumn(functions.struct(selFields.toIndexedSeq: _*))
             } else KeepColumn
           case t: GenericArrayDataType =>
             val arrayTransformed = functions.transform(column, c => transformColumn(t.elementDataType, c, path, visitorFunc).getOrElse(c))
@@ -129,7 +129,7 @@ object NestedColumnUtil extends SmartDataLakeLogger {
  */
 sealed trait TransformColumnCmd {
   def changeRequested = true
-  def getOrElse(originalColumn: GenericColumn) = originalColumn
+  def getOrElse(originalColumn: GenericColumn): GenericColumn = originalColumn
 }
 case class TransformColumn(newColumn: GenericColumn) extends TransformColumnCmd {
   override def getOrElse(originalColumn: GenericColumn): GenericColumn = newColumn

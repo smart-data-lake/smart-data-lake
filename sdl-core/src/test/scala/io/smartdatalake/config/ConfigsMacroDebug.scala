@@ -19,13 +19,14 @@
 package io.smartdatalake.config
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, CsvFileDataObjectTest}
+import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 
 /**
  * Configs macro expansion can be debugged in Intellij by creating a run configuration as follows:
- * - Main class: scala.tools.nsc.Main
- * - VM options: -Dscala.usejavacp=true
- * - program arguments: -cp io.smartdatalake.config.ConfigsMacroDebug C:\Entwicklung\smart-data-lake\sdl-core\src\test\scala\io\smartdatalake\config\ConfigsMacroDebug.scala
+ *   - Main class: scala.tools.nsc.Main
+ *   - VM options: -Dscala.usejavacp=true
+ *   - program arguments: -cp io.smartdatalake.config.ConfigsMacroDebug
+ *     C:\Entwicklung\smart-data-lake\sdl-core\src\test\scala\io\smartdatalake\config\ConfigsMacroDebug.scala
  */
 object ConfigsMacroDebug extends App with ConfigImplicits {
 
@@ -35,11 +36,12 @@ object ConfigsMacroDebug extends App with ConfigImplicits {
       |   id = 123
       |   path = /tmp/test.csv
       | }
-      |""".stripMargin).resolve
+      |""".stripMargin
+  ).resolve
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   import configs.syntax.RichConfig
   config.extract[CsvFileDataObject].value
-  //CsvFileDataObject.fromConfig(config)(new InstanceRegistry)
+  // CsvFileDataObject.fromConfig(config)(new InstanceRegistry)
 
 }

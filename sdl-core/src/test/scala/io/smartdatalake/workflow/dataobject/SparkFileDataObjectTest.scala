@@ -29,8 +29,8 @@ import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
+import org.scalatest.Assertion
 
-import java.nio.file
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
 class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogger {
@@ -156,7 +156,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
-      .as[(String,Int)].collect.toSeq.sorted
+      .as[(String,Int)].collect().toSeq.sorted
     assert( result == Seq(("A",1),("A",2),("B",7),("B",8)))
     assert( dataObject.listPartitions.map(pv => pv("p").toString).sorted == Seq("A","B","C"))
 
@@ -180,7 +180,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
-      .as[(String,Int)].collect.toSeq.sorted
+      .as[(String,Int)].collect().toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
 
     FileUtils.deleteQuietly(tempDir.toFile)
@@ -227,7 +227,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
-      .as[(String,Int)].collect.toSeq.sorted
+      .as[(String,Int)].collect().toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
 
     FileUtils.deleteQuietly(tempDir.toFile)
@@ -256,7 +256,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dfInit.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
     val df = dataObject.getSparkDataFrame()(contextExec)
     df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
-    df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
+    df.select(sourceFileColName).collect.head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
 
     // test if it could be written again
     dataObject.initSparkDataFrame(df.drop(sourceFileColName), Seq())
@@ -301,7 +301,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     assert(getFullPaths(PartitionValues(Map("c" -> 1))) == Set("a=1/b=1/c=1","a=1/b=2/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=1/b=3/c=1","a=2/b=3/c=1"))
     assert(getFullPaths(PartitionValues(Map("b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1"))
     // files
-    assert(getFullPaths(PartitionValues(Map("b" -> 1)), true) == Set("a=1/b=1/c=1/abc.test"))
+    assert(getFullPaths(pv = PartitionValues(elements = Map("b" -> 1)), returnFiles = true) == Set("a=1/b=1/c=1/abc.test"))
   }
 
   test("delete files only") {
@@ -342,7 +342,9 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     a [ProcessingLogicException] should be thrownBy dataObject.writeSparkDataFrame(df, partitionValues = Seq())
   }
 
-  private def createJsonFiles(path: java.nio.file.Path, nbOfFile: Int = 100, filenamePrefix: String = "test") = {
+  private def createJsonFiles(path: java.nio.file.Path,
+                              filenamePrefix: String = "test",
+                              nbOfFile: Int = 10): Assertion = {
     Files.createDirectory(path)
     logger.info(s"creating test files in $path")
     (1 to nbOfFile).foreach { i =>
@@ -361,8 +363,8 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // create 100 json files for partition p=A and p=B
     val partitionPathA = Paths.get(tempDir.toString, "p=A")
     val partitionPathB = Paths.get(tempDir.toString, "p=B")
-    createJsonFiles(partitionPathA, 10, "testA")
-    createJsonFiles(partitionPathB, 10, "testB")
+    createJsonFiles(path = partitionPathA, filenamePrefix = "testA")
+    createJsonFiles(path = partitionPathB, filenamePrefix = "testB")
 
     // move partition p=A to p=B
     val pvsToMove = Seq((PartitionValues(Map("p" -> "A")), PartitionValues(Map("p" -> "B"))))

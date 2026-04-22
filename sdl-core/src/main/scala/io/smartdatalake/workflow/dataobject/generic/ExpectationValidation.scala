@@ -91,7 +91,7 @@ private[smartdatalake] trait ExpectationValidation {
       val genericObservation = if (forceGenericAggColumns.nonEmpty) Some(setupObservation(dfConstraints, forceGenericAggColumns, context.isExecPhase, pushDownTolerant, forceGenericObservation = true)._2) else None
       // if there are now two GenericCalculatedObservations, combine them to avoid duplicate query execution
       val observations = (normalObservation, genericObservation) match {
-        case (o1: GenericCalculatedObservation, Some(o2: GenericCalculatedObservation)) => Seq(GenericCalculatedObservation(o1.df, o1.aggregateColumns ++ o2.aggregateColumns: _*))
+        case (o1: GenericCalculatedObservation, Some(o2: GenericCalculatedObservation)) => Seq(GenericCalculatedObservation(o1.df, o1.aggregateColumns ++ o2.aggregateColumns.toIndexedSeq: _*))
         case (o1, o2) => Seq(Some(o1), o2).flatten
       }
       (dfObserved, observations)
@@ -204,7 +204,7 @@ private[smartdatalake] trait ExpectationValidation {
       // add validation as additional column
       val validationErrorColumns = constraints.map(_.getValidationExceptionColumn(this.id, pkCols, dfSimpleCols))
       val dfErrors = df
-        .withColumn("_validation_errors", array_construct_compact(validationErrorColumns: _*))
+        .withColumn("_validation_errors", array_construct_compact(validationErrorColumns.toIndexedSeq: _*))
       // use column in where condition to avoid elimination by optimizer before dropping the column again.
       dfErrors
         .where(size(col("_validation_errors")) < lit(constraints.size + 1)) // this is always true - but we want to force evaluating column "_validation_errors" to throw exceptions

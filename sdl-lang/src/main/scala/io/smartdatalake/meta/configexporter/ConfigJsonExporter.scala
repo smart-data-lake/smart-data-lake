@@ -190,7 +190,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
           logger.info(s"Target ${writer.getClass.getSimpleName} does not support listing existing files.")
           Map[String, FileDescriptor]()
       }
-      val filesToDelete = mutable.Set(existingFiles.keySet.toSeq: _*)
+      val filesToDelete = mutable.Set(existingFiles.keySet.toSeq.toIndexedSeq: _*)
       logger.info(s"Searching description files in $path")
       RemoteIteratorWrapper(filesystem.listFiles(path, true))
         .filterNot(_.isDirectory)

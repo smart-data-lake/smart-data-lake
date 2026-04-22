@@ -351,7 +351,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     aggFunction.apply() match {
       case sparkAggFunctionColumn: SparkColumn => SparkColumn(sparkAggFunctionColumn
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner): _*)
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner).toIndexedSeq: _*)
             .orderBy(orderBy.asInstanceOf[SparkColumn].inner))
       )
       case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)

@@ -119,7 +119,7 @@ class SparkClassicConnectionTest extends AnyFunSuite with BeforeAndAfter {
 
     // check
     val actual = tgt1DO.getSparkDataFrame()
-      .select($"rating").as[Int].collect
+      .select($"rating").as[Int].collect()
     assert(actual.toSeq == Seq(6, 11))
   }
 }

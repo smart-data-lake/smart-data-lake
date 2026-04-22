@@ -68,7 +68,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
       TestData("source_tableDO", "mock", "source_table", "id STRING,value STRING", Seq(TestKV("id", "4let")), Seq(TestKV("value", "quatriplet"))),
       TestData("source_tableDO", "mock", "source_table", "id STRING,value STRING", Seq(TestKV("id", "4let")), Seq(TestKV("value", "quatriplet")))
     )
-    val expected = SparkDataFrame(rows_expected.toDF)
+    val expected = SparkDataFrame(rows_expected.toDF())
 
     // Comparing actual with expected
     val resultat: Boolean = actual.isEqual(expected)
@@ -97,7 +97,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "4let"), TestKV("value", "quatriplet"))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "4let"), TestKV("value", "quatriplet")))
     )
-    val expected = SparkDataFrame(rows_expected.toDF)
+    val expected = SparkDataFrame(rows_expected.toDF())
 
     val resultat: Boolean = actual.isEqual(expected)
     if (!resultat) printFailedTestResult("pk violations with null values",
@@ -154,7 +154,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     )
 
     val expected = SparkDataFrame(
-      rows_expectedWithData.toDF.union(rows_expectedWithOutData.toDF)
+      rows_expectedWithData.toDF().union(rows_expectedWithOutData.toDF())
     )
 
     val resultat: Boolean = actual.isEqual(expected)

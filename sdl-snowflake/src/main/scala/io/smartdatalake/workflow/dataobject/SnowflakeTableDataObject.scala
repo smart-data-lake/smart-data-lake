@@ -416,7 +416,7 @@ object SnowflakeUtils {
       if (f.dataType != targetType) spark.functions.col(f.name).cast(targetType)
       else spark.functions.col(f.name)
     }
-    df.select(targetCols: _*)
+    df.select(targetCols.toIndexedSeq: _*)
   }
 }
 

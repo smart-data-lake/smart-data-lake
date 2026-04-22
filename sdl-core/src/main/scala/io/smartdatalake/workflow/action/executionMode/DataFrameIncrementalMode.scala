@@ -43,7 +43,7 @@ case class DataFrameIncrementalMode(compareCol: String
                                     , override val alternativeOutputId: Option[DataObjectId] = None
                                     , applyCondition: Option[Condition] = None
                                    ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  override val applyConditionsDef = applyCondition.toSeq
+  override val applyConditionsDef: Seq[Condition] = applyCondition.toSeq
 
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 
