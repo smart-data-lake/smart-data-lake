@@ -267,9 +267,9 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
     srcDO.writeSparkDataFrame(testDf, Seq())
     jsonDO.writeSparkDataFrame(testDf, Seq())
     val resultParquet = srcDO.getSparkDataFrame()(contextExec)
-    assert(resultParquet.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("csv", "csv", "csv"))
+    assert(resultParquet.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("csv", "csv", "csv"))
     val resultJson = jsonDO.getSparkDataFrame()(contextExec)
-    assert(resultJson.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+    assert(resultJson.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("json", "json", "json"))
   }
 
 }

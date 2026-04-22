@@ -52,14 +52,14 @@ case class PartitionValues(elements: Map[String, Any]) {
   def nonEmpty: Boolean = elements.nonEmpty
   def keys: Set[String] = elements.keySet
   def isDefinedAt(colName: String): Boolean = elements.isDefinedAt(colName)
-  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.filterKeys(colNames.contains).toMap)
+  def filterKeys(colNames: Seq[String]): PartitionValues = this.copy(elements = elements.view.filterKeys(colNames.contains).toMap)
   def addKey(key: String, value: Any): PartitionValues = if(!elements.contains(key)) this.copy(elements = elements + (key -> value)) else this
-  def getMapString: Map[String,String] = elements.mapValues(_.toString).toMap
+  def getMapString: Map[String,String] = elements.view.mapValues(_.toString).toMap
 
   /**
    * Returns true if all given partitions are defined in this partition values instance
    */
-  def isComplete(partitions: Seq[String]) = this.keys == partitions.toSet
+  def isComplete(partitions: Seq[String]): Boolean = this.keys == partitions.toSet
 
   /**
    * Returns true if partition defined by this instance are a valid "init" of given partitions
@@ -83,11 +83,11 @@ object PartitionValues {
    * @param partitions partition columns to use for sorting
    * @return Ordering to be used e.g. with Seq.sort|sortBy
    */
-  def getOrdering(partitions: Seq[String]): Ordering[PartitionValues] = new Ordering[PartitionValues] {
-    def compare(pv1: PartitionValues, pv2: PartitionValues): Int = {
-      val keys = pv1.keys.intersect(pv2.keys)
-      partitions.filter(keys.contains).map{
-        p => (pv1(p), pv2(p)) match {
+  def getOrdering(partitions: Seq[String]): Ordering[PartitionValues] = (pv1: PartitionValues, pv2: PartitionValues) => {
+    val keys = pv1.keys.intersect(pv2.keys)
+    partitions.filter(keys.contains).map {
+      p =>
+        (pv1(p), pv2(p)) match {
           case (v1: String, v2: String) => v1.compare(v2)
           case (v1: Byte, v2: Byte) => v1.compare(v2)
           case (v1: Short, v2: Short) => v1.compare(v2)
@@ -96,8 +96,7 @@ object PartitionValues {
           case (v1: Char, v2: Char) => v1.compare(v2)
           case _ => 0 // if not an ordered type, we don't use it for sorting
         }
-      }.find(_!=0).getOrElse(0)
-    }
+    }.find(_ != 0).getOrElse(0)
   }
   def parseSingleColArg(arg: String): Seq[PartitionValues] ={
     val keyValues = arg.split("=")
@@ -220,7 +219,7 @@ object PartitionLayout {
     val tokens = extractTokens(partitionLayout)
     var partitionLayoutPattern = partitionLayout
     // quote regexp characters in partition layout
-    partitionLayoutPattern = raw"[\.\[\]]".r.replaceAllIn(partitionLayoutPattern, quoteMatch => raw"\\" + quoteMatch.group(0))
+    partitionLayoutPattern = raw"[.\[\]]".r.replaceAllIn(partitionLayoutPattern, quoteMatch => raw"\\" + quoteMatch.group(0))
     // replace * to regexp .*
     partitionLayoutPattern = partitionLayoutPattern.replace("*", ".*")
     // replace tokens in partition layout with a defined or default regexp

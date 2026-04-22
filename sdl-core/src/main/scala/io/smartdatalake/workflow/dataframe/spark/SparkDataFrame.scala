@@ -106,7 +106,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     SparkDataFrame(inner.orderBy(sparkCols.toIndexedSeq: _*))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect.map(SparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
 
   override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
 

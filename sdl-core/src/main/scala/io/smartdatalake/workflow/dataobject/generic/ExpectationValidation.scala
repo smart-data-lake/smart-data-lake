@@ -143,7 +143,7 @@ private[smartdatalake] trait ExpectationValidation {
       logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope $scope")
       val dfMetrics = df.agg(deduplicate(aggExpressions))
       dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap).head
-        .mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
+        .view.mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
     } else Map()
   }
 
