@@ -174,7 +174,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   override def createSampleFile(implicit context: ActionPipelineContext): Option[String] = {
     // only create new sample file if there is no schema defined, and no schema file exists or an update is forced by the environment configuration
-    if (schema.isEmpty && (Environment.updateSparkFileDataObjectSampleDataFile || !filesystem.exists(sampleFile))) {
+    if (schema.isEmpty && (Environment.updateSparkFileDataObjectSampleDataFile() || !filesystem.exists(sampleFile))) {
       Some(sampleFile.toString)
     } else None
   }
@@ -520,7 +520,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   private def createSchemaFile(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
-    if(Environment.updateSparkFileDataObjectSchemaFile || !filesystem.exists(schemaFile)) {
+    if (Environment.updateSparkFileDataObjectSchemaFile() || !filesystem.exists(schemaFile)) {
       logger.info(s"($id) Writing schema file")
       HdfsUtil.writeHadoopFile(schemaFile, df.schema.prettyJson)(filesystem)
     }
@@ -681,7 +681,6 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
 private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
-  import org.apache.spark.sql.classic.ClassicConversions._
   def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
     logger.debug(s"($name) add files observation to Dataset")
     on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))

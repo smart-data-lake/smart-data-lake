@@ -31,12 +31,12 @@ object GraphUtil {
     /**
      * Map of inbound connected nodes per node from a list of edges.
      */
-    private lazy val outboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._1).mapValues(_.map(_._2)).toMap
+    private lazy val outboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
     /**
      * Map of outbound connected nodes per node from a list of edges.
      */
-    private lazy val inboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._2).mapValues(_.map(_._1)).toMap
+    private lazy val inboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._2).view.mapValues(_.map(_._1)).toMap
 
     /**
      * Search all connected nodes from a given node

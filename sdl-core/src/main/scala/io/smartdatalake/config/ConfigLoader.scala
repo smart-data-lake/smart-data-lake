@@ -125,10 +125,11 @@ object ConfigLoader extends SmartDataLakeLogger {
           sortedConfigs.flatMap { case (file, config) => ConfigParser.getConnectionEntries(config).map(objName => (ConnectionId(objName), file)) }
       val duplicates = objectIdLocationMap.groupBy(_._1)
         .filter(_._2.size > 1)
-        .mapValues(_.map(_._2))
+        .view.mapValues(_.map(_._2))
       if (duplicates.nonEmpty) {
         val duplicatesStr = duplicates.map { case (id, files) => s"$id=${files.mkString(";")}" }.mkString(" ")
-        throw ConfigurationException(s"Configuration parsing failed because of configuration objects defined in multiple locations: $duplicatesStr")
+        throw ConfigurationException(s"Configuration parsing failed" +
+          s" because of configuration objects defined in multiple locations: $duplicatesStr")
       }
     }
 

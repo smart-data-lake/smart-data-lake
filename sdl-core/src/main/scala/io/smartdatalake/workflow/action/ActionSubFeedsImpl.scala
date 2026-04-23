@@ -21,12 +21,11 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
-import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
@@ -398,7 +397,10 @@ case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionDa
 
 object SubFeedsExpressionData {
   def fromSubFeeds(subFeeds: Seq[SubFeed], mainInputId: DataObjectId): SubFeedsExpressionData = {
-    val subFeedDataMap = subFeeds.map(subFeed => (subFeed.dataObjectId.id, SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString), subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).mapValues(_.toString).toMap))).toMap
+    val subFeedDataMap = subFeeds.map(subFeed => (subFeed.dataObjectId.id,
+      SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString),
+      subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).view.mapValues(_.toString).toMap))
+    ).toMap
     SubFeedsExpressionData(inputSubFeeds = subFeedDataMap, mainInputSubFeed = subFeedDataMap(mainInputId.id))
   }
 }

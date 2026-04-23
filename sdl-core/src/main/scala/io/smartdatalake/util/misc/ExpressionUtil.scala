@@ -219,15 +219,15 @@ case class DefaultExpressionData(
 object DefaultExpressionData {
   def from(context: ActionPipelineContext, partitionValues: Seq[PartitionValues]): DefaultExpressionData =
     DefaultExpressionData(
-      context.feed,
-      context.application,
-      context.executionId.runId,
-      context.executionId.attemptId,
-      context.phase.toString,
-      context.referenceTimestamp.map(Timestamp.valueOf),
-      Timestamp.valueOf(context.runStartTime),
-      Timestamp.valueOf(context.attemptStartTime),
-      partitionValues.map(_.elements.mapValues(_.toString).toMap)
+      feed = context.feed,
+      application = context.application,
+      runId = context.executionId.runId,
+      attemptId = context.executionId.attemptId,
+      executionPhase = context.phase.toString,
+      referenceTimestamp = context.referenceTimestamp.map(Timestamp.valueOf),
+      runStartTime = Timestamp.valueOf(context.runStartTime),
+      attemptStartTime = Timestamp.valueOf(context.attemptStartTime),
+      partitionValues = partitionValues.map(_.elements.view.mapValues(_.toString).toMap)
     )
 }
 

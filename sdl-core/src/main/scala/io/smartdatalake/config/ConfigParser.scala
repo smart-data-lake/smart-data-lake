@@ -212,8 +212,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     if (!rootCause.isInstanceOf[ConfigException]) {
       val rootCauseClassName = rootCause.getClass.getSimpleName
       if (e.getMessage != null && !e.getMessage.contains(rootCauseClassName)) e match {
-        case c: ConfigurationException => c.copy(message = s"${rootCauseClassName}: ${c.getMessage}")
-        case e => ConfigurationException(s"${rootCauseClassName}: ${e.getMessage}", throwable = e)
+        case c: ConfigurationException => c.copy(message = s"$rootCauseClassName: ${c.getMessage}")
+        case e => ConfigurationException(s"$rootCauseClassName: ${e.getMessage}", throwable = e)
       } else e
     } else e
   }

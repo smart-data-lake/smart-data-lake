@@ -78,12 +78,20 @@ trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromCo
 trait SparkDfsTransformer extends GenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.
   def transformSpark(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame]
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
-    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
+
+  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues],
+                               dfs: Map[String, GenericDataFrame],
+                               executionModeResultOptions: Map[String, String],
+                               outputDataObjectIds: Seq[String])
+                              (implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s)" +
+      s" ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")}" +
+      s" in method transform")
+    val sparkDfs = dfs.view.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
     transformSpark(actionId, partitionValues, sparkDfs)
-      .mapValues(SparkDataFrame).toMap
+      .view.mapValues(SparkDataFrame).toMap
   }
+
   override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
 }
 
@@ -131,11 +139,13 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
     // transform
     transformWithOptions(actionId, partitionValues, dfs, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
+                                   (implicit context: ActionPipelineContext): Map[String, String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
+    runtimeOptions.view.mapValues {
       expr => ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get).toMap
+    }.filter(_._2.isDefined).view.mapValues(_.get).toMap
   }
 }
 object OptionsGenericDfsTransformer {
@@ -150,13 +160,17 @@ object OptionsGenericDfsTransformer {
  */
 trait OptionsSparkDfsTransformer extends OptionsGenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.
-  def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,DataFrame]
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
+  def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])
+                               (implicit context: ActionPipelineContext): Map[String, DataFrame]
+
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], options: Map[String, String])
+                                   (implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
+    val sparkDfs = dfs.view.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
     transformSparkWithOptions(actionId, partitionValues, sparkDfs, options)
-      .mapValues(SparkDataFrame).toMap
+      .view.mapValues(SparkDataFrame).toMap
   }
+
   override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
 }
 
