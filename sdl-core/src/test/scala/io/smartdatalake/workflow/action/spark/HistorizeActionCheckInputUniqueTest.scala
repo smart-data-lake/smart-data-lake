@@ -28,8 +28,10 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfter {
+  private implicit lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   protected implicit val session: SparkSession = TestUtil.session
 

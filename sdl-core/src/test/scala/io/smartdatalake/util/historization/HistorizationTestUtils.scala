@@ -19,15 +19,17 @@
 package io.smartdatalake.util.historization
 
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeedCompanion}
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
-import org.apache.spark.sql.{Encoder, SparkSession}
+import org.slf4j.Logger
 
 import java.sql.Timestamp
 import java.time.{Duration, LocalDateTime}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
+
+case class NameAgeHealth(id: Int, name: String, age: Int, health_state: String)
+case class NameAgeHealthNewCol(id: Int, name: String, age: Int, health_state: String, new_col1: Option[String] = None)
 
 object HistorizationTestUtils {
 
@@ -57,10 +59,23 @@ object HistorizationTestUtils {
   private[historization] val referenceTimestampNew = LocalDateTime.now
   private[historization] val referenceTimestampNewTs = Timestamp.valueOf(referenceTimestampNew)
 
-  private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit) = Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
+  private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit): Timestamp =
+    Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
 
-  def toHistorizedDf[T <: Product: ClassTag: TypeTag](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false, timeUnitAxis: Option[Duration] = defaultTimeAxisUnit)
-                                            (implicit actionPipelineContext: ActionPipelineContext, functions: DataFrameSubFeedCompanion): GenericDataFrame = {
+  def toHistorizedDf[T <: Product: ClassTag: TypeTag](
+      records: Seq[T],
+      phase: HistorizationPhase.HistorizationPhase,
+      colNames: Seq[String] = this.colNames,
+      withHashCol: Boolean = false,
+      withOperation: Boolean = false,
+      timeUnitAxis: Option[Duration] = defaultTimeAxisUnit
+  )(implicit
+      actionPipelineContext: ActionPipelineContext,
+      functions: DataFrameSubFeedCompanion,
+      logger: Logger
+  ): GenericDataFrame = {
+    logger.debug(s"toHistorizedDf: phase=$phase , records.size=${records.size} , withHashCol=$withHashCol ," +
+      s" withOperation=$withOperation , timeUnitAxis=$timeUnitAxis , colNames=${colNames.mkString(",")}")
     import functions._
     val referenceTimestampOldTs = getReferenceTimestampOldTs(timeUnitAxis)
     var operation: Option[String] = None
@@ -90,15 +105,21 @@ object HistorizationTestUtils {
           .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldDeletedHistTs))
           .withColumn(s"${Environment.delimitedColumnName}", lit(ersetztTimestampOldDeletedHistTs))
     }
-    if (withHashCol) dfHist = Historization.addHashCol(dfHist, None, None, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
-    if (withOperation) dfHist = dfHist.withColumn(Historization.historizeOperationColName, operation.map(lit).getOrElse(lit(null)))
+    if (withHashCol)
+      dfHist = Historization.addHashCol(dfHist, None, None, useHash = true,
+        colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
+    if (withOperation) dfHist = dfHist
+      .withColumn(Historization.historizeOperationColName, operation.map(lit).getOrElse(lit(null)))
+    if (logger.isDebugEnabled) {
+      logger.debug(s"toHistorizedDf: result schema:")
+      dfHist.printSchema()
+    }
     dfHist
   }
 
-  def toDataDf[T <: Product : ClassTag: TypeTag](records: Seq[T], colNames: Seq[String] = this.colNames)
-                                      (implicit functions: DataFrameSubFeedCompanion, actionPipelineContext: ActionPipelineContext): GenericDataFrame = {
-    functions.createDataFrame(records)
-
-  }
+  def toDataDf[T <: Product: ClassTag: TypeTag](records: Seq[T], colNames: Seq[String] = this.colNames)(implicit
+      functions: DataFrameSubFeedCompanion,
+      actionPipelineContext: ActionPipelineContext
+  ): GenericDataFrame = functions.createDataFrame(records)
 
 }
