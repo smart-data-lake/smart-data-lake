@@ -42,7 +42,7 @@ trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
     logger.error(s"  Do schemata equal? ${actual.schema.fields.toSet == expected.schema.fields.toSet}")
     logger.error(s"  Do cardinalities equal? ${actual.count() == expected.count()}")
     logger.error("   symmetric Difference ")
-    actual.getSymmetricDifference(expected).show(false)
+    actual.getSymmetricDifference(expected).withColumnRenamed("_this", "_actual").show(false)
   }
 
   def printFailedTestResultGeneric(testName: String, arguments: Seq[GenericDataFrame] = Seq())(actual: GenericDataFrame)(expected: GenericDataFrame)(implicit

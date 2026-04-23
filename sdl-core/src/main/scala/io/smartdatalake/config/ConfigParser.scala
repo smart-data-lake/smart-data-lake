@@ -292,7 +292,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
     if (config.hasPath(path) && config.getValue(path).valueType() == ConfigValueType.STRING) {
       val value = config.getString(path)
-      val valueSubstituted = """~\{(.*?)\}""".r.replaceAllIn(value, localSubstituter)
+      val valueSubstituted = """~\{(.*?)}""".r.replaceAllIn(value, localSubstituter)
       config.withValue(path, ConfigValueFactory.fromAnyRef(valueSubstituted))
     } else config
   }

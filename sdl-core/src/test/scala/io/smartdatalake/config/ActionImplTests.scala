@@ -28,11 +28,13 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerC
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.Duration
 
-
 private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
+
+  private implicit lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   val dataObjectConfig: Config = ConfigFactory.parseString(
     """
