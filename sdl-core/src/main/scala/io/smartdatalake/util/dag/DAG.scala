@@ -286,7 +286,7 @@ object DAG extends SmartDataLakeLogger {
    * Create a lookup table to retrieve outgoing (target) node IDs for a node.
    */
   private def buildOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
-    val targetIDsforIncomingIDsMap = edges.groupBy(_.nodeIdFrom).mapValues(_.map(_.nodeIdTo))
+    val targetIDsforIncomingIDsMap = edges.groupBy(_.nodeIdFrom).view.mapValues(_.map(_.nodeIdTo))
     nodes.map(n => (n, targetIDsforIncomingIDsMap.getOrElse(n.nodeId, Seq()))).toMap
   }
 
@@ -294,7 +294,7 @@ object DAG extends SmartDataLakeLogger {
    * Create a lookup table to retrieve incoming (source) node IDs for a node.
    */
   private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
-    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom).distinct.sorted)
+    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).view.mapValues(_.map(_.nodeIdFrom).distinct.sorted)
     nodes.map(n => (n, incomingIDsForTargetIDMap.getOrElse(n.nodeId, Seq.empty))).toMap
   }
 
@@ -310,7 +310,8 @@ object DAG extends SmartDataLakeLogger {
       val (startNodeIds, nonStartNodeIds) = incomingIds.partition(_._2.isEmpty)
       assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
       // remove start nodes from incoming node list of remaining nodes
-      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.mapValues(_.filterNot(startNodeIds.isDefinedAt)).toMap
+      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.view
+        .mapValues(_.filterNot(startNodeIds.isDefinedAt)).toMap
       val newSortedNotes = sortedNodes ++ startNodeIds.keys.toSeq.sorted
       if (nonStartNodeIdsWithoutIncomingStartNodes.isEmpty) newSortedNotes
       else go(newSortedNotes, nonStartNodeIdsWithoutIncomingStartNodes)

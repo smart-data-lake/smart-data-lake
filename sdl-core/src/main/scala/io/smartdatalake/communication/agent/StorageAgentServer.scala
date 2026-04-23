@@ -105,7 +105,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
   def getInstructionFileIterator(hadoopPath: Path)(implicit filesystem: FileSystem): Iterator[Path] = {
     RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath))
       .map(_.getPath)
-      .filter(_.getName.endsWith(FileType.Instruction + ".json"))
+      .filter(_.getName.endsWith(FileType.Instruction.toString + ".json"))
   }
 }
 

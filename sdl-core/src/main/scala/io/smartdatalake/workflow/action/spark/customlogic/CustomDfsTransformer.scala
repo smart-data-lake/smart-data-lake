@@ -83,7 +83,8 @@ trait CustomDfsTransformer extends CustomTransformMethodDef with TransformInfo w
   }
 
   @transient private lazy val customTransformMethodWrapper = customTransformMethod.map(new CustomTransformMethodWrapper(_))
-  override def getInputDataObjectsNameAndType: Option[Seq[(String, universe.Type)]] = customTransformMethodWrapper.map(_.getInputDataObjectNames.mapValues(_.tpe).toSeq)
+  override def getInputDataObjectsNameAndType: Option[Seq[(String, universe.Type)]] = customTransformMethodWrapper
+    .map(_.getInputDataObjectNames.view.mapValues(_.tpe).toSeq)
   override def isSingleInput: Boolean = customTransformMethodWrapper.exists(_.getInputDataObjectNames.keys.size==1)
   override def isSingleOutput: Boolean = customTransformMethodWrapper.exists(_.returnsSingleDataset)
 }
@@ -235,7 +236,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
     if (returnType =:= typeOf[Map[String, DataFrame]]) {
       transformResult.asInstanceOf[Map[String, DataFrame]]
     } else if (returnType <:< typeOf[Map[String, Dataset[_]]]) {
-      transformResult.asInstanceOf[Map[String, Dataset[_]]].mapValues(_.toDF()).toMap
+      transformResult.asInstanceOf[Map[String, Dataset[_]]].view.mapValues(_.toDF()).toMap
     } else if (returnType =:= typeOf[DataFrame]) {
       require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambiguous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
       Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])

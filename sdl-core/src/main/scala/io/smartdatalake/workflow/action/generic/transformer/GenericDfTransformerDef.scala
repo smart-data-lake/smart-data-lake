@@ -45,14 +45,17 @@ trait PartitionValueTransformer extends Transformer {
    */
   def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct, executionModeResultOptions) // toStream is lazy: distinct is only calculated if transformPartitionValues creates a mapping.
+  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues, PartitionValues], executionModeResultOptions: Map[String, String])
+                                                (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
+    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.to(LazyList).distinct, executionModeResultOptions) // toStream is lazy: distinct is only calculated if transformPartitionValues creates a mapping.
     thisPartitionValuesMap.map { newMapping =>
       // transform is mapping is defined
       def lookupNewValue(key: PartitionValues) =
-        newMapping.getOrElse(key, throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
+        newMapping.getOrElse(key,
+          throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key" +
+            s" in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
 
-      partitionValuesMap.mapValues(lookupNewValue).toMap
+      partitionValuesMap.view.mapValues(lookupNewValue).toMap
     }.getOrElse(partitionValuesMap)
   }
 }
@@ -147,11 +150,13 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
     // transform
     transformWithOptions(actionId, partitionValues, df, dataObjectId, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions ++ previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _))
   }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
+                                   (implicit context: ActionPipelineContext): Map[String, String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
+    runtimeOptions.view.mapValues {
       expr => ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get).toMap
+    }.filter(_._2.isDefined).view.mapValues(_.get).toMap
   }
 }
 object OptionsGenericDfTransformer {
