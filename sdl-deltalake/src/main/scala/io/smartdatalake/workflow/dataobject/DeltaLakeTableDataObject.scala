@@ -42,7 +42,7 @@ import org.apache.spark.sql.delta.DeltaLog
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, DataFrameWriterV2, Row, SparkSession}
 
 import java.sql.{SQLException, Timestamp}
 import java.time.{Duration, LocalDateTime}
@@ -179,7 +179,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     throw ConfigurationException(s"($id) db is not defined in table and connection for dataObject.")
   }
 
-  assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite and Append supported for now.")
+  assert(Seq(SDLSaveMode.Overwrite, SDLSaveMode.Append, SDLSaveMode.AppendV2, SDLSaveMode.Merge).contains(saveMode), s"($id) Only saveMode Overwrite, Append, AppendV2 and Merge supported for now.")
 
   def deltaTable(implicit session: SparkSession): DeltaTable = DeltaTable.forName(session, table.fullName)
 
@@ -346,7 +346,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       .conditionalOption("path", path.isDefined, () => hadoopPath.toString) // evaluate hadoopPath only for external tables
       .option("userMetadata", userMetadata)
       .option("mergeSchema", allowSchemaEvolution) // allow schema evolution for SaveMode.Append
-
+    // we also prepare a V2 writer for certain cases
+    val dfWriterV2: DataFrameWriterV2[Row] = targetDf.writeTo(table.fullName)
+      .options(options)
+      .conditionalOption("path", path.isDefined, () => hadoopPath.toString) // evaluate hadoopPath only for external tables
+      .option("userMetadata", userMetadata)
+      .option("mergeSchema", allowSchemaEvolution.toString) // allow schema evolution for SaveMode.Append
     val sparkMetrics = if (isTableExisting) {
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
@@ -354,14 +359,19 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         if (partitions.isEmpty) {
-          // overwrite all
-          dfWriter
-            .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
-            .mode(SparkSaveMode.from(finalSaveMode))
-            .saveAsTable(table.fullName)
+          if (finalSaveMode == SDLSaveMode.AppendV2) {
+            dfWriterV2
+              .option("overwriteSchema", allowSchemaEvolution.toString) // allow overwriting schema when overwriting whole table
+              .append()
+          } else {
+            dfWriter
+              .option("overwriteSchema", allowSchemaEvolution) // allow overwriting schema when overwriting whole table
+              .mode(SparkSaveMode.from(finalSaveMode))
+              .saveAsTable(table.fullName)
+          }
         } else {
           if (finalSaveMode == SDLSaveMode.Overwrite) {
-            // insert overwrite
+            // partitioned insert overwrite
             val overwriteModeIsDynamic = options.get("partitionOverwriteMode").orElse(session.conf.getOption("spark.sql.sources.partitionOverwriteMode")).contains("dynamic")
             if (partitionValues.isEmpty && !overwriteModeIsDynamic) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this DeltaLakeTableDataObject to enable delta lake dynamic partitioning and get around this exception.")
             dfWriter
@@ -370,7 +380,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
               .mode(SparkSaveMode.from(finalSaveMode))
               .saveAsTable(table.fullName)
           } else {
-            // insert append
+            // partitioned insert append
             dfWriter
               .mode(SparkSaveMode.from(finalSaveMode))
               .saveAsTable(table.fullName)

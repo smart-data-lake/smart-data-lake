@@ -89,11 +89,18 @@ object SDLSaveMode extends Enumeration {
    */
   val Merge: Value = Value("Merge")
 
+  /**
+   * Force using Append mode with V2 API, to avoid https://github.com/delta-io/delta/issues/2564
+   *
+   * Note: this is only implemented for a few DataObjects, e.g. DeltaLakeTableDataObject, as it is no problem otherwise
+   */
+  val AppendV2: Value = Value("AppendV2")
+
   private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
     implicit val helper: SparkSubFeed.type = SparkSubFeed
     import org.apache.spark.sql.functions.expr
     saveMode match {
-      case SDLSaveMode.Append => writer.append()
+      case SDLSaveMode.Append | SDLSaveMode.AppendV2 => writer.append()
       case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty => writer.overwrite(expr(partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql))
       case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty && partitionOverwriteModeDynamic => writer.overwritePartitions()
       case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()

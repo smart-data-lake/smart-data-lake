@@ -47,4 +47,14 @@ trait ReadWrite extends Serializable {
       if (activated) writer.option(key, value()) else writer
     }
   }
+
+  implicit class DataFrameWriterUtilsV2[T](writer: DataFrameWriterV2[T]) {
+    final def optionalOption(key: String, value: Option[String]): DataFrameWriterV2[T] = {
+      if (value.isDefined) writer.option(key, value.get) else writer
+    }
+
+    final def conditionalOption(key: String, activated: Boolean, value: () => String): DataFrameWriterV2[T] = {
+      if (activated) writer.option(key, value()) else writer
+    }
+  }
 }
