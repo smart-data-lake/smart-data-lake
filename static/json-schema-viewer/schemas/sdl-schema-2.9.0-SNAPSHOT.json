@@ -855,7 +855,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -1110,7 +1110,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "`SDLSaveMode` to use when writing files, default is \"append\". Overwrite, Append are supported for now.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "connectionId" : {
             "type" : "string",
@@ -1166,7 +1166,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -1564,7 +1564,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "`SDLSaveMode` to use when writing files, default is \"Overwrite\". Overwrite, Append and Merge are supported for now.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
             "type" : "boolean",
@@ -1730,7 +1730,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -1974,7 +1974,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "spark`SaveMode` to use when writing files, default is \"Overwrite\"",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "acl" : {
             "type" : "object",
@@ -2126,7 +2126,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "`SDLSaveMode` to use when writing files, default is \"Overwrite\". Overwrite, Append and Merge are supported for now.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
             "type" : "boolean",
@@ -2308,7 +2308,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "`SDLSaveMode` to use when writing table, default is \"Overwrite\". Only \"Append\" and \"Overwrite\" supported.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "allowSchemaEvolution" : {
             "type" : "boolean",
@@ -2438,7 +2438,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -3018,7 +3018,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -3217,7 +3217,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -3417,7 +3417,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -3596,7 +3596,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -3696,7 +3696,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "spark`SDLSaveMode` to use when writing files, default is \"Overwrite\"",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "connectionId" : {
             "type" : "string",
@@ -4007,7 +4007,7 @@
           "saveMode" : {
             "type" : "string",
             "description" : "Overwrite or Append new data.  \nWhen writing partitioned data, this applies only to partitions concerned.",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           },
           "sparkRepartition" : {
             "type" : "object",
@@ -6259,7 +6259,7 @@
           },
           "saveMode" : {
             "type" : "string",
-            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+            "enum" : [ "AppendV2", "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
           }
         },
         "title" : "SaveModeGenericOptions",
