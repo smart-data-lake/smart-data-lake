@@ -4,10 +4,10 @@
 
 Smart Data Lake Builder is a declarative, configuration-driven data pipeline framework built on Apache Spark. The core architecture consists of:
 
+- **Connections**: Configuration for external systems (databases, APIs, file systems)
 - **DataObjects**: Abstract data sources/sinks (files, databases, APIs) implementing the `DataObject` trait
 - **Actions**: Data transformations implementing the `Action` trait, connecting input/output DataObjects
 - **Feeds**: Execution units forming directed acyclic graphs (DAGs) from Action dependencies
-- **Connections**: Configuration for external systems (databases, APIs, file systems)
 
 ## Project Structure
 
@@ -15,6 +15,13 @@ Smart Data Lake Builder is a declarative, configuration-driven data pipeline fra
 sdl-core/           # Main framework (Actions, DataObjects, Workflows)
 sdl-{connector}/    # Specialized connectors (kafka, deltalake, snowflake, etc.)
 ```
+
+## Main frameworks / versions
+
+- Scala 2.13
+- Apache Spark 4.1
+- Hadoop 3.4
+- Build System**: Maven (multi-module project)
 
 ## Development Workflow
 
@@ -79,25 +86,6 @@ object MyDataObject extends FromConfigFactory[DataObject] {
 }
 ```
 
-### Action Implementation
-```scala
-case class MyAction(
-  override val id: ActionId,
-  inputId: DataObjectId,
-  outputId: DataObjectId,
-  override val metadata: Option[ActionMetadata] = None
-) extends Action {
-
-  override def inputs: Seq[DataObject] = Seq(getInputDataObject[DataObject](inputId))
-  override def outputs: Seq[DataObject] = Seq(getOutputDataObject[DataObject](outputId))
-
-  override def transform(inputSubFeeds: Seq[SparkSubFeed], outputSubFeeds: Seq[SparkSubFeed])
-                        (implicit context: ActionPipelineContext): Seq[SparkSubFeed] = {
-    // transformation logic
-  }
-}
-```
-
 ### Testing Patterns
 ```scala
 class MyDataObjectTest extends DataObjectTestSuite {
@@ -142,44 +130,6 @@ class MyDataObjectTest extends DataObjectTestSuite {
 - `SmartDataLakeLogger`: Provides logging via `logger` member
 - `ParsableFromConfig[T]`: Configuration parsing capability
 
-## Integration Points
-
-### File Systems
-- Hadoop FileSystem (HDFS, S3, GCS, Azure)
-- Local filesystem
-- SFTP
-
-### Databases
-- JDBC (any JDBC-compatible database)
-- Snowflake
-- Delta Lake tables
-- Apache Iceberg tables
-
-### Streaming
-- Apache Kafka
-- Debezium CDC (MySQL, MariaDB, PostgreSQL, Oracle)
-
-### APIs
-- REST APIs (OpenAPI, OData)
-- Web services
-
-## Common Patterns
-
-### Schema Handling
-- `UserDefinedSchema`: For explicit schema definitions
-- `SchemaValidation`: For schema validation against minimum requirements
-- Lazy schema parsing in `prepare()` method
-
-### Partitioning
-- `PartitionValues`: Represents partition keys/values
-- Automatic partition discovery and management
-- Housekeeping modes for partition lifecycle management
-
-### Error Handling
-- `ConfigurationException`: For config parsing errors
-- Custom exceptions with descriptive messages
-- Logging via `SmartDataLakeLogger` trait
-
 ## Development Best Practices
 
 ### License Headers
@@ -193,7 +143,7 @@ Every source file MUST include GPLv3 license header (see existing files for temp
 ### Code Style
 - Follow Scala Style Guide
 - IntelliJ IDEA config in `.idea/codeStyles/`
-- No scalafmt enforcement (`scalafmt.skip=true`)
+- scalafmt configured (`.scalafmt.conf`)
 
 ## Testing Strategy
 
@@ -215,9 +165,3 @@ Every source file MUST include GPLv3 license header (see existing files for temp
 3. Create module POM inheriting from `sdl-parent`
 4. Implement DataObjects/Actions following existing patterns
 5. Add comprehensive tests
-
-### Key Reference Files
-- `sdl-core/src/main/scala/io/smartdatalake/workflow/dataobject/DataObject.scala`
-- `sdl-core/src/main/scala/io/smartdatalake/workflow/action/Action.scala`
-- `sdl-core/src/test/resources/application.conf`
-- `.github/copilot-instructions.md`</content>
