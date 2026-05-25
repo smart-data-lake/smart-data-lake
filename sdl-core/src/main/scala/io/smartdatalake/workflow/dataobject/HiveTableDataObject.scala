@@ -137,7 +137,7 @@ case class HiveTableDataObject(override val id: DataObjectId,
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     super.prepare
-    require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (needs to be created manually).")
+    if (!Environment.allowCreateDatabase) require(isDbExisting, s"($id) Hive DB ${table.db.get} doesn't exist (set Environment.allowCreateDatabase=true or create manually).")
     if (!isTableExisting)
       require(path.isDefined, s"($id) If Hive table does not exist yet, the path must be set.")
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition

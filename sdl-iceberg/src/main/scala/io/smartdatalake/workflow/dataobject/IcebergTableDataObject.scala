@@ -213,9 +213,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     }
     val thisIsPathBasedCatalog = isPathBasedCatalog(getIcebergCatalog)
     if (thisIsPathBasedCatalog && path.nonEmpty) logger.warn(s"($id) path is ignored for path based catalogs like HadoopCatalog.")
-    if (!isDbExisting) {
+    if (!Environment.allowCreateDatabase && !isDbExisting) {
       // DB (schema) is created automatically by iceberg when creating tables. But we would like to keep the same behaviour as done by spark_catalog, where only default DB is existing, and others must be created manually.
-      require(table.db.contains("default"), s"($id) DB ${table.db.get} doesn't exist (needs to be created manually).")
+      require(table.db.contains("default"), s"($id) DB ${table.db.get} doesn't exist (set Environment.allowCreateDatabase=true or create manually).")
     }
     if (!isTableExisting) {
       require(path.isDefined || thisIsPathBasedCatalog, s"($id) If Iceberg table does not exist yet, path must be set.")

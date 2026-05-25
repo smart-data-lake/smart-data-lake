@@ -618,6 +618,19 @@ object Environment extends SmartDataLakeLogger {
 
   var _dataFrameObservationTimeoutSec: Option[Int] = None
 
+  /**
+   * Whether SDLB is allowed to create missing database when it is creating tables.
+   * Default is false, e.g. an error is thrown if database is not existing.
+   */
+  def allowCreateDatabase: Boolean = {
+    if (_allowCreateDatabase.isEmpty) {
+      _allowCreateDatabase = Some(EnvironmentUtil.getSdlParameter("allowCreateDatabase").exists(_.toBoolean))
+    }
+    _allowCreateDatabase.get
+  }
+
+  var _allowCreateDatabase: Option[Boolean] = None
+
   // static configurations
   def configPathsForLocalSubstitution: Seq[String] = Seq(
       "path", "table.name"

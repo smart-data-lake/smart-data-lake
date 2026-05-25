@@ -190,7 +190,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("io.delta.sql.DeltaSparkSessionExtension"),
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
-    require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
+    if (!Environment.allowCreateDatabase) {
+      require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (set Environment.allowCreateDatabase=true or create manually).")
+    } else if (!isDbExisting) {
+      session.sql(s"CREATE DATABASE ${table.getDbName}")
+      logger.info(s"($id) Created database ${table.getDbName} for table ${table.fullName}")
+    }
     metadata.flatMap(_.description).foreach(_ => {
       require(table.db.isDefined && table.catalog.isDefined,
         "Since the attribute metadata.description is set, you must also define a " +

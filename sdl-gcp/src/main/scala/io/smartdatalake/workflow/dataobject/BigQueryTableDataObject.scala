@@ -24,7 +24,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -116,7 +116,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
       require(Seq("direct", "indirect").contains(writeMethod), f"The write method should be 'direct' or 'indirect', and not the provided value of $writeMethod")
       if (writeMethod == "indirect") require(!Seq(persistentGcsPath, persistentGcsBucket, temporaryGcsBucket).flatten.isEmpty, "When using indirect mode, a temporary/persistent bucket or path must be defined")
 
-      require(isDbExisting, f"The provided dataset ${table.db.get} doesn't exist")
+      if (!Environment.allowCreateDatabase) require(isDbExisting, f"The provided dataset ${table.db.get} doesn't exist (set Environment.allowCreateDatabase=true or create manually)")
       require(viewsEnabled || !hasQuery, "If the table has a 'query' argument, the parameter 'viewsEnabled' cannot be false")
       require(Seq(SDLSaveMode.Append, SDLSaveMode.Overwrite).contains(saveMode), "As of now, the BigQuery Data Object only supports Save modes Append and Overwrite")
     }
