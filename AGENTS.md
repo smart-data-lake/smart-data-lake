@@ -26,8 +26,8 @@ mvn -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezi
 # Build specific module
 mvn clean install -pl sdl-core
 
-# Run specific test
-mvn test -Dtest=MyTest -pl sdl-core
+# Run specific test suite (ScalaTest plugin filter), e.g. for AccessTableDataObjectTest:
+mvn -B test -pl sdl-core -Dsuites=io.smartdatalake.workflow.dataobject.AccessTableDataObjectTest
 ```
 
 ## Configuration Patterns
@@ -221,4 +221,3 @@ Every source file MUST include GPLv3 license header (see existing files for temp
 - `sdl-core/src/main/scala/io/smartdatalake/workflow/action/Action.scala`
 - `sdl-core/src/test/resources/application.conf`
 - `.github/copilot-instructions.md`</content>
-<parameter name="filePath">C:\Users\nte\GIT\smart-data-lake\AGENTS.md

@@ -45,10 +45,10 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
 
     // run
-    val df: DataFrame = dataObj.getSparkDataFrame()
+    val df = dataObj.getSparkDataFrame()
 
     // check
-    val result: Array[Row] = df.collect()
+    val result = df.collect()
 
     result.length shouldEqual 1
     val firstRow = result.head
