@@ -51,6 +51,4 @@ class JettyAgentClientSocket() extends WebSocketAdapter with SmartDataLakeLogger
     super.onWebSocketError(cause)
     logger.error(s"Socket $this was closed with error ${cause.printStackTrace(System.err)}")
   }
-
-
 }

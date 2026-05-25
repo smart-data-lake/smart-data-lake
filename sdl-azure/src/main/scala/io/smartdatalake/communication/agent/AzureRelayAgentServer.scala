@@ -66,8 +66,8 @@ case class AzureRelayAgentServer(sdlb: SmartDataLakeBuilder, config: LocalAzureR
             val responseMessageOpt = agentController.handle(sdlMessage, config)
             if (responseMessageOpt.isDefined) {
               sendSDLMessage(responseMessageOpt.get, connection)
-              if(responseMessageOpt.get.agentResult.get.exception.isDefined){
-                throw(responseMessageOpt.get.agentResult.get.exception.get)
+              if(responseMessageOpt.get.agentResult.get.errorMsg.isDefined){
+                throw new Exception(responseMessageOpt.get.agentResult.get.errorMsg.get)
               }
             }
             else closeConnection(connection)

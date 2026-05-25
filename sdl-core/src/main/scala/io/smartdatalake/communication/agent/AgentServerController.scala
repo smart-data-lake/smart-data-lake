@@ -76,8 +76,9 @@ case class AgentServerController(
 
             Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = resultingDataObjectIdToSchema))))
           } catch {
-            case e: Exception => logger.error("Run failed, sending error message to AgentClient.")
-              Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = Map(), exception = Some(e)))))
+            case e: Exception =>
+              logger.error("Run failed, sending error message to AgentClient.")
+              Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = Map(), errorMsg = Some(e.getMessage)))))
           }
       }
       case _ =>

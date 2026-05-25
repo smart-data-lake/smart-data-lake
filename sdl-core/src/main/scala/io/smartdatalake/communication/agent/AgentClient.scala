@@ -21,6 +21,7 @@ package io.smartdatalake.communication.agent
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions, ConfigValueFactory}
 import io.smartdatalake.communication.message.{AgentInstruction, AgentResult, SDLMessage, SDLMessageType}
 import io.smartdatalake.config.ConfigParser.{CONFIG_SECTION_ACTIONS, CONFIG_SECTION_CONNECTIONS, CONFIG_SECTION_DATAOBJECTS}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.Action

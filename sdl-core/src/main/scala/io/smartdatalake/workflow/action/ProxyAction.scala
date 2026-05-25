@@ -80,7 +80,7 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
     val response = agentClient.sendSDLMessage(hoconInstructions)
 
     // throw exception if execution on agent failed
-    response.exception.foreach(e => throw RemoteAgentException(e))
+    response.errorMsg.foreach(e => throw RemoteAgentException(e))
 
     // if succeeded, create subfeeds with empty dataframes but correct schema
     response.dataObjectIdToSchema.map {
@@ -98,4 +98,4 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
   }
 }
 
-case class RemoteAgentException(e: Exception) extends Exception(e.getMessage, e)
+case class RemoteAgentException(msg: String) extends Exception(msg)
