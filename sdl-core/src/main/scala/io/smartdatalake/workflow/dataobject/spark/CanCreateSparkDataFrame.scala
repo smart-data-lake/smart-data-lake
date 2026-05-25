@@ -18,11 +18,9 @@
  */
 package io.smartdatalake.workflow.dataobject.spark
 
-import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
-import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.connection.{Connection, SparkClassicConnection}
+import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -30,7 +28,6 @@ import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.{DataFrame, DataFrameReader, DataFrameWriter}
 
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 trait CanCreateSparkDataFrame extends CanCreateDataFrame { this: DataObject =>
@@ -53,10 +50,6 @@ trait CanCreateSparkDataFrame extends CanCreateDataFrame { this: DataObject =>
   override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     if (subFeedType =:= typeOf[SparkSubFeed]) SparkSubFeed(Some(SparkDataFrame(getSparkDataFrame(partitionValues))), id, partitionValues)
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
-  }
-
-  def sparkConnection(implicit context: ActionPipelineContext): SparkClassicConnection = {
-    context.engineConnection.asInstanceOf[SparkClassicConnection]
   }
 
   override private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed])

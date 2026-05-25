@@ -113,7 +113,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getDataFrame")
-    implicit val session: SparkSession = sparkConnection.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
 
     val df = context.phase match {
       // init phase -> return empty dataframe

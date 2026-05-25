@@ -54,7 +54,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
   extends TableDataObject with CanCreateSparkDataFrame {
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
-    val session = sparkConnection.sparkSession
+    val session = getSparkSession
 
     val db = openDb(session)
     val accessTable = db.getTable(table.name)

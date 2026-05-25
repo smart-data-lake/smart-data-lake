@@ -139,7 +139,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
    * parse CSV from DataFrame prepared by Sparks "text" DataSource
    */
   override def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = sparkConnection.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     // parse csv files content
     assert(df.columns.head == "value") // reading format=text should give schema "value: string" (+ partition columns)
     df

@@ -30,6 +30,7 @@ import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, default
 import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend}
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.conf.Configuration
@@ -165,7 +166,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(schema.nonEmpty, s"($id) prepare must be called before getDataFrame")
-    implicit val session: SparkSession = sparkConnection.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     import org.json4s.jackson.JsonMethods.parse
     import session.implicits._
 

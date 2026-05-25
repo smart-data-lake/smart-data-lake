@@ -26,6 +26,7 @@ import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
 import io.smartdatalake.workflow.connection.SparkClassicConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -62,7 +63,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
    * Create a DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val session = sparkConnection.sparkSession
+    val session = SparkSubFeed.getSparkSession
     import session.implicits._
 
     val listElementsSeparator = ","
