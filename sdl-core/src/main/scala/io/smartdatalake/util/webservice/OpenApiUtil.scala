@@ -84,55 +84,76 @@ object OpenApiUtil extends SmartDataLakeLogger {
     OpenApiSpec(operations, server)
   }
 
-  private[smartdatalake] def extractFirstServerFromJson(spec: JValue): Option[String] = {
-    (spec \ "servers") match {
-      case servers: JArray =>
-        servers.arr.collectFirst { case x: JString => x.s }
-      case JNothing => None
-    }
-  }
+   private[smartdatalake] def extractFirstServerFromJson(spec: JValue): Option[String] = {
+     spec \ "servers" match {
+       case servers: JArray =>
+         servers.arr.collectFirst { case x: JString => x.s }
+       case JNothing => None
+       // TODO: replace by meaningful exception
+       case _ => throw new Exception("unexpected case")
+     }
+   }
 
-  private[smartdatalake] def extractOperationsFromJson(spec: JValue): Seq[OpenApiOperation] = {
-    spec \ "paths" match {
-      case paths: JObject =>
-        paths.obj.flatMap { case (path, pathSpec: JObject) =>
-          pathSpec.obj.flatMap { case (operation, opSpec: JObject) =>
-            val response200 = opSpec \ "responses" \ "200"
-            if (response200 != JNothing) {
-              response200 \ "content" match {
-                case contents: JObject =>
-                  val sparkSchemas = contents.obj.map { case (contentType, contentSpec: JObject) =>
-                    logger.debug(s"parsing operation $path:$operation: element responses\\200\\content\\$contentType\\schema")
-                    val jsonSchema = contentSpec \ "schema" match {
-                      case JNothing => throw new IllegalStateException(s"Element responses\\200\\content\\$contentType\\schema not found in OpenApi Spec operation $path:$operation")
-                      case obj: JObject =>
-                        // enrich with definitions
-                        val definitions = (spec \ definitionsPath) merge (response200 \ definitionsPath)
-                        obj ~ (definitionsPath -> definitions) // enrich with definitions
-                      case any => any
-                    }
-                    // sparkSchema is parsed lazy to avoid errors on irrelevant operations
-                    val sparkSchema = () => JsonSchemaConverter.convertParsedSchemaToSparkDataType(jsonSchema, definitionsPath = definitionsPath)
-                    (contentType, sparkSchema)
-                  }
-                  val operationId = opSpec \ "operationId" match {
-                    case JNothing => s"$path:$operation" // default if operationId is not set
-                    case id: JString => id.s
-                    case any => any.toString
-                  }
-                  Some(OpenApiOperation(path, operation, operationId, sparkSchemas.toMap))
-                case JNothing =>
-                  logger.debug(s"Element responses\\200\\content not found in OpenApi Spec operation $path:$operation")
-                  None
-              }
-            } else {
-              logger.debug(s"Element responses\\200 not found in OpenApi Spec operation $path:$operation")
-              None
-            }
-          }
-        }
-    }
-  }
+   private[smartdatalake] def extractOperationsFromJson(spec: JValue): Seq[OpenApiOperation] = {
+     spec \ "paths" match {
+       case paths: JObject =>
+         paths.obj.flatMap { case (path, pathSpec) =>
+           pathSpec match {
+             case pathSpecJObj: JObject =>
+               pathSpecJObj.obj.flatMap { case (operation, opSpec) =>
+                 opSpec match {
+                   case opSpecJObj: JObject =>
+                     val response200 = opSpecJObj \ "responses" \ "200"
+                     if (response200 != JNothing) {
+                       response200 \ "content" match {
+                         case contents: JObject =>
+                           val sparkSchemas = contents.obj.flatMap { case (contentType, contentSpec) =>
+                             contentSpec match {
+                               case contentSpecJObj: JObject =>
+                                 logger.debug(s"parsing operation $path:$operation: element responses\\200\\content\\$contentType\\schema")
+                                 val jsonSchema = contentSpecJObj \ "schema" match {
+                                   case JNothing => throw new IllegalStateException(s"Element responses\\200\\content\\$contentType\\schema not found in OpenApi Spec operation $path:$operation")
+                                   case obj: JObject =>
+                                     // enrich with definitions
+                                     val definitions = (spec \ definitionsPath) merge (response200 \ definitionsPath)
+                                     obj ~ (definitionsPath -> definitions) // enrich with definitions
+                                   case any => any
+                                 }
+                                 // sparkSchema is parsed lazy to avoid errors on irrelevant operations
+                                 val sparkSchema = () => JsonSchemaConverter.convertParsedSchemaToSparkDataType(jsonSchema, definitionsPath = definitionsPath)
+                                 Some((contentType, sparkSchema))
+                               // TODO: replace by meaningful exception
+                               case _ => Some((contentType, () => throw new Exception("unexpected case")))
+                             }
+                           }
+                           val operationId = opSpecJObj \ "operationId" match {
+                             case JNothing => s"$path:$operation" // default if operationId is not set
+                             case id: JString => id.s
+                             case any => any.toString
+                           }
+                           Some(OpenApiOperation(path, operation, operationId, sparkSchemas.toMap))
+                         case JNothing =>
+                           logger.debug(s"Element responses\\200\\content not found in OpenApi Spec operation $path:$operation")
+                           None
+                         // TODO: replace by meaningful exception
+                         case _ => throw new Exception("unexpected case")
+                       }
+                     } else {
+                       logger.debug(s"Element responses\\200 not found in OpenApi Spec operation $path:$operation")
+                       None
+                     }
+                   // TODO: replace by meaningful exception
+                   case _ => None
+                 }
+               }
+             // TODO: replace by meaningful exception
+             case _ => List()
+           }
+         }
+       // TODO: replace by meaningful exception
+       case _ => throw new Exception("unexpected case")
+     }
+   }
 
   def simplifyContentType(contentType: String): String = {
     contentType.takeWhile(_ != ';')

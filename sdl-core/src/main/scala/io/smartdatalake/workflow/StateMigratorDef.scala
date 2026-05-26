@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import org.json4s.JArray
 import org.json4s.JsonAST.{JField, JInt, JNothing, JObject}
-import org.json4s.{JArray, JValue}
 
 /**
  * Definition of how to migrate from one state version to another.
@@ -59,13 +59,15 @@ private[smartdatalake] trait StateMigratorDef {
  * - Additionally `actionState.inputIds[].id` was cleaned up as `inputIds[]`, and the same applies for `actionState.outputIds`.
  */
 class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
-  override val versionFrom = 3
-  override val versionTo = 4
-  override def migrate(json: JObject): JObject = {
-    assert(json \ "runStateFormatVersion" match {
-      case JInt(version) => version <= versionFrom
-      case JNothing => true // first state files did not have an attribute runStateFormatVersion
-    }, s"Version should be equals or less than $versionFrom")
+   override val versionFrom = 3
+   override val versionTo = 4
+   override def migrate(json: JObject): JObject = {
+     assert(json \ "runStateFormatVersion" match {
+       case JInt(version) => version <= versionFrom
+       case JNothing => true // first state files did not have an attribute runStateFormatVersion
+       // TODO: replace by meaningful exception
+       case _ => throw new Exception("unexpected case")
+     }, s"Version should be equals or less than $versionFrom")
 
     // migrate json
     val migratedJson = json.transformField {
@@ -111,13 +113,15 @@ class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
  * - appVersion: String is converted to appVersionInfo: Map[String,Any]
  */
 class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
-  override val versionFrom = 4
-  override val versionTo = 5
-  override def migrate(json: JObject): JObject = {
-    assert(json \ "runStateFormatVersion" match {
-      case JInt(version) => version <= versionFrom
-      case JNothing => true // first state files did not have an attribute runStateFormatVersion
-    }, s"Version should be equals or less than $versionFrom")
+   override val versionFrom = 4
+   override val versionTo = 5
+   override def migrate(json: JObject): JObject = {
+     assert(json \ "runStateFormatVersion" match {
+       case JInt(version) => version <= versionFrom
+       case JNothing => true // first state files did not have an attribute runStateFormatVersion
+       // TODO: replace by meaningful exception
+       case _ => throw new Exception("unexpected case")
+     }, s"Version should be equals or less than $versionFrom")
 
     // migrate json
     val migratedJson = json.transformField {

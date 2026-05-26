@@ -98,23 +98,27 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
    * Parse *.ipynb Notebook content
    * Get code from all cells with cell_type=code and language=scala, ignoring cells which start with "//!IGNORE" comment
    */
-  def parseNotebook(notebookContent: String): String = {
-    val notebookJson = JsonMethods.parse(notebookContent)
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    val notebookCells = (notebookJson \ "cells")
-      .filter(_ \ "cell_type" == JString("code"))
-    val notebookCode = notebookCells
-      .map(_ \ "source")
-      .map {
-        case JString(code) => code
-        case JArray(codeList) => codeList.map{
-          case JString(code) => code
-        }.mkString(System.lineSeparator)
-      }
-      .filterNot(_.startsWith("//!IGNORE"))
-      .mkString(System.lineSeparator)
-    notebookCode
-  }
+   def parseNotebook(notebookContent: String): String = {
+     val notebookJson = JsonMethods.parse(notebookContent)
+     implicit val formats: Formats = Serialization.formats(NoTypeHints)
+     val notebookCells = (notebookJson \ "cells")
+       .filter(_ \ "cell_type" == JString("code"))
+     val notebookCode = notebookCells
+       .map(_ \ "source")
+       .map {
+         case JString(code) => code
+         case JArray(codeList) => codeList.map{
+           case JString(code) => code
+           // TODO: replace by meaningful exception
+           case _ => throw new Exception("unexpected case")
+         }.mkString(System.lineSeparator)
+         // TODO: replace by meaningful exception
+         case _ => throw new Exception("unexpected case")
+       }
+       .filterNot(_.startsWith("//!IGNORE"))
+       .mkString(System.lineSeparator)
+     notebookCode
+   }
 
   /**
    * Prepare function

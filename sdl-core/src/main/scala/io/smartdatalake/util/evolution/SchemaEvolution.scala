@@ -129,15 +129,15 @@ object SchemaEvolution extends SmartDataLakeLogger {
     logger.debug(s"new schema: ${newDf.schema.treeString()}")
 
     val oldColsWithoutTechCols = if (caseSensitiveComparison) {
-      oldDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
+      oldDf.columns.filter(c => !colsToIgnore.contains(c))
     } else {
-      oldDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase)).toSeq
+      oldDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase))
     }
 
     val newColsWithoutTechCols = if (caseSensitiveComparison) {
-      newDf.columns.filter(c => !colsToIgnore.contains(c)).toSeq
+      newDf.columns.filter(c => !colsToIgnore.contains(c))
     } else {
-      newDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase)).toSeq
+      newDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase))
     }
 
     // check if schema is identical
@@ -183,13 +183,16 @@ object SchemaEvolution extends SmartDataLakeLogger {
               else (thisColumn, Some(getNullColumnOfType(o).as(c)), Some(s"column $c is old and will be set to null for new records"))
               (oldToNewColumn, newColumn, info, None)
             // datatypes are *not* equal -> conversion of old to new datatype required
-            case (Some(o), Some(n)) if !hasSameColNamesAndTypes(Seq(functions.field(c, o, true)), Seq(functions.field(c, n, true)), caseSensitiveComparison) =>
+            case (Some(o), Some(n))
+              if !hasSameColNamesAndTypes(Seq(functions.field(c, o, nullable = true)), Seq(functions.field(c, n, nullable = true)), caseSensitiveComparison) =>
               val convertedColumns = convertDataType(col(if(caseSensitiveComparison) c else c.toLowerCase), o, n, ignoreOldDeletedNestedColumns)
               val info = if (convertedColumns.isDefined) Some(s"column $c is converted from ${o.typeName}/${n.typeName} to ${convertedColumns.get._3.typeName}") else None
               val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.typeName} to ${n.typeName}") else None
               (convertedColumns.map(_._1.as(c)), convertedColumns.map(_._2.as(c)), info, err)
             // datatypes are equal -> no conversion required
-            case (Some(o),Some(n)) => (thisColumn,thisColumn,None,None)
+            case (Some(_),Some(_)) => (thisColumn,thisColumn,None,None)
+            // TODO: replace by meaningful exception
+            case _ => throw new Exception("unexpected case")
           }
           ColumnDetail(c, oldToNewColumn, newColumn, infoMsg, errMsg)
       }

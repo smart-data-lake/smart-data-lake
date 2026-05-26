@@ -356,42 +356,54 @@ object GenericSchema {
   /**
    * Parsing schema export created by DataObjectSchemaExporter
    */
-  def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+   def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
+     implicit val formats: Formats = Serialization.formats(NoTypeHints)
+     val companion = DataFrameSubFeed.getCompanion(subFeedType)
 
-    def createDataType(json: JValue): GenericDataType = json match {
-      // simple type
-      case JString(str) => companion.createSimpleDataType(str)
-      // struct
-      case j: JObject if (j \ "dataType") == JString("struct") =>
-        val fields = j \ "fields" match {
-          case jFields: JArray => jFields.arr.map { case jsonField: JObject => parseField(jsonField) }
-        }
-        companion.createStructDataType(fields)
-      // array
-      case j: JObject if (j \ "dataType") == JString("array") =>
-        val valueType = createDataType(j \ "elementType")
-        companion.createArrayDataType(valueType)
-      // map
-      case j: JObject if (j \ "dataType") == JString("map") =>
-        val keyType = createDataType(j \ "keyType")
-        val valueType = createDataType(j \ "valueType")
-        companion.createMapDataType(keyType, valueType)
-    }
+      def createDataType(json: JValue): GenericDataType = json match {
+        // simple type
+        case JString(str) => companion.createSimpleDataType(str)
+        // struct
+        case j: JObject if (j \ "dataType") == JString("struct") =>
+          val fields = j \ "fields" match {
+            case jFields: JArray => jFields.arr.map {
+              case jsonField: JObject => parseField(jsonField)
+              // TODO: replace by meaningful exception
+              case _ => throw new Exception("unexpected case")
+            }
+            // TODO: replace by meaningful exception
+            case _ => throw new Exception("unexpected case")
+          }
+          companion.createStructDataType(fields)
+        // array
+        case j: JObject if (j \ "dataType") == JString("array") =>
+          val valueType = createDataType(j \ "elementType")
+          companion.createArrayDataType(valueType)
+        // map
+        case j: JObject if (j \ "dataType") == JString("map") =>
+          val keyType = createDataType(j \ "keyType")
+          val valueType = createDataType(j \ "valueType")
+          companion.createMapDataType(keyType, valueType)
+       // TODO: replace by meaningful exception
+       case _ => throw new Exception("unexpected case")
+     }
 
-    def parseField(json: JObject): GenericField = {
-      companion.createField(
-        (json \ "name").extract[String],
-        createDataType(json \ "dataType"),
-        (json \ "nullable").extract[Boolean],
-        (json \ "comment").toOption.map(_.extract[String])
-      )
-    }
+     def parseField(json: JObject): GenericField = {
+       companion.createField(
+         (json \ "name").extract[String],
+         createDataType(json \ "dataType"),
+         (json \ "nullable").extract[Boolean],
+         (json \ "comment").toOption.map(_.extract[String])
+       )
+     }
 
-    val fields = json.arr.map { case jsonField: JObject => parseField(jsonField) }
-    companion.createSchema(fields)
-  }
+      val fields = json.arr.map {
+        case jsonField: JObject => parseField(jsonField)
+        // TODO: replace by meaningful exception
+        case _ => throw new Exception("unexpected case")
+      }
+      companion.createSchema(fields)
+   }
 }
 
 /**

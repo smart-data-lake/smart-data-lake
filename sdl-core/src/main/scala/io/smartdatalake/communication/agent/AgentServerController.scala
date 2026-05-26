@@ -80,6 +80,8 @@ case class AgentServerController(
               logger.error("Run failed, sending error message to AgentClient.")
               Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = Map(), errorMsg = Some(e.getMessage)))))
           }
+        // TODO: replace by meaningful exception
+        case _ => throw new Exception("unexpected case")
       }
       case _ =>
         logger.warn(s"Cannot process message of type ${message.msgType}")
