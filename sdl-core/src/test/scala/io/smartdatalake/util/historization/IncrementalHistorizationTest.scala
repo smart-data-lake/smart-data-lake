@@ -49,7 +49,6 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
   implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   import functions._
 
-  // incrementalHistorize closes existing record and creates new record if schema changes (but only for current records).
   test("History changed with new columns but unchanged data") {
     val dataOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
     val dfOldHist = toHistorizedDf(dataOldHist, HistorizationPhase.Existing, withHashCol = true)
@@ -63,11 +62,10 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
+    // change for Egon, but no change for Erna, because the new column is null.
     val dataExpected = Seq(
       (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
       (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs),
-      (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
-      (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs)
     )
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 

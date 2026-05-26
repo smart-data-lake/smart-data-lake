@@ -120,6 +120,6 @@ object HistorizationTestUtils {
   def toDataDf[T <: Product: ClassTag: TypeTag](records: Seq[T], colNames: Seq[String] = this.colNames)(implicit
       functions: DataFrameSubFeedCompanion,
       actionPipelineContext: ActionPipelineContext
-  ): GenericDataFrame = functions.createDataFrame(records)
+  ): GenericDataFrame = functions.createDataFrame(records, colNames)
 
 }

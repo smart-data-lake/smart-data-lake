@@ -75,9 +75,6 @@ object Historization {
    *     allowing to use only primary key and hashColumn for joining new data with existing data and
    *     detecting changes
    *
-   * Note that the use of hashColumn to detect changed records will create new version for every
-   * record on schema evolution. This behaviour is different from legacy full historize.
-   *
    * @param referenceTimestamp
    *   The valid from timestamp for new records
    * @param timeAxisUnit
