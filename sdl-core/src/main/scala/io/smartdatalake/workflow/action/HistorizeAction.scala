@@ -52,11 +52,15 @@ import scala.reflect.runtime.universe.Type
  * HistorizeAction needs a transactional table (e.g. implementation of
  * [[TransactionalTableDataObject]]) as output with defined primary keys.
  *
- * Incremental historization is used always, which does not rewrite all data in output table. It
- * still needs to join new data with all existing data, but uses hash values to minimize data
+ * Since SDLB version 3.0 incremental historization is used per default, and full historization is removed.
+ * Incremental historization does not rewrite all data in output table.
+ * It still needs to join new data with all existing data, but uses hash values to minimize data
  * transfer. If you have change-data-capture (CDC) information available to identify deleted
  * records, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join
  * between new and existing data. This is optimal from a performance perspective.
+ *
+ * If you still have a legacy full historization table, migration to incremental historization should happen
+ * automatically. The missing hash column is detected and added to existing data.
  *
  * @param inputId
  *   inputs DataObject

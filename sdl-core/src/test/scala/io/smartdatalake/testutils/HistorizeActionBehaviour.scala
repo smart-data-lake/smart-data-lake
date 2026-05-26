@@ -20,6 +20,7 @@ package io.smartdatalake.testutils
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -239,7 +240,7 @@ trait HistorizeActionBehaviour {
       }
     }
 
-    test("activate merge mode on existing dataframe no null dl_hash") {
+    test("activate merge mode on legacy full historized dataframe, no null dl_hash") {
 
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
       tgtConnection.foreach(instanceRegistry.register)
@@ -257,32 +258,26 @@ trait HistorizeActionBehaviour {
 
       // prepare & start 1st load without merge mode
       val refTimestamp1 = LocalDateTime.now()
-      val action1 = HistorizeAction("ha1", inputId = srcDO.id, outputId = tgtDO.id)
-      val context1 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+      val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
 
-      val l1 = Seq((1, "doe", "john", 5)).toDF("id", "lastname", "firstname", "rating")
-      srcDO.writeDataFrame(l1)(context1)
-      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-      action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
-      action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
-      action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
-      action1.exec(Seq(srcSubFeed))(context1)
+      // create a legacy historized dataframe without dl_hash column, and write to target
+      val l1 = Seq((1, "doe", "john", 5, Timestamp.valueOf(refTimestamp1), Environment.historizationUpperHorizonTimestamp))
+        .toDF("id", "lastname", "firstname", "rating", Environment.capturedColumnName, Environment.delimitedColumnName)
+      tgtDO.writeDataFrame(l1)(context1)
 
       // 1. expectation schema should not have dl_hash column
       assert(!tgtDO.getDataFrame().columns.contains("dl_hash"))
 
-      // prepare & start 2nd load with merge mode
+      // prepare & start load with merge mode and migrate existing data to merge mode
       val refTimestamp2 = LocalDateTime.now()
       val action2 = HistorizeAction("ha2", inputId = srcDO.id, outputId = tgtDO.id)
-      val context2 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+      val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
 
       val l2 = Seq((1, "doe", "john", 4)).toDF("id", "lastname", "firstname", "rating")
       srcDO.writeDataFrame(l2)(context2)
       val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
       action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
-      action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
+      action2.preInit(Seq(srcSubFeed2), Seq())(context2.copy(phase = ExecutionPhase.Init))
       action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
       action2.exec(Seq(srcSubFeed2))(context2)
 
