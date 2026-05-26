@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql.DataFrame
 import org.json4s._
-import org.json4s.jackson.{JsonMethods, Serialization}
+import org.json4s.jackson.JsonMethods
 
 import scala.util.{Failure, Success}
 
@@ -47,8 +47,8 @@ import scala.util.{Failure, Success}
  * @param functionName   The notebook needs to contain a Scala-function with this name and type [[fnTransformType]].
  * @param authMode       optional authentication information for webservice, e.g. BasicAuthMode for user/pw authentication
  * @param options        Options to pass to the transformation
- * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param runtimeOptions optional tuples of [key, spark SQL expression] to be added as additional options when executing transformation.
+ *                       The spark SQL expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   import ScalaNotebookSparkDfTransformer._
@@ -98,33 +98,35 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
    * Parse *.ipynb Notebook content
    * Get code from all cells with cell_type=code and language=scala, ignoring cells which start with "//!IGNORE" comment
    */
-   def parseNotebook(notebookContent: String): String = {
-     val notebookJson = JsonMethods.parse(notebookContent)
-     implicit val formats: Formats = Serialization.formats(NoTypeHints)
-     val notebookCells = (notebookJson \ "cells")
-       .filter(_ \ "cell_type" == JString("code"))
-     val notebookCode = notebookCells
-       .map(_ \ "source")
-       .map {
-         case JString(code) => code
-         case JArray(codeList) => codeList.map{
-           case JString(code) => code
-           // TODO: replace by meaningful exception
-           case _ => throw new Exception("unexpected case")
-         }.mkString(System.lineSeparator)
-         // TODO: replace by meaningful exception
-         case _ => throw new Exception("unexpected case")
-       }
-       .filterNot(_.startsWith("//!IGNORE"))
-       .mkString(System.lineSeparator)
-     notebookCode
-   }
+    def parseNotebook(notebookContent: String): String = {
+      val notebookJson = JsonMethods.parse(notebookContent)
+      val notebookCells = (notebookJson \ "cells")
+        .filter(_ \ "cell_type" == JString("code"))
+      val notebookCode = notebookCells
+        .map(_ \ "source")
+        .map {
+          case JString(code) => code
+          case JArray(codeList) => codeList.map{
+            case JString(code) => code
+            case _ =>
+              throw new IllegalArgumentException("Unexpected type in notebook source code array," +
+                " expected JString for each code line")
+          }.mkString(System.lineSeparator)
+          case _ =>
+            throw new IllegalArgumentException("Unexpected type for notebook cell 'source' field," +
+              " expected JString or JArray of code lines")
+        }
+        .filterNot(_.startsWith("//!IGNORE"))
+        .mkString(System.lineSeparator)
+      notebookCode
+    }
 
   /**
    * Prepare function
    */
   def prepareFunction(notebookCode: String, functionName: String): String = {
-    require(notebookCode.contains(functionName), s"Notebook code doesnt contain a function with name $functionName")
+    require(notebookCode.contains(functionName),
+      s"Notebook code doesn't contain a function with name $functionName")
     val defaultImports = """
         |import org.apache.spark.sql.{DataFrame, SparkSession}
         |""".stripMargin

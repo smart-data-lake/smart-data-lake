@@ -37,7 +37,7 @@ import scala.collection.mutable
 /**
  * Utils to handle OpenApi webservices.
  *
- * For now it can query the specification and extract the schema of an operation.
+ * For now, it can query the specification and extract the schema of an operation.
  */
 object OpenApiUtil extends SmartDataLakeLogger {
   private val definitionsPath = "components"
@@ -49,7 +49,7 @@ object OpenApiUtil extends SmartDataLakeLogger {
   /**
    * Query OpenApi specification and extract the schema of an operation.
    *
-   * For now this supports OpenApi V3, most parts of json schema and reusable schema components.
+   * For now this supports OpenApi V3, most parts of JSON schema and reusable schema components.
    *
    * @param specUrl Url of OpenApi specification
    * @param operationId         Id of operation to extract schema for
@@ -84,15 +84,16 @@ object OpenApiUtil extends SmartDataLakeLogger {
     OpenApiSpec(operations, server)
   }
 
-   private[smartdatalake] def extractFirstServerFromJson(spec: JValue): Option[String] = {
-     spec \ "servers" match {
-       case servers: JArray =>
-         servers.arr.collectFirst { case x: JString => x.s }
-       case JNothing => None
-       // TODO: replace by meaningful exception
-       case _ => throw new Exception("unexpected case")
-     }
-   }
+    private[smartdatalake] def extractFirstServerFromJson(spec: JValue): Option[String] = {
+      spec \ "servers" match {
+        case servers: JArray =>
+          servers.arr.collectFirst { case x: JString => x.s }
+        case JNothing => None
+        case _ =>
+          throw new IllegalStateException("Unexpected type for 'servers' field in OpenAPI spec," +
+            " expected JArray or JNothing")
+      }
+    }
 
    private[smartdatalake] def extractOperationsFromJson(spec: JValue): Seq[OpenApiOperation] = {
      spec \ "paths" match {
@@ -122,8 +123,10 @@ object OpenApiUtil extends SmartDataLakeLogger {
                                  // sparkSchema is parsed lazy to avoid errors on irrelevant operations
                                  val sparkSchema = () => JsonSchemaConverter.convertParsedSchemaToSparkDataType(jsonSchema, definitionsPath = definitionsPath)
                                  Some((contentType, sparkSchema))
-                               // TODO: replace by meaningful exception
-                               case _ => Some((contentType, () => throw new Exception("unexpected case")))
+                               case _ => Some((contentType,
+                                 () => throw new IllegalStateException(s"Unexpected type for content specification in" +
+                                   s" OpenAPI response for operation $path:$operation, expected JObject")
+                               ))
                              }
                            }
                            val operationId = opSpecJObj \ "operationId" match {
@@ -135,8 +138,8 @@ object OpenApiUtil extends SmartDataLakeLogger {
                          case JNothing =>
                            logger.debug(s"Element responses\\200\\content not found in OpenApi Spec operation $path:$operation")
                            None
-                         // TODO: replace by meaningful exception
-                         case _ => throw new Exception("unexpected case")
+                         case _ => throw new IllegalStateException(s"Unexpected type for 'content' field in" +
+                           s" OpenAPI response for operation $path:$operation, expected JObject")
                        }
                      } else {
                        logger.debug(s"Element responses\\200 not found in OpenApi Spec operation $path:$operation")
@@ -149,13 +152,12 @@ object OpenApiUtil extends SmartDataLakeLogger {
              // TODO: replace by meaningful exception
              case _ => List()
            }
-         }
-       // TODO: replace by meaningful exception
-       case _ => throw new Exception("unexpected case")
-     }
-   }
+          }
+        case _ => throw new IllegalStateException("Unexpected type for 'paths' field in OpenAPI spec, expected JObject")
+      }
+    }
 
-  def simplifyContentType(contentType: String): String = {
+   def simplifyContentType(contentType: String): String = {
     contentType.takeWhile(_ != ';')
   }
 }

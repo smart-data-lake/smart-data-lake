@@ -62,12 +62,13 @@ class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
    override val versionFrom = 3
    override val versionTo = 4
    override def migrate(json: JObject): JObject = {
-     assert(json \ "runStateFormatVersion" match {
-       case JInt(version) => version <= versionFrom
-       case JNothing => true // first state files did not have an attribute runStateFormatVersion
-       // TODO: replace by meaningful exception
-       case _ => throw new Exception("unexpected case")
-     }, s"Version should be equals or less than $versionFrom")
+      assert(json \ "runStateFormatVersion" match {
+        case JInt(version) => version <= versionFrom
+        case JNothing => true // first state files did not have an attribute runStateFormatVersion
+        case _ =>
+          throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+            s" but found unexpected type during migration from version $versionFrom to $versionTo")
+      }, s"Version should be equals or less than $versionFrom")
 
     // migrate json
     val migratedJson = json.transformField {
@@ -116,12 +117,13 @@ class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
    override val versionFrom = 4
    override val versionTo = 5
    override def migrate(json: JObject): JObject = {
-     assert(json \ "runStateFormatVersion" match {
-       case JInt(version) => version <= versionFrom
-       case JNothing => true // first state files did not have an attribute runStateFormatVersion
-       // TODO: replace by meaningful exception
-       case _ => throw new Exception("unexpected case")
-     }, s"Version should be equals or less than $versionFrom")
+      assert(json \ "runStateFormatVersion" match {
+        case JInt(version) => version <= versionFrom
+        case JNothing => true // first state files did not have an attribute runStateFormatVersion
+        case _ =>
+          throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+            s" but found unexpected type during migration from version $versionFrom to $versionTo")
+      }, s"Version should be equals or less than $versionFrom")
 
     // migrate json
     val migratedJson = json.transformField {

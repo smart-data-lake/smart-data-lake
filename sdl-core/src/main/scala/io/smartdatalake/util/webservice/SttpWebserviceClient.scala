@@ -41,19 +41,20 @@ private[smartdatalake] case class SttpWebserviceClient(uri: Uri,
 
   override def patch(body: Array[Byte], mimeType: String, params: Map[String, String]): Try[Array[Byte]] = send(Method.PATCH, body, mimeType, params)
 
-   private def send(method: Method, body: Array[Byte] = Array(), mimeType: String = "", params: Map[String, String] = Map()): Try[Array[Byte]] = {
-     val contextForErrorMsg = context.getOrElse(f"$method method when requesting at $uri")
-     val uriWithParams = uri.addParams(params)
-     val req = method match {
-       case Method.GET => request.get(uriWithParams)
-       case Method.PUT => request.put(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
-       case Method.POST => request.post(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
-       case Method.PATCH => request.patch(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
-       // TODO: replace by meaningful exception
-       case _ => throw new Exception("unexpected case")
-     }
-     Try(SttpUtil.sendRequest(req, contextForErrorMsg, retries))
-   }
+    private def send(method: Method, body: Array[Byte] = Array(), mimeType: String = "", params: Map[String, String] = Map()): Try[Array[Byte]] = {
+      val contextForErrorMsg = context.getOrElse(f"$method method when requesting at $uri")
+      val uriWithParams = uri.addParams(params)
+      val req = method match {
+        case Method.GET => request.get(uriWithParams)
+        case Method.PUT => request.put(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
+        case Method.POST => request.post(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
+        case Method.PATCH => request.patch(uriWithParams).header(HeaderNames.ContentType, mimeType).body(body)
+        case unsupported =>
+          throw new IllegalArgumentException(s"Unsupported HTTP method:" +
+            s" $unsupported. Only GET, POST, PUT, and PATCH are supported")
+      }
+      Try(SttpUtil.sendRequest(req, contextForErrorMsg, retries))
+    }
 }
 
 private[smartdatalake] object SttpWebserviceClient extends SmartDataLakeLogger {
