@@ -268,7 +268,8 @@ trait Transform extends Serializable {
           case n if isPrecisionSmallerThan(19)(n) => LongType
           case _                                  => oldType(colName)
         }
-        Seq(col(colName).cast(newType))
+        if (strict) Seq(col(colName).cast(newType))
+        else Seq(col(colName).try_cast(newType))
       }
       transformCols(transformFun = trfFun, colFilter = cFilter)
     }
@@ -305,7 +306,7 @@ trait Transform extends Serializable {
     }
 
     def decomposeArrayColumn[S](arrayCol: Column, indexMap: Map[S, String]): DataFrame = ds
-      .withColumns(indexMap.map { case (i, s) => (s, arrayCol(i)) })
+      .withColumns(indexMap.map { case (i, s) => (s, get(arrayCol,lit(i))) })
 
     /**
      * Enumerates groups in a dataframe. Groups are final defined based on `keyCols` and `condition`
@@ -554,7 +555,7 @@ trait Transform extends Serializable {
      * @return
      *   df 1+numRows Zeilen und Anzahl Zeilen, die der Spaltenanzahl entspricht
      */
-    def transpose(numRows: Byte = 2)(implicit ss: SparkSession): DataFrame = if (ds.isEmpty) {
+    def transposeCustom(numRows: Byte = 2)(implicit ss: SparkSession): DataFrame = if (ds.isEmpty) {
       ss.createDataFrame(ds.columns.map(Row(_)).toList.asJava, StructType(List(StructField("_column", StringType, nullable = false))))
     } else {
       val rows: Array[Row] = ds.asInstanceOf[DataFrame].take(numRows)

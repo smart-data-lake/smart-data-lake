@@ -134,7 +134,7 @@ class TransformTest extends AnyFlatSpec with Matchers
     val actual = dfIntDecimal.castDecimalsToIntegralType(strict = false)
     val rowsExpected = ArrayBuffer(
       Row(-1, -99.toByte, -9999.toShort, -999999999, -999999999999999999L, Long.MinValue, BigDecimal(-1.1)),
-      Row(0, 12.toByte, 1234.toShort, 123456789, 123456789012345678L, Long.MinValue, BigDecimal(0.123)),
+      Row(0, 12.toByte, 1234.toShort, 123456789, 123456789012345678L, None, BigDecimal(0.123)),
       Row(1, 99.toByte, 9999.toShort, 999999999, 999999999999999999L, Long.MaxValue, BigDecimal(1.2345))
     ).asJava
     val schema_expected = createStruct(Array[(String, DataType)](("id", IntegerType),
@@ -648,7 +648,7 @@ class TransformTest extends AnyFlatSpec with Matchers
   }
 
   "transpose" should "transpose empty DataFrame" in {
-    val actual = dfSnapshotsWithGaps.where(lit(false)).transpose(lit(11))
+    val actual = dfSnapshotsWithGaps.where(lit(false)).transposeCustom(11)
     val expectedSchema: StructType = createStruct(Array[(String, DataType, Boolean)](("_column", StringType, false)))
     val rowsExpected: java.util.List[Row] = ArrayBuffer(
       Row("id"), Row("dt"), Row("x"), Row("y")).asJava
@@ -657,7 +657,7 @@ class TransformTest extends AnyFlatSpec with Matchers
   }
 
   "transpose" should "transpose the first 11 rows of a DataFrame" in {
-    val actual = dfSnapshotsWithGaps.transpose(lit(11))
+    val actual = dfSnapshotsWithGaps.transposeCustom(11)
     val expectedSchema: StructType = createStruct(Array[(String, DataType, Boolean)](
       ("_column", StringType, false),
       ("_000", DoubleType, true),

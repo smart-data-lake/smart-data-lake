@@ -175,7 +175,7 @@ object Collection extends StructTypeUtil {
       BigDecimal(1234),
       BigDecimal(123456789),
       BigDecimal(123456789012345678L),
-      BigDecimal(Long.MaxValue) + java.math.BigDecimal.ONE,
+      BigDecimal(Long.MaxValue) + java.math.BigDecimal.ONE, // too big for long!
       BigDecimal(0.123)
     ),
     Row(1, BigDecimal(99), BigDecimal(9999), BigDecimal(999999999), BigDecimal(999999999999999999L), BigDecimal(Long.MaxValue), BigDecimal(1.2345))
@@ -364,7 +364,7 @@ object Collection extends StructTypeUtil {
 
   val rowsManyTypes: List[(Boolean, Int, Int, Int, Int, String, String, String, String, String, String, Double, Double, String, String, String)] = List(
     (false, 0, 0, 0, 0, "0", "0", "0", "0", "0.0", "0.0", 0.0, 0.0, "1970-01-01", "1970-01-01 02:34:56.789", "zero"),
-    (true, 127, 32767, Int.MaxValue, Int.MaxValue, "99", "9999", "9999999999", "99999999999", "1.234", "1234567890123456789012345678901234567.8",
+    (true, 127, 32767, Int.MaxValue, Int.MaxValue, "99", "9999", "1999999999", "99999999999", "1.234", "1234567890123456789012345678901234567.8",
       Float.MaxValue, Double.MaxValue, "2020-02-29", "2020-02-29 12:34:56.789", "maximal")
   )
 
