@@ -150,7 +150,8 @@ object OpenApiUtil extends SmartDataLakeLogger {
                  }
                }
              // TODO: replace by meaningful exception
-             case _ => List()
+             case t => throw new IllegalStateException(s"Unexpected type $t for pathSpec in" +
+                           s" OpenAPI response for operation $path:$operation, expected JObject")
            }
           }
         case _ => throw new IllegalStateException("Unexpected type for 'paths' field in OpenAPI spec, expected JObject")
