@@ -398,8 +398,8 @@ object GenericSchema {
 
        val fields = json.arr.map {
          case jsonField: JObject => parseField(jsonField)
-         case _ =>
-           throw new IllegalArgumentException("Unexpected type in schema fields array, expected JObject for each field")
+         case t =>
+           throw new IllegalArgumentException(s"Unexpected type $t in schema fields array, expected JObject for each field")
        }
        companion.createSchema(fields)
     }
