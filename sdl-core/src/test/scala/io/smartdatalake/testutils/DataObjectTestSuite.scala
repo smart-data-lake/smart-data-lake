@@ -41,6 +41,7 @@ trait DataObjectTestSuite extends AnyFunSuite with Matchers with BeforeAndAfter 
 
   // initialize empty instance registry
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  instanceRegistry.register(TestUtil.defaultSparkConnection)
 
   // prepare contexts to reuse
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext

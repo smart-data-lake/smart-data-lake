@@ -24,12 +24,13 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.WoodstoxXMLOutputFactory
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions.explode
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.xml.XsdSchemaConverter
-import org.apache.spark.sql.{functions, DataFrame}
+import org.apache.spark.sql.{DataFrame, functions}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
@@ -41,6 +42,8 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   import session.implicits._
+  // Needed in Spark 4.1, see WoodstoxXMLOutputFactory for details
+  System.setProperty("javax.xml.stream.XMLOutputFactory", classOf[WoodstoxXMLOutputFactory].getName)
 
   testsFor(readNonExistingSources(createDataObject, ".xml"))
   testsFor(readEmptySources(createDataObject, ".xml"))
@@ -57,7 +60,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     // Partitions have to be written manually as spark-xml doesn't support writing partitions
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)),
-      filenameColumn = Some("_filename"))
+      filenameColumn = Some("_filename"), xmlOptions = Some(Map("rowTag" -> "entry")))
     dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1" === "A")), new Path(dataObj.hadoopPath, "h1=A"), SDLSaveMode.Overwrite)
     dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1" === "B")), new Path(dataObj.hadoopPath, "h1=B"), SDLSaveMode.Overwrite)
 
@@ -117,7 +120,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
-      xmlOptions = Some(Map("rowTag" -> "node"))
+      xmlOptions = Some(Map("rowTag" -> "node", "dateFormat" -> "yyyy-MM-dd[XXX]"))
     )
 
     // read
@@ -125,20 +128,21 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // see also https://issues.apache.org/jira/browse/SPARK-38285
     session.conf.set(key = "spark.sql.optimizer.expression.nestedPruning.enabled", value = false)
     session.conf.set(key = "spark.sql.optimizer.nestedSchemaPruning.enabled", value = false)
+    val dfResult = dataObj.getSparkDataFrame()(contextExec).cache
     // test L0: should include 1 updated L0 and 1 deleted record
-    val dfResultL0 = dataObj.getSparkDataFrame()(contextExec).cache()
+    val dfResultL0 = dfResult
       .withColumn("cntDesc", functions.size($"descriptions.description"))
       .withColumn("cntChildren", functions.size($"nodes.node"))
-    val resultL0 = dfResultL0.select($"name", $"cntDesc", $"cntChildren").as[(String, Int, Int)].collect().toSeq
-    assert(resultL0 == Seq(("Test Update L0", 2, 1), ("Test Delete", -1, -1)))
+    val resultL0 = dfResultL0.select($"name", $"cntDesc", $"cntChildren").as[(String, Option[Int], Option[Int])].collect().toSeq
+    assert(resultL0 == Seq(("Test Update L0", Some(2), Some(1)), ("Test Delete", None, None)))
     // test L1: should include 1 updated L1 record
     val dfResultL1 = dfResultL0
       .withColumn("nodes", explode($"nodes.node"))
       .select($"nodes.*")
       .withColumn("cntDesc", functions.size($"descriptions.description"))
       .withColumn("cntChildren", functions.size($"nodes.node"))
-    val resultL1 = dfResultL1.select($"name", $"cntDesc", $"cntChildren").as[(String, Int, Int)].collect().toSeq
-    assert(resultL1 == Seq(("Test Update L1", 2, -1)))
+    val resultL1 = dfResultL1.select($"name", $"cntDesc", $"cntChildren").as[(String, Option[Int], Option[Int])].collect().toSeq
+    assert(resultL1 == Seq(("Test Update L1", Some(2), None)))
   }
 
   test("XML with nested lists") {
@@ -175,7 +179,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
          |    id = test
          |    path = "temp/test"
          |    schema = "xsdfile#temp/test/test.xsd;TestReport"
-         |    rowTag = TestReport
+         |    xmlOptions = { rowTag = TestReport }
          |    filenameColumn = _filename
          | }
          """.stripMargin
@@ -193,18 +197,18 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   }
 
   private def createDataObject(path: String, schemaOpt: Option[StructType]): XmlFileDataObject = {
-    val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema.apply))
+    val dataObj = XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema.apply), xmlOptions = Some(Map("rowTag" -> "entry")))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   private def createDataObjectWithSchemaMin(path: String, schemaOpt: Option[StructType], schemaMinOpt: Option[StructType]): XmlFileDataObject = {
     val dataObj =
-      XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply))
+      XmlFileDataObject(id = "schemaTestXmlDO", path = path, schema = schemaOpt.map(SparkSchema.apply), schemaMin = schemaMinOpt.map(SparkSchema.apply), xmlOptions = Some(Map("rowTag" -> "entry")))
     instanceRegistry.register(dataObj)
     dataObj
   }
 
   override def createFile(path: String, data: DataFrame): Unit =
-    data.write.format("com.databricks.spark.xml").save(path)
+    data.write.format("com.databricks.spark.xml").option("rowTag", "entry").save(path)
 }
