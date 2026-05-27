@@ -383,8 +383,8 @@ object GenericSchema {
            val keyType = createDataType(j \ "keyType")
            val valueType = createDataType(j \ "valueType")
            companion.createMapDataType(keyType, valueType)
-        case _ =>
-          throw new IllegalArgumentException(s"Unexpected data type format in schema definition: ${json.toString}")
+        case t =>
+          throw new IllegalArgumentException(s"Unexpected data type format $t in schema definition: ${json.toString}")
       }
 
      def parseField(json: JObject): GenericField = {
