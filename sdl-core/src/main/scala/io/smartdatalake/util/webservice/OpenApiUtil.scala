@@ -89,9 +89,8 @@ object OpenApiUtil extends SmartDataLakeLogger {
         case servers: JArray =>
           servers.arr.collectFirst { case x: JString => x.s }
         case JNothing => None
-        case _ =>
-          throw new IllegalStateException("Unexpected type for 'servers' field in OpenAPI spec," +
-            " expected JArray or JNothing")
+        case t =>
+          throw new IllegalStateException(s"Unexpected type $t for 'servers' field in OpenAPI spec, expected JArray or JNothing")
       }
     }
 
