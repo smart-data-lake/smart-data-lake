@@ -24,8 +24,6 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
 import java.sql.Timestamp
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
 
 trait Transform extends Serializable {
 
@@ -306,7 +304,7 @@ trait Transform extends Serializable {
     }
 
     def decomposeArrayColumn[S](arrayCol: Column, indexMap: Map[S, String]): DataFrame = ds
-      .withColumns(indexMap.map { case (i, s) => (s, get(arrayCol,lit(i))) })
+      .withColumns(indexMap.map { case (i, s) => (s, get(arrayCol, lit(i))) })
 
     /**
      * Enumerates groups in a dataframe. Groups are final defined based on `keyCols` and `condition`
@@ -344,7 +342,9 @@ trait Transform extends Serializable {
       ds.withColumn(attr + "_prev", lag(attr, 1).over(Window.partitionBy(keyCols.toIndexedSeq: _*).orderBy(orderCols.toIndexedSeq: _*)))
         .withColumn("consecutive", col(attr + "_prev").isNotNull and condition)
         .withColumn(groupNbName,
-          sum(when($"consecutive", lit(0)).otherwise(lit(1))).over(Window.partitionBy(keyCols.toIndexedSeq: _*).orderBy(orderCols.toIndexedSeq: _*)))
+          sum(when($"consecutive", lit(0)).otherwise(lit(1))).over(
+            Window.partitionBy(keyCols.toIndexedSeq: _*).orderBy(orderCols.toIndexedSeq: _*)
+          ))
         .drop(attr + "_prev", "consecutive")
     }
 
@@ -544,28 +544,6 @@ trait Transform extends Serializable {
       else colNamesToPivot.foldLeft(ds.asInstanceOf[DataFrame])((dtf, cn) => dtf.castColumnTo(StringType)(cn))
       dfCasted.unpivot(ids = keys, values = colNamesToPivot.map(col),
         variableColumnName = namesColName, valueColumnName = valuesColname)
-    }
-
-    /**
-     * transponiert die ersten numRows Zeilen des Dataframes
-     *
-     * @param numRows
-     *   : Anzahl Zeilen, die transponiert werden sollen. Datentyp Byte damit nicht zu viele
-     *   angegeben werden.
-     * @return
-     *   df 1+numRows Zeilen und Anzahl Zeilen, die der Spaltenanzahl entspricht
-     */
-    def transposeCustom(numRows: Byte = 2)(implicit ss: SparkSession): DataFrame = if (ds.isEmpty) {
-      ss.createDataFrame(ds.columns.map(Row(_)).toList.asJava, StructType(List(StructField("_column", StringType, nullable = false))))
-    } else {
-      val rows: Array[Row] = ds.asInstanceOf[DataFrame].take(numRows)
-
-      def transposeRow(rows: Array[Row])(r: Row): DataFrame = ss
-        .createDataFrame(ArrayBuffer(r).asJava, ds.schema)
-        .unpivotCast(Array(), "_column", f"_${rows.indexOf(r)}%03d", ds.columns)
-
-      rows.map(transposeRow(rows))
-        .reduce((df1, df2) => df1.join(df2, Seq("_column")))
     }
 
     /**

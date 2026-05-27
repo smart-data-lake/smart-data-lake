@@ -94,7 +94,7 @@ object Collection extends StructTypeUtil {
     (1, Some(3.0), Some(4.0), -2.72, Timestamp.valueOf("2020-01-01 00:00:00"), doomsTime),
     (1, None,      Some(5.0), 100.1, Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-03-31 23:59:59.999")),
     (1, Some(4.0), Some(5.0), 9.87,  Timestamp.valueOf("2020-04-01 00:00:00"), doomsTime)
-  ).toDF("id", "x", "y", "wert", "valid_from", "valid_to")
+  ).toDF("id", "x", "y", "val", "valid_from", "valid_to")
   val dfSnapshotsWithGaps: DataFrame = List(
     (0, 20190101, Some(3.14),  None),
     (0, 20190102, Some(3.14),  Some(-2.37)),
@@ -210,7 +210,7 @@ object Collection extends StructTypeUtil {
     (1, -2.0,  "2019-03-03 01:00:0",            "2021-12-01 02:34:56.1")
   )
   val dfTimeRanges: DataFrame = rowsTimeRanges.map(makeRowsWithTimeRanges[Int, Double])
-    .toDF("id", "Wert", "valid_from", "valid_to")
+    .toDF("id", "val", "valid_from", "valid_to")
 
   /**
    * * DataFrames with Map **

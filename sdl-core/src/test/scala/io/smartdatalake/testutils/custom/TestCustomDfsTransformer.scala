@@ -25,7 +25,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 class TestCustomDfsTransformer extends CustomDfsTransformer {
 
-  def transform(session: SparkSession, srcData: DataFrame): DataFrame = {
+  def transform(session: SparkSession, srcData: DataFrame): DataFrame =
     srcData.withColumn("_rnk", row_number().over(Window.partitionBy(col("text")).orderBy(col("id"))))
-  }
 }
