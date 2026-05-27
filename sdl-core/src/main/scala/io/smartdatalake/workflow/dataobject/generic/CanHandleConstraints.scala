@@ -55,8 +55,8 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
           if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!")
           dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
           createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
-        case _ =>
-          throw new IllegalStateException(s"$id: Unexpected state in primary key constraint handling." +
+        case t =>
+          throw new IllegalStateException(s"$id: Unexpected state $t in primary key constraint handling." +
             s" Both defined and existing primary keys are present but identical," +
             s" or neither defined keys nor existing keys are present but not handled by other cases.")
       }
