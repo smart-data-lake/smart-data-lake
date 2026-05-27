@@ -111,8 +111,8 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
             case t => throw new IllegalArgumentException(s"Unexpected type $t in notebook source code array," +
                 " expected JString for each code line")
           }.mkString(System.lineSeparator)
-          case _ =>
-            throw new IllegalArgumentException("Unexpected type for notebook cell 'source' field," +
+          case t =>
+            throw new IllegalArgumentException(s"Unexpected type $t for notebook cell 'source' field," +
               " expected JString or JArray of code lines")
         }
         .filterNot(_.startsWith("//!IGNORE"))
