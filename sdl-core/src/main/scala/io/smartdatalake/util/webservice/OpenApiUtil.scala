@@ -137,7 +137,7 @@ object OpenApiUtil extends SmartDataLakeLogger {
                          case JNothing =>
                            logger.debug(s"Element responses\\200\\content not found in OpenApi Spec operation $path:$operation")
                            None
-                         case _ => throw new IllegalStateException(s"Unexpected type for 'content' field in" +
+                         case t => throw new IllegalStateException(s"Unexpected type $t for 'content' field in" +
                            s" OpenAPI response for operation $path:$operation, expected JObject")
                        }
                      } else {
