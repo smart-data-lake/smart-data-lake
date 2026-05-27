@@ -108,8 +108,7 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
           case JString(code) => code
           case JArray(codeList) => codeList.map{
             case JString(code) => code
-            case _ =>
-              throw new IllegalArgumentException("Unexpected type in notebook source code array," +
+            case t => throw new IllegalArgumentException(s"Unexpected type $t in notebook source code array," +
                 " expected JString for each code line")
           }.mkString(System.lineSeparator)
           case _ =>
