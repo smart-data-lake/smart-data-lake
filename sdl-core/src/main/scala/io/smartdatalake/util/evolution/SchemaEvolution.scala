@@ -191,8 +191,7 @@ object SchemaEvolution extends SmartDataLakeLogger {
               (convertedColumns.map(_._1.as(c)), convertedColumns.map(_._2.as(c)), info, err)
             // datatypes are equal -> no conversion required
             case (Some(_),Some(_)) => (thisColumn,thisColumn,None,None)
-            // TODO: replace by meaningful exception
-            case _ => throw new Exception("unexpected case")
+            case (None,None) => throw new Exception("Either old or new type should be present, got (None, None)")
           }
           ColumnDetail(c, oldToNewColumn, newColumn, infoMsg, errMsg)
       }
