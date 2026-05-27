@@ -30,7 +30,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.Type
 
 /**
- * Interface for all Generic objects defining it's subfeed type
+ * Interface for all Generic objects defining its subfeed type
  */
 trait GenericTypedObject {
   def subFeedType: Type
@@ -356,47 +356,58 @@ object GenericSchema {
   /**
    * Parsing schema export created by DataObjectSchemaExporter
    */
-  def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+   def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
+     implicit val formats: Formats = Serialization.formats(NoTypeHints)
+     val companion = DataFrameSubFeed.getCompanion(subFeedType)
 
-    def createDataType(json: JValue): GenericDataType = json match {
-      // simple type
-      case JString(str) => companion.createSimpleDataType(str)
-      // struct
-      case j: JObject if (j \ "dataType") == JString("struct") =>
-        val fields = j \ "fields" match {
-          case jFields: JArray => jFields.arr.map { case jsonField: JObject => parseField(jsonField) }
-        }
-        companion.createStructDataType(fields)
-      // array
-      case j: JObject if (j \ "dataType") == JString("array") =>
-        val valueType = createDataType(j \ "elementType")
-        companion.createArrayDataType(valueType)
-      // map
-      case j: JObject if (j \ "dataType") == JString("map") =>
-        val keyType = createDataType(j \ "keyType")
-        val valueType = createDataType(j \ "valueType")
-        companion.createMapDataType(keyType, valueType)
+       def createDataType(json: JValue): GenericDataType = json match {
+         // simple type
+         case JString(str) => companion.createSimpleDataType(str)
+         // struct
+         case j: JObject if (j \ "dataType") == JString("struct") =>
+           val fields = j \ "fields" match {
+             case jFields: JArray => jFields.arr.map {
+               case jsonField: JObject => parseField(jsonField)
+               case _ => throw new IllegalArgumentException("Unexpected type for schema field, expected JObject")
+             }
+             case _ =>
+               throw new IllegalArgumentException("Unexpected type for 'fields' in struct schema, expected JArray")
+           }
+           companion.createStructDataType(fields)
+         // array
+         case j: JObject if (j \ "dataType") == JString("array") =>
+           val valueType = createDataType(j \ "elementType")
+           companion.createArrayDataType(valueType)
+         // map
+         case j: JObject if (j \ "dataType") == JString("map") =>
+           val keyType = createDataType(j \ "keyType")
+           val valueType = createDataType(j \ "valueType")
+           companion.createMapDataType(keyType, valueType)
+        case t =>
+          throw new IllegalArgumentException(s"Unexpected data type format $t in schema definition: ${json.toString}")
+      }
+
+     def parseField(json: JObject): GenericField = {
+       companion.createField(
+         (json \ "name").extract[String],
+         createDataType(json \ "dataType"),
+         (json \ "nullable").extract[Boolean],
+         (json \ "comment").toOption.map(_.extract[String])
+       )
+     }
+
+       val fields = json.arr.map {
+         case jsonField: JObject => parseField(jsonField)
+         case t =>
+           throw new IllegalArgumentException(s"Unexpected type $t in schema fields array, expected JObject for each field")
+       }
+       companion.createSchema(fields)
     }
+ }
 
-    def parseField(json: JObject): GenericField = {
-      companion.createField(
-        (json \ "name").extract[String],
-        createDataType(json \ "dataType"),
-        (json \ "nullable").extract[Boolean],
-        (json \ "comment").toOption.map(_.extract[String])
-      )
-    }
-
-    val fields = json.arr.map { case jsonField: JObject => parseField(jsonField) }
-    companion.createSchema(fields)
-  }
-}
-
-/**
- * Interface for the columns of a GenericDataFrame
- */
+ /**
+  * Interface for the columns of a GenericDataFrame
+  */
 trait GenericColumn extends GenericTypedObject {
   def ===(other: GenericColumn): GenericColumn
 
@@ -476,7 +487,7 @@ trait GenericField extends GenericTypedObject {
 }
 
 /**
- * Interface for the data type of a GenericField
+ * Interface for the data type of GenericField
  */
 trait GenericDataType extends GenericTypedObject {
   def isSortable: Boolean

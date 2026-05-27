@@ -78,8 +78,13 @@ case class AgentServerController(
           } catch {
             case e: Exception =>
               logger.error("Run failed, sending error message to AgentClient.")
-              Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = Map(), errorMsg = Some(e.getMessage)))))
-          }
+              Some(SDLMessage(msgType = SDLMessageType.AgentResult, agentResult = Some(
+                AgentResult(instructionId = agentInstruction.instructionId,
+                  phase = agentInstruction.phase,
+                  dataObjectIdToSchema = Map(),
+                  errorMsg = Some(e.getMessage)))))
+           }
+        case _ => throw new IllegalStateException("AgentInstruction is None in message but was expected to be present")
       }
       case _ =>
         logger.warn(s"Cannot process message of type ${message.msgType}")
