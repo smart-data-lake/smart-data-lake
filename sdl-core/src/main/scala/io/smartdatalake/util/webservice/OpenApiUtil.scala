@@ -145,7 +145,8 @@ object OpenApiUtil extends SmartDataLakeLogger {
                        None
                      }
                    // TODO: replace by meaningful exception
-                   case _ => None
+                   case t => throw new IllegalStateException(s"Unexpected type $t for opSpec in" +
+                           s" OpenAPI response for operation $path:$operation, expected JObject")
                  }
                }
              // TODO: replace by meaningful exception
