@@ -68,7 +68,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   ///// tests treating gaps in axis (time or space) /////
 
   "fillGaps_next" should "fill the gaps taking value from next row" in {
-    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt")
+    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("val"), "dt")
     val expected = Seq(
       (Some(0), Some(20190101), Some(3.14),  Some(-2.37)),
       (Some(0), Some(20190102), Some(3.14),  Some(-2.37)),
@@ -86,7 +86,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   }
 
   "fillGaps_next" should "fill the gaps taking value from previous row" in {
-    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt", takeNextValueFirst = false)
+    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("val"), "dt", takeNextValueFirst = false)
     val expected = Seq(
       (Some(0), Some(20190101), Some(3.14),  Some(-2.37)),
       (Some(0), Some(20190102), Some(3.14),  Some(-2.37)),
