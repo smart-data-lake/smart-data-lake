@@ -63,7 +63,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * This is usually prohibited as it creates loops in the DAG.
    * In special cases this makes sense, i.e. when building a complex comparision/update logic.
    * Recursive inputs are allowed in the same Action if the DataObject implements TransactionalSparkTableDataObject.
-   * For special cases this is to restrictive. To allow special DataObjects for recursive use within two different actions,
+   * For special cases this is too restrictive. To allow special DataObjects for recursive use within two different actions,
    * see also [[GlobalConfig.allowAsRecursiveInput]].
    *
    * Usage: add DataObjects that are used both as Output and Input as outputIds and recursiveInputIds, but do not add them as inputIds.
@@ -72,7 +72,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
 
   /**
    * Define if recursive inputs should be prepared as input SubFeed by ActionDAG or if this is handled by the action internally.
-   * Default is to prepare & expect it as input SubFeed, but this can be overriden by subclasses
+   * Default is to prepare & expect it as input SubFeed, but this can be overridden by subclasses
    */
   private[smartdatalake] def handleRecursiveInputsAsSubFeeds: Boolean = true
 
@@ -83,12 +83,12 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def outputs: Seq[DataObject]
 
   /**
-   * Hook to define main input in sub classes
+   * Hook to define main input in subclasses
    */
   def mainInputId: Option[DataObjectId] = None
 
   /**
-   * Hook to define main output in sub classes
+   * Hook to define main output in subclasses
    */
   def mainOutputId: Option[DataObjectId] = None
 
@@ -164,7 +164,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
    * - connections can be created
-   * - needed structures exist, e.g Kafka topic or Jdbc table
+   * - needed structures exist, e.g. Kafka topic or Jdbc table
    *
    * This runs during the "prepare" phase of the DAG.
    */
@@ -188,7 +188,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   }
 
   /**
-   * Checks before initalization of Action
+   * Checks before initialization of Action
    * In this step execution condition is evaluated and Action init is skipped if result is false.
    */
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
@@ -200,7 +200,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Evaluate and check the executionCondition in exec phase
    * @throws TaskSkippedDontStopWarning if task is skipped
    */
-  private def checkExecutionCondition(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
+  private def checkExecutionCondition(subFeeds: Seq[SubFeed]): Unit = {
     //noinspection MapGetOrElseBoolean
     val skipMsg = executionCondition.map { c =>
       // evaluate condition if existing
@@ -273,9 +273,9 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   }
 
   /**
-   * Executes operations needed to cleanup after executing an action failed (this includes NoDataToProcessWarning).
+   * Executes operations needed to clean up after executing an action failed (this includes NoDataToProcessWarning).
    */
-  def postExecFailed(ex: Exception)(implicit context: ActionPipelineContext): Unit = {
+  def postExecFailed(ex: Exception): Unit = {
     ex match {
       case ex: NoDataToProcessWarning if ex.results.isDefined =>
         // evaluate metrics fail condition if defined
@@ -300,7 +300,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
+  private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed]): Unit = {
     val conditionEvaluator = Environment.expressionEvaluatorFactory().getEvaluator[Metric, Boolean](condition)
     val metrics = subFeeds.flatMap{ subFeed =>
       val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric

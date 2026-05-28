@@ -126,12 +126,12 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     val globalConfig = GlobalConfig(defaultSparkConnectionId = Some("default-spark"))
     // create context
     ActionPipelineContext(
-      "feedTest",
-      "appTest",
-      SDLExecutionId.executionId1,
-      instanceRegistry,
-      Some(LocalDateTime.now()),
-      SmartDataLakeBuilderConfig("feedTest", Some("appTest")),
+      feed = "feedTest",
+      application = "appTest",
+      executionId = SDLExecutionId.executionId1,
+      instanceRegistry = instanceRegistry,
+      referenceTimestamp = Some(LocalDateTime.now()),
+      appConfig = SmartDataLakeBuilderConfig("feedTest", Some("appTest")),
       phase = ExecutionPhase.Init,
       globalConfig = globalConfig
     )
