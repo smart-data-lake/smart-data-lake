@@ -36,4 +36,9 @@ class HistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartD
     (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
   ))
 
+  testsFor(activateMergeMode(
+    (id, registry) => MockScalaDataObject(id),
+    (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+  ))
+
 }

@@ -547,7 +547,7 @@
         <!-- other dependency versions -->
         <scopt.version>4.1.0</scopt.version>
         <spark.excel.version>4.1.1_0.34.1-prerelease0</spark.excel.version>
-        <hsqldb.version>2.7.2</hsqldb.version>
+        <hsqldb.version>2.7.4</hsqldb.version>
         <jackcess.version>4.0.5</jackcess.version>
         <typesafe.config.version>1.4.3</typesafe.config.version>
         <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
