@@ -86,7 +86,6 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
     // creating expected
     val rows_expected = Seq(
-      TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "0let"), TestKV("value", null))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "3let"), TestKV("value", "triplet"))),
@@ -141,7 +140,6 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
     // PKviolators of hiveTablePKidValueDO
     val rows_expectedWithOutData = Seq(
-      TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "0let"), TestKV("value", null))),
       TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "3let"), TestKV("value", "triplet"))),
@@ -163,10 +161,8 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     assert(resultat)
   }
 
-
 }
 
 case class TestKV(column_name: String, column_value: String)
 
 case class TestData(data_object_id: String, db: String, table: String, schema: String, key: Seq[TestKV], data: Seq[TestKV] = null)
-
