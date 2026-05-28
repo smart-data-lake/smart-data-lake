@@ -38,7 +38,6 @@ import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, date_format, expr, max}
 import org.apache.spark.sql.types._
-import org.json4s.{DefaultFormats, Formats}
 
 import java.io.{BufferedWriter, File, FileWriter}
 import java.net.URLEncoder
@@ -573,12 +572,10 @@ case class ODataDataObject(
   }
 
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
-    implicit val formats: Formats = DefaultFormats
     previousState = state.getOrElse("")
   }
 
   override def getState: Option[String] = {
-    implicit val formats: Formats = DefaultFormats
     Some(nextState)
   }
 

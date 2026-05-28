@@ -26,6 +26,7 @@ import org.apache.spark.sql.jdbc.JdbcDialect
 
 import java.sql.{ResultSet, Statement, Connection => SqlConnection}
 import java.time.Duration
+import scala.util.{Success, Try}
 
 object JdbcUtil {
 
@@ -155,7 +156,15 @@ trait JdbcExecution { this: Connection with SmartDataLakeLogger =>
   def execJdbcDmlStatement(sql: String, logging: Boolean = true): Int = {
     execWithJdbcConnection(JdbcUtil.execWithJdbcStatement(_, doCommit = true) { stmt =>
       if (logging) logger.info(s"($id) execJdbcDmlStatement: $sql")
-      stmt.executeUpdate(sql)
+      val returnCode = Try(stmt.executeUpdate(sql)) match {
+        case Success(value) =>
+          if (logging) logger.info(s"($id) execJdbcDmlStatement succeeded: returnCode = $value")
+          value
+        case scala.util.Failure(e) =>
+          logger.error(s"execJdbcDmlStatement failed: $sql , error message = ${e.getMessage}")
+          throw e
+      }
+      returnCode
     })
   }
 
@@ -193,7 +202,7 @@ trait JdbcExecution { this: Connection with SmartDataLakeLogger =>
  *
  * @param maxIdleTimeSec timeout to close unused connections in the pool. Default is 3 seconds.
  * @param maxWaitTimeSec timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes).
- * @param testOnBorrow flag to set the GenericObjectPool's `testOnBorrow`. If true the connection pool will validate the connection before it is lend. Default is false.
+ * @param testOnBorrow flag to set the GenericObjectPool's `testOnBorrow`. If true the connection pool will validate the connection before it is lent. Default is false.
  * @param testOnCreate flag to set the GenericObjectPool's `testOnCreate`. If true the connection pool will validate the connection when it is created. Default is false.
  * @param testOnReturn flag to set the GenericObjectPool's `testOnReturn`. If true the connection pool will validate the connection after it is returned. Default is false.
  * @param testWhileIdle flag to set the GenericObjectPool's `testWhileIdle`. If true the connection pool will validate the connection periodically while it is idle. Default is false.

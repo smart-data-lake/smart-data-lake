@@ -34,7 +34,7 @@ import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.StructType
 
-import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, ResultSet}
+import java.sql.{DatabaseMetaData, DriverManager, ResultSet, Connection => SqlConnection}
 
 /**
  * Connection information for JDBC tables. If authentication is needed, user and password must be

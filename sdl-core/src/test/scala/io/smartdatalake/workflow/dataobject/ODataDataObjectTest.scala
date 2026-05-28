@@ -33,7 +33,6 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.mockito.{Mockito => m}
 
-import java.io.File
 import java.nio.file.Files
 import java.time.Instant
 
@@ -129,7 +128,8 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getSparkDataFrame in init phase") {
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
+    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry)
+      .copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")

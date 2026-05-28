@@ -60,12 +60,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   protected lazy val prioritizedMainInputCandidates: Seq[DataObject] = getMainDataObjectCandidates(mainInputId, inputs, "input")
   private[smartdatalake] lazy val mainOutput: DataObject = getMainDataObjectCandidates(mainOutputId, outputs, "output").head
 
-  private[smartdatalake] def getMainInput(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataObject = {
+  private[smartdatalake] def getMainInput: DataObject = {
     prioritizedMainInputCandidates.head // otherwise just take first candidate
   }
 
-  private[smartdatalake] def getMainPartitionValues(inputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    val mainInput = getMainInput(inputSubFeeds)
+  private[smartdatalake] def getMainPartitionValues(inputSubFeeds: Seq[SubFeed]): Seq[PartitionValues] = {
+    val mainInput = getMainInput
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id)
     mainInputSubFeed.map(_.partitionValues).getOrElse(Seq())
   }
@@ -78,9 +78,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   def prepareInputSubFeeds(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): (Seq[S], Seq[S]) = {
     logger.debug(s"($id) prepareInputSubFeeds: subFeeds: ${subFeeds.mkString(", ")}")
-    val mainInput = getMainInput(subFeeds)
+    val mainInput = getMainInput
     val mainSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).get
-    // convert subfeeds to this Actions SubFeed type or initialize if not yet existing
+    // convert subfeeds to these Actions SubFeed type or initialize if not yet existing
     var inputSubFeeds: Seq[S] = subFeeds.map { subFeed =>
       val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
       updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
@@ -247,16 +247,17 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       throw ex.copy(results = Some(allSubFeeds))
   }
 
-  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
+  override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])
+                       (implicit context: ActionPipelineContext): Unit = {
     if (isAsynchronousProcessStarted) return
     super.postExec(inputSubFeeds, outputSubFeeds)
-    val mainInput = getMainInput(inputSubFeeds)
+    val mainInput = getMainInput
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     val mainOutputSubFeed = outputSubFeeds.find(_.dataObjectId == mainOutput.id).get
     executionMode.foreach(_.postExec(id, mainInput, mainOutput, mainInputSubFeed, mainOutputSubFeed))
   }
 
-  protected def logWritingStarted(subFeed: S)(implicit context: ActionPipelineContext): Unit = {
+  protected def logWritingStarted(subFeed: S): Unit = {
     // sort partition values for logging
     val sortedPartitionValues = mainOutput match {
       case output: CanHandlePartitions => PartitionValues.sort(output.partitions, subFeed.partitionValues)
@@ -265,14 +266,14 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.info(s"($id) start writing to ${subFeed.dataObjectId}" + (if (subFeed.partitionValues.nonEmpty) s", partitionValues ${sortedPartitionValues.mkString(" ")}" else ""))
   }
 
-  protected def logWritingFinished(subFeed: SubFeed, duration: Duration)(implicit context: ActionPipelineContext): Unit = {
+  protected def logWritingFinished(subFeed: SubFeed, duration: Duration): Unit = {
     val metrics = subFeed.metrics.getOrElse(Map())
     val metricsLog = orderMetrics(metrics, SortedSet("count", "records_written", "num_tasks"))
       .map(x => x._1 + "=" + x._2).mkString(" ")
     logger.info(s"($id) finished writing to ${subFeed.dataObjectId.id}: job_duration=$duration " + metricsLog)
   }
 
-  protected def logNoData(subFeed: SubFeed, isMainSubFeed: Boolean)(implicit context: ActionPipelineContext): Unit = {
+  protected def logNoData(subFeed: SubFeed, isMainSubFeed: Boolean): Unit = {
     logger.info(s"($id) got NoDataToProcessWarning when writing to ${subFeed.dataObjectId.id}. ${if (isMainSubFeed) "As this is the main output, Action will be set to skipped." else "As this is not the main output, Action will not be set to skipped."}")
   }
 

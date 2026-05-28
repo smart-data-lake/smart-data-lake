@@ -26,21 +26,17 @@ import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExp
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import io.smartdatalake.workflow.connection.{HadoopFileConnection, SparkClassicConnection}
+import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql._
 import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, DatasetHelper, Encoder, Encoders, Row, SparkSession, functions}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{Type, typeOf}
-import scala.reflect.runtime.universe.TypeTag
-import org.apache.spark.sql.classic.ClassicConversions._
-
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 import scala.util.Try
 
 /**
@@ -52,7 +48,7 @@ import scala.util.Try
  * @param isDAGStart true if this subfeed is a start node of the dag
  * @param isSkipped true if this subfeed is the result of a skipped action
  * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
- * @param filter a spark sql filter expression. This is used by DataFrameIncrementalMode.
+ * @param filter a spark SQL filter expression. This is used by DataFrameIncrementalMode.
  */
 case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame],
                         override val dataObjectId: DataObjectId,
@@ -388,7 +384,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
 
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = (srcType, tgtType) match {
     case (srcType, tgtType) if srcType.isSameType(tgtType) => SparkUnaryUdf(x => x)
-    case (srcType: SparkSimpleDataType, tgtType: SparkSimpleDataType) => SparkUnaryUdf(x => x.cast(tgtType.inner))
+    case (_: SparkSimpleDataType, tgtType: SparkSimpleDataType) => SparkUnaryUdf(x => x.cast(tgtType.inner))
     case (srcType: SparkStructDataType, tgtType: SparkStructDataType) => SparkUnaryUdf(x => DatasetHelper.toCol(TypeEvolutionUtil.schemaEvolutionUdf(srcType.inner, tgtType.inner)(x.expr)))
     case (srcType: SparkArrayDataType, tgtType: SparkArrayDataType) => new GenericUnaryUdf {
       override def subFeedType: universe.Type = SparkSubFeed.subFeedType
@@ -446,14 +442,19 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   def getSparkSession(implicit context: ActionPipelineContext): SparkSession = {
+    val frameRequired = "Spark connection is required to create DataFrame!"
     context.engineConnection match {
-      case Some(connection) if connection.isInstanceOf[SparkClassicConnection] => connection.asInstanceOf[SparkClassicConnection].sparkSession
-      case Some(connection) => throw new IllegalStateException(s"Spark connection is required to create DataFrame, but got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
+      case Some(null) =>
+        throw new IllegalStateException(s"context.currentAction: ${context.currentAction.map(_.id.toString)} context.engineConnection = Some(null). $frameRequired")
+      case Some(connection) if connection.isInstanceOf[SparkClassicConnection] =>
+        connection.asInstanceOf[SparkClassicConnection].sparkSession
+      case Some(connection) => throw new IllegalStateException(frameRequired +
+        s" But got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
       case _ =>
         Try(context.instanceRegistry.get[SparkClassicConnection](ConnectionId(Environment.defaultEngineConnectionId)))
           .toOption.map(_.sparkSession)
           .orElse(_defaultSparkSession) // for testing only
-          .getOrElse(throw new IllegalStateException("No connection available in context. Spark connection is required to create DataFrame."))
+          .getOrElse(throw new IllegalStateException(s"No connection available in context. $frameRequired"))
     }
   }
 
