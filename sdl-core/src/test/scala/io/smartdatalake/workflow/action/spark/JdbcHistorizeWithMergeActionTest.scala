@@ -22,8 +22,8 @@ import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
-import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.scalatest.funsuite.AnyFunSuite

@@ -52,9 +52,7 @@ trait HistorizeActionBehaviour {
   def historizeWithMergeMode(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None,
-      canDetectNoData: Boolean = true // TODO: removed unused parameter or uses it
-  ): Unit = {
+      tgtConnection: Option[Connection] = None): Unit = {
 
     test("historize load mergeModeEnable") {
 
@@ -320,7 +318,7 @@ trait HistorizeActionBehaviour {
       // 1. expectation schema should not have dl_hash column
       assert(!tgtDO.getDataFrame().columns.map(_.toLowerCase).contains("dl_hash"))
 
-      // prepare & start 2st load
+      // prepare & start 2nd load
       val refTimestamp2 = LocalDateTime.now()
       val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
       val action2 = HistorizeAction("ha",
@@ -336,7 +334,7 @@ trait HistorizeActionBehaviour {
         action2.exec(Seq(srcSubFeed))(context2)
       catch {
         // some DataObjects might detect that there is no new data to process
-        case e: NoDataToProcessWarning => ()
+        case _: NoDataToProcessWarning => ()
       }
 
       // 2. expectation schema should have dl_hash column
@@ -352,9 +350,7 @@ trait HistorizeActionBehaviour {
           Option[Seq[String]],
           InstanceRegistry
       ) => TransactionalTableDataObject with CanMergeDataFrame with CanCreateIncrementalOutput,
-      tgtConnection: Option[Connection] = None,
-      canDetectNoData: Boolean = true
-  ): Unit =
+      tgtConnection: Option[Connection] = None): Unit =
 
     test("historize load mergeModeEnable and copy incremental action") {
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry

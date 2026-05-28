@@ -69,7 +69,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * Force persisting input DataFrame's on Disk.
    * This improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point
-   * in case a task get's lost.
+   * in case a task gets lost.
    * Note that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this
    * behaviour set breakDataFrameLineage=false.
    */
@@ -120,7 +120,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     if (commonTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs/outputs and engine connection")
     val commonType = if (transformerSubFeedType.isDefined && !(transformerSubFeedType.get =:= typeOf[DataFrameSubFeed])) {
       // if transformerSubFeedType is defined and not generic, we have to take that one and assert it is in common types list
-      assert(commonTypes.contains(transformerSubFeedType.get), s"($id) subfeed type of transformers (${transformerSubFeedType.get}) doesnt exist in common subfeed types of inputs & outputs (${commonInputOutputTypes.mkString(", ")})")
+      assert(commonTypes.contains(transformerSubFeedType.get),
+        s"($id) subfeed type of transformers (${transformerSubFeedType.get}) doesn't exist in common subfeed types" +
+          s" of inputs & outputs (${commonInputOutputTypes.mkString(", ")})")
       transformerSubFeedType.get
     } else {
       // if transformerSubFeedType is None or generic, take the first matching entry from the inputs list
@@ -145,7 +147,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   // TODO: this is still spark specific!
   private var sparkStreamingQuery: Option[StreamingQuery] = None
 
-  private[smartdatalake] def notifySparkStreamingQueryTerminated(implicit context: ActionPipelineContext): Unit = {
+  private[smartdatalake] def notifySparkStreamingQueryTerminated: Unit = {
     sparkStreamingQuery = None
   }
 
@@ -214,7 +216,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
                 input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
                   .withFilter(subFeed.partitionValues, subFeed.filter)
               } catch {
-                // if there is no data, but it's an action with multiple inputs, we need to avoid that that the action gets skipped because of the thrown NoDataToProcessWarning
+                // if there is no data, but it's an action with multiple inputs, we need to avoid that the action gets skipped because of the thrown NoDataToProcessWarning
                 case _: NoDataToProcessWarning if inputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
               }
             } else {
@@ -372,7 +374,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame =>
         // get metrics with scope Job from observations
         val scopeJobExpectationMetrics = subFeed.observation.map(_.waitForElseNoData()).getOrElse(Map())
-        // get input metrics for this actions expectations with scope All (scope=Job is calculated with preprocessInputSubFeedCustomized, scope=JobPartition is not supported on input)
+        // get input metrics for these actions expectations with scope All
+        // (scope=Job is calculated with preprocessInputSubFeedCustomized, scope=JobPartition is not supported on input)
         // Note that scope All metrics are only calculated if this is the main output.
         val actionExpectationsInputMetrics = if (isMainOutput) calculateInputAggMetricsWithScopeAll(subFeed) else Map()
         // if this is mainOutput, enrich main input metrics
@@ -426,7 +429,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val actionExpectationsInputAggColumns = expectations.filter(_.scope == ExpectationScope.All).flatMap(_.getInputAggExpressionColumns(id))
       .map(expr => expr.getName match {
         case Some(exprNameRegex(name, dataObjectId)) => (DataObjectId(dataObjectId), expr.as(name))
-        case Some(name) => (prioritizedMainInputCandidates.head.id, expr)
+        case Some(_) => (prioritizedMainInputCandidates.head.id, expr)
         case None => throw new IllegalStateException(s"($id) name of aggregate expression unknown: $expr")
       })
     // calculate metrics on input DataObject
