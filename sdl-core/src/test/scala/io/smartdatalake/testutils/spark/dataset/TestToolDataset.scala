@@ -22,10 +22,13 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.Dataset
 import org.slf4j.Logger
+import scala.util.{Failure,Success,Try}
 
 trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
 
-  def printFailedTestResult[T](testName: String, arguments: Seq[Dataset[T]] = Nil)(actual: Dataset[T])(expected: Dataset[T])(implicit logger: Logger): Unit = {
+  def printFailedTestResult[T](testName: String, arguments: Seq[Dataset[T]] = Nil)(actual: Dataset[T])(expected: Dataset[T])(implicit
+      logger: Logger
+  ): Unit = {
     def printDf(df: Dataset[T]): Unit = {
       logger.error(df.schema.simpleString)
       df.printSchema()
@@ -33,19 +36,27 @@ trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
     }
 
     logger.error(s"!!!! Test $testName Failed !!!")
-    logger.error("   Arguments ")
+    logger.error(s"   ${arguments.length} Arguments: ")
     arguments.foreach(printDf)
     logger.error("   Actual ")
     printDf(actual)
     logger.error("   Expected ")
     printDf(expected)
     logger.error(s"  Do schemata equal? ${actual.schema.fields.toSet == expected.schema.fields.toSet}")
-    logger.error(s"  Do cardinalities equal? ${actual.count() == expected.count()}")
+    logger.error(
+      s"  Do cardinalities equal? ${actual.count() == expected.count()} (actual.count=${actual.count()}, expected.count()=${expected.count()}"
+    )
     logger.error("   symmetric Difference ")
-    actual.getSymmetricDifference(expected).withColumnRenamed("_this", "_actual").show(false)
+    Try(actual.getSymmetricDifference(expected).withColumnRenamed("_this", "_actual")) match {
+      case Success(df) => df.show(false)
+      case Failure(e)  => logger.error(s"Could not calculate symmetric difference: ${e.getMessage}")
+    }
   }
 
-  def printFailedTestResultGeneric(testName: String, arguments: Seq[GenericDataFrame] = Seq())(actual: GenericDataFrame)(expected: GenericDataFrame)(implicit
+  def printFailedTestResultGeneric(
+      testName: String,
+      arguments: Seq[GenericDataFrame] = Seq()
+  )(actual: GenericDataFrame)(expected: GenericDataFrame)(implicit
       logger: Logger
   ): Unit =
     (actual, expected) match {

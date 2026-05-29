@@ -21,7 +21,6 @@ package io.smartdatalake.util.historization
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.LogUtils.debugLog
-import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 import org.slf4j.Logger
@@ -294,17 +293,6 @@ object Historization {
     df.withColumn(Environment.capturedColumnName, lit(captured))
       .withColumn(Environment.delimitedColumnName, lit(delimited))
   }
-
-  private def joinCols(left: GenericDataFrame, right: GenericDataFrame, cols: Seq[String])(implicit logger: Logger): GenericColumn = {
-    debugLog(s"joinCols: cols = ${cols.mkString(", ")}")
-    cols.map(c => left(c) === right(c)).reduce(_ and _)
-  }
-
-  private def nullTableCols(table: String, cols: Seq[String])(implicit functions: DataFrameFunctions): GenericColumn =
-    cols.map(c => functions.col(s"$table.$c").isNull).reduce(_ and _)
-
-  private def nonNullTableCols(table: String, cols: Seq[String])(implicit functions: DataFrameFunctions): GenericColumn =
-    cols.map(c => functions.col(s"$table.$c").isNotNull).reduce(_ and _)
 
   private[smartdatalake] def getCompareColumns(
       colsToUse: Seq[String],
