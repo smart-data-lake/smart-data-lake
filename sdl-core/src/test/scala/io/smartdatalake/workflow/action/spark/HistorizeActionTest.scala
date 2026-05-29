@@ -26,7 +26,6 @@ import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.historization.HistorizationTestUtils.defaultTimeAxisUnit
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.action.HistorizeAction
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
@@ -39,15 +38,13 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
-  with io.smartdatalake.util.spark.dataset.Equality {
+    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
-
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeActionTest", "org.hsqldb.jdbcDriver")
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
@@ -66,7 +63,6 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
   }
 
   test("historize load") {
-    val context = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1").register
@@ -85,14 +81,17 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
     assert(tgtSubFeed.asInstanceOf[SparkSubFeed].isDummy) // should return a dummy DataFrame as breakDataFrameOutputLineage is set to true
+    println("********* srcDO")
+    srcDO.getSparkDataFrame()(context1).show(false)
 
     {
+      val actual = tgtDO.getSparkDataFrame()(context1).drop(Historization.historizeHashColName)
       val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Environment.historizationUpperHorizonTimestamp))
         .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-      val actual = tgtDO.getSparkDataFrame()(context1)
-        .drop(Historization.historizeHashColName)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("historize 1st load", Seq())(actual)(expected)
+      val resultat = actual.equal(expected)
+      if (!resultat)
+        printFailedTestResult(testName = "historize 1st load",
+          arguments = List(srcDO.getSparkDataFrame()(context1)))(actual)(expected)
       assert(resultat)
     }
 
@@ -110,13 +109,13 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
     {
       val expected = Seq(
-        ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 5,  Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
         ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-      val actual = tgtDO.getSparkDataFrame()(context1)
-        .drop(Historization.historizeHashColName)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("historize 2nd load", Seq())(actual)(expected)
+      val actual = tgtDO.getSparkDataFrame()(context1).drop(Historization.historizeHashColName)
+      val resultat = actual.equal(expected)
+      if (!resultat)
+        printFailedTestResult(testName = "historize 2nd load", arguments = List(srcDO.getSparkDataFrame()(context1)))(actual)(expected)
       assert(resultat)
     }
 
@@ -134,13 +133,16 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
     {
       val expected = Seq(
-        ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
-        ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 5,  null,   Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minus(defaultTimeAxisUnit.get))),
+        ("doe", "john", 10, null,   Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minus(defaultTimeAxisUnit.get))),
         ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
       ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
-      val actual = tgtDO.getSparkDataFrame()(context3)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+      val actual = tgtDO.getSparkDataFrame()(context3).drop(Historization.historizeHashColName)
+      val resultat = actual.equal(expected)
+      if (!resultat)
+        printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", List(srcDO.getSparkDataFrame()(context1)))(
+          actual
+        )(expected)
       assert(resultat)
     }
   }
