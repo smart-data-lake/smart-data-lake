@@ -24,7 +24,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.generic.{PartitionArchiveCompactionMode, PartitionRetentionMode, Table}
+import io.smartdatalake.workflow.dataobject.generic.{PartitionArchiveCompactionMode, PartitionRetentionMode}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
@@ -78,7 +78,7 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
 
   test("PartitionArchiveCompactionMode with SparkFileDataObject") {
     val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
-    val tgtDO = CsvFileDataObject("tgtDO", tempPath + s"/tgt1", partitions = Seq("dt")
+    val tgtDO = CsvFileDataObject(id = "tgtDO", path = tempPath + s"/tgt1", partitions = Seq("dt")
       , housekeepingMode = Some(PartitionArchiveCompactionMode(
         archivePartitionExpression = Some("map('dt','20201101')"), // always archive to 20201101
         compactPartitionExpression = Some("true") // compact all partitions...
@@ -94,9 +94,16 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
     assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101", "20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
-    // check partition dt=20201201 is archived and dt=20201101 is compacted
+    logger.debug(s"check partition dt=20201201 is archived and dt=20201101 is compacted:" +
+      s" ${tgtDO.listPartitions.length} partitions found")
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
-    assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
+
+    val compacted = tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED"))
+    if (!compacted) {
+      logger.error(s"Test failed: tgtDO.path = ${tgtDO.path} , tgtDO.hadoopPath = ${tgtDO.hadoopPath} ," +
+        s" tgtDO.filesystem.getUri = ${tgtDO.filesystem.getUri}")
+    }
+    assert(compacted)
     val actual = tgtDO.getSparkDataFrame()
     val expected = df1.withColumn("dt", lit("20201101"))
     val resultat = actual.equal(expected)
