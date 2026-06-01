@@ -73,7 +73,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                               )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
 
-  override val format = "com.crealytics.spark.excel"
+  override val format = "dev.mauch.spark.excel"
 
   override val fileName: String = "*.xls*"
 
