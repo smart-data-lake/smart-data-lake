@@ -302,7 +302,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // skip all succeeded actions
     val actionsToSkip = runState.actionsState
-      .filter { case (id, info) => info.hasCompleted }
+      .filter { case (_, info) => info.hasCompleted }
     val initialSubFeeds = actionsToSkip.flatMap(_._2.results).toSeq
     // get latest DataObject state and overwrite with current DataObject state
     val lastStateId = stateStore.getLatestStateId(Some(runState.runId - 1))
@@ -351,7 +351,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       failOnMissingInputSubFeeds: Boolean = true
   )(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
     Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
-    implicit val hadoopConf: Configuration = session.sparkContext.hadoopConfiguration
     val (subFeeds, stats) = exec(
       appConfig,
       SDLExecutionId.executionId1,
@@ -528,7 +527,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         require(
           actionBySubFeedType.size == 1,
           s"Simulation needs all selected actions to be instances of DataFrameActionImpl of the same subFeedType, e.g. SparkSubFeed. There are ${actionBySubFeedType.map {
-              case (subFeedType, actions) => s"${actions.size} of ${actions.head.subFeedType.typeSymbol.name} (${actions.map(_.id).mkString(",")})"
+              case (_, actions) => s"${actions.size} of ${actions.head.subFeedType.typeSymbol.name} (${actions.map(_.id).mkString(",")})"
             }.mkString(" and ")}"
         )
         actionDAGRun.init(context)
@@ -646,10 +645,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         // execute DAG
         val startTime = LocalDateTime.now
         var finalRunState: ActionDAGRunState = null
-        var subFeeds = try
-          actionDAGRun.exec(context)
-        finally
-          finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context)
 
         // Iterate execution in streaming mode
         if (context.appConfig.streaming) {

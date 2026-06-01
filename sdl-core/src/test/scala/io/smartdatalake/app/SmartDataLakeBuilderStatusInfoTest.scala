@@ -28,6 +28,7 @@ import org.eclipse.jetty.websocket.api.{Session, WebSocketAdapter}
 import org.eclipse.jetty.websocket.client.WebSocketClient
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -38,7 +39,7 @@ import scala.util.{Failure, Success}
  * This tests use configuration test/resources/configstatusinfo/application.conf
  */
 class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter {
-
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -53,7 +54,7 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
   test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
 
     val feedName = "test"
-    // setup input DataObject
+    logger.debug("setup input DataObject")
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
@@ -61,12 +62,12 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(
       getClass.getResource("/configstatusinfo/application.conf").getPath)
     )
-    //Run SDLB
+    logger.debug("Run SDLB")
     sdlb.run(sdlConfig)
 
-    //Create Client Websocket that tries to establish connection with SDLB Job
+    logger.debug("Create Client Websocket that tries to establish connection with SDLB Job")
     val receivedMessages: ListBuffer[String] = ListBuffer()
-    // The socket that receives events
+    logger.debug("The socket that receives events")
     class UnitTestSocket extends WebSocketAdapter with SmartDataLakeLogger {
       override def onWebSocketConnect(sess: Session): Unit = {}
 
@@ -83,8 +84,9 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
     val session = client.connect(new UnitTestSocket, URI.create("ws://localhost:4440/ws/")).get
 
 
-    //Verify Rest API context endpoint is reachable and returns correct results
-    val webserviceDOContext = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
+    logger.debug("Verify Rest API context endpoint is reachable and returns correct results")
+    val webserviceDOContext = WebserviceFileDataObject("dummy",
+      url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
     val webserviceClientContext = SttpWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
       case Failure(exception) =>
@@ -114,4 +116,3 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
     client.stop()
   }
 }
-
