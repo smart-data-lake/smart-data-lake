@@ -83,7 +83,14 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // convert subfeeds to these Actions SubFeed type or initialize if not yet existing
     var inputSubFeeds: Seq[S] = subFeeds.map { subFeed =>
       val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
-      updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
+      scala.util.Try {
+        updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
+      } match {
+        case scala.util.Success(sf) => sf
+        case scala.util.Failure(e) =>
+          logger.error(s"prepareInputSubFeeds failed on subFeed ${subFeed.dataObjectId.toString}")
+          throw e
+      }
     }
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
