@@ -23,7 +23,6 @@ import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.{FileUtils, IOUtils}
-import org.apache.hadoop.fs.Path
 import org.apache.poi.hssf.usermodel.HSSFWorkbook
 import org.apache.poi.ss.usermodel
 import org.apache.poi.ss.usermodel.{DateUtil, Sheet, Workbook}
@@ -34,8 +33,7 @@ import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.BeforeAndAfterAll
 
 import java.io.{File, FileOutputStream}
-import java.nio.file.Files
-import java.nio.file.{Path => NioPath}
+import java.nio.file.{Files, Path => NioPath}
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
@@ -290,6 +288,6 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
 
   override def createFile(path: String, data: DataFrame): Unit = {
     data.write.options(Map("header" -> "false", "dataAddress" -> "'testSheet'!A1"))
-      .format("com.crealytics.spark.excel").save(path)
+      .format("dev.mauch.spark.excel").save(path)
   }
 }

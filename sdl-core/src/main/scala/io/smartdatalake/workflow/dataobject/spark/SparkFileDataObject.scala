@@ -47,7 +47,7 @@ import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
 import scala.collection.mutable
 import scala.reflect.runtime.universe.typeOf
-import scala.util.Try
+import scala.util.{Failure,Success,Try}
 
 /**
  * A [[DataObject]] backed by a file in HDFS. Can load file contents into an Apache Spark [[DataFrame]]s.
@@ -99,7 +99,6 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * Default is to validate the `schemaMin` and not apply any modification.
    */
   def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = df.sparkSession
     validateSchemaMin(SparkSchema(df.schema), "read")
     validateSchemaHasPartitionCols(df, "read")
     getSchema.map(createReadSchema).foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "read"))
@@ -383,34 +382,47 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * There are some DataSources which dont support reading multiple files, e.g. ExcelFileDataObject.
    * getContentFilesOneByOne implements an approach to query a DataFrame per file, adding partition columns and union all DataFrames.
    */
-  protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+  protected def getContentFilesOneByOne(partitionValues: Seq[PartitionValues],
+                                        schema: Option[StructType],
+                                        incrementalOutputOptions: Map[String, String])
+                                       (implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = getSparkSession
-    assert(incrementalOutputOptions.isEmpty || schema.isDefined, "Incremental output without Schema is not supported for DataSources reading files one by one. Specify a schema for the DataObject to use incremental output.")
+    assert(incrementalOutputOptions.isEmpty || schema.isDefined,
+      "Incremental output without Schema is not supported for DataSources reading files one by one. Specify a schema for the DataObject to use incremental output.")
 
     // search files to be read
-    val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((PartitionValues(Map()),hadoopPath))
-    else  if (partitions.isEmpty) {
-      filesystem.globStatus(new Path(hadoopPath,fileName)).toSeq
-        .filter(_.isFile).map(fs => (PartitionValues(Map()),fs.getPath))
+    val files = if (filesystem.getFileStatus(hadoopPath).isFile) Seq((PartitionValues(Map()), hadoopPath))
+    else if (partitions.isEmpty) {
+      filesystem.globStatus(new Path(hadoopPath, fileName)).toSeq
+        .filter(_.isFile).map(fs => (PartitionValues(Map()), fs.getPath))
     } else {
       val pvs = if (partitionValues.isEmpty) listPartitions else partitionValues
-      pvs.flatMap(pv => getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString),p)))
+      pvs.flatMap(pv =>
+        getConcreteFullPaths(pv, returnFiles = true).map(p => (extractPartitionValuesFromFilePath(p.toString), p)))
     }
+    logger.debug(s"getContentFilesOneByOne: ${files.length} files to be read.")
 
-    // get and union DataFrames per File
+    logger.debug("getContentFilesOneByOne: get and union DataFrames per File")
     val schemaWithoutPartitions = schema.map(s => StructType(s.filterNot(f => partitions.contains(f.name))))
-    val reader = session.read
+    val reader: DataFrameReader = session.read
       .format(readFormat)
       .options(readOptions ++ incrementalOutputOptions)
       .optionalSchema(schemaWithoutPartitions)
-    val df = if (files.nonEmpty) Some(
-      files.map { case (pv,p) =>
+    val dfOpt: Option[DataFrame] = if (files.nonEmpty) Some(
+      files.map { case (pvs: PartitionValues, p: Path) => Try {
         partitions.foldLeft(reader.option("path", p.toString).load()) {
-          case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
+          case (df, partition) => df.withColumn(partition, lit(pvs(partition).toString))
         }
+      } match {
+        case Success(df) => df
+        case Failure(e) => logger.error(s"getContentFilesOneByOne: could not get DataFrame from file. p = ${p.toString}")
+          logger.error(s"pv = $pvs")
+          logger.error(s"${partitions.length} partitions: ${partitions.mkString(",")}")
+          throw e
+      }
       }.reduce(_ unionByName _)
     ) else None
-    df.getOrElse {
+    dfOpt.getOrElse {
       // if there are no paths to read for given partition values, handle no data
       if (context.isExecPhase) {
         // skip action in exec phase
@@ -434,7 +446,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
     if (filenameColumn.isEmpty) df = df.withColumn(forcedFilenameColumn, input_file_name())
     // initialize observers
     df = filesObservers.foldLeft(df) {
-      case (df, (actionId, observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
+      case (df, (_, observer)) => observer.on(df, filenameColumn.getOrElse(forcedFilenameColumn))
     }
     filesObservers.clear()
     // drop forced filenameColumn
@@ -537,7 +549,6 @@ trait SparkFileDataObject extends HadoopFileDataObject
    */
   final override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = getSparkSession
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when dataobject is also used as recursive input ")
 
     // prepare data
