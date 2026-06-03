@@ -702,7 +702,7 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
   /**
    * Setup observation of custom metric on Dataset.
    */
-  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T]
+  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T]
 
   /**
    * Get processed files observation result.
@@ -718,7 +718,7 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
 private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
-  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
     logger.debug(s"($name) add files observation to Dataset")
     on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
   }
@@ -737,7 +737,7 @@ private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: Stri
 
   private var filesInExecutionPlan: Option[Seq[String]] = None
 
-  def on[T](ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
     logger.debug(s"($name) add files observation to Dataset")
     filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
     ds
