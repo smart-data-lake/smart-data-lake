@@ -111,12 +111,12 @@ class Json4sJsonPathProvider extends JsonProvider {
       case x: BigDecimal => JDecimal(x)
       case x: Double => JDouble(x)
       case x: Boolean => JBool(x)
-      case x: Map[String, _] =>
+      case x: Map[String @unchecked, _] =>
         val fields = x.map { case (k, v) => JField(k, wrap(v)) }.toList
         JObject(fields)
       case x: JValue => x
-      case x: Seq[JValue] => JArray(x.toList)
-      case x: Set[JValue] => JSet(x)
+      case x: Seq[JValue @unchecked] => JArray(x.toList)
+      case x: Set[JValue @unchecked] => JSet(x)
       case None | null => JNothing
     }
   }

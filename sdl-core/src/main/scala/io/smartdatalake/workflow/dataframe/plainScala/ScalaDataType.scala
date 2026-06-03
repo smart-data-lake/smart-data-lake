@@ -20,11 +20,9 @@ package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericSimpleDataType}
-import io.smartdatalake.util.misc.MetricsLog
 import org.json4s.{JString, JValue}
 
 import java.sql.Timestamp
-import scala.math.Ordering
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
@@ -45,11 +43,11 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   def numeric: Numeric[A] = throw new IllegalStateException("'numeric' not implemented for this DataType")
 
-  def numericDiv: ((A, A) => A) = throw new IllegalStateException("'numericDiv' not implemented for this DataType")
+  def numericDiv: (A, A) => A = throw new IllegalStateException("'numericDiv' not implemented for this DataType")
 
   def getDecimalSpec: Option[(Int, Int)] = None; //not relevant as java.math.BigDecimal is not accepted as input
 
-  override def isSimpleType: Boolean = true;
+  override def isSimpleType: Boolean = true
 
   def sql: String = typeName
 
@@ -63,12 +61,12 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   override def isSameType(other: GenericDataType): Boolean = {
     other match {
-      case scalaOther: ScalaDataType[A] => this == scalaOther // this works as trait implementations are case objects
+      case scalaOther: ScalaDataType[_] => this == scalaOther // this works as trait implementations are case objects
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
-  def getCastFunction(fromDataType: ScalaDataType[_]): (Any => A)
+  def getCastFunction(fromDataType: ScalaDataType[_]): Any => A
 
   def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_]
 
@@ -78,7 +76,7 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
 
   def createLiteral(value: Any): ScalaLiteral[A] = {
     val litValue = value match {
-      case x: Option[A] => x
+      case x: Option[_] => x.asInstanceOf[Option[A]]
       case x => Option(x).map(_.asInstanceOf[A])
     }
     ScalaLiteral(litValue)
@@ -105,17 +103,16 @@ object ScalaStringDataType extends ScalaDataType[String] {
 
   override def isImpreciseNumeric: Boolean = false
 
-  def ordering: Ordering[Option[String]] = Ordering.Option(new Ordering[String] {
-    def compare(x: String, y: String): Int = if (x == null) -1 else if (y == null) 1 else  x.compareTo(y)
-  })
+  def ordering: Ordering[Option[String]] = Ordering
+    .Option((x: String, y: String) => if (x == null) -1 else if (y == null) 1 else x.compareTo(y))
 
-  def getCastFunction(fromDataType: ScalaDataType[_]): (Any => String) = {
+  def getCastFunction(fromDataType: ScalaDataType[_]): Any => String = {
     fromDataType match {
-      case ScalaStringDataType => (x => x.asInstanceOf[String])
-      case ScalaIntDataType => (x => x.asInstanceOf[Int].toString)
-      case ScalaDoubleDataType => (x => x.asInstanceOf[Double].toString)
-      case ScalaBooleanDataType => (x => x.asInstanceOf[Boolean].toString)
-      case ScalaNullDataType => (_ => null)
+      case ScalaStringDataType => x => x.asInstanceOf[String]
+      case ScalaIntDataType => x => x.asInstanceOf[Int].toString
+      case ScalaDoubleDataType => x => x.asInstanceOf[Double].toString
+      case ScalaBooleanDataType => x => x.asInstanceOf[Boolean].toString
+      case ScalaNullDataType => _ => null
     }
   }
 
@@ -135,16 +132,16 @@ object ScalaDoubleDataType extends ScalaDataType[Double] {
 
   override def numeric: Numeric[Double] = fractional
 
-  override def numericDiv: ((Double, Double) => Double) = fractional.div
+  override def numericDiv: (Double, Double) => Double = fractional.div
 
   def ordering: Ordering[Option[Double]] = Ordering.Option(Ordering[Double])
 
-  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Double) = {
+  override def getCastFunction(fromDataType: ScalaDataType[_]): Any => Double = {
     fromDataType match {
-      case ScalaDoubleDataType => (x => x.asInstanceOf[Double])
-      case ScalaStringDataType => (x => x.asInstanceOf[String].toDouble)
-      case ScalaIntDataType => (x => x.asInstanceOf[Int].toDouble)
-      case ScalaBooleanDataType => (x => if (x.asInstanceOf[Boolean]) 1d else 0d)
+      case ScalaDoubleDataType => x => x.asInstanceOf[Double]
+      case ScalaStringDataType => x => x.asInstanceOf[String].toDouble
+      case ScalaIntDataType => x => x.asInstanceOf[Int].toDouble
+      case ScalaBooleanDataType => x => if (x.asInstanceOf[Boolean]) 1d else 0d
     }
   }
 
@@ -165,16 +162,16 @@ object ScalaIntDataType extends ScalaDataType[Int] {
 
   override def numeric: Numeric[Int] = integral
 
-  override def numericDiv: ((Int, Int) => Int) = integral.quot
+  override def numericDiv: (Int, Int) => Int = integral.quot
 
   def ordering: Ordering[Option[Int]] = Ordering.Option(Ordering[Int])
 
-  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Int) = {
+  override def getCastFunction(fromDataType: ScalaDataType[_]): Any => Int = {
     fromDataType match {
-      case ScalaIntDataType => (x => x.asInstanceOf[Int])
-      case ScalaStringDataType => (x => x.asInstanceOf[String].toInt)
-      case ScalaDoubleDataType => (x => x.asInstanceOf[Double].toInt)
-      case ScalaBooleanDataType => (x => if (x.asInstanceOf[Boolean]) 1 else 0)
+      case ScalaIntDataType => x => x.asInstanceOf[Int]
+      case ScalaStringDataType => x => x.asInstanceOf[String].toInt
+      case ScalaDoubleDataType => x => x.asInstanceOf[Double].toInt
+      case ScalaBooleanDataType => x => if (x.asInstanceOf[Boolean]) 1 else 0
     }
   }
 
@@ -193,12 +190,12 @@ object ScalaBooleanDataType extends ScalaDataType[Boolean] {
 
   def ordering: Ordering[Option[Boolean]] = Ordering.Option(Ordering[Boolean])
 
-  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Boolean) = {
+  override def getCastFunction(fromDataType: ScalaDataType[_]): Any => Boolean = {
     fromDataType match {
-      case ScalaBooleanDataType => (x => x.asInstanceOf[Boolean])
-      case ScalaStringDataType => (x => x.asInstanceOf[String].toLowerCase == "true")
-      case ScalaIntDataType => (x => x.asInstanceOf[Int] > 0)
-      case ScalaDoubleDataType => (x => x.asInstanceOf[Double] > 0d)
+      case ScalaBooleanDataType => x => x.asInstanceOf[Boolean]
+      case ScalaStringDataType => x => x.asInstanceOf[String].toLowerCase == "true"
+      case ScalaIntDataType => x => x.asInstanceOf[Int] > 0
+      case ScalaDoubleDataType => x => x.asInstanceOf[Double] > 0d
     }
   }
 
@@ -222,7 +219,7 @@ object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
   def ordering: Ordering[Option[Timestamp]] = Ordering.Option(Ordering[Timestamp])
 
   override def numeric: Numeric[Timestamp] = new Numeric[Timestamp] {
-    def compare(x: Timestamp, y: Timestamp): Int = ordering.compare(Option(x),Option(y)) // this allows for comparision in ScalaBinaryExpr
+    def compare(x: Timestamp, y: Timestamp): Int = ordering.compare(Option(x),Option(y)) // this allows for comparison in ScalaBinaryExpr
     // Timestamp arithmetic is intentionally unsupported.
     def plus(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp plus is not supported")
     def minus(x: Timestamp, y: Timestamp): Timestamp = throw new UnsupportedOperationException("Timestamp minus is not supported")
@@ -236,9 +233,9 @@ object ScalaTimestampDataType extends ScalaDataType[Timestamp] {
     def toDouble(x: Timestamp): Double = throw new UnsupportedOperationException("Timestamp toDouble is not supported")
   }
 
-  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Timestamp) = {
+  override def getCastFunction(fromDataType: ScalaDataType[_]): Any => Timestamp = {
     fromDataType match {
-      case ScalaNullDataType => (_ => null)
+      case ScalaNullDataType => _ => null
     }
   }
 
@@ -258,7 +255,7 @@ case class ScalaArrayDataType(elementType: Option[ScalaDataType[_]]) extends Sca
 
   def getCastFunction(fromDataType: ScalaDataType[_]): Any => Seq[_] = {
     fromDataType match {
-      case ScalaNullDataType => (_ => null)
+      case ScalaNullDataType => _ => null
     }
   }
 
@@ -283,7 +280,7 @@ object ScalaNullDataType extends ScalaDataType[Null] {
 
   def ordering: Ordering[Option[Null]] = Ordering.Option(Ordering[Null])
 
-  override def getCastFunction(fromDataType: ScalaDataType[_]): (Any => Null) = {
+  override def getCastFunction(fromDataType: ScalaDataType[_]): Any => Null = {
     throw new UnsupportedOperationException("A ScalaTimestampDataType cannot be cast from other types supported in ScalaDataFrame")
   }
 

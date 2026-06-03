@@ -90,14 +90,14 @@ object ProductUtil {
         case None => msg.append("None")
         case Some(obj) => addObjToBuilder(msg, obj, spacing = false)
         // handle key->value pairs
-        case obj: Tuple2[Any, Any] =>
+        case obj: Tuple2[_, _] =>
           addObjToBuilder(msg, obj._1, spacing = false)
           msg.append("=")
           addObjToBuilder(msg, obj._2, spacing = false)
         // handle arrays -> convert to Seq (Iterable)
         case obj: Array[Any] => addObjToBuilder(msg, obj.toSeq, spacing = false)
         // handle lists & maps
-        case objs: Iterable[Any] =>
+        case objs: Iterable[_] =>
           msg.append("[")
           val truncatedObjs = objs.take(truncateListLimit)
           // no spacing for first element
