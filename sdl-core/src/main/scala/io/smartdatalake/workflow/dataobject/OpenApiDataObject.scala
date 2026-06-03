@@ -219,7 +219,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
     try {
       val result = JsonUtils.evaluateJsonPath(response, jsonPath)
       val link = result.values match {
-        case x: Seq[String] => x.headOption
+        case x: Seq[String @unchecked] => x.headOption
         case x: String => Some(x)
         case null => None
         case x => throw new IllegalStateException(s"($id) pagingLinkJsonPathExtractor expects a String or a list of Strings as result, but got $x")
