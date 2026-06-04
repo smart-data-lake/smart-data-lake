@@ -106,7 +106,7 @@ object CustomDfsTransformer {
   def extractSeqVal(options: Map[String, String], param: MethodParameterInfo, converter: String => Any): Seq[Any] = {
     val v = options.getOrElse(param.name, throw NotFoundError(s"No value found in options for parameter ${param.name}"))
     try {
-      v.split(",").map(_.trim).filter(_.nonEmpty).map(converter)
+      v.split(",").map(_.trim).filter(_.nonEmpty).map(converter).toList
     } catch {
       case e: Exception => throw new IllegalStateException(s"Could not convert value $v for parameter ${param.name} to ${param.tpe}: ${e.getClass.getSimpleName} - ${e.getMessage}")
     }
@@ -128,7 +128,7 @@ object CustomDfsTransformer {
 }
 
 /**
- * A trait for all transformers having a custom transform method which allows to extract detailed transformation parameter informations.
+ * A trait for all transformers having a custom transform method which allows to extract detailed transformation parameter information.
  */
 trait CustomTransformMethodDef {
   private[smartdatalake] def customTransformMethod: Option[universe.MethodSymbol]
@@ -241,7 +241,7 @@ class CustomTransformMethodWrapper(method: universe.MethodSymbol) {
       require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single DataFrame, but outputDataObjectId is ambiguous. Modify Action to have only one outputIds entry, or return a Map[String,DataFrame] from your custom transform function." )
       Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[DataFrame])
     } else if (returnType <:< typeOf[Dataset[_]]) {
-      require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambigous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
+      require(options.isDefinedAt(OPTION_OUTPUT_DATAOBJECT_ID), "Custom transform function returns a single Dataset, but outputDataObjectId is ambiguous. Modify Action to have only one outputIds entry, or return a Map[String,Dataset] from your custom transform function." )
       Map(options(OPTION_OUTPUT_DATAOBJECT_ID) -> transformResult.asInstanceOf[Dataset[_]].toDF())
     } else {
       throw new IllegalStateException(s"Custom transform function has unsupported return type $returnType")

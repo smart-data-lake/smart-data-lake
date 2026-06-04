@@ -55,7 +55,7 @@ object HistorizationTestUtils {
   private[historization] val ersetztTimestampOldDeletedHist = LocalDateTime.now.minusDays(23)
   private[historization] val ersetztTimestampOldDeletedHistTs = Timestamp.valueOf(ersetztTimestampOldDeletedHist)
   private[historization] val colNames = Seq("id", "name", "age", "health_state")
-  private[historization] val primaryKeyColumns = Array("id", "name")
+  private[historization] val primaryKeyColumns = List("id", "name")
   private[historization] val referenceTimestampNew = LocalDateTime.now
   private[historization] val referenceTimestampNewTs = Timestamp.valueOf(referenceTimestampNew)
 

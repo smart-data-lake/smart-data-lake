@@ -171,7 +171,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
                              isRecursive: Boolean = false)
                             (implicit context: ActionPipelineContext): DataFrameSubFeed = {
     logger.debug(s"($id) enrichSubFeedDataFrame: subFeed = $subFeed, isRecursive = $isRecursive")
-    assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesnt match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
+    assert(input.id == subFeed.dataObjectId, s"($id) DataObject.Id ${input.id} doesn't match SubFeed.DataObjectId ${subFeed.dataObjectId} ")
     assert(phase != ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
       case Some(m: SparkStreamingMode) if !context.simulation =>
@@ -491,8 +491,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         // add metrics listener for this action if not yet done
         val queryName = getStreamingQueryName(output.id)
         val queryListener = new SparkStreamingQueryListener(this, output.id, queryName)
-        // start streaming query - use Trigger.Once for synchronous one-time execution
-        val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.Once(), m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
+        // start streaming query - use Trigger.AvailableNow for synchronous one-time execution
+        val streamingQuery = output.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.AvailableNow(), m.outputOptions, m.checkpointLocation, queryName, m.outputMode, saveModeOptions)
         // wait for termination
         streamingQuery.awaitTermination()
         // wait for first progress (otherwise metrics might not yet be ready)

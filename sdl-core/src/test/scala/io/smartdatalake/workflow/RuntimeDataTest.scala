@@ -71,7 +71,7 @@ class RuntimeDataTest extends AnyFunSuite {
     runtimeData.addEvent(SparkStreamingExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Exec, RuntimeEventState.RUNNING, None, Seq()))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric1", 1, Map("metric1" -> 1)))
     runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId, GenericMetrics("test-metric2", 2, Map("metric2" -> 2)))
-    runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId+"dummy", GenericMetrics("test-metric99", 2, Map()))
+    runtimeData.addMetric(Some(SparkStreamingExecutionId(1)), dataObjectId.id + "dummy", GenericMetrics("test-metric99", 2, Map()))
     assert(runtimeData.getMetrics(dataObjectId, Some(SparkStreamingExecutionId(1))).exists(_.getMainInfos.isDefinedAt("metric2")))
     assert(runtimeData.getMetrics(dataObjectId).exists(_.getMainInfos.isDefinedAt("metric2")))
     // metric for wrong asynchronous execution

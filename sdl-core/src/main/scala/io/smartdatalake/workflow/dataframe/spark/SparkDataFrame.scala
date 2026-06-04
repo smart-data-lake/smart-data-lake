@@ -106,7 +106,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     SparkDataFrame(inner.orderBy(sparkCols.toIndexedSeq: _*))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().toList.map(SparkRow)
 
   override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
 
@@ -217,9 +217,9 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
     else None
   }
 
-  override def columns: Seq[String] = inner.fieldNames
+  override def columns: Seq[String] = inner.fieldNames.toList
 
-  override def fields: Seq[SparkField] = inner.fields.map(SparkField)
+  override def fields: Seq[SparkField] = inner.fields.toList.map(SparkField)
 
   override def sql: String = inner.toDDL
 
@@ -466,12 +466,12 @@ case class SparkStructDataType(override val inner: StructType) extends SparkData
 
   override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
-      case sparkOther: SparkStructDataType => func(inner.fields.map(SparkField), sparkOther.inner.fields.map(SparkField))
+      case sparkOther: SparkStructDataType => func(inner.fields.toList.map(SparkField), sparkOther.inner.fields.toList.map(SparkField))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
-  override def fields: Seq[SparkField] = inner.fields.map(SparkField)
+  override def fields: Seq[SparkField] = inner.fields.toList.map(SparkField)
 
   override def fieldIndex(fieldName: String): Int = inner.fieldIndex(fieldName)
 }

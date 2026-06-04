@@ -61,7 +61,7 @@ object LocalStorageAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    OParser.parse(agentParser, args, LocalStorageAgentSmartDataLakeBuilderConfig()) match {
+    OParser.parse(agentParser, args.toList, LocalStorageAgentSmartDataLakeBuilderConfig()) match {
       case Some(config) =>
 
         // poll for instructions

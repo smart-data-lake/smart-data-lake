@@ -32,8 +32,8 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
   private val indexFile = new Path(hadoopStatePath, "index.json")
-  val currentStatePath: Path = new Path(hadoopStatePath, "current")
-  val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
+  private val currentStatePath: Path = new Path(hadoopStatePath, "current")
+  private val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(currentStatePath) // make sure current state directory exists
   filesystem.setWriteChecksum(false) // disable writing CRC files
@@ -58,6 +58,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
           logger.info(s"renamed ${stateFile.path} -> $tgtFile")
         }
     }
+
     // if final, update index file if enabled
     if (state.isFinal && Environment.hadoopFileStateStoreIndexAppend) {
       val relativeFile = hadoopStatePath.toUri.relativize(filePath.toUri).toString
@@ -133,7 +134,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
           Some(HadoopFileStateId(x.getPath, appName, runId.toInt, attemptId.toInt))
         case _ => None
       })
-      .filter(_.appName == this.appName)
+      .filter(_.appName == this.appName).toList
   }
 
 
@@ -142,7 +143,7 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
    */
   override def recoverRunState(stateId: HadoopFileStateId): ActionDAGRunState = {
     val stateFile = stateId.path
-    require(filesystem.isFile(stateFile), s"Cannot recover previous run state. ${stateFile.toUri} doesn't exists or is not a file.")
+    require(filesystem.exists(stateFile) && filesystem.getFileStatus(stateFile).isFile, s"Cannot recover previous run state. ${stateFile.toUri} doesn't exists or is not a file.")
     val json = HdfsUtil.readHadoopFile(stateFile)
     ActionDAGRunState.fromJson(json)
   }

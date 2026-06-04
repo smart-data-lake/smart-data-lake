@@ -51,7 +51,7 @@ object GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
       override def errorOnUnknownArgument: Boolean = false
     }
 
-    OParser.parse(parser, args, SmartDataLakeBuilderConfig(), setup) match {
+    OParser.parse(parser, args.toList, SmartDataLakeBuilderConfig(), setup) match {
       case Some(config) =>
         val stats = run(config)
         logStats(stats)

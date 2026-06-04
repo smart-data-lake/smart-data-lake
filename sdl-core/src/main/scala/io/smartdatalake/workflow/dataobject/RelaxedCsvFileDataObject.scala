@@ -262,7 +262,7 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
    * Combine parsed row and badRecord into result row
    */
   private def createResultRow(fileRow: Option[Row], badRecord: Option[String], errorMsg: Option[String]): Row = {
-    val values = tgtSchema.fieldNames.map { name =>
+    val values = tgtSchema.fieldNames.toList.map { name =>
       if (name == parserOptions.columnNameOfCorruptRecord) badRecord.orNull
       else if (name == columnNameOfCorruptRecordMsg) errorMsg.orNull
       else if (missingFieldNames.contains(name)) null

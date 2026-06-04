@@ -225,7 +225,7 @@ trait Transform extends Serializable {
      * @return
      *   casted [[DataFrame]]
      */
-    def castAll2String: DataFrame = castColumnsTo(newType = StringType)(colNames = ds.columns)
+    def castAll2String: DataFrame = castColumnsTo(newType = StringType)(colNames = ds.columns.toList)
 
     /**
      * Casts type of all [[DataType]] columns to [[TimestampType]].

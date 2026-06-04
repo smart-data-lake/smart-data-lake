@@ -253,7 +253,7 @@ object TestUtil extends SmartDataLakeLogger with Equality {
       }
 
     def arbitraryRow(fields: Array[StructField]): Row = {
-      val colValues = fields.map(f => arbitraryValue(f.dataType))
+      val colValues = fields.map(f => arbitraryValue(f.dataType)).toList
       Row.fromSeq(colValues)
     }
 

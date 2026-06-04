@@ -18,11 +18,11 @@
  */
 package io.smartdatalake.util.dag
 
-import org.scalameta.ascii.graph.Graph
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import monix.eval.Task
 import monix.execution.Scheduler
+import org.scalameta.ascii.graph.Graph
 
 import scala.annotation.tailrec
 import scala.reflect._
@@ -96,7 +96,7 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
    *
    * @see https://medium.com/@sderosiaux/are-scala-futures-the-past-69bd62b9c001
    *
-   * @param eventListener A instance of [[DAGEventListener]] to be notified about progress of DAG execution
+   * @param eventListener An instance of [[DAGEventListener]] to be notified about progress of DAG execution
    * @param operation A function that computes the result ([[DAGResult]]) for the current node,
    *                  given the result of its predecessors given.
    * @param scheduler The [[Scheduler]] to use for Tasks.
@@ -138,7 +138,7 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
     // prepare final task (Future) by combining all (independent) endNodes in the DAG
     val endTasks = endNodes.map(n => allTasksMap(n.nodeId))
     // wait for all end tasks to complete, then return a sequence
-    val flattenedResult = Task.gatherUnordered(endTasks).map(_.flatMap(trySeqToSeqTry))
+    val flattenedResult = Task.parSequenceUnordered(endTasks).map(_.flatMap(trySeqToSeqTry))
     flattenedResult
       .memoize
       .doOnCancel(Task {
@@ -210,7 +210,7 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       getResultTask(tasksAcc, incomingEdge.nodeIdFrom, incomingEdge.resultId)
     }
     // Wait for results from incoming tasks to be computed and return their results
-    Task.gatherUnordered(incomingTasks)
+    Task.parSequenceUnordered(incomingTasks)
   }
 
   /**

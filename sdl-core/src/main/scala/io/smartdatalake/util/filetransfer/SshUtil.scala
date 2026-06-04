@@ -29,8 +29,8 @@ import java.io.{InputStream, OutputStream}
 import java.net.{InetAddress, Proxy, Socket}
 import java.util
 import javax.net.SocketFactory
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
@@ -79,12 +79,12 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     def splitPathElements(path: String): (String, Seq[String]) = {
       val pathElements = if (path.endsWith("/")) path.split("/"):+"*" else path.split("/")
       val basePath = pathElements.takeWhile(e => !e.contains('*')).mkString("/")
-      val childPathElements = pathElements.dropWhile(e => !e.contains('*'))
+      val childPathElements = pathElements.dropWhile(e => !e.contains('*')).toList
       (basePath, childPathElements)
     }
     def lsGlobElement( basePath: String, globPathElementsResolved: Seq[String], globPathElementsTodo: Seq[String] ): Seq[String] = {
       val path = (basePath+:globPathElementsResolved).mkString("/")
-      val globPathElementPattern = "^"+globPathElementsTodo.head.replaceAll("([\\^$\\.])","\\\\$1").replace("*",".*")+"$"
+      val globPathElementPattern = "^"+globPathElementsTodo.head.replaceAll("([\\^$.])","\\\\$1").replace("*",".*")+"$"
       val newglobPathElementsTodo = globPathElementsTodo.drop(1)
       val fileAttrs = try {
         sftp.ls(path).asScala.filter( _.getName.matches(globPathElementPattern))
@@ -128,7 +128,6 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     import net.schmizz.sshj.sftp.{OpenMode, RemoteFile}
 
     import java.util
-    val stat = sftp.stat(path)
     val handle: RemoteFile = sftp.open(path, util.EnumSet.of(OpenMode.READ))
     new handle.RemoteFileInputStream() {
       override def close(): Unit = try {
@@ -160,7 +159,7 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     import java.io.IOException
 
     // prepare output stream
-    val path = new Path(filename)
+    private val path = new Path(filename)
 
     // override methods
     override def getChild(file: String): HDFSFile = {
@@ -186,11 +185,11 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
     override def getTargetDirectory(dirname: String): LocalDestFile = {
       val tgtDir = getChild(dirname)
       // check parent directory
-      if (hdfs.exists(path) && hdfs.isFile(path)) throw new IOException(path + " existiert bereits als file")
+      if (hdfs.exists(path) && hdfs.getFileStatus(path).isFile) throw new IOException(s"$path exists already as file")
       // check target directory
-      if (hdfs.exists(tgtDir.path) && hdfs.isFile(tgtDir.path)) throw new IOException(tgtDir.path + " existiert bereits als file")
+      if (hdfs.exists(tgtDir.path) && hdfs.getFileStatus(tgtDir.path).isFile) throw new IOException(s"${tgtDir.path} exists already as file")
       // create directories if missing
-      if (!hdfs.mkdirs(tgtDir.path)) throw new IOException("Fehler beim Erstellen des directory " + tgtDir.path)
+      if (!hdfs.mkdirs(tgtDir.path)) throw new IOException("error creating directory " + tgtDir.path)
       tgtDir
     }
 
@@ -198,9 +197,9 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
       val tgtFile = getChild(filename)
       // create parent directory if missing
       //if (!fs.exists(path)) println( s"creating directory $path" )
-      if (!hdfs.exists(path) && !hdfs.mkdirs(path)) throw new IOException("Fehler beim Erstellen des directory " + path)
+      if (!hdfs.exists(path) && !hdfs.mkdirs(path)) throw new IOException("error creating directory " + path)
       // check target file
-      if (hdfs.exists(tgtFile.path) && hdfs.isDirectory(tgtFile.path)) throw new IOException("Ein directory mit demselben Namen existiert bereits")
+      if (hdfs.exists(tgtFile.path) && hdfs.getFileStatus(tgtFile.path).isDirectory) throw new IOException("a directory with this name exists already")
       tgtFile
     }
 
@@ -216,9 +215,9 @@ private[smartdatalake] object SshUtil extends SmartDataLakeLogger {
    */
   class ProxySocketFactory(proxy: Proxy) extends SocketFactory {
     override def createSocket = new Socket(proxy)
-    override def createSocket(host: String, port: Int) = throw new RuntimeException("not implemented")
-    override def createSocket(address: InetAddress, port: Int) = throw new RuntimeException("not implemented")
-    override def createSocket(host: String, port: Int, clientAddress: InetAddress, clientPort: Int) = throw new RuntimeException("not implemented")
-    override def createSocket(address: InetAddress, port: Int, clientAddress: InetAddress, clientPort: Int) = throw new RuntimeException("not implemented")
+    override def createSocket(host: String, port: Int): Socket = throw new RuntimeException("not implemented")
+    override def createSocket(address: InetAddress, port: Int): Socket = throw new RuntimeException("not implemented")
+    override def createSocket(host: String, port: Int, clientAddress: InetAddress, clientPort: Int): Socket = throw new RuntimeException("not implemented")
+    override def createSocket(address: InetAddress, port: Int, clientAddress: InetAddress, clientPort: Int): Socket = throw new RuntimeException("not implemented")
   }
 }

@@ -48,7 +48,7 @@ private[smartdatalake] object AirbyteMessage extends SmartDataLakeLogger {
    * and filtered if filterLog=true. If log level is ERROR they are added to error buffer as well.
    * Invalid
    */
-  def parseOutput(lines: Stream[String], errBuffer: mutable.Buffer[String], filterLog: Boolean = true): Stream[AirbyteMessage] =
+  def parseOutput(lines: LazyList[String], errBuffer: mutable.Buffer[String], filterLog: Boolean = true): LazyList[AirbyteMessage] =
     lines
       // parse json
       .flatMap(line =>

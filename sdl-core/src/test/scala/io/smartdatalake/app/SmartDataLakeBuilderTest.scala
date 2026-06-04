@@ -763,7 +763,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     // check results
     assert(finalSubFeeds.size == 1)
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
-    assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
+    assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.toList.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
 
   test("sdlb run converting col names to lower case") {

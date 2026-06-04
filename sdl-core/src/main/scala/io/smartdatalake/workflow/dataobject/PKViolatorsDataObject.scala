@@ -81,7 +81,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
     def optionalCastColToString(doCast: Boolean)(col: GenericColumn) = if (doCast) col.cast(functions.stringType) else col
 
     def getPKviolatorDf(dataObject: TableDataObject) = {
-      val pkColNames = dataObject.table.primaryKey.get.toArray
+      val pkColNames = dataObject.table.primaryKey.get.toList
       if (dataObject.isTableExisting) {
         val dfTable = dataObject.getDataFrame(Seq(), subFeedType)
         val dfPKViolators = dfTable.getPKviolators(pkColNames)

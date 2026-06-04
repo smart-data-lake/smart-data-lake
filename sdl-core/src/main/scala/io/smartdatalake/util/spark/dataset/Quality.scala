@@ -80,7 +80,7 @@ trait Quality extends Transform {
     def setColumnComments(commentMap: Map[String, String])(implicit logger: Logger): Dataset[T] = {
       def commentField(fld: StructField): StructField = commentMap.get(fld.name).map(comment => fld.withComment(comment)).getOrElse(fld)
 
-      val superfluousComments = commentMap.keys.toSeq.diff(ds.columns)
+      val superfluousComments = commentMap.keys.toSeq.diff(ds.columns.toList)
       if (superfluousComments.nonEmpty) logger.warn(s"Superfluous comment detected for columns ${superfluousComments.mkString(", ")}")
       val commentedCols = ds.schema.map(f => col(f.name).as(f.name, commentField(f).metadata))
       ds.select(commentedCols.toIndexedSeq: _*).as[T](ds.encoder)
