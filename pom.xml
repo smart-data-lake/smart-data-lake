@@ -697,21 +697,25 @@
                     <artifactId>license-maven-plugin</artifactId>
                     <version>4.2</version>
                     <configuration>
-                        <header>${basedir}/${license.header.file}</header>
+                        <licenseSets>
+                            <licenseSet>
+                                <header>${basedir}/${license.header.file}</header>
+                                <includes>
+                                    <include>src/**</include>
+                                </includes>
+                                <excludes>
+                                    <exclude>**/*.accdb</exclude>
+                                    <exclude>**/*.mdb</exclude>
+                                    <exclude>**/*.csv</exclude>
+                                    <exclude>**/*.keytab</exclude>
+                                    <exclude>**/*.pkcs12</exclude>
+                                </excludes>
+                            </licenseSet>
+                        </licenseSets>
                         <properties>
                             <copyright.name>${project.organization.name}</copyright.name>
                             <copyright.contact>${project.organization.url}</copyright.contact>
                         </properties>
-                        <includes>
-                            <include>src/**</include>
-                        </includes>
-                        <excludes>
-                            <exclude>**/*.accdb</exclude>
-                            <exclude>**/*.mdb</exclude>
-                            <exclude>**/*.csv</exclude>
-                            <exclude>**/*.keytab</exclude>
-                            <exclude>**/*.pkcs12</exclude>
-                        </excludes>
                         <mapping>
                             <scala>SLASHSTAR_STYLE</scala>
                             <conf>SCRIPT_STYLE</conf>
