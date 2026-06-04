@@ -57,7 +57,7 @@ object LocalJettyAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    OParser.parse(agentParser, args, LocalJettyAgentSmartDataLakeBuilderConfig()) match {
+    OParser.parse(agentParser, args.toList, LocalJettyAgentSmartDataLakeBuilderConfig()) match {
       case Some(agentServerConfig) =>
         val server = JettyAgentServer(this, agentServerConfig)
         server.start()

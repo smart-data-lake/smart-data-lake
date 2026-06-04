@@ -44,14 +44,14 @@ object ProductUtil {
   }
 
   /**
-   * Same as getFieldData, but helps extracting an optional field type
+   * Same as getFieldData, but helps to extract an optional field type
    */
   def getOptionalFieldData[T](obj: Product, fieldName: String): Option[T] = {
     getRawFieldData(obj, fieldName).flatMap(_.asInstanceOf[Option[T]])
   }
 
   /**
-   * Same as getFieldData, but helps extracting an field which is optional for some objects but for others not
+   * Same as getFieldData, but helps to extract a field which is optional for some objects but for others not
    */
   def getEventuallyOptionalFieldData[T](obj: Product, fieldName: String): Option[T] = {
     getRawFieldData(obj, fieldName).flatMap {
@@ -150,11 +150,11 @@ object ProductUtil {
         f.setAccessible(true)
         (f.getName,f.get(obj))
       }
-      addPairs(msg, pairs)
+      addPairs(msg, pairs.toList)
     }
 
     // generate string
-    val msg = StringBuilder.newBuilder
+    val msg = new StringBuilder()
     addObjToBuilder(msg, obj, spacing = false)
     msg.toString
   }

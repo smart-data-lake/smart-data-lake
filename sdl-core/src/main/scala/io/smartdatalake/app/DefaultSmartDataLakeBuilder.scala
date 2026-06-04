@@ -34,7 +34,7 @@ object DefaultSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    parse(args) match {
+    parse(args.toList) match {
       case Some(config) =>
         val stats = run(config)
         logStats(stats)

@@ -80,7 +80,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * @param table Hive table
    * @param columns Columns to collect statistics from
    */
-  def analyzeTableColumns(table: Table, columns: Seq[String] = Seq(), partitionValue: Option[PartitionValues] = None )(implicit session: SparkSession): Unit = {
+  def analyzeTableColumns(table: Table, columns: Seq[String] = Seq())(implicit session: SparkSession): Unit = {
     val columnsClause = if (columns.nonEmpty) s"COLUMNS ${columns.mkString(",")}" else "ALL COLUMNS"
     val stmt = s"ANALYZE TABLE ${table.fullName} COMPUTE STATISTICS FOR $columnsClause"
     Try(measureTime(execSqlStmt(stmt))) match {
@@ -104,7 +104,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     val preparedPartitionValues = if (partitionValues.nonEmpty) {
       partitionValues.map{
         partitionValue =>
-          // extend PartitionValue with defaults for missing partition colums
+          // extend PartitionValue with defaults for missing partition columns
           partitionValue.elements.view.mapValues(Some(_)) ++ partitionCols.diff(partitionValue.keys.toSeq).map( c => (c, None))
       }
     } else {
@@ -127,7 +127,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
   def getTablePartitions(table: Table) (implicit session: SparkSession) : Seq[Map[String,String]] = {
     import session.implicits._
 
-    // Parse HDFS partitionname into Map
+    // Parse HDFS partition name into Map
     def parseHDFSPartitionString(partitions:String) : Map[String,String] = try {
       partitions.split(Path.SEPARATOR_CHAR).map(_.split("=")).map( e => (e(0), e(1))).toMap
     } catch {
@@ -159,7 +159,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
     }
 
     // return seq of columns
-    partitionColsAndDatatypes.map(_.map(_(0)))
+    partitionColsAndDatatypes.map(_.map(_(0)).toList)
   }
 
   private def movePartitionColsLast( cols:Seq[String], partitions:Seq[String] ): Seq[String] = {
@@ -171,7 +171,7 @@ private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
    * Move partition columns at end of DataFrame as required when writing to Hive in Spark > 2.x
    */
   def movePartitionColsLast( df: DataFrame, partitions:Seq[String] ): DataFrame = {
-    val newColOrder = movePartitionColsLast(df.columns, partitions)
+    val newColOrder = movePartitionColsLast(df.columns.toList, partitions)
     df.select(newColOrder.map(col):_*)
   }
 

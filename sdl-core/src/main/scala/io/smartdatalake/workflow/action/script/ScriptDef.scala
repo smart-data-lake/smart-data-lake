@@ -50,7 +50,7 @@ trait ScriptDef {
    * @param errors an optional Buffer to collect stdErr messages
    * @return standard output of script as Stream of lines
    */
-  def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String,String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): Stream[String]
+  def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String,String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): LazyList[String]
 }
 
 trait ParsableScriptDef extends ScriptDef with ParsableFromConfig[ParsableScriptDef] with ConfigHolder

@@ -100,7 +100,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
       val namePostfix = if (metricName != name) {
         Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
       } else None
-      val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
+      val metricEntries = r.getValuesMap[Any](r.schema.fieldNames.toList).map(e => createMetric(namePostfix, e))
       logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
       metricEntries
     }

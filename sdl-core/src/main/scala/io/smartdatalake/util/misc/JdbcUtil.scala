@@ -31,7 +31,7 @@ import scala.util.{Success, Try}
 object JdbcUtil {
 
   def createTransaction(pool: GenericObjectPool[SqlConnection], logging: Boolean, id: ConfigObjectId): JdbcTransaction = {
-    new JdbcTransaction(pool, logging, id)
+    new JdbcTransaction(pool, id)
   }
 
   def execWithJdbcStatement[A](conn: SqlConnection, doCommit: Boolean)(func: Statement => A): A = {
@@ -54,7 +54,7 @@ object JdbcUtil {
 /**
  * Class for handling database transactions. If all operations succeeded call [[commit]], otherwise [[rollback]].
  */
-private[smartdatalake] class JdbcTransaction(pool: GenericObjectPool[SqlConnection], logging: Boolean, id: ConfigObjectId) extends SmartDataLakeLogger {
+private[smartdatalake] class JdbcTransaction(pool: GenericObjectPool[SqlConnection], id: ConfigObjectId) extends SmartDataLakeLogger {
   logger.info(s"($id) begin transaction $transactionId")
   private val jdbcConnection: SqlConnection = pool.borrowObject()
 
@@ -232,7 +232,7 @@ case class ConnectionPoolConfig (
     // setup connection pool
     val pool = new GenericObjectPool[SqlConnection](new JdbcClientPoolFactory(factoryFun, initSql, testTimeoutSec))
     pool.setMaxTotal(maxParallelConnections)
-    pool.setMinEvictableIdle(Duration.ofSeconds(maxIdleTimeSec)) // timeout to close jdbc connection if not in use
+    pool.setMinEvictableIdleDuration(Duration.ofSeconds(maxIdleTimeSec)) // timeout to close jdbc connection if not in use
     pool.setMaxWait(Duration.ofSeconds(maxWaitTimeSec))
     pool.setTestOnBorrow(testOnBorrow)
     pool.setTestOnCreate(testOnCreate)

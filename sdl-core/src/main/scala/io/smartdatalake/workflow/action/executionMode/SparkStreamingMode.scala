@@ -41,7 +41,7 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
   private[smartdatalake] val trigger = triggerType.toLowerCase match {
     case "once" =>
       assert(triggerTime.isEmpty, "triggerTime must not be set for SparkStreamingMode with triggerType=Once")
-      Trigger.Once()
+      Trigger.AvailableNow()
     case "processingtime" =>
       assert(triggerTime.isDefined, "triggerTime must be set for SparkStreamingMode with triggerType=ProcessingTime")
       Trigger.ProcessingTime(triggerTime.get)
@@ -50,7 +50,7 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
       Trigger.Continuous(triggerTime.get)
   }
 
-  override def isAsynchronous = trigger != Trigger.Once
+  override def isAsynchronous: Boolean = trigger != Trigger.AvailableNow()
 
   override def factory: FromConfigFactory[ExecutionMode] = SparkStreamingMode
 }

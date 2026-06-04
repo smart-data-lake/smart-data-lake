@@ -39,8 +39,8 @@ import scala.collection.mutable
  *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param winCmd       Cmd to execute on windows operating systems - note that it is executed with "cmd /C" prefixed
- * @param linuxCmd     Cmd to execute on linux operating systems - note that it is executed with "sh -c" prefixed.
+ * @param winCmd       Cmd to execute on Windows operating systems - note that it is executed with "cmd /C" prefixed
+ * @param linuxCmd     Cmd to execute on Linux operating systems - note that it is executed with "sh -c" prefixed.
  */
 case class CmdScript(override val name: String = "cmd", override val description: Option[String] = None, winCmd: Option[String] = None, linuxCmd: Option[String] = None) extends CmdScriptBase {
   if (EnvironmentUtil.isWindowsOS) assert(winCmd.isDefined, s"($name) winCmd must be defined when running on Windows")
@@ -79,7 +79,7 @@ trait CmdScriptBase extends ParsableScriptDef with SmartDataLakeLogger {
     cmd.!!(errLogger)
   }
 
-  override def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String, String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): Stream[String] = {
+  override def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String, String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): LazyList[String] = {
     import sys.process._
     val cmd = getCmd(parameters)
     val errLogger = ProcessLogger.apply { err =>
@@ -87,7 +87,7 @@ trait CmdScriptBase extends ParsableScriptDef with SmartDataLakeLogger {
       errors.append(err)
     }
     logger.info(s"($configObjectId) executing command: ${cmd.mkString(" ")}")
-    cmd.lineStream(errLogger)
+    cmd.lineStream(log = errLogger).to(LazyList)
   }
 
   /**

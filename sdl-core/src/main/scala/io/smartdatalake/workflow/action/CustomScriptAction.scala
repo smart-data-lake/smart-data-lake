@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -61,7 +61,7 @@ case class CustomScriptAction(override val id: ActionId,
   }
 
   private def parseLastLine(stdOut: String): Map[String,String] = {
-    val lastLine = stdOut.linesIterator.toIterable.lastOption
+    val lastLine = stdOut.linesIterator.toList.lastOption
     lastLine.map(_.split(' ').map(_.split('=')).filter(_.length==2).map{case Array(k,v) => (k,v)}.toMap).getOrElse(Map())
   }
 

@@ -317,19 +317,19 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // delete partition files
     val partitionValues = PartitionValues(Map("p"->"A"))
     val partitionPath = new Path(dataObject.hadoopPath, dataObject.getPartitionString(partitionValues).get)
-    assert(dataObject.filesystem.isDirectory(partitionPath))
+    assert(dataObject.filesystem.getFileStatus(partitionPath).isDirectory)
     assert(dataObject.filesystem.listStatus(partitionPath).nonEmpty)
     dataObject.deletePartitionsFiles(Seq(partitionValues))
     assert(dataObject.filesystem.listStatus(partitionPath).isEmpty)
-    assert(dataObject.filesystem.isDirectory(partitionPath))
+    assert(dataObject.filesystem.getFileStatus(partitionPath).isDirectory)
 
     // delete files in base dir
     dataObject.filesystem.createNewFile(new Path(dataObject.hadoopPath, "testFile"))
     assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
     dataObject.deleteAllFiles(dataObject.hadoopPath)
     assert(!dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
-    assert(dataObject.filesystem.isDirectory(dataObject.hadoopPath))
-    assert(dataObject.filesystem.isDirectory(new Path(dataObject.hadoopPath,"p=A")))
+    assert(dataObject.filesystem.getFileStatus(dataObject.hadoopPath).isDirectory)
+    assert(dataObject.filesystem.getFileStatus(new Path(dataObject.hadoopPath,"p=A")).isDirectory)
 
     FileUtils.deleteQuietly(tempDir.toFile)
   }

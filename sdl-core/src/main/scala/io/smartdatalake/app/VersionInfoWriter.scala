@@ -108,7 +108,7 @@ object VersionInfoWriter extends SmartDataLakeLogger {
     val config = VersionInfoWriterConfig()
 
     // Parse command line
-    parser.parse(args, config) match {
+    parser.parse(args.toList, config) match {
       case Some(config) => BuildVersionInfo(config.version).writeBuildVersionInfo(config.outputDir, config.app)
       case None => logAndThrowException(s"Error parsing command line parameters", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
