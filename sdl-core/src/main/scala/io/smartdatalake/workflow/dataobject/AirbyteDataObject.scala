@@ -22,15 +22,14 @@ import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.networknt.schema.{JsonSchema, JsonSchemaFactory, SpecVersion, ValidationMessage}
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.json.JsonUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.util.spark.json.JsonUtils
+import io.smartdatalake.util.spark.json.JsonUtils._
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
-import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, SchemaValidation}
@@ -57,7 +56,7 @@ import scala.reflect.{ClassTag, classTag}
  * Limitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.
  * In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
  *
- * Also note that the getDataFrame method is not lazy in Exec-Phase. It will will query the Airbyte Connector before creating the DataFrame.
+ * Also note that the getDataFrame method is not lazy in Exec-Phase. It will query the Airbyte Connector before creating the DataFrame.
  *
  * @param id DataObject identifier
  * @param config Configuration for the source
@@ -141,16 +140,16 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before setState")
-    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
-    assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"${id} Stream '$streamName' does not support incremental output")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"$id Connector does not support incremental output")
+    assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"$id Stream '$streamName' does not support incremental output")
     this.state = state
     configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
   }
 
   override def getState: Option[String] = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getState")
-    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
-    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"$id Connector does not support incremental output")
+    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"$id Stream configuration must be set to SyncMode.Incremental by calling setState before")
     state
   }
 
@@ -174,7 +173,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
       state.map(s => Files.write(tempPath.resolve(stateFilename), s.getBytes(StandardCharsets.UTF_8)))
 
       // prepare parameters
-      val (parameters) = cmd match {
+      val parameters = cmd match {
         case dockerCmd: DockerRunScript =>
           val dockerParams = Seq("run", "--rm", "-v", s"${dockerCmd.preparePath(tempPath.toString)}:$containerConfigDir")
           val runParams = Seq(
@@ -198,7 +197,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
       val linesStream = cmd.execStdOutStream(id, Seq(), parameters.toMap, errors)
 
       // parse result
-      AirbyteMessage.parseOutput(linesStream, errors).toIterator
+      AirbyteMessage.parseOutput(linesStream, errors).iterator
 
     } catch {
       case ex: Exception => throw AirbyteConnectorException(s"($id) Could not launch connector: ${errors.mkString(", ")}, ${ex.getMessage}", ex)

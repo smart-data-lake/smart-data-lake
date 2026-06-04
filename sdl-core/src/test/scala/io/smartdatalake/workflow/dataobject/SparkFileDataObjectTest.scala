@@ -48,7 +48,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    dataObject.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame().count() shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
@@ -57,7 +57,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    dataObject.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    dataObject.getSparkDataFrame().count() shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
     FileUtils.deleteQuietly(tempDir.toFile)
@@ -127,9 +127,9 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.writeSparkDataFrame(df1, partitionValuesCreated )
 
     // test reading data
-    dataObject.getSparkDataFrame().count shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
-    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"B")))).count shouldEqual 2 // two records in partition B
-    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count shouldEqual 4
+    dataObject.getSparkDataFrame().count() shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"B")))).count() shouldEqual 2 // two records in partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count() shouldEqual 4
 
     // test expected partitions
     assert( dataObject.filterExpectedPartitionValues(partitionValuesCreated) == Seq(PartitionValues(Map("p"->"B"))))
@@ -256,7 +256,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dfInit.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
     val df = dataObject.getSparkDataFrame()(contextExec)
     df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
-    df.select(sourceFileColName).collect.head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
+    df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
 
     // test if it could be written again
     dataObject.initSparkDataFrame(df.drop(sourceFileColName), Seq())
@@ -372,8 +372,8 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     //check
     assert(!Files.exists(partitionPathA)) // p=A is deleted
-    assert(Files.list(partitionPathB).count == 20) // check p=A moved to p=B
-    assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head == 110) // check completeness of p=A + p=B
+    assert(Files.list(partitionPathB).count() == 20) // check p=A moved to p=B
+    assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head() == 110) // check completeness of p=A + p=B
   }
 
   test("incremental output mode") {
@@ -389,7 +389,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     // test 1
     dataObject.setState(None) // initialize incremental output with empty state
-    dataObject.getSparkDataFrame()(contextExec).count shouldEqual 4
+    dataObject.getSparkDataFrame()(contextExec).count() shouldEqual 4
     val newState1 = dataObject.getState
 
     // append test data 2
@@ -400,11 +400,11 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test 2
     dataObject.setState(newState1)
     val df2result = dataObject.getSparkDataFrame()(contextExec)
-    df2result.count shouldEqual 1
+    df2result.count() shouldEqual 1
     val newState2 = dataObject.getState
     assert(newState1.get < newState2.get)
 
-    dataObject.getSparkDataFrame()(contextInit).count shouldEqual 5
+    dataObject.getSparkDataFrame()(contextInit).count() shouldEqual 5
 
     FileUtils.deleteQuietly(tempDir.toFile)
   }

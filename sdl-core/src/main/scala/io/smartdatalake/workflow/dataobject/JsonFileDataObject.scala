@@ -49,6 +49,7 @@ import org.apache.spark.sql.DataFrame
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
  */
+@scala.annotation.nowarn("cat=deprecation")
 case class JsonFileDataObject( override val id: DataObjectId,
                                override val path: String,
                                jsonOptions: Option[Map[String, String]] = None,
@@ -75,11 +76,13 @@ case class JsonFileDataObject( override val id: DataObjectId,
   private val formatOptionsDefault = Map("multiLine" -> "true", "pathGlobFilter" -> fileName)
   override val options: Map[String, String] = formatOptionsDefault ++ jsonOptions.getOrElse(Map())
 
+  @scala.annotation.nowarn("cat=deprecation")
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.afterRead(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }
 
+  @scala.annotation.nowarn("cat=deprecation")
   override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame  = {
     val dfSuper = super.beforeWrite(df)
     if (stringify) dfSuper.castAll2String else dfSuper

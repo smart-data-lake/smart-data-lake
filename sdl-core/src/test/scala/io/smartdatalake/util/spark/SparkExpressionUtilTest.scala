@@ -52,7 +52,7 @@ class SparkExpressionUtilTest extends AnyFunSuite {
       )
     )
     val resultDf = df.withColumn("actual", evalUdf($"eqn", $"a", $"b", $"c", $"d", $"x"))
-    val result = resultDf.agg(min($"actual" === $"expected")).as[Boolean].head
+    val result = resultDf.agg(min($"actual" === $"expected")).as[Boolean].head()
     if (!result) {
       println(s"Test Failed for the following rows:")
       resultDf.where($"actual" =!= $"expected")

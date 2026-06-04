@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow.connection.jdbc
 
 import org.apache.spark.sql.connector.catalog.Identifier
-import org.apache.spark.sql.connector.expressions.NamedReference
-import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, GeneralAggregateFunc}
+import org.apache.spark.sql.connector.expressions.aggregate.GeneralAggregateFunc
+import org.apache.spark.sql.connector.expressions.{Expression, NamedReference}
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcUtils}
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcType}
 import org.apache.spark.sql.types._
@@ -30,17 +30,17 @@ import java.util.Locale
 import scala.collection.mutable
 
 /**
- * Spark does not provide a [[JdbcDialect]] for MariaDb, so we provide one here.
- * The [[MariaDbDialect]] is based on [[org.apache.spark.sql.jdbc.MySQLDialect]].
+ * Spark does not provide a [[JdbcDialect]] for MariaDb, so we provide one here. The
+ * [[MariaDbDialect]] is based on [[org.apache.spark.sql.jdbc.MySQLDialect]].
  */
 private case object MariaDbDialect extends JdbcDialect {
 
   override def canHandle(url: String): Boolean = url.toLowerCase(Locale.ROOT).startsWith("jdbc:mariadb")
 
   // See https://mariadb.com/kb/en/aggregate-functions/
-  override def compileAggregate(aggFunction: AggregateFunc): Option[String] = {
-    super.compileAggregate(aggFunction).orElse(
-      aggFunction match {
+  override def compileExpression(expr: Expression): Option[String] =
+    super.compileExpression(expr).orElse(
+      expr match {
         case f: GeneralAggregateFunc if f.name() == "VAR_POP" && !f.isDistinct =>
           assert(f.children().length == 1)
           Some(s"VAR_POP(${f.children().head})")
@@ -56,9 +56,8 @@ private case object MariaDbDialect extends JdbcDialect {
         case _ => None
       }
     )
-  }
 
-  override def getCatalystType(sqlType: Int, typeName: String, size: Int, md: MetadataBuilder): Option[DataType] = {
+  override def getCatalystType(sqlType: Int, typeName: String, size: Int, md: MetadataBuilder): Option[DataType] =
     if (sqlType == Types.VARBINARY && typeName.equals("BIT") && size != 1) {
       // This could instead be a BinaryType if we'd rather return bit-vectors of up to 64 bits as
       // byte arrays instead of longs.
@@ -67,46 +66,39 @@ private case object MariaDbDialect extends JdbcDialect {
     } else if (sqlType == Types.BIT && typeName.equals("TINYINT")) {
       Option(BooleanType)
     } else None
-  }
 
-  override def quoteIdentifier(colName: String): String = {
-    s"`${colName}`"
-  }
+  override def quoteIdentifier(colName: String): String =
+    s"`$colName`"
 
-  override def schemasExists(conn: java.sql.Connection, options: JDBCOptions, schema: String): Boolean = {
+  override def schemasExists(conn: java.sql.Connection, options: JDBCOptions, schema: String): Boolean =
     listSchemas(conn, options).exists(_.head == schema)
-  }
 
   override def listSchemas(connection: java.sql.Connection, options: JDBCOptions): Array[Array[String]] = {
     val schemaBuilder = mutable.ArrayBuilder.make[Array[String]]
-    try {
+    try
       JdbcUtils.executeQuery(connection, options, "SHOW SCHEMAS") { rs =>
-        while (rs.next()) {
+        while (rs.next())
           schemaBuilder += Array(rs.getString("Database"))
-        }
       }
-    } catch {
+    catch {
       case _: Exception =>
         logWarning("Cannot show schemas.")
     }
     schemaBuilder.result()
   }
 
-  override def getTableExistsQuery(table: String): String = {
+  override def getTableExistsQuery(table: String): String =
     s"SELECT 1 FROM $table LIMIT 1"
-  }
 
   override def isCascadingTruncateTable(): Option[Boolean] = Some(false)
 
   // See https://mariadb.com/kb/en/alter-table/
-  override def getUpdateColumnTypeQuery(tableName: String, columnName: String, newDataType: String): String = {
+  override def getUpdateColumnTypeQuery(tableName: String, columnName: String, newDataType: String): String =
     s"ALTER TABLE $tableName MODIFY COLUMN ${quoteIdentifier(columnName)} $newDataType"
-  }
 
   // See https://mariadb.com/kb/en/alter-table/
-  override def getRenameColumnQuery(tableName: String, columnName: String, newName: String, dbMajorVersion: Int): String = {
+  override def getRenameColumnQuery(tableName: String, columnName: String, newName: String, dbMajorVersion: Int): String =
     s"ALTER TABLE $tableName RENAME COLUMN ${quoteIdentifier(columnName)} TO ${quoteIdentifier(newName)}"
-  }
 
   // It is required to have column data type to change the column nullability, see https://mariadb.com/kb/en/alter-table/:
   // ALTER TABLE tbl_name MODIFY [COLUMN] col_name column_definition
@@ -114,35 +106,35 @@ private case object MariaDbDialect extends JdbcDialect {
   //    data_type [NOT NULL | NULL]
   // e.g. ALTER TABLE t1 MODIFY b INT NOT NULL;
   // We don't have column data type here, so throw an exception for now.
-  override def getUpdateColumnNullabilityQuery(tableName: String, columnName: String, isNullable: Boolean): String = {
+  override def getUpdateColumnNullabilityQuery(tableName: String, columnName: String, isNullable: Boolean): String =
     throw new SQLFeatureNotSupportedException("UpdateColumnNullability is not supported without knowledge of the data type.")
-  }
 
   // See https://mariadb.com/kb/en/alter-table/
-  override def getTableCommentQuery(table: String, comment: String): String = {
+  override def getTableCommentQuery(table: String, comment: String): String =
     s"ALTER TABLE $table COMMENT = '$comment'"
-  }
 
   override def getJDBCType(dt: DataType): Option[JdbcType] = dt match {
     // See SPARK-35446: MySQL treats REAL as a synonym to DOUBLE by default.
     // The same holds for MariaDB, see https://mariadb.com/kb/en/double-precision/.
     // We override getJDBCType so that FloatType is mapped to FLOAT instead.
     case FloatType => Option(JdbcType("FLOAT", java.sql.Types.FLOAT))
-    case _ => JdbcUtils.getCommonJDBCType(dt)
+    case _         => JdbcUtils.getCommonJDBCType(dt)
   }
 
-  override def getSchemaCommentQuery(schema: String, comment: String): String = {
+  override def getSchemaCommentQuery(schema: String, comment: String): String =
     throw new SQLFeatureNotSupportedException("Schema comments are not supported in MariaDB.")
-  }
 
-  override def removeSchemaCommentQuery(schema: String): String = {
+  override def removeSchemaCommentQuery(schema: String): String =
     throw new SQLFeatureNotSupportedException("Schema comments are not supported in MariaDB.")
-  }
 
   // See c
-  override def createIndex(indexName: String, tableIdent: Identifier, columns: Array[NamedReference],
-                           columnsProperties: java.util.Map[NamedReference, java.util.Map[String, String]],
-                           properties: java.util.Map[String, String]): String = {
+  override def createIndex(
+      indexName: String,
+      tableIdent: Identifier,
+      columns: Array[NamedReference],
+      columnsProperties: java.util.Map[NamedReference, java.util.Map[String, String]],
+      properties: java.util.Map[String, String]
+  ): String = {
     val columnList = columns.map(col => quoteIdentifier(col.fieldNames.head))
     val (indexType, indexPropertyList) = JdbcUtils.processIndexProperties(properties, "mysql")
 
@@ -158,15 +150,13 @@ private case object MariaDbDialect extends JdbcDialect {
   }
 
   // See https://mariadb.com/kb/en/drop-index/
-  override def dropIndex(indexName: String, tableIdent: Identifier): String = {
+  override def dropIndex(indexName: String, tableIdent: Identifier): String =
     s"DROP INDEX ${quoteIdentifier(indexName)} ON ${tableIdent.name()}"
-  }
 
-  override def dropSchema(schema: String, cascade: Boolean): String = {
+  override def dropSchema(schema: String, cascade: Boolean): String =
     if (cascade) {
       s"DROP SCHEMA ${quoteIdentifier(schema)}"
     } else {
       throw new SQLFeatureNotSupportedException("DROP SCHEMA is always cascading in MariaDB.")
     }
-  }
 }

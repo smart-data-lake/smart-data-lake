@@ -696,7 +696,7 @@ class TransformTest extends AnyFlatSpec with Matchers
     ).toDF("x", "y", "z", "t", "val")
     val actual = SortedMap[Int, Map[Int, Map[Int, Map[Int, Float]]]]() ++
       argument.dataSet2curryFrame(pkCols = List("x", "y", "z", "t"))
-        .as[Map[Int, Map[Int, Map[Int, Map[Int, Float]]]]].head
+        .as[Map[Int, Map[Int, Map[Int, Map[Int, Float]]]]].head()
     val expected = SortedMap[Int, Map[Int, Map[Int, Map[Int, Float]]]]() ++ Map(
       -2 -> Map(7 -> Map(9 -> Map(8 -> -2798f))),
       0  -> Map(
@@ -712,7 +712,7 @@ class TransformTest extends AnyFlatSpec with Matchers
     val argument = dfIdX.where(org.apache.spark.sql.functions.not($"x".isNaN))
     val actual = SortedMap[Int, Option[Double]]() ++
       argument.dataSet2curryFrame(pkCols = List("id"))
-        .as[Map[Int, Option[Double]]].head
+        .as[Map[Int, Option[Double]]].head()
     val expected = SortedMap[Int, Option[Double]]() ++
       dfIdXRows.filter { case (_, y) => y.forall(!_.isNaN) }.toMap
     actual should be(expected)
@@ -724,7 +724,7 @@ class TransformTest extends AnyFlatSpec with Matchers
     ).toDF("x", "y", "val")
     val actual = SortedMap[Int, Map[Int, Float]]() ++
       argument.dataSet2curryFrame(pkCols = List("x", "y"))
-        .as[Map[Int, Map[Int, Float]]].head
+        .as[Map[Int, Map[Int, Float]]].head()
     val expected = SortedMap[Int, Map[Int, Float]]() ++ Map(
       -2 -> Map(7 -> -27f),
       0  -> Map(0 -> 0f, 1 -> 1f),

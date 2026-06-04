@@ -35,7 +35,7 @@ import io.smartdatalake.workflow.dataobject.DataObject
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
-import java.lang.reflect.{InvocationTargetException, ParameterizedType}
+import java.lang.reflect.InvocationTargetException
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
@@ -47,13 +47,13 @@ import scala.reflect.runtime.universe.typeOf
  * @param description                Optional description of the transformer
  * @param className                  Class name implementing trait [[CustomDfsTransformer]]
  * @param options                    Options to pass to the transformation
- * @param runtimeOptions             Optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                                   The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
- * @param parameterResolution        By default parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
+ * @param runtimeOptions             Optional tuples of [key, spark SQL expression] to be added as additional options when executing transformation.
+ *                                   The spark SQL expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param parameterResolution        By default, parameter resolution for transform function uses input Datasets id to match the corresponding parameter name.
  *                                   But there are other options, see [[ParameterResolution]].
- * @param strictInputValidation      Enforce that the number of input dataobjects must be the same as the number of input datasets. False by default,
+ * @param strictInputValidation      Enforce that the number of input data objects must be the same as the number of input datasets. False by default,
  *                                   because when chaining multiple transformations in the same action, you may not need all output Data objects of the previous transformations.
- *                                   However, having more input parameters in your transform method than Dataobjects will always fail.
+ *                                   However, having more input parameters in your transform method than Data objects will always fail.
  * @param inputColumnAutoSelect      Determine if the input-datasets should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default.
  * @param outputColumnAutoSelect     Determine if the output-dataset should contain exactly the columns defined by the corresponding case class (spark does not ensure this out of the box). True per default.
  * @param addPartitionValuesToOutput If set to true and if one partition-value is processed at a time, the partition-columns will be added to the output-dataset
@@ -62,6 +62,7 @@ import scala.reflect.runtime.universe.typeOf
  * @param outputDatasetId            Optional id of the output Dataset. Default is the id of the Actions first output DataObject.
  */
 case class ScalaClassSparkDsNTo1Transformer(override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), parameterResolution: ParameterResolution = ParameterResolution.DataObjectId, strictInputValidation: Boolean = false, inputColumnAutoSelect: Boolean = true, outputColumnAutoSelect: Boolean = true, addPartitionValuesToOutput: Boolean = false, outputDatasetId: Option[String] = None) extends OptionsSparkDfsTransformer with SmartDataLakeLogger {
+  @scala.annotation.nowarn("cat=deprecation")
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomDsNto1Transformer](className)
   override val name: String = className
 

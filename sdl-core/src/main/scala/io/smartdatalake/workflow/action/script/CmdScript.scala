@@ -87,7 +87,7 @@ trait CmdScriptBase extends ParsableScriptDef with SmartDataLakeLogger {
       errors.append(err)
     }
     logger.info(s"($configObjectId) executing command: ${cmd.mkString(" ")}")
-    cmd.lineStream(log = errLogger).to(LazyList)
+    cmd.lazyLines(log = errLogger)
   }
 
   /**

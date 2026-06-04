@@ -28,11 +28,11 @@ import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.dataframe.plainScala.{ScalaAbstractColumn, ScalaDataFrame, ScalaSchema, ScalaSubFeed}
+import io.smartdatalake.workflow.dataframe.plainScala.{ScalaAbstractColumn, ScalaDataFrame, ScalaSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, CanMergeDataFrame, CanWriteDataFrame, Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -77,7 +77,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
   def getScalaDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): ScalaDataFrame = {
     if (partitions.nonEmpty) {
       partitionedDataFrameMock
-        .map(_.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).values.reduce(_ unionByName _))
+        .map(_.view.filterKeys(pv => partitionValues.isEmpty || partitionValues.exists(pv.isIncludedIn)).toMap.values.reduce(_ unionByName _))
         .orElse(dataFrameMock) // dataFrameMock can be initialized with an empty DataFrame for partitioned MockDataObject if no partitionValues are provided in initSparkDataFrame
         .orElse(schemaMin.map(subFeedCompanion.getEmptyDataFrame(_, id).asInstanceOf[ScalaDataFrame]))
         .getOrElse(throw NoDataToProcessWarning("mock", s"($id) partitionedDataFrameMock not initialized"))
@@ -110,14 +110,14 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
 
   override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     df match {
-      case scalaDf: ScalaDataFrame => writeScalaDataFrame(scalaDf, partitionValues, isRecursiveInput, saveModeOptions)
+      case scalaDf: ScalaDataFrame => writeScalaDataFrame(scalaDf, partitionValues, saveModeOptions)
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
     }
   }
 
   override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[ScalaSubFeed])
 
-  def writeScalaDataFrame(df: ScalaDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
+  def writeScalaDataFrame(df: ScalaDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
     assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
@@ -189,7 +189,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     }
 
     // update records
-    val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(dfNew.columns.toSeq.diff(table.primaryKey.get))
+    val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(dfNew.columns.diff(table.primaryKey.get))
     val updateSelectCols = targetColumns
       .map(c => (if (updateCols.contains(c)) col(s"new.$c") else if (existingColumns.contains(c)) col(s"existing.$c") else lit(null)).as(c))
     val updateCondition = saveModeExpr.updateConditionExpr.getOrElse(lit(true))
@@ -198,7 +198,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
 
     // update existing records
     val (dfUpdated2, dfNotUpdated2) = if (saveModeOptions.updateExistingCondition.isDefined) {
-      val updateCols = dfNew.columns.toSeq.diff(Seq(Historization.historizeOperationColName))
+      val updateCols = dfNew.columns.diff(Seq(Historization.historizeOperationColName))
       val updateSelectCols = targetColumns
         .map(c => (if (updateCols.contains(c)) col(s"new.$c") else if (existingColumns.contains(c)) col(s"existing.$c") else lit(null)).as(c))
       val updateExistingCondition = saveModeExpr.updateExistingConditionExpr.get
@@ -206,7 +206,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
       val dfNotUpdated = dfMatched.where(not(updateExistingCondition) and not(updateCondition)).select(col("existing.*"))
       (dfUpdated.unionByName(dfUpdatedExisting), dfNotUpdated)
     } else (dfUpdated, dfNotUpdated)
-    var dfMerged = dfUpdated2.unionByName(dfNotUpdated2, allowMissingColumns = true)
+    val dfMerged = dfUpdated2.unionByName(dfNotUpdated2, allowMissingColumns = true)
 
     // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
     val insertCols = dfNew.columns.diff(saveModeOptions.insertColumnsToIgnore)

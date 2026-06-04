@@ -84,9 +84,9 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
     val dfResult = dataObj.getSparkDataFrame().cache()
 
     assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3", "_corrupt_record", "_corrupt_record_msg", "_filename"))
-    assert(dfResult.where($"h1"==="A" and $"_corrupt_record".isNull and $"_corrupt_record_msg".isNull).count == 2)
-    assert(dfResult.where($"h1"==="B" and $"_corrupt_record".isNotNull and $"_corrupt_record_msg".isNotNull).count == 2)
-    assert(dfResult.where($"h1"==="C" and $"_corrupt_record".isNotNull and $"_corrupt_record_msg".isNotNull).count == 2)
+    assert(dfResult.where($"h1"==="A" and $"_corrupt_record".isNull and $"_corrupt_record_msg".isNull).count() == 2)
+    assert(dfResult.where($"h1"==="B" and $"_corrupt_record".isNotNull and $"_corrupt_record_msg".isNotNull).count() == 2)
+    assert(dfResult.where($"h1"==="C" and $"_corrupt_record".isNotNull and $"_corrupt_record_msg".isNotNull).count() == 2)
   }
 
   test("CSV files with different column order") {
@@ -130,7 +130,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
     assert(dfResult.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     val expectedResult = data1 ++ data2.map(x => (x._3, x._1, x._2))
     assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == expectedResult.toSet )
-    assert(dfResult.select($"_filename").distinct.count > 1 )
+    assert(dfResult.select($"_filename").distinct().count() > 1 )
   }
 
   test("CSV files partitioned") {
@@ -220,7 +220,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
     assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3", "_corrupt_record"))
     val expectedResult = Seq[(String,String,String)](("A","1",null))
     assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == expectedResult.toSet )
-    assert(dfResult.where($"_corrupt_record".isNotNull).count == 1)
+    assert(dfResult.where($"_corrupt_record".isNotNull).count() == 1)
   }
 
   test("Bad CSV File with FailFastMode") {
@@ -234,7 +234,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
     val options = Map("mode" -> "failfast")
     val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string"))
     val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
-    intercept[SparkException](dataObj.getSparkDataFrame().count)
+    intercept[SparkException](dataObj.getSparkDataFrame().count())
   }
 
   test("Bad CSV File with DropMalformedMode") {
@@ -251,7 +251,7 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
     val dfResult = dataObj.getSparkDataFrame()
 
     assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
-    assert(dfResult.count == 0)
+    assert(dfResult.count() == 0)
   }
 
   private val testDf = Seq(

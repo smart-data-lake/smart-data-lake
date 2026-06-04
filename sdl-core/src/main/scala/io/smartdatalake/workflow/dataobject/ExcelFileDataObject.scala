@@ -89,7 +89,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
 
     // cleanup header names
     val newNames = dfSuper.columns.map(name => StringUtil.strCamelCase2LowerCaseWithUnderscores(cleanHeaderName(name)))
-    dfSuper.toDF(newNames: _ *)
+    dfSuper.toDF(newNames.toIndexedSeq: _ *)
   }
 
   /**

@@ -38,7 +38,7 @@ class SDLSparkExtensionTest extends AnyFunSuite with StructTypeUtil {
   test("fail on assertNonEmpty with empty DataFrame") {
     // fail after applying assertNonEmpty
     val dfWithAssert = SDLSparkExtension.assertNotEmpty(df = emptyDf)
-    intercept[AssertNotEmptyFailure](dfWithAssert.count)
+    intercept[AssertNotEmptyFailure](dfWithAssert.count())
   }
 
   test("succeed on assertNonEmpty with non-empty DataFrame") {
@@ -47,7 +47,7 @@ class SDLSparkExtensionTest extends AnyFunSuite with StructTypeUtil {
 
     // succeed when applying assertNonEmpty
     val dfWithAssert = SDLSparkExtension.assertNotEmpty(dfJoined)
-    dfWithAssert.count
+    dfWithAssert.count()
   }
 
   test("fail on check no-data rule with empty DataFrame") {

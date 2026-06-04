@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -52,6 +52,7 @@ case class CustomMode(className: String, override val alternativeOutputId: Optio
 }
 
 object CustomMode extends FromConfigFactory[ExecutionMode] {
+  @scala.annotation.nowarn("cat=deprecation")
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomMode = {
     extract[CustomMode](config)
   }

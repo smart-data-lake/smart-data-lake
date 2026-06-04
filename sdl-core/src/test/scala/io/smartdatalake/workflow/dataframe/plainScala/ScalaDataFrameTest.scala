@@ -232,7 +232,7 @@ class ScalaDataFrameTest extends AnyFunSuite {
   test("ScalaArrayDataType stores Sequences in its cell values") {
     val df = ScalaDataFrame.fromData(Seq(Seq(Seq(1,2,3,4)), Seq(Seq(5,6,7)), Seq(Seq(8,9,10))))
     val hasCorrectType = df.schema("col0").dataType == ScalaArrayDataType(None)
-    val storesCorrectData = Seq(0,1,2).forall(ix => df(ix)(0).isInstanceOf[Option[Seq[Int]]])
+    val storesCorrectData = Seq(0,1,2).forall(ix => df(ix)(0).isInstanceOf[Option[_]])
     assert(hasCorrectType && storesCorrectData)
   }
 
