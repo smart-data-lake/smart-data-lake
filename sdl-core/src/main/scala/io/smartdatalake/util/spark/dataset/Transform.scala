@@ -376,7 +376,7 @@ trait Transform extends Serializable {
         case None         => ds.asInstanceOf[DataFrame]
         case Some(mapCol) =>
           val i = ds.columns.indexOf(mapCol)
-          ds.select(ds.columns.take(i).map(col) ++ (explode(col(mapCol)) +: ds.columns.drop(i + 1).map(col)).toIndexedSeq: _*)
+          ds.select((ds.columns.take(i).map(col) ++ (explode(col(mapCol)) +: ds.columns.drop(i + 1).map(col))).toIndexedSeq: _*)
             .withColumnRenamed("key", s"${mapCol}_key")
             .withColumnRenamed("value", s"${mapCol}_value")
             .explodeMaps

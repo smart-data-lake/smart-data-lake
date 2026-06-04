@@ -101,7 +101,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     // read
     val dfResult2 = dataObj.getSparkDataFrame()
-    dfResult2.show
+    dfResult2.show()
   }
 
   test("Complex XML file") {
@@ -128,7 +128,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // see also https://issues.apache.org/jira/browse/SPARK-38285
     session.conf.set(key = "spark.sql.optimizer.expression.nestedPruning.enabled", value = false)
     session.conf.set(key = "spark.sql.optimizer.nestedSchemaPruning.enabled", value = false)
-    val dfResult = dataObj.getSparkDataFrame()(contextExec).cache
+    val dfResult = dataObj.getSparkDataFrame()(contextExec).cache()
     // test L0: should include 1 updated L0 and 1 deleted record
     val dfResultL0 = dfResult
       .withColumn("cntDesc", functions.size($"descriptions.description"))

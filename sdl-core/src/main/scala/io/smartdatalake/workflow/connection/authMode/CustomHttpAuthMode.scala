@@ -42,6 +42,7 @@ case class CustomHttpAuthMode(className: String, options: Map[String, StringOrSe
 }
 
 object CustomHttpAuthMode extends FromConfigFactory[HttpAuthMode] {
+  @scala.annotation.nowarn("cat=deprecation")
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomHttpAuthMode = {
     extract[CustomHttpAuthMode](config)
   }

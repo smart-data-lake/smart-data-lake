@@ -52,9 +52,10 @@ case class AnotherOutputDataSetPartitioned(concatenated_name: String, added_rati
 
 case class AddedRating(added_rating: Int)
 
+@scala.annotation.nowarn("cat=deprecation")
 class TestResolutionByIdDs2To1Transformer extends CustomDsNto1Transformer {
 
-  def transform(session: SparkSession, options: Map[String, String], src1Ds: Dataset[NameRating], src2Ds: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
+  def transform(session: SparkSession, src1Ds: Dataset[NameRating], src2Ds: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
     import session.implicits._
 
     val crossJoined = src1Ds.as("ds1").crossJoin(src2Ds.as("ds2"))
@@ -66,6 +67,7 @@ class TestResolutionByIdDs2To1Transformer extends CustomDsNto1Transformer {
   }
 }
 
+@scala.annotation.nowarn("cat=deprecation")
 class TestResolutionByOrderingDs2To1Transformer extends CustomDsNto1Transformer {
 
   //The params are in strange order to illustrate that only Datasets are taken into account when resolving DOs by config order
@@ -81,6 +83,7 @@ class TestResolutionByOrderingDs2To1Transformer extends CustomDsNto1Transformer 
   }
 }
 
+@scala.annotation.nowarn("cat=deprecation")
 class Ds9To1Transformer extends CustomDsNto1Transformer {
 
   //The params are in strange order to illustrate that only Datasets are taken into account when resolving DOs by config order
@@ -94,11 +97,13 @@ class Ds9To1Transformer extends CustomDsNto1Transformer {
   }
 }
 
+@scala.annotation.nowarn("cat=deprecation")
 class NoTransformDsNTo1Transformer extends CustomDsNto1Transformer {
 }
 
+@scala.annotation.nowarn("cat=deprecation")
 class BadSignatureTransformDsNTo1Transformer extends CustomDsNto1Transformer {
-  def transform(gugus: String, options: Map[String, String], firstDataset: Dataset[RatingName], session: SparkSession, secondDataset: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
+  def transform(options: Map[String, String], firstDataset: Dataset[RatingName], session: SparkSession, secondDataset: Dataset[NameRating]): Dataset[AnotherOutputDataSet] = {
     throw new IllegalStateException("Code should not be reached")
   }
 }
@@ -320,7 +325,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
     val (subFeeds, _): (Seq[SubFeed], Map[RuntimeEventState, Int]) = sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1, srcDO2))(session)
 
     val tgt1DO: SparkSubFeed = subFeeds.head.asInstanceOf[SparkSubFeed]
-    val actual = tgt1DO.dataFrame.get.inner.as[AnotherOutputDataSetPartitioned].collect.head
+    val actual = tgt1DO.dataFrame.get.inner.as[AnotherOutputDataSetPartitioned].collect().head
     assert(actual.added_rating == 15)
     assert(actual.concatenated_name == "johndoe")
     assert(actual.year == "1992")

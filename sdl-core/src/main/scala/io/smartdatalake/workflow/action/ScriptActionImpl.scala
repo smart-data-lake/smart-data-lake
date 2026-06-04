@@ -35,7 +35,7 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
   override val executionMode: Option[ExecutionMode] = None // no use for execution mode with scripts so far
   override def metricsFailCondition: Option[String] = None // no metrics for script execution so far
 
-  private[smartdatalake] override def subFeedConverter(): SubFeedConverter[ScriptSubFeed] = ScriptSubFeed
+  private[smartdatalake] override def subFeedConverter: SubFeedConverter[ScriptSubFeed] = ScriptSubFeed
 
   /**
    * To be implemented by sub-classes

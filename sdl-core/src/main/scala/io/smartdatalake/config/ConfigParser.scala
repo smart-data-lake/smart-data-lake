@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
-import org.reflections.scanners.SubTypesScanner
+import org.reflections.scanners.Scanners
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe._
@@ -40,7 +40,7 @@ import scala.util.matching.Regex
  */
 private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
-  final val CONFIG_SECTION_AGENTS = "agents"
+  private final val CONFIG_SECTION_AGENTS = "agents"
 
   /**
    * Parses the supplied config and returns a populated [[InstanceRegistry]].
@@ -257,7 +257,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
       val abstractSymbol = symbolOf[A]
       if (implClasses.isEmpty) {
         // check if type does exist in package, but has wrong type
-        val allReflections = new Reflections(WORKFLOW_PACKAGE, new SubTypesScanner(false /* don't exclude Object.class */))
+        val allReflections = new Reflections(WORKFLOW_PACKAGE, Scanners.SubTypes.filterResultsBy(_ => true) /* don't exclude Object.class */)
         val classes = allReflections.getSubTypesOf(classOf[AnyRef]).asScala.filter(_.getSimpleName == configuredType).toSeq
         classes match {
           case Seq() => throw new ClassNotFoundException(s"$configuredType not found in package $WORKFLOW_PACKAGE")

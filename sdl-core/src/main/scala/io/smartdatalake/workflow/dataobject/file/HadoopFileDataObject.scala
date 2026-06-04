@@ -45,7 +45,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    *
    * @return the current [[InstanceRegistry]].
    */
-  def instanceRegistry(): InstanceRegistry
+  def instanceRegistry: InstanceRegistry
 
   /**
    * Return the connection id.
@@ -55,7 +55,7 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
   def connectionId(): Option[ConnectionId]
 
   protected val connection: Option[HadoopFileConnection] = connectionId().map {
-    c => getConnectionReg[HadoopFileConnection](c, instanceRegistry())
+    c => getConnectionReg[HadoopFileConnection](c, instanceRegistry)
   }
 
   // these variables are not serializable
