@@ -18,10 +18,11 @@
  */
 package io.smartdatalake.workflow.action.spark
 
+import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomDataFrameAction
@@ -30,7 +31,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDsNto1Transforme
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SubFeed}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -50,7 +51,7 @@ case class AnotherOutputDataSet(concatenated_name: String, added_rating: Int)
 
 case class AnotherOutputDataSetPartitioned(concatenated_name: String, added_rating: Int, year: String, month: String, day: String)
 
-case class AddedRating(added_rating: Int)
+case class AddedRating(name: String, added_rating: Int)
 
 @scala.annotation.nowarn("cat=deprecation")
 class TestResolutionByIdDs2To1Transformer extends CustomDsNto1Transformer {
@@ -92,7 +93,7 @@ class Ds9To1Transformer extends CustomDsNto1Transformer {
 
     val unioned = src1.unionByName(src2).unionByName(src3).unionByName(src4).unionByName(src5).unionByName(src6).unionByName(src7).unionByName(src8).unionByName(src9)
     unioned.withColumn("added_rating", sum($"rating").over(Window.partitionBy()).cast("int"))
-      .select("added_rating")
+      .select("name", "added_rating")
       .as[AddedRating]
   }
 }
@@ -119,7 +120,8 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
 
   private val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-  implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   before {
     instanceRegistry.clear()
@@ -238,9 +240,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
     //Run SDLB
     sdlb.run(sdlConfig)
 
-    val tgt1DO = CsvFileDataObject("tgt1", "target/tgt1Ds2to1", partitions = Seq()
-      , schema = Some(SparkSchema(StructType.fromDDL("concatenated_name string, added_rating int"))))
-    instanceRegistry.register(tgt1DO)
+    val tgt1DO = sdlb.instanceRegistry.get[CsvFileDataObject](DataObjectId("tgt1Ds"))
     val actual = tgt1DO.getSparkDataFrame().as[AnotherOutputDataSet].head()
     assert(actual.added_rating == 15)
     assert(actual.concatenated_name == "johndoe")
@@ -335,77 +335,45 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
 
   test("One Ds9To1 Transformation using config file: 9 input dataObjects using dataObjectOrdering") {
 
+    val config = ConfigFactory.load("configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9Inputs.conf").resolve
+    ConfigParser.parse(config, instanceRegistry)
+
     // setup DataObjects
     // source has partition columns dt and type
-    val srcDO1 = CsvFileDataObject("src1", "target/src1DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
-
-    val srcDO2 = CsvFileDataObject("src2", "target/src2DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
+    val srcDO1 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src1"))
+    val srcDO2 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src2"))
+    val srcDO3 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src3"))
+    val srcDO4 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src4"))
+    val srcDO5 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src5"))
+    val srcDO6 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src6"))
+    val srcDO7 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src7"))
+    val srcDO8 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src8"))
+    val srcDO9 = instanceRegistry.get[MockSparkDataObject](DataObjectId("src9"))
+    val tgt1DO = sdlb.instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt1"))
 
     // fill src with first files
     val dfSrc1 = Seq(("john", 5))
       .toDF("name", "rating")
-    srcDO1.writeSparkDataFrame(dfSrc1, Seq())
     val dfSrc2 = Seq(("doe", 10))
       .toDF("name", "rating")
+    srcDO1.writeSparkDataFrame(dfSrc1, Seq())
     srcDO2.writeSparkDataFrame(dfSrc2, Seq())
-
-    val srcDO3 = CsvFileDataObject("src3", "target/src3DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO3.writeSparkDataFrame(dfSrc1, Seq())
-
-    val srcDO4 = CsvFileDataObject("src4", "target/src4DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO4.writeSparkDataFrame(dfSrc2, Seq())
-
-    // fill src with first files
-    val srcDO5 = CsvFileDataObject("src5", "target/src5DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO5.writeSparkDataFrame(dfSrc1, Seq())
-
-    val srcDO6 = CsvFileDataObject("src6", "target/src6DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO6.writeSparkDataFrame(dfSrc2, Seq())
-
-    val srcDO7 = CsvFileDataObject("src7", "target/src7DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO7.writeSparkDataFrame(dfSrc1, Seq())
-
-    val srcDO8 = CsvFileDataObject("src8", "target/src8DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO8.writeSparkDataFrame(dfSrc2, Seq())
-
-    val srcDO9 = CsvFileDataObject("src9", "target/src9DsNto1", partitions = Seq("name")
-      , schema = Some(SparkSchema(StructType.fromDDL("name string, rating int"))))
     srcDO9.writeSparkDataFrame(dfSrc2, Seq())
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = "test_feed_name", configuration = Seq("cp:/configScalaClassSparkDsNto1Transformer/usingDataObjectOrdering9Inputs.conf"))
-    //Run SDLB
-    sdlb.run(sdlConfig)
+    val action = instanceRegistry.get[CustomDataFrameAction](ActionId("double_rating"))
+    val initSubFeeds = (1 to 9).map(nb => InitSubFeed("src"+nb, Seq()))
+    action.prepare
+    action.init(initSubFeeds)
+    action.exec(initSubFeeds)(contextExec)
 
-    val tgt1DO = CsvFileDataObject("tgt1", "target/tgt1Ds2to1", partitions = Seq()
-      , schema = Some(SparkSchema(StructType.fromDDL("added_rating int"))))
-    instanceRegistry.register(tgt1DO)
     val actual = tgt1DO.getSparkDataFrame().as[AddedRating].head()
     assert(actual.added_rating == 70)
-
-    //cleanup
-    val directoriesToDelete = {
-      List(
-        new Directory(new File("target/src1DsNto1")),
-        new Directory(new File("target/src2DsNto1")),
-        new Directory(new File("target/src3DsNto1")),
-        new Directory(new File("target/src4DsNto1")),
-        new Directory(new File("target/src5DsNto1")),
-        new Directory(new File("target/src6DsNto1")),
-        new Directory(new File("target/src7DsNto1")),
-        new Directory(new File("target/src8DsNto1")),
-        new Directory(new File("target/src9DsNto1")),
-        new Directory(new File("target/tgt1DsNto1")),
-      )
-    }
-    directoriesToDelete.foreach(dir => dir.deleteRecursively())
   }
 
   test("One Ds9To1 Transformation using config file: wrong number of dataset params using dataObjectOrdering") {
