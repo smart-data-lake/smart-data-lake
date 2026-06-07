@@ -28,115 +28,139 @@ import io.smartdatalake.workflow.dataobject.DataObject
 
 import java.sql.Timestamp
 
-trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigHolder{
+trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigHolder {
   def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
   def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit
 }
 
 /**
- * Keep partitions while retention condition is fulfilled, delete other partitions.
- * Example: cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:
+ * Keep partitions while retention condition is fulfilled, delete other partitions. Example: cleanup
+ * partitions with partition layout dt=<yyyymmdd> after 90 days:
  * {{{
  * housekeepingMode = {
  *   type = PartitionRetentionMode
  *   retentionCondition = "datediff(now(), to_date(elements['dt'], 'yyyyMMdd')) <= 90"
  * }
  * }}}
- * @param retentionCondition Condition to decide if a partition should be kept. Define a spark sql expression
- *                           working with the attributes of [[PartitionExpressionData]] returning a boolean with value true if the partition should be kept.
+ * @param retentionCondition
+ *   Condition to decide if a partition should be kept. Define a spark sql expression working with
+ *   the attributes of [[PartitionExpressionData]] returning a boolean with value true if the
+ *   partition should be kept.
  */
-case class PartitionRetentionMode(retentionCondition: String, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
+case class PartitionRetentionMode(retentionCondition: String, description: Option[String] = None) extends HousekeepingMode
+    with SmartDataLakeLogger {
   override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
-    assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
-    ExpressionUtil.syntaxCheck[PartitionExpressionData,Boolean](dataObject.id, Some("houskeepingMode.retentionCondition"), retentionCondition)
+    assert(dataObject.isInstanceOf[CanHandlePartitions],
+      s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
+    ExpressionUtil.syntaxCheck[PartitionExpressionData, Boolean](dataObject.id, Some("houskeepingMode.retentionCondition"),
+      retentionCondition)
   }
-  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
+  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit =
     dataObject match {
       case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.isEmpty =>
-        throw ConfigurationException(s"(${dataObject.id}) PartitionRetentionMode not supported for DataObject without partition columns defined")
+        throw ConfigurationException(
+          s"(${dataObject.id}) PartitionRetentionMode not supported for DataObject without partition columns defined"
+        )
       case partitionedDataObject: DataObject with CanHandlePartitions =>
         val pvs = partitionedDataObject.listPartitions
-        val pvsEvaluated = ExpressionUtil.evaluateSeq[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.retentionCondition"), retentionCondition, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
+        val pvsEvaluated =
+          ExpressionUtil.evaluateSeq[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.retentionCondition"),
+            retentionCondition, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
         val pvsToDelete = pvsEvaluated
-          .filterNot{ case (pvs,keep) => keep.getOrElse(throw ExpressionEvaluationException(s"(${dataObject.id}.housekeepingMode.retentionCondition) expression evaluation should not return 'null' (partitionValue=$pvs"))}
+          .filterNot { case (pvs, keep) =>
+            keep.getOrElse(throw ExpressionEvaluationException(
+                s"(${dataObject.id}.housekeepingMode.retentionCondition) expression evaluation should not return 'null' (partitionValue=$pvs"
+              ))
+          }
           .map(x => PartitionValues(x._1.elements))
         partitionedDataObject.deletePartitions(pvsToDelete)
-        logger.info(s"(${dataObject.id}) Housekeeping cleaned partitions ${pvsToDelete.mkString(", ")}" )
+        logger.info(s"(${dataObject.id}) Housekeeping cleaned partitions ${pvsToDelete.mkString(", ")}")
     }
-  }
   override def factory: FromConfigFactory[HousekeepingMode] = PartitionRetentionMode
 }
 
 object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PartitionRetentionMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PartitionRetentionMode =
     extract[PartitionRetentionMode](config)
-  }
 }
 
 /**
- * Archive and compact old partitions:
- * Archive partition reduces the number of partitions in the past by moving older partitions into special "archive partitions".
- * Compact partition reduces the number of files in a partition by rewriting them with Spark.
- * Example: archive and compact a table with partition layout run_id=<integer>
- *  - archive partitions after 1000 partitions into "archive partition" equal to floor(run_id/1000)
- *  - compact "archive partition" when full
- * {{{
+ * Archive old partitions: Archive partition reduces the number of partitions in the past by moving
+ * older partitions into special "archive partitions". Example: archive a table with partition
+ * layout run_id=<integer>
+ *   - archive partitions after 1000 partitions into "archive partition" equal to floor(run_id/1000)
+ *     {{{
  * housekeepingMode = {
  *   type = PartitionArchiveCompactionMode
  *   archivePartitionExpression = "if( elements['run_id'] < runId - 1000, map('run_id', elements['run_id'] div 1000), elements)"
- *   compactPartitionExpression = "elements['run_id'] % 1000 = 0 and elements['run_id'] <= runId - 2000"
  * }
- * }}}
- * @param archivePartitionExpression Expression to define the archive partition for a given partition. Define a spark
- *                                   sql expression working with the attributes of [[PartitionExpressionData]] returning archive
- *                                   partition values as Map[String,String]. If return value is the same as input elements, partition is not touched,
- *                                   otherwise all files of the partition are moved to the returned partition definition.
- *                                   Be aware that the value of the partition columns changes for these files/records.
- * @param compactPartitionExpression Expression to define partitions which should be compacted. Define a spark
- *                                   sql expression working with the attributes of [[PartitionExpressionData]] returning a
- *                                   boolean = true when this partition should be compacted.
- *                                   Once a partition is compacted, it is marked as compacted and will not be compacted again.
- *                                   It is therefore ok to return true for all partitions which should be compacted, regardless if they have been compacted already.
+ *     }}}
+ * @param archivePartitionExpression
+ *   Expression to define the archive partition for a given partition. Define a spark sql expression
+ *   working with the attributes of [[PartitionExpressionData]] returning archive partition values
+ *   as Map[String,String]. If return value is the same as input elements, partition is not touched,
+ *   otherwise all files of the partition are moved to the returned partition definition. Be aware
+ *   that the value of the partition columns changes for these files/records.
  */
-case class PartitionArchiveCompactionMode(archivePartitionExpression: Option[String] = None, compactPartitionExpression: Option[String] = None, description: Option[String] = None) extends HousekeepingMode with SmartDataLakeLogger {
+case class PartitionArchiveMode(
+    archivePartitionExpression: Option[String] = None,
+    description: Option[String] = None
+) extends HousekeepingMode with SmartDataLakeLogger {
   override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
-    assert(dataObject.isInstanceOf[CanHandlePartitions], s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
-    archivePartitionExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionExpressionData, Map[String,String]](dataObject.id, Some("housekeepingMode.archivePartitionExpression"), expression))
-    compactPartitionExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionExpressionData, Boolean](dataObject.id, Some("housekeepingMode.compactPartitionExpression"), expression))
+    assert(dataObject.isInstanceOf[CanHandlePartitions],
+      s"(${dataObject.id}) PartitionRetentionMode only supports DataObject that can handle partitions")
+    archivePartitionExpression.foreach(expression =>
+      ExpressionUtil.syntaxCheck[PartitionExpressionData, Map[String, String]](dataObject.id,
+        Some("housekeepingMode.archivePartitionExpression"), expression)
+    )
   }
-  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = {
+  override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit =
     dataObject match {
       case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.isEmpty =>
-        throw ConfigurationException(s"(${dataObject.id}) PartitionArchiveCompactionMode not supported for DataObject without partition columns defined")
+        throw ConfigurationException(
+          s"(${dataObject.id}) PartitionArchiveCompactionMode not supported for DataObject without partition columns defined"
+        )
       case partitionedDataObject: DataObject with CanHandlePartitions =>
         val pvs = partitionedDataObject.listPartitions
         // evaluate partition to archive
-        val pvsToArchiveMapping = archivePartitionExpression.map( expression =>
-          ExpressionUtil.evaluateSeq[PartitionExpressionData, Map[String,String]](dataObject.id, Some(s"housekeepingMode.archivePartitionExpression"), expression, pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
-            .map{ case (input, resultPvs) => (input.elements, resultPvs.getOrElse(throw ExpressionEvaluationException(s"(${dataObject.id}) housekeepingMode.archivePartitionExpression result is null for partition value ${input.elements}")))}
-            .filter{ case (inputPvs, resultPvs) => inputPvs != resultPvs}
-            .map{ case (inputPvs, resultPvs) => (PartitionValues(inputPvs), PartitionValues(resultPvs))}
-          ).getOrElse(Seq())
+        val pvsToArchiveMapping = archivePartitionExpression.map(expression =>
+          ExpressionUtil.evaluateSeq[PartitionExpressionData, Map[String, String]](dataObject.id,
+            Some(s"housekeepingMode.archivePartitionExpression"), expression,
+            pvs.map(pv => PartitionExpressionData.from(context, dataObject.id, pv)))
+            .map { case (input, resultPvs) =>
+              (input.elements,
+                resultPvs.getOrElse(throw ExpressionEvaluationException(
+                    s"(${dataObject.id}) housekeepingMode.archivePartitionExpression result is null for partition value ${input.elements}"
+                  )))
+            }
+            .filter { case (inputPvs, resultPvs) => inputPvs != resultPvs }
+            .map { case (inputPvs, resultPvs) => (PartitionValues(inputPvs), PartitionValues(resultPvs)) }
+        ).getOrElse(Seq())
         val pvsToArchive = pvsToArchiveMapping.map(_._1)
         // archive
         if (pvsToArchiveMapping.nonEmpty) {
           partitionedDataObject.movePartitions(pvsToArchiveMapping)
-          logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}" )
+          logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}")
         }
     }
-  }
-  override def factory: FromConfigFactory[HousekeepingMode] = PartitionArchiveCompactionMode
+  override def factory: FromConfigFactory[HousekeepingMode] = PartitionArchiveMode
 }
 
-object PartitionArchiveCompactionMode extends FromConfigFactory[HousekeepingMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PartitionArchiveCompactionMode = {
-    extract[PartitionArchiveCompactionMode](config)
-  }
+object PartitionArchiveMode extends FromConfigFactory[HousekeepingMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PartitionArchiveMode =
+    extract[PartitionArchiveMode](config)
 }
 
-case class PartitionExpressionData(feed: String, application: String, runId: Int, runStartTime: Timestamp, dataObjectId: String, elements: Map[String,String])
+case class PartitionExpressionData(
+    feed: String,
+    application: String,
+    runId: Int,
+    runStartTime: Timestamp,
+    dataObjectId: String,
+    elements: Map[String, String]
+)
 object PartitionExpressionData {
-  def from(context: ActionPipelineContext, dataObjectId: DataObjectId, partitionValues: PartitionValues): PartitionExpressionData = {
-    PartitionExpressionData(context.feed, context.application, context.executionId.runId, Timestamp.valueOf(context.runStartTime), dataObjectId.id, partitionValues.getMapString)
-  }
+  def from(context: ActionPipelineContext, dataObjectId: DataObjectId, partitionValues: PartitionValues): PartitionExpressionData =
+    PartitionExpressionData(context.feed, context.application, context.executionId.runId, Timestamp.valueOf(context.runStartTime),
+      dataObjectId.id, partitionValues.getMapString)
 }
