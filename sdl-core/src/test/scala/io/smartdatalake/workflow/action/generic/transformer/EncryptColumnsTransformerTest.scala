@@ -102,7 +102,6 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
         |  enc {
         |    type = ParquetFileDataObject
         |    path = "target/column_encrypted"
-        |    schema = "c1 STRING, c2 STRING, c3 STRING"
         |  }
         |  dec {
         |    type = ParquetFileDataObject
@@ -121,7 +120,7 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
     val dfSrc = Seq(("testData", "Foo", "ice"), ("bar", "Space", "water"), ("gogo", "Space", "water")).toDF("c1", "c2", "c3")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc), Seq())
     dfSrc.createdLog("dfSrc")
 
     val initialSubFeeds: Seq[SparkSubFeed] = Seq(SparkSubFeed(None, srcDO.id, Seq()))
@@ -140,18 +139,12 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
     )
 
     logger.debug(s"run_test($enc_type): check result. first check the encoded dataFrame.")
-    val enc: ParquetFileDataObject = instanceRegistry.get[ParquetFileDataObject]("enc")
-    val dfEnc = Try(enc.getSparkDataFrame()) match {
-      case Success(df) => df
-      case Failure(e)  =>
-        logger.error(s"run_test($enc_type): enc.getSparkDataFrame() failed !")
-        logger.error(s"enc: $enc")
-        throw e
-    }
+    val enc = instanceRegistry.get[ParquetFileDataObject]("enc")
+    val dfEnc = enc.getSparkDataFrame()
     dfEnc.createdLog("dfEnc")
     val colName = dfEnc.columns
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
-    val testCols: List[String] = dfEnc.select("c2").map(f => f.getString(0)).collect().toList
+    val testCols = dfEnc.select("c2").collect().map(r => r.getString(0)).toList
     dfEnc.show(false)
     logger.info(s"run_test: $enc_type encrypted dataFrame: ${testCols.length} testCols = ${testCols.mkString(",")}")
     assert(testCols != Seq("Foo", "Space", "Space"))
@@ -172,7 +165,7 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
 
     val colDecName = dfDec.columns
     assert(colDecName.toSeq == Seq("c1", "c2", "c3"))
-    val testDecCol = dfDec.select("c2").map(f => f.getString(0)).collect().toList
+    val testDecCol = dfDec.select("c2").collect().map(r => r.getString(0)).toList
     assert(testDecCol == Seq("Foo", "Space", "Space"))
     dfEnc
   }
