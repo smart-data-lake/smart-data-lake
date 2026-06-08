@@ -79,6 +79,14 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
         // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
         // Note: no partition values supported when writing streaming target
         def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = {
+          // Spark's streaming engine overwrites the thread-local job group between batches.
+          // Re-set it here so SparkStageMetricsListener can capture stage metrics for every batch.
+          context.currentAction.foreach { action =>
+            SparkSubFeed.getSparkSession(context).sparkContext.setJobGroup(
+              s"${context.appConfig.appName} ${action.id} runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}",
+              s"writing to $id"
+            )
+          }
           val metrics = writeSparkDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
           val actionMetrics = GenericMetrics(s"streaming-microBatchWriter", System.currentTimeMillis()/1000, metrics)
           context.currentAction.get.addAsyncMetrics(None, Some(id), actionMetrics)

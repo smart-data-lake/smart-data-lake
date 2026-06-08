@@ -73,9 +73,13 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
   private def getRecordsWritten(info: RuntimeInfo): Long = {
     val metricsMap: MetricsMap = info.results.head.metrics.getOrElse(Map())
-    metricsMap.get("records_written").map(_.asInstanceOf[Long]).getOrElse({
-      logger.error("getRecordsWritten: key records_written nor found in metrics. returning -1")
-      logger.error(s"getFirstMetrics(${info.executionId}, in: ${info.inputIds.mkString(",")}, out: ${info.outputIds.mkString(",")}):" +
+    metricsMap.get("records_written").map {
+      case l: Long => l
+      case bi: BigInt => bi.toLong  // json's deserializes integers as BigInt when reading from state store
+      case other => other.toString.toLong
+    }.getOrElse({
+      logger.error("getRecordsWritten: key records_written not found in metrics. returning -1")
+      logger.error(s"getRecordsWritten(${info.executionId}, in: ${info.inputIds.mkString(",")}, out: ${info.outputIds.mkString(",")}):" +
         s" metricsMap has ${metricsMap.size} entries: $metricsMap")
       -1L
     })
@@ -210,16 +214,21 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
       transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
     instanceRegistry.register(action1)
 
-    debugLog("streaming event listener will add data and stop streaming after 3 micro-batches")
+    debugLog("streaming event listener will add data and stop streaming after second data batch is processed")
     val testStreamingQueryListener = new StreamingQueryListener {
       private var dfWritten = false
+      private var batchAfterWriteProcessed = false
       private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
 
       override def onQueryIdle(event: StreamingQueryListener.QueryIdleEvent): Unit = {
-        // Behaviour changed with Spark 3.5: no more progress if no data, but onQueryIdle is fired
-        // stop streaming query
-        logger.info("stopping streaming query after idle")
-        session.streams.active.find(_.runId == event.runId).get.stop()
+        // TODO: Adapt comment to Spark 4!
+        // In Spark 3.5+, idle fires when no new data available instead of onQueryProgress
+        // Only stop after the batch that processes the newly written data has completed
+        if (batchAfterWriteProcessed) {
+          logger.info("stopping streaming query after idle")
+          session.streams.active.find(_.runId == event.runId).get.stop()
+        }
+        // else: data was recently written, wait for next trigger to pick it up
       }
 
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
@@ -239,6 +248,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
               case 2 =>
                 debugLog("onQueryProgress: stopping streaming query")
                 session.streams.active.find(_.name == event.progress.name).get.stop()
+              case x if x > 0 && dfWritten && !batchAfterWriteProcessed =>
+                batchAfterWriteProcessed = true
               case _ => ()
             }
         }
