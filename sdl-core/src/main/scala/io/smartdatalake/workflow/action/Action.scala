@@ -396,9 +396,9 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Get summarized runtime information for a given ExecutionId.
    * @param executionId ExecutionId to get runtime information for. If empty runtime information for last ExecutionId are returned.
    */
-  def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = {
-    runtimeData.getRuntimeInfo((inputs ++ recursiveInputs).map(_.id), outputs.map(_.id), getDataObjectsState, executionId)
-  }
+  def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = runtimeData
+    .getRuntimeInfo(inputIds = (inputs ++ recursiveInputs).map(_.id),
+      outputIds = outputs.map(_.id), dataObjectsState = getDataObjectsState, executionIdOpt = executionId)
 
   /**
    * Resets the runtime state of this Action
