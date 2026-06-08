@@ -23,7 +23,6 @@ import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.dataset.{ReadWrite, Transform, getEmptyDataFrame}
 import io.smartdatalake.util.spark.{SparkRepartitionDef, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -37,10 +36,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, Proce
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
-import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
-import org.apache.spark.sql.functions.{col, input_file_name, lit}
+import org.apache.spark.sql.functions.{input_file_name, lit}
 import org.apache.spark.sql.types.{DataType, StringType, StructType}
 
 import java.time.format.DateTimeFormatter
@@ -484,8 +482,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
   /**
    * It seems that Hadoop on Windows returns modified date in local timezone, but according to documentation it should be in UTC.
-   * This results in wrong comparison of modified date by Spark, as Spark adds an additional local timezone offset to the files modification date.
-   * To fix this we need to add an additional local timezone offset to the comparison thresholds given to spark.
+   * This results in wrong comparison of modified date by Spark, as Spark adds a local timezone offset to the files modification date.
+   * To fix this we need to add a local timezone offset to the comparison thresholds given to spark.
    */
   private def fixWindowsTimezone(localDateTime: LocalDateTime): LocalDateTime = {
     if (EnvironmentUtil.isWindowsOS) LocalDateTime.ofInstant(localDateTime.atOffset(ZoneOffset.UTC).toInstant, ZoneId.systemDefault())
@@ -713,21 +711,23 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
 
 
 /**
+ * TODO: Where is ObserverSparkFilenameObservation used?
+ *
  * Get files processed by using Spark observer on filename column
- * Note: There is a Spark problem - NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+ * Note: There is a Spark problem - NullPointerException/*private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+ * def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+ * logger.debug(s"($name) add files observation to Dataset")
+ * on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
+ * }
+ *
+ * def getFilesProcessed: Seq[String] = {
+ * waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+ * .asInstanceOf[Seq[String]]
+ * }
+ * }*/n with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
-private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
-  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
-    logger.debug(s"($name) add files observation to Dataset")
-    on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
-  }
 
-  def getFilesProcessed: Seq[String] = {
-    waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
-      .asInstanceOf[Seq[String]]
-  }
-}
 
 /**
  * Workaround for bug in ObserverSparkFilenameObservation - get files processed from DataFrames execution plan.
@@ -749,4 +749,3 @@ private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: Stri
     files
   }
 }
-
