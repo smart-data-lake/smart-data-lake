@@ -64,12 +64,12 @@ object TestMode extends Enumeration {
 
   /**
    * Test if config is valid. Note that this only parses and validates the configuration. No
-   * attempts are made to check the environment (e.g. connection informations...).
+   * attempts are made to check the environment (e.g. connection information...).
    */
   val Config: app.TestMode.Value = Value("config")
 
   /**
-   * Test the environment if connections can be initalized and spark lineage can be created. Note
+   * Test the environment if connections can be initialized and spark lineage can be created. Note
    * that no changes are made to the environment if possible. The test executes "prepare" and "init"
    * phase, but not the "exec" phase of an SDLB run.
    */
@@ -136,7 +136,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .unbounded()
         .required()
         .text(
-          "One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."
+          "One or multiple configuration files or directories containing configuration files, separated by comma." +
+            " Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."
         ),
       opt[String]('o', "config-value-overwrite")
         .action((arg, config) => config.addConfigurationValueOverwrite(parseKeyValue(arg)))
@@ -349,7 +350,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       initialSubFeeds: Seq[SparkSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq(),
       failOnMissingInputSubFeeds: Boolean = true
-  )(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
+  )(implicit instanceRegistry: InstanceRegistry): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
     Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
     val (subFeeds, stats) = exec(
       appConfig,
@@ -377,7 +378,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       dataObjectsState: Seq[DataObjectState] = Seq()
   )(session: SparkSession): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
     loadConfigIntoInstanceRegistry(appConfig, session.sparkContext.hadoopConfiguration)
-    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
+    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry)
   }
 
   def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, hadoopConfiguration: Configuration): Unit =
@@ -473,7 +474,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     require(actionsSelected.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
     if (appConfig.test.contains(TestMode.Config)) { // stop here if only config check
-      logger.info(s"${appConfig.test.get}-Test successfull")
+      logger.info(s"${appConfig.test.get}-Test successful")
       return (Seq(), Map())
     }
 
@@ -603,7 +604,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   /**
    * Execute one action DAG iteration and call recursion if streaming mode Must be implemented with
-   * tail recursion to avoid stack overflow error for long running streaming jobs.
+   * tail recursion to avoid stack overflow error for long-running streaming jobs.
    */
   @tailrec
   final def execActionDAG(
@@ -645,7 +646,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         // execute DAG
         val startTime = LocalDateTime.now
         var finalRunState: ActionDAGRunState = null
-        var subFeeds = try
+        val _ = try
           actionDAGRun.exec(context)
         finally
           finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context)
