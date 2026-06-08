@@ -674,13 +674,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           if (actionsSelected.exists(!_.isAsynchronous)) {
             if (Environment.stopStreamingGracefully) {
               if (actionsSelected.exists(_.isAsynchronous)) {
-                // TODO: add additional method actionDAGRun.stopAsynchronous or similar, which will stop asynchronous actions
-                // if (context.hasSparkSession) {
-                // stop active streaming queries
-                // SparkSubFeed.getSparkSession.streams.active.foreach(_.stop())
-                // if there were exceptions, throw first one
-                // SparkSubFeed.getSparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
-                // }
+                // re-throw exception if any async streaming query terminated with exception
+                // awaitAnyTermination returns immediately since onQueryTerminated already fired (which set stopStreamingGracefully=true)
+                SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination(1)
+                // stop remaining active streaming queries gracefully
+                SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
               }
               logger.info("Stopped streaming gracefully")
               None
