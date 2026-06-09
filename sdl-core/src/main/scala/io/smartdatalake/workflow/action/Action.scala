@@ -347,12 +347,18 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
 
   def getEngineConnection(implicit registry: InstanceRegistry): Connection with EngineConnection = {
     val connectionId = engineConnectionId.getOrElse(ConnectionId(Environment.defaultEngineConnectionId))
+    val logPrefix = s"getEngineConnection ($id):"
+    val failureMsg = s"$logPrefix FAILED! registry.getActions: ${registry.getActions.map(_.toStringMedium).mkString(",")}"
     try {
       registry.get[Connection with EngineConnection](connectionId)
     } catch {
-      case _: NoSuchElementException => throw new NoSuchElementException(s"($id) $connectionId not found in instance registry")
+      case _: NoSuchElementException =>
+        logger.error(failureMsg)
+        throw new NoSuchElementException(s"$logPrefix $connectionId not found in instance registry")
       case TypeMismatchException(_, currentClass, expectedType) =>
-        throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
+        logger.error(failureMsg)
+        throw ConfigurationException(s"$logPrefix $connectionId of type ${currentClass.getSimpleName}" +
+          s" does not implement expected connection type $expectedType")
     }
   }
 
@@ -368,7 +374,12 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Adds a runtime event for this Action
    */
-  def addRuntimeEvent(executionId: ExecutionId, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq(), tstmp: LocalDateTime = LocalDateTime.now): Unit = {
+  def addRuntimeEvent(executionId: ExecutionId,
+                      phase: ExecutionPhase,
+                      state: RuntimeEventState,
+                      msg: Option[String] = None,
+                      results: Seq[SubFeed] = Seq(),
+                      tstmp: LocalDateTime = LocalDateTime.now): Unit = {
     runtimeData.addEvent(executionId, RuntimeEvent(tstmp, phase, state, msg, results))
   }
 
