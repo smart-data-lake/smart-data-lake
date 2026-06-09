@@ -51,9 +51,9 @@ private[smartdatalake] object SparkSnowparkSchemaConverter extends SchemaConvert
 
   private def simpleDataTypeMapping(dataType: spark.DataType): snowpark.DataType = {
     dataType match {
-      case _: spark.StringType => snowpark.StringType
       case _: spark.VarcharType => snowpark.StringType
       case _: spark.CharType => snowpark.StringType
+      case _: spark.StringType => snowpark.StringType
       case _: spark.BooleanType => snowpark.BooleanType
       case _: spark.ByteType => snowpark.ByteType
       case _: spark.ShortType => snowpark.ShortType
