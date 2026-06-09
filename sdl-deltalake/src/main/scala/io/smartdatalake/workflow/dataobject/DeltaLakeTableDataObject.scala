@@ -64,7 +64,7 @@ import scala.util.Try
  * - table is registered and path contains parquet files, but _delta_log subfolder is missing -> path is converted to delta format
  * - table is not registered but path contains parquet files and _delta_log subfolder -> Table is registered
  * - table is not registered but path contains parquet files without _delta_log subfolder -> path is converted to delta format and table is registered
- * - table is not registered and path does not exists -> table is created on write
+ * - table is not registered and path does not exist -> table is created on write
  *
  *  * DeltaLakeTableDataObject implements
  * - [[CanMergeDataFrame]] by using DeltaTable.merge API.
@@ -102,10 +102,11 @@ import scala.util.Try
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- * @param housekeepingMode Optional definition of a housekeeping mode applied after every write. E.g. it can be used to cleanup, archive and compact partitions.
+ * @param housekeepingMode Optional definition of a housekeeping mode applied after every write.
+ *                         E.g. it can be used to clean up, archive and compact partitions.
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
- * @param metadata meta data of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
+ * @param metadata metadata of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
  *                  attributes are required as the pipeline will try to add the description to the catalog.
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
@@ -171,7 +172,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def getAbsolutePath(implicit context: ActionPipelineContext) = {
     val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // dont use "filesystem" to avoid loop
+    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // don't use "filesystem" to avoid loop
   }
 
   table = table.overrideCatalogAndDb(connection.flatMap(_.catalog), connection.map(_.db))
@@ -186,7 +187,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
     super.prepare
-    if (connection.exists(_.checkDeltaLakeSparkOptions) && !UCFileSystemFactory.isDatabricksEnv) { // check not needed if on Databricks UC environment (and actionally it fails because this is configured differently on Databricks)
+    if (connection.exists(_.checkDeltaLakeSparkOptions) && !UCFileSystemFactory.isDatabricksEnv) {
+      // check not needed if on Databricks UC environment
+      // (and actually it fails because this is configured differently on Databricks)
       require(session.conf.getOption("spark.sql.extensions").toSeq.flatMap(_.split(',')).contains("io.delta.sql.DeltaSparkSessionExtension"),
         s"($id) DeltaLake spark properties are missing. Please set spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog")
     }
@@ -346,7 +349,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val sparkMetrics = if (isTableExisting) {
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetDf.schema), SparkSchema(session.table(table.fullName).schema), "write")
       if (finalSaveMode == SDLSaveMode.Merge) {
-        // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
+        // merge operations still need all columns for potential insert/updateConditions.
+        // Therefore, dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         if (partitions.isEmpty) {
@@ -534,8 +538,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     hasFiles
   }
 
-  protected val separator: Char = Path.SEPARATOR_CHAR
-
   /**
    * List partitions.
    * Note that we need a Spark SQL statement as there might be partition directories with no current data inside
@@ -583,7 +585,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
         .select("timestamp", "userMetadata").as[(Long,String)]
       val (_,lastCommitMsg) = dfHistory.head()
       val (oldestSnapshot,_) = dfHistory.head()
-      val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, properties) = getDetails
+      val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, _) = getDetails
         .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head()
       val numRows = deltaTable.toDF.count() // This is actionally calculated by Metadata only :-)
       val deltaStats = Map(TableStatsType.CreatedAt.toString -> createdAt, TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.LastCommitMsg.toString -> lastCommitMsg, TableStatsType.NumDataFilesCurrent.toString -> numDataFilesCurrent, TableStatsType.SizeInBytesCurrent.toString -> sizeInBytesCurrent, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshot, TableStatsType.NumRows.toString -> numRows)
@@ -624,11 +626,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
           statsColIfExists("minValues", col).map(min(_).as("minValue")),
           statsColIfExists("maxValues", col).map(max(_).as("maxValue")),
           statsColIfExists("nullCount", col).map(sum(_).as("nullCount"))
-        ).flatten: _*
+        ).flatten.toIndexedSeq: _*
       ).as(col)
       val metricsRow = snapshot.allFiles
         .select(from_json($"stats", snapshot.statsSchema).as("stats"))
-        .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg):_*).head()
+        .agg(sum($"stats.numRecords").as("numRecords"), columns.map(getAgg).toIndexedSeq:_*).head()
 
       def getAsOption[T](row: Row, col: String): Option[T] = {
         if (row.schema.fieldNames.contains(col) && !row.isNullAt(row.fieldIndex(col))) Some(row.getAs[T](col))
@@ -658,10 +660,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
-   * The state is just a string. It's semantics is internal to the DataObject.
-   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   * The state is just a string. Its semantics is internal to the DataObject.
+   * Note that this method is called on initialization of the SmartDataLakeBuilder job (init Phase)
+   * and for streaming execution after every execution of an Action involving this DataObject (postExec).
    *
-   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   * @param state Internal state of last increment. If None then the first increment (maybe a full increment) is delivered.
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
