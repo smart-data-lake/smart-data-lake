@@ -54,13 +54,6 @@
 			<version>${project.parent.version}</version>
 			<scope>${sdl-core.scope}</scope>
 		</dependency>
-
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-
 		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
@@ -91,15 +84,19 @@
 			<artifactId>iceberg-spark-${spark.minor40.version}_${scala.minor.version}</artifactId>
 			<version>${iceberg.version}</version>
 		</dependency>
+		<!-- Spark catalog extension registered via SPI; no direct import needed -->
 		<dependency>
 			<groupId>org.apache.iceberg</groupId>
 			<artifactId>iceberg-spark-extensions-${spark.minor40.version}_${scala.minor.version}</artifactId>
 			<version>${iceberg.version}</version>
+			<scope>runtime</scope>
 		</dependency>
+		<!-- HMS catalog support loaded at runtime; no direct import needed -->
 		<dependency>
 			<groupId>org.apache.iceberg</groupId>
 			<artifactId>iceberg-hive-metastore</artifactId>
 			<version>${iceberg.version}</version>
+			<scope>runtime</scope>
 		</dependency>
 
 		<!-- parquet-avro is set to scope=test by spark pom, but is needed for iceberg on runtime -->
@@ -249,6 +246,16 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<configuration>
+					<ignoredUnusedDeclaredDependencies>
+						<!-- used in source but bytecode analyzer attributes it to sdl-core's transitive chain -->
+						<ignoredUnusedDeclaredDependency>org.apache.spark:spark-sql_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- kept to prevent NoClassDefFoundError at runtime; see dependency comment above -->
+						<ignoredUnusedDeclaredDependency>org.apache.spark:spark-tags_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- used in source (scala.util.Try, scala.annotation.*) but not detected by bytecode analyzer -->
+						<ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->

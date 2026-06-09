@@ -121,10 +121,6 @@
             <artifactId>commons-codec</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.dropwizard.metrics</groupId>
-            <artifactId>metrics-core</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.minor.version}</artifactId>
         </dependency>
@@ -134,19 +130,7 @@
         </dependency>
         <dependency>
             <groupId>org.json4s</groupId>
-            <artifactId>json4s-ast_${scala.minor.version}</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.json4s</groupId>
             <artifactId>json4s-core_${scala.minor.version}</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-scala_${scala.minor.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
@@ -190,6 +174,11 @@
             <groupId>com.github.tomakehurst</groupId>
             <artifactId>wiremock-standalone</artifactId>
             <version>2.25.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -275,6 +264,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <ignoredUnusedDeclaredDependencies>
+                        <!-- Azure filesystem implementation registered via Hadoop SPI; not directly imported -->
+                        <ignoredUnusedDeclaredDependency>org.apache.hadoop:hadoop-azure</ignoredUnusedDeclaredDependency>
+                        <!-- Used in Scala source (StateChangeLogger); bytecode analyzer misses Scala usages -->
+                        <ignoredUnusedDeclaredDependency>org.json4s:json4s-jackson_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Used in LogAnalyticsClient.java (Base64); analyzer attributes class to Azure SDK transitive -->
+                        <ignoredUnusedDeclaredDependency>commons-codec:commons-codec</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
+                </configuration>
             </plugin>
 
             <!-- check for dependency version conflicts -->

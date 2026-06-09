@@ -67,11 +67,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-		</dependency>
-
-		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
 			<scope>${sdl-core.scope}</scope>
@@ -102,13 +97,7 @@
 			<groupId>org.apache.kafka</groupId>
 			<artifactId>kafka-clients</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>io.confluent</groupId>
-			<artifactId>kafka-json-serializer</artifactId>
-			<version>${confluent.version}</version>
-		</dependency>
 		<!-- this is for reading from kafka using confluent schema registry with Spark -->
-		<!-- this is an unused declared dependency but needed in tests and at runtime -->
 		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-schema-registry-client</artifactId>
@@ -123,11 +112,6 @@
 					<artifactId>snakeyaml</artifactId>
 				</exclusion>
 			</exclusions>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.zookeeper</groupId>
-			<artifactId>zookeeper</artifactId>
 		</dependency>
 
 		<dependency>
@@ -150,23 +134,28 @@
 
 		<dependency>
 			<groupId>org.scala-lang</groupId>
-			<artifactId>scala-library</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.scala-lang</groupId>
 			<artifactId>scala-reflect</artifactId>
 			<scope>${sdl-core.scope}</scope>
 		</dependency>
 
-		<!-- this is needed for running kafka/scala_2.12 on java8, unit tests fail otherwise -->
+		<!-- TEST dependencies -->
+		<dependency>
+			<groupId>org.apache.zookeeper</groupId>
+			<artifactId>zookeeper</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.scala-lang.modules</groupId>
 			<artifactId>scala-java8-compat_${scala.minor.version}</artifactId>
 			<version>0.9.1</version>
+			<scope>test</scope>
 		</dependency>
-
-		<!-- TEST dependencies -->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-json-serializer</artifactId>
+			<version>${confluent.version}</version>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.scalatest</groupId>
 			<artifactId>scalatest_${scala.minor.version}</artifactId>
@@ -326,6 +315,13 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<configuration>
+					<ignoredUnusedDeclaredDependencies>
+						<!-- Needed at compile time: Scala compiler requires ParsedSchema on the classpath
+						     to resolve ConfluentClient.S, even though our code never imports it directly -->
+						<ignoredUnusedDeclaredDependency>io.confluent:kafka-schema-registry-client</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->

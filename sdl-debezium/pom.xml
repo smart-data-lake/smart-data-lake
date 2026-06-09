@@ -37,18 +37,6 @@
     </dependency>
 
     <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <scope>${sdl-core.scope}</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.scala-lang</groupId>
-      <artifactId>scala-library</artifactId>
-      <scope>${sdl-core.scope}</scope>
-    </dependency>
-
-    <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-reflect</artifactId>
       <scope>${sdl-core.scope}</scope>
@@ -280,6 +268,27 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <!-- Optional connector/storage plug-ins: declared so downstream users get them on the classpath,
+                 never directly imported in this module's main sources -->
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-connector-oracle</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-connector-db2</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-connector-postgres</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-connector-sqlserver</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.smartdatalake:debezium-connector-mysql-shaded</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.smartdatalake:debezium-connector-mariadb-shaded</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-storage-azure-blob</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-storage-jdbc</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-storage-redis</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-storage-rocketmq</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>io.debezium:debezium-storage-s3</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
+          <ignoredNonTestScopedDependencies>
+            <!-- hadoop-common arrives transitively at compile scope; only test sources use it directly -->
+            <ignoredNonTestScopedDependency>org.apache.hadoop:hadoop-common</ignoredNonTestScopedDependency>
+          </ignoredNonTestScopedDependencies>
+        </configuration>
       </plugin>
 
       <!-- check for dependency version conflicts -->
