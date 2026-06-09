@@ -295,6 +295,13 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     val action1InfoStream2 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(1)))
     assert(action1InfoStream2.isDefined)
     assert(action1InfoStream2.get.state == RuntimeEventState.SUCCEEDED)
+    /* TODO: This assert fails every now and then. No Idea why.
+    2026-06-09 09:43:11 ERROR SmartDataLakeBuilderStreamingTest - getRecordsWritten: key records_written not found in metrics. returning -1 [ScalaTest-run-running-SmartDataLakeBuilderStreamingTest]
+    2026-06-09 09:43:11 ERROR SmartDataLakeBuilderStreamingTest - getRecordsWritten(1, in: DataObject~src1, out: DataObject~tgt1): metricsMap has 2 entries: Map(no_data -> false, batch_duration -> 2078) [ScalaTest-run-running-SmartDataLakeBuilderStreamingTest]
+    -1 did not equal 1
+    ScalaTestFailureLocation: io.smartdatalake.app.SmartDataLakeBuilderStreamingTest at (SmartDataLakeBuilderStreamingTest.scala:299)
+    Expected :1
+    Actual   :-1 */
     assert(getRecordsWritten(action1InfoStream2.get) == 1)
 
     debugLog("check state after streaming is terminated")
