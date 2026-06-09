@@ -24,23 +24,20 @@ import org.apache.commons.lang.NotImplementedException
 import org.json4s._
 import org.json4s.jackson.Serialization
 
-import scala.collection.compat.immutable.LazyList
-import scala.collection.immutable
 import scala.collection.AbstractMap
 import scala.collection.immutable.ListMap
 
 /**
- * Enumeration of json schema types
+ * Enumeration of JSON schema types
  */
 private[smartdatalake] object JsonTypeEnum extends Enumeration {
   type JsonTypeEnum = Value
-  val Object = Value("object")
-  val Array = Value("array")
-  val String = Value("string")
-  val Integer = Value("integer")
-  val Number = Value("number")
-  val Boolean = Value("boolean")
-  val Null = Value("null")
+  val Object: Value = Value("object")
+  val Array: Value = Value("array")
+  val String: Value = Value("string")
+  val Integer: Value = Value("integer")
+  val Number: Value = Value("number")
+  val Boolean: Value = Value("boolean")
 }
 
 /**
@@ -49,7 +46,7 @@ private[smartdatalake] object JsonTypeEnum extends Enumeration {
 private[smartdatalake] sealed trait JsonTypeDef extends JsonExtractor
 
 /**
- * Definition of a json object
+ * Definition of a JSON object
  * @param properties: ListMap ensures that property ordering is kept. It has to be lazy to break recursive conversion.
  */
 private[smartdatalake] case class JsonObjectDef(
@@ -64,7 +61,7 @@ private[smartdatalake] case class JsonObjectDef(
 }
 
 /**
- * Definition of a json array
+ * Definition of a JSON array
  */
 private[smartdatalake] case class JsonArrayDef(
                          items: JsonTypeDef,
@@ -75,7 +72,7 @@ private[smartdatalake] case class JsonArrayDef(
 }
 
 /**
- * Definition of a json string
+ * Definition of a JSON string
  */
 private[smartdatalake] case class JsonStringDef(
                           description: Option[String] = None,
@@ -88,7 +85,7 @@ private[smartdatalake] case class JsonStringDef(
 }
 
 /**
- * Definition of a json number
+ * Definition of a JSON number
  */
 private[smartdatalake] case class JsonNumberDef(
                           description: Option[String] = None,
@@ -99,7 +96,7 @@ private[smartdatalake] case class JsonNumberDef(
 }
 
 /**
- * Definition of a json integer
+ * Definition of a JSON integer
  */
 private[smartdatalake] case class JsonIntegerDef(
                           description: Option[String] = None,
@@ -110,7 +107,7 @@ private[smartdatalake] case class JsonIntegerDef(
 }
 
 /**
- * Definition of a json boolean
+ * Definition of a JSON boolean
  */
 private[smartdatalake] case class JsonBooleanDef(
                            description: Option[String] = None,
@@ -121,21 +118,14 @@ private[smartdatalake] case class JsonBooleanDef(
 }
 
 /**
- * Definition of a json empty object
- */
-private[smartdatalake] case class JsonNullDef() extends JsonTypeDef {
-  override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Null)
-}
-
-/**
- * Definition of a json constant
+ * Definition of a JSON constant
  */
 private[smartdatalake] case class JsonConstDef(
                          const: String
                        ) extends JsonTypeDef
 
 /**
- * Definition of a json reference, which referes a type in the global definition.
+ * Definition of a JSON reference, which refers a type in the global definition.
  * @param `$ref` reference to global definition. Example: #/definitions/[typename]
  */
 private[smartdatalake] case class JsonRefDef(
@@ -145,7 +135,7 @@ private[smartdatalake] case class JsonRefDef(
                      ) extends JsonTypeDef
 
 /**
- * Definition of a json union: this allows one of the defined types.
+ * Definition of a JSON union: this allows one of the defined types.
  */
 private[smartdatalake] case class JsonOneOfDef(
                          oneOf: Seq[JsonTypeDef],
@@ -154,22 +144,8 @@ private[smartdatalake] case class JsonOneOfDef(
                        ) extends JsonTypeDef
 
 /**
- * Definition of a json all of: this requires all of the defined types.
- */
-private[smartdatalake] case class JsonAllOfDef(
-                         allOf: Seq[JsonTypeDef]
-                       ) extends JsonTypeDef
-
-/**
- * Definition of a json any of: this allows one or multiple of the defined types.
- */
-private[smartdatalake] case class JsonAnyOfDef(
-                         anyOf: Seq[JsonTypeDef]
-                       ) extends JsonTypeDef
-
-/**
  * A Map is an object with restricted value types.
- * This can be created in json schema by limiting the type of additional properties.
+ * This can be created in JSON schema by limiting the type of additional properties.
  */
 private[smartdatalake] case class JsonMapDef(
                        additionalProperties: JsonTypeDef,
@@ -180,12 +156,12 @@ private[smartdatalake] case class JsonMapDef(
 }
 
 /**
- * Supertype of json schema definition root elements
+ * Supertype of JSON schema definition root elements
  */
 private[smartdatalake] trait SchemaRootDef extends JsonExtractor
 
 /**
- * Json schema root element that starts the schema with an json object.
+ * JSON schema root element that starts the schema with a JSON object.
  */
 private[smartdatalake] case class SchemaRootObjectDef(
                                 `$schema`: String,
@@ -201,7 +177,7 @@ private[smartdatalake] case class SchemaRootObjectDef(
 }
 
 /**
- * Mixin to convert json schema elements to json syntax using json4s.
+ * Mixin to convert JSON schema elements to JSON syntax using json4s.
  */
 private[smartdatalake] trait JsonExtractor {
   val `type`: Option[JsonTypeEnum] = None
@@ -218,16 +194,17 @@ private[smartdatalake] object JsonExtractor {
   /**
    * Custom serializer adds type-attribute if defined and ignores empty attributes
    */
-  def jsonTypeDefSerializer() = new CustomSerializer[JsonTypeDef](format => {
+  private def jsonTypeDefSerializer() = new CustomSerializer[JsonTypeDef](format => {
     val serializer: PartialFunction[Any, JValue] = {
       case obj: JsonExtractor =>
         val attributes = ProductUtil.attributesWithValuesForCaseClass(obj)
           .filter {
-            case (k, None) => false
-            case (k, v: Iterable[_]) if (v.isEmpty) => false
+            case (_, None) => false
+            case (_, v: Iterable[_]) if v.isEmpty
+            => false
             case _ => true
           }
-          .map { case (k, v) => (k, Extraction.decompose(v)(format)) }.toList
+          .map { case (k, v) => (k, Extraction.decompose(v)(format)) }
         val jsonObj = if (obj.`type`.isDefined) JObject(("type", JString(obj.`type`.get.toString)) +: attributes)
         else JObject(attributes)
         jsonObj
@@ -242,7 +219,7 @@ private[smartdatalake] object JsonExtractor {
 /**
  * LazyListMapWrapper is used to break recursive conversion.
  *
- * Note that its difficult to find an implementation that compiles for Scala 2.12 and 2.13.
+ * Note that it is difficult to find an implementation that compiles for Scala 2.12 and 2.13.
  * It's possible with collection.AbstractMap, but not collection.immutable.AbstractMap...
  */
 private[smartdatalake] class LazyListMapWrapper[A,B](createFn: () => ListMap[A,B]) extends AbstractMap[A,B] with Serializable {
@@ -250,7 +227,7 @@ private[smartdatalake] class LazyListMapWrapper[A,B](createFn: () => ListMap[A,B
   override def size: Int = wrappedList.size
   def get(key: A): Option[B] = wrappedList.get(key) // removed in 2.9: orElse Some(default(key))
   def iterator: Iterator[(A, B)] = wrappedList.iterator
-  override def -(key: A): Map[A, B] = wrappedList - key
-  override def -(key1: A, key2: A, keys: A*): Map[A, B] = wrappedList -(key1,key2,keys:_*)
+  override def -(key: A): Map[A, B] = wrappedList -- Iterable(key)
+  override def -(key1: A, key2: A, keys: A*): Map[A, B] = wrappedList -- (Seq(key1, key2) ++ keys)
   override def +[V1 >: B](kv: (A, V1)): collection.Map[A, V1] = wrappedList + kv
 }

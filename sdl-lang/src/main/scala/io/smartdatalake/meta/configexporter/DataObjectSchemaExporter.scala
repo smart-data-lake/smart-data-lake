@@ -54,7 +54,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('c', "config")
       .required()
-      .action((value, c) => c.copy(configPaths = value.split(',')))
+      .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('p', "exportPath")
       .action((value, c) => c.copy(targets = Seq(value)))

@@ -33,7 +33,6 @@ import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 import org.reflections.Reflections
 import scaladoc.Tag
-import scala.collection.compat._
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
@@ -41,7 +40,7 @@ import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe.{ClassSymbol, Type, TypeRef, typeOf}
 
 /**
- * Create Json schema elements from generic type definitions.
+ * Create JSON schema elements from generic type definitions.
  */
 private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
 
@@ -52,7 +51,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
   private val agentsKey = "agents"
 
   /**
-   * create generic type definitions and convert to json schema elements.
+   * create generic type definitions and convert to JSON schema elements.
    */
   def createSdlSchema(version: String): SchemaRootObjectDef = {
 
@@ -103,15 +102,16 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Converter of Scala types to json schema element
+   * Converter of Scala types to JSON schema element
    */
   class JsonTypeConverter(reflections: Reflections, registry: DefinitionRegistry) {
 
     def fromGenericTypeDef(typeDef: GenericTypeDef): JsonObjectDef = {
       val typeProperty = if(typeDef.baseTpe.isDefined) Seq(("type", JsonConstDef(typeDef.name))) else Seq()
       val attributes = getTypeAttributesForJsonSchema(typeDef)
-      // to break recursive conversion this has to be a function and evaluated lazy. Otherwise there might happen a stack overflow with ProxyAction.
-      val properties = new LazyListMapWrapper(() => ListMap((typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a)))):_*))
+      // to break recursive conversion this has to be a function and evaluated lazy.
+      // Otherwise, there might happen a stack overflow with ProxyAction.
+      val properties = new LazyListMapWrapper(() => ListMap(typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a))):_*))
       val required = typeProperty.map(_._1) ++ attributes.filter(_.isRequired).map(_.name)
       jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
     }
@@ -141,6 +141,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       convertToJsonType(attr.tpe, attr.description, if (attr.isDeprecated) Some(true) else None)
     }
 
+    @annotation.nowarn("msg=abstract type pattern")
     def convertToJsonType(tpe: Type, description: Option[String] = None, isDeprecated: Option[Boolean] = None): JsonTypeDef = {
       tpe match {
         case t if t =:= typeOf[String] => JsonStringDef(description, deprecated = isDeprecated)
@@ -155,11 +156,10 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         case t if t =:= typeOf[StringOrSecret] => JsonStringDef(Some(addSecretScaladocToDescription(description)), deprecated = isDeprecated) // map StringOrSecret as string
         case t if t =:= typeOf[OutputMode] => JsonStringDef(description, enum = Some(Seq("Append", "Complete", "Update")), deprecated = isDeprecated) // OutputMode is not an ordinary enum...
         // BaseTypes needs to be handled before ParsableFromConfig type
-        case t if registry.baseTypeExists(t) => {
+        case t if registry.baseTypeExists(t) =>
           val refDefs = registry.getJsonRefDefs(t)
           if (refDefs.size > 1) JsonOneOfDef(refDefs, description, deprecated = isDeprecated)
           else refDefs.head
-        }
         case t if registry.typeExists(t) => Some(registry.getJsonRefDef(t, isDeprecated)).map(x => x.copy(description = description.orElse(x.description))).get
         case t if t <:< typeOf[Product] => Some(fromCaseClass(t.typeSymbol.asClass, isDeprecated)).map(x => x.copy(description = description.orElse(x.description))).get
         case t if t <:< typeOf[ParsableFromConfig[_]] =>
@@ -223,9 +223,9 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
 }
 
 /**
- * Registry for global json schema element definitions
+ * Registry for global JSON schema element definitions
  */
-private[smartdatalake] class DefinitionRegistry() {
+private[smartdatalake] class DefinitionRegistry {
   private val defaultBaseTypeName = "Others"
   private val entries: mutable.Map[Option[Type], mutable.Map[Type,JsonTypeDef]] = mutable.Map()
   def add(baseType: Option[Type], tpe: Type, jsonType: JsonTypeDef): Unit = {
@@ -239,7 +239,7 @@ private[smartdatalake] class DefinitionRegistry() {
     // specific base (e.g. HttpAuthMode), avoiding missing options in places where the
     // more general base type is used.
     val refs = entries.iterator.flatMap {
-      case (Some(registeredBase), typeDefs) if (registeredBase <:< baseType) =>
+      case (Some(registeredBase), typeDefs) if registeredBase <:< baseType =>
         typeDefs.keys.map(tpe => getJsonRefDef(Some(registeredBase), tpe))
       case _ => Seq.empty[JsonRefDef]
     }.toSeq
@@ -267,4 +267,3 @@ private[smartdatalake] class DefinitionRegistry() {
   def typeExists(tpe: Type): Boolean = entries.values.flatMap(_.keys).toSeq.contains(tpe)
   private def getDefinitionName(baseType: Option[Type], name: String) = s"${baseType.map(_.typeSymbol.name.toString).getOrElse(defaultBaseTypeName)}/$name"
 }
-

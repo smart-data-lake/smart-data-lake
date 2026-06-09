@@ -1,7 +1,7 @@
 /*
  * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,18 +29,18 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
  * Configuration for exporting SDL configuration schema as json schema
  */
 case class JsonSchemaExporterConfig(
-                                     filename: String = null,
-                                     version: Option[String] = None
-                                   )
+    filename: String = null,
+    version: Option[String] = None
+)
 
 /**
  * Main class to export SDL configuration schema as json schema
  */
 object JsonSchemaExporter extends SmartDataLakeLogger {
 
-  // read version from package jar-manifest (not defined if project is executed in IntellJ)
-  val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
-  val appType: String = getClass.getSimpleName.replaceAll("\\$$","") // remove $ from object name and use it as appType
+  // read version from package jar-manifest (not defined if project is executed in IntelliJ)
+  private val appVersion: String = Option(getClass.getPackage.getImplementationVersion).getOrElse("develop")
+  val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
   /**
    * The Parser defines how to extract the options from the command line args.
@@ -74,10 +74,11 @@ object JsonSchemaExporter extends SmartDataLakeLogger {
 
         // write file
         logger.info(s"Writing schema to file ${config.filename}")
-        Files.write(Paths.get(config.filename), jsonRootString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING )
+        Files.write(Paths.get(config.filename), jsonRootString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
 
       case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+        logAndThrowException(s"Aborting $appType after error",
+          new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 }
