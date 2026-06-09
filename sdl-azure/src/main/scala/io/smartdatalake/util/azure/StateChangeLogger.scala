@@ -34,20 +34,14 @@ import org.json4s.{Formats, NoTypeHints}
 import java.time.LocalDateTime
 
 /**
- * Log state changes to LogAnalytics workspace.
- * Supports LogAnalyticsIngestionBackend and the older LogAnalyticsHttpCollectorBackend by defining corresponding configuration as options.
+ * Log state changes to LogAnalytics workspace. Supports LogAnalyticsIngestionBackend and the older
+ * LogAnalyticsHttpCollectorBackend by defining corresponding configuration as options.
  *
  * To enable add the state listener as follows to global config section:
  *
- * stateListeners = [{
- * className = "io.smartdatalake.util.azure.StateChangeLogger"
- * options = {
- *   endpoint: "https://....switzerlandnorth-1.ingest.monitor.azure.com"
- *   ruleId: "dcr-..."
- *   streamName: "Custom-sdlb-log"
- *   includeMetadata: "true" # optionally disable logging data object metadata
- * }
- * }]
+ * stateListeners = [{ className = "io.smartdatalake.util.azure.StateChangeLogger" options = {
+ * endpoint: "https://....switzerlandnorth-1.ingest.monitor.azure.com" ruleId: "dcr-..." streamName:
+ * "Custom-sdlb-log" includeMetadata: "true" # optionally disable logging data object metadata } }]
  */
 class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListener with SmartDataLakeLogger {
 
@@ -56,24 +50,29 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
 
   val backend: LogAnalyticsBackend[StateLogEvent] = if (options.isDefinedAt("workspaceId")) {
     // LogAnalyticsHttpCollectorBackend
-    val workspaceId =  options.getOrElse("workspaceID", throw new ConfigurationException(s"Option workspaceID needed for ${this.getClass.getSimpleName}")).resolve()
-    val workspaceKey = options.getOrElse("workspaceKey", throw new ConfigurationException(s"Option workspaceKey needed for ${this.getClass.getSimpleName}")).resolve()
+    val workspaceId = options.getOrElse("workspaceID",
+      throw new ConfigurationException(s"Option workspaceID needed for ${this.getClass.getSimpleName}")).resolve()
+    val workspaceKey = options.getOrElse("workspaceKey",
+      throw new ConfigurationException(s"Option workspaceKey needed for ${this.getClass.getSimpleName}")).resolve()
     val logType = options.get("logType").map(_.resolve()).getOrElse("sdlb_state")
     new LogAnalyticsHttpCollectorBackend[StateLogEvent](workspaceId, workspaceKey, logType, serialize)
   } else if (options.isDefinedAt("endpoint")) {
     // LogAnalyticsIngestionBackend
-    val endpoint =  options.getOrElse("endpoint", throw new ConfigurationException(s"Option endpoint needed for ${this.getClass.getSimpleName}")).resolve()
-    val ruleId =  options.getOrElse("ruleId", throw new ConfigurationException(s"Option ruleId needed for ${this.getClass.getSimpleName}")).resolve()
-    val streamName =  options.getOrElse("streamName", throw new ConfigurationException(s"Option streamName needed for ${this.getClass.getSimpleName}")).resolve()
-    val batchSize =  options.get("batchSize").map(_.resolve().toInt).getOrElse(100)
+    val endpoint = options.getOrElse("endpoint",
+      throw new ConfigurationException(s"Option endpoint needed for ${this.getClass.getSimpleName}")).resolve()
+    val ruleId =
+      options.getOrElse("ruleId", throw new ConfigurationException(s"Option ruleId needed for ${this.getClass.getSimpleName}")).resolve()
+    val streamName = options.getOrElse("streamName",
+      throw new ConfigurationException(s"Option streamName needed for ${this.getClass.getSimpleName}")).resolve()
+    val batchSize = options.get("batchSize").map(_.resolve().toInt).getOrElse(100)
     new LogAnalyticsIngestionBackend[StateLogEvent](endpoint, ruleId, streamName, batchSize, serialize)
-  } else throw new ConfigurationException("Configuration options missing for LogAnalyticsHttpCollectorBackend or LogAnalyticsIngestionBackend")
+  } else
+    throw new ConfigurationException("Configuration options missing for LogAnalyticsHttpCollectorBackend or LogAnalyticsIngestionBackend")
 
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
-  override def init(context: ActionPipelineContext): Unit = {
+  override def init(context: ActionPipelineContext): Unit =
     logger.debug(s"initialized")
-  }
 
   override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
     val logContext = StateLogEventContext.from(context, state.isFinal)
@@ -82,23 +81,38 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
         extractLogEvents(actionId, runtimeInfo, logContext, context.instanceRegistry)
       }.toSeq
       sendLogEvents(events)
-    }
-    else if (changedActionId.isDefined) {
-      val changedActionState = state.actionsState.getOrElse(changedActionId.get, throw new IllegalStateException(s"changed $changedActionId not found in state!"))
+    } else if (changedActionId.isDefined) {
+      val changedActionState =
+        state.actionsState.getOrElse(changedActionId.get, throw new IllegalStateException(s"changed $changedActionId not found in state!"))
       val logEvents = extractLogEvents(changedActionId.get, changedActionState, logContext, context.instanceRegistry)
       sendLogEvents(logEvents)
     }
   }
 
-  def extractLogEvents(actionId: ActionId, runtimeInfo: RuntimeInfo, logContext: StateLogEventContext, instanceRegistry: InstanceRegistry): Seq[StateLogEvent] = {
+  def extractLogEvents(
+      actionId: ActionId,
+      runtimeInfo: RuntimeInfo,
+      logContext: StateLogEventContext,
+      instanceRegistry: InstanceRegistry
+  ): Seq[StateLogEvent] = {
     val results = runtimeInfo.results.map {
       result =>
         val metadata = instanceRegistry.get[DataObject](result.dataObjectId).metadata
-        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap.filterKeys(_ != "description").view.mapValues(_.toString).toMap
+        val metadataMap: Map[String, String] = if (includeMetadata) attributesWithValuesForCaseClass(metadata).toMap
+          .view.filterKeys(_ != "description").mapValues(_.toString).toMap
         else Map()
         val dataObjectsState = runtimeInfo.dataObjectsState.find(_.dataObjectId == result.dataObjectId).map(_.state)
-        StateLogEvent(logContext, actionId.id, runtimeInfo.state.toString, runtimeInfo.msg,
-          Some(result.dataObjectId.id), optionalizeMap(metadataMap), result.metrics, optionalizeSeq(result.partitionValues.map(_.toString)), dataObjectsState)
+        StateLogEvent(
+          logContext,
+          actionId.id,
+          runtimeInfo.state.toString,
+          runtimeInfo.msg,
+          Some(result.dataObjectId.id),
+          optionalizeMap(metadataMap),
+          result.metrics,
+          optionalizeSeq(result.partitionValues.map(_.toString)),
+          dataObjectsState
+        )
     }
     // generate at least one log entry per Action if no results
     if (results.nonEmpty) results
@@ -119,7 +133,7 @@ class StateChangeLogger(options: Map[String, StringOrSecret]) extends StateListe
 case class StateLogEventContext(application: String, startTime: LocalDateTime, runId: Int, attemptId: Int, phase: String, isFinal: Boolean)
 
 object StateLogEventContext {
-  def from(context: ActionPipelineContext, isFinal: Boolean): StateLogEventContext = {
+  def from(context: ActionPipelineContext, isFinal: Boolean): StateLogEventContext =
     StateLogEventContext(
       application = context.application,
       startTime = context.runStartTime,
@@ -128,7 +142,16 @@ object StateLogEventContext {
       phase = context.phase.toString,
       isFinal = isFinal
     )
-  }
 }
 
-case class StateLogEvent(context: StateLogEventContext, actionId: String, state: String, msg: Option[String], dataObjectId: Option[String] = None, metadata: Option[Map[String, String]] = None, metrics: Option[Map[String, Any]] = None, partitionValues: Option[Seq[String]] = None, dataObjectsState: Option[String] = None)
+case class StateLogEvent(
+    context: StateLogEventContext,
+    actionId: String,
+    state: String,
+    msg: Option[String],
+    dataObjectId: Option[String] = None,
+    metadata: Option[Map[String, String]] = None,
+    metrics: Option[Map[String, Any]] = None,
+    partitionValues: Option[Seq[String]] = None,
+    dataObjectsState: Option[String] = None
+)

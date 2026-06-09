@@ -72,7 +72,7 @@ import scala.util.Try
  * - table is registered and path contains parquet files, but metadata subfolder is missing -> path is converted to Iceberg format
  * - table is not registered but path contains parquet files and metadata subfolder -> Table is registered in catalog
  * - table is not registered but path contains parquet files without metadata subfolder -> path is converted to Iceberg format and table is registered in catalog
- * - table is not registered and path does not exists -> table is created on write
+ * - table is not registered and path does not exist -> table is created on write
  *
  * IcebergTableDataObject implements
  * - [[CanMergeDataFrame]] by writing a temp table and using one SQL merge statement.
@@ -131,10 +131,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
 
-  val filetypePattern: String = ".*(\\.parquet|\\.avro|\\.orc|c\\d\\d\\d)$" // Iceberg supports to read mixed tables! 'c000' can be the file ending for parquet files of legacy hive tables!
+  private val filetypePattern: String = ".*(\\.parquet|\\.avro|\\.orc|c\\d\\d\\d)$" // Iceberg supports to read mixed tables! 'c000' can be the file ending for parquet files of legacy hive tables!
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
-    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     val thisIsTableExisting = isTableExisting
     val thisIsPathBasedCatalog = isPathBasedCatalog(getIcebergCatalog)
     require(thisIsTableExisting || thisIsPathBasedCatalog || path.isDefined, s"($id) Iceberg table ${table.fullName} does not exist, so path must be set.")
@@ -162,7 +161,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   private def getAbsolutePath(implicit context: ActionPipelineContext) = {
     val prefixedPath = HdfsUtil.prefixHadoopPath(path.get, connection.map(_.pathPrefix))
-    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // dont use "filesystem" to avoid loop
+    HdfsUtil.makeAbsolutePath(prefixedPath)(getFilesystem(prefixedPath, context.serializableHadoopConf)) // don't use "filesystem" to avoid loop
   }
 
   table = table.overrideCatalogAndDb(connection.flatMap(_.catalog), connection.map(_.db))
@@ -351,7 +350,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                                   (implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
-    implicit val helper: SparkSubFeed.type = SparkSubFeed
 
     val genericDf = SparkDataFrame(df)
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
@@ -382,7 +380,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
         // make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=false with SQL merge, because this is not supported in Spark 3.5. See also https://github.com/apache/iceberg/issues/9827.
         // TODO: This might be solved with Spark 4.0, as there will be a Spark API for merge.
         updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, "false", TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
-        // merge operations still need all columns for potential insert/updateConditions. Therefore dfPrepared instead of saveModeTargetDf is passed on.
+        // merge operations still need all columns for potential insert/updateConditions.
+        // Therefore, dfPrepared instead of saveModeTargetDf is passed on.
         mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         // Make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=true for schema evolution
@@ -416,7 +415,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       throw NoDataToProcessWarning(id.id, s"($id) No data was written to Iceberg table by Spark.")
     }
     // add all summary entries except spark application id to metrics
-    val icebergMetrics = (summary - "spark.app.id")
+    val icebergMetrics = summary.filter(_._1 != "spark.app.id")
       // normalize names lowercase with underscore
       .map{case(k,v) => (k.replace("-","_"), Try(v.toLong).getOrElse(v))}
       // standardize naming
@@ -434,7 +433,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   }
 
   private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     // check if temp-table existing
     if(getIcebergCatalog.tableExists(getTableIdentifier)) {
       logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists! There might be a potential conflict with another job. It will be replaced.")
@@ -469,11 +467,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       }
 
       // override missing columns with null value, as Iceberg needs all target columns be included in insert statement
-      val targetCols = session.table(table.fullName).schema.fieldNames
-      val missingCols = targetCols.diff(df.columns)
+      val targetCols = session.table(table.fullName).schema.fieldNames.toSeq
+      val missingCols = targetCols.diff(df.columns.toSeq)
       val saveModeOptionsExt = saveModeOptions.copy(
         insertValuesOverride = saveModeOptions.insertValuesOverride ++ missingCols.map(_ -> "null"),
-        updateColumns = if (saveModeOptions.updateColumns.isEmpty) df.columns.diff(table.primaryKey.get) else saveModeOptions.updateColumns
+        updateColumns = if (saveModeOptions.updateColumns.isEmpty) df.columns.diff(table.primaryKey.get).toSeq else saveModeOptions.updateColumns
       )
       // prepare SQL merge statement
       // note that we pass all target cols instead of new df columns as parameter, but with customized saveModeOptionsExt
@@ -502,7 +500,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   /**
    * Iceberg has a write option 'mergeSchema' (see also SparkWriteOptions.MERGE_SCHEMA),
-   * but it doesnt work as there is another validation before that checks the schema (e.g. QueryCompilationErrors$.cannotWriteTooManyColumnsToTableError in the stack trace)
+   * but it does not work as there is another validation before that checks the schema
+   * (e.g. QueryCompilationErrors$.cannotWriteTooManyColumnsToTableError in the stack trace)
    * This code is therefore copied from SparkWriteBuilder.validateOrMergeWriteSchema:246ff
    */
   def evolveTableSchema(dsSchema: StructType)(implicit context: ActionPipelineContext): Unit = {
@@ -606,8 +605,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     hasFiles
   }
 
-  protected val separator: Char = Path.SEPARATOR_CHAR
-
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
     if (isTableExisting) {
       val dfPartitions = SparkSubFeed.getSparkSession.table(s"${table.fullName}.partitions")
@@ -616,7 +613,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       if (partitions.isEmpty && isPartitioned) logger.warn(s"($id) partitions are not defined but Iceberg table is partitioned.")
       if (partitions.nonEmpty && isPartitioned) {
         val dfPartitionsPartition = dfPartitions.select(col("partition.*"))
-        val partitions = dfPartitionsPartition.collect().toSeq.map(r => r.getValuesMap[Any](dfPartitionsPartition.columns).view.mapValues(_.toString).toMap)
+        val partitions = dfPartitionsPartition.collect().toSeq.map(r => r.getValuesMap[Any](dfPartitionsPartition.columns.toSeq).view.mapValues(_.toString).toMap)
         partitions.map(PartitionValues(_))
       } else Seq()
     } else Seq()
@@ -684,10 +681,11 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   /**
    * To implement incremental processing this function is called to initialize the DataObject with its state from the last increment.
-   * The state is just a string. It's semantics is internal to the DataObject.
-   * Note that this method is called on initializiation of the SmartDataLakeBuilder job (init Phase) and for streaming execution after every execution of an Action involving this DataObject (postExec).
+   * The state is just a string. Its semantics is internal to the DataObject.
+   * Note that this method is called on initialization of the SmartDataLakeBuilder job (init Phase)
+   * and for streaming execution after every execution of an Action involving this DataObject (postExec).
    *
-   * @param state Internal state of last increment. If None then the first increment (may be a full increment) is delivered.
+   * @param state Internal state of last increment. If None then the first increment (maybe a full increment) is delivered.
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
 
@@ -715,4 +713,3 @@ object IcebergTableDataObject extends FromConfigFactory[DataObject] {
     extract[IcebergTableDataObject](config)
   }
 }
-
