@@ -56,12 +56,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
 			<scope>${sdl-core.scope}</scope>
@@ -241,6 +235,16 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<configuration>
+					<ignoredUnusedDeclaredDependencies>
+						<!-- used in source but bytecode analyzer attributes it to delta-spark's transitive chain -->
+						<ignoredUnusedDeclaredDependency>org.apache.spark:spark-sql_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- kept to prevent NoClassDefFoundError at runtime; see dependency comment above -->
+						<ignoredUnusedDeclaredDependency>org.apache.spark:spark-tags_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- used in source (scala.util.Try, scala.language.*) but not detected by bytecode analyzer -->
+						<ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->
