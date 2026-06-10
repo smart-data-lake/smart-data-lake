@@ -662,7 +662,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         // execute DAG
         val startTime = LocalDateTime.now
         var finalRunState: ActionDAGRunState = null
-        val _ = try
+        try
           actionDAGRun.exec(context)
         finally
           finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context)
