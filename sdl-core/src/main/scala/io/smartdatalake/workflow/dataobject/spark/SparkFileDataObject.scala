@@ -24,6 +24,7 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
 import io.smartdatalake.util.spark.dataset.{Quality, ReadWrite, Transform, getEmptyDataFrame}
 import io.smartdatalake.util.spark.{SparkRepartitionDef, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -39,7 +40,7 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
-import org.apache.spark.sql.functions.{input_file_name, lit}
+import org.apache.spark.sql.functions.{col, input_file_name, lit}
 import org.apache.spark.sql.types.{DataType, StringType, StructType}
 import org.slf4j.Logger
 
@@ -526,7 +527,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   }
 
   // Store files observation object between call to setupFilesObserver until it is used in getSparkDataFrame.
-  @transient private val filesObservers: mutable.Map[ActionId, ExecutionPlanSparkFilenameObservation[Row]] = mutable.Map()
+  @transient private val filesObservers: mutable.Map[ActionId, ObserverSparkFilenameObservation[Row]] = mutable.Map()
 
   /**
    * Set up an observation of files processed through custom metrics.
@@ -536,7 +537,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
   def setupFilesObserver(actionId: ActionId): SparkFilenameObservation[Row] = {
     logger.debug(s"($id) setting up files observer for $actionId")
     // return existing observation for this action if existing, otherwise create a new one.
-    filesObservers.getOrElseUpdate(actionId, new ExecutionPlanSparkFilenameObservation(actionId.id + "/" + id.id))
+    filesObservers.getOrElseUpdate(actionId, new ObserverSparkFilenameObservation(actionId.id + "/" + id.id))
   }
 
   override def getStreamingDataFrame(options: Map[String, String], pipelineSchema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
@@ -750,39 +751,19 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
  * (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
-
-/*
-TODO: Replace ExecutionPlanSparkFilenameObservation by ExecutionPlanSparkFilenameObservation
 private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+
+  import org.apache.spark.sql.classic.ColumnConversions._
+
   def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
-    logger.debug(s"($name) add files observation to Dataset")
+    logger.debug(s"on(name=$name,filenameColumnName=$filenameColumnName) add files observation to Dataset")
     on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
   }
 
   def getFilesProcessed: Seq[String] = {
-    waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+    logger.debug(s"getFilesProcessed(name=$name): START")
+    waitFor().getOrElse("filesProcessed",
+        throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
       .asInstanceOf[Seq[String]]
-  }
-}*/
-
-
-/**
- * Workaround for bug in ObserverSparkFilenameObservation - get files processed from DataFrames execution plan.
- * Note that this might be incorrect if there are additional filters applied.
- */
-private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
-
-  private var filesInExecutionPlan: Option[Seq[String]] = None
-
-  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
-    logger.debug(s"($name) add files observation to Dataset")
-    filesInExecutionPlan = Some(SparkFileDataObject.getFilesProcessedFromSparkPlan(name, ds))
-    ds
-  }
-
-  override def getFilesProcessed: Seq[String] = {
-    val files = filesInExecutionPlan.getOrElse(throw new IllegalStateException(s"($name) filesInExecutionPlan is empty!"))
-    if (logger.isDebugEnabled()) logger.debug(s"($name) files processed: ${files.mkString(", ")}")
-    files
   }
 }
