@@ -285,6 +285,9 @@ trait SparkFileDataObject extends HadoopFileDataObject
     df
   }
 
+  private def filterWithoutPartitions(schemaOpt: Option[StructType])(df: DataFrame): Boolean = schemaOpt.isDefined ||
+    partitions.diff(df.columns).isEmpty
+
   /**
    * Update incremental output state and prepare options for filtering DataSource.
    */
@@ -312,23 +315,27 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * Prepares the DataFrame with the content when reading.
    * Uses Spark DataSource V2 interface.
    */
-  protected def getContentV2(partitionValues: Seq[PartitionValues], schema: Option[StructType], incrementalOutputOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrame = {
+  protected def getContentV2(partitionValues: Seq[PartitionValues], schemaOpt: Option[StructType],
+                             incrementalOutputOptions: Map[String,String])
+                            (implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = getSparkSession
     if (partitions.isEmpty || partitionValues.isEmpty) {
       session.read
         .format(readFormat)
         .options(readOptions ++ incrementalOutputOptions)
-        .optionalSchema(schema)
+        .optionalSchema(schemaOpt)
         .load(hadoopPath.toString)
     } else {
       val reader = session.read
         .format(readFormat)
         .options(readOptions ++ incrementalOutputOptions)
-        .optionalSchema(schema)
+        .optionalSchema(schemaOpt)
         .option("basePath", hadoopPath.toString) // this is needed for partitioned tables when subdirectories are read directly; it then keeps the partition columns from the subdirectory path in the dataframe
       val pathsToRead = partitionValues.flatMap(getConcreteInitPaths).map(_.toString)
-      val df = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead.toIndexedSeq: _*)) else None
-      df.filter(df => schema.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
+      val dfOpt: Option[DataFrame] = if (pathsToRead.nonEmpty) Some(reader.load(pathsToRead.toIndexedSeq: _*)) else None
+      // filter DataFrames without partition columns as they are empty
+      // this might happen if there is no schema specified and the partition is empty
+      dfOpt.filter(filterWithoutPartitions(schemaOpt))
         .getOrElse {
           // if there are no paths to read for given partition values, handle no data
           if (context.isExecPhase) {
@@ -337,7 +344,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
           } else {
             // create empty data frame in init phase
             require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
-            getEmptyDataFrame(schema.get)
+            getEmptyDataFrame(schemaOpt.get)
           }
         }
     }
@@ -359,7 +366,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
           .format(readFormat)
           .options(readOptions ++ incrementalOutputOptions)
           .optionalSchema(schemaOpt)
-          .option("path", hadoopPath.toString) // spark-xml is a V1 source and only supports one path, which must be given as option...
+          // spark-xml is a V1 source and only supports one path, which must be given as option...
+          .option("path", hadoopPath.toString)
           .load()
       } else {
         val schemaWithoutPartitions = schemaOpt
@@ -373,14 +381,16 @@ trait SparkFileDataObject extends HadoopFileDataObject
             getConcreteFullPaths(pv).map(p =>
               (extractPartitionValuesFromDirPath(p.toString), p)))
           .filter{case (_,path) => filesystem.globStatus(new Path(path,fileName)).nonEmpty} // filter empty path to avoid NullPointerException in DataFrame
-        val df = if (pathsToRead.nonEmpty) Some(
+        val dfOpt: Option[DataFrame] = if (pathsToRead.nonEmpty) Some(
           pathsToRead.map { case (pv, path) =>
             partitions.foldLeft(reader.option("path", path.toString).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
               case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
             }
           }.reduce(_ unionByName _)
         ) else None
-        df.filter(df => schemaOpt.isDefined || partitions.diff(df.columns).isEmpty) // filter DataFrames without partition columns as they are empty (this might happen if there is no schema specified and the partition is empty)
+        // filter DataFrames without partition columns as they are empty.
+        // This might happen if there is no schema specified and the partition is empty.
+        dfOpt.filter(filterWithoutPartitions(schemaOpt))
           .getOrElse {
             // if there are no paths to read for given partition values, handle no data
             if (context.isExecPhase) {
@@ -453,10 +463,12 @@ trait SparkFileDataObject extends HadoopFileDataObject
       // if there are no paths to read for given partition values, handle no data
       if (context.isExecPhase) {
         // skip action in exec phase
-        throw NoDataToProcessWarning(id.id, s"($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
+        throw NoDataToProcessWarning(id.id, s"getContentFilesOneByOne: ($id) No existing files found for partition values ${partitionValues.mkString(", ")}.")
       } else {
         // create empty data frame in init phase
-        require(schema.isDefined, s"($id) DataObject schema is undefined. A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
+        require(schema.isDefined,
+          s"getContentFilesOneByOne: ($id) DataObject schema is undefined." +
+            s" A schema must be defined as there are no existing files for partition values ${partitionValues.mkString(", ")}.")
         getEmptyDataFrame(schema.get)
       }
     }
@@ -732,24 +744,26 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
   def getFilesProcessed: Seq[String]
 }
 
-
 /**
- * TODO: Where is ObserverSparkFilenameObservation used?
- *
  * Get files processed by using Spark observer on filename column
- * Note: There is a Spark problem - NullPointerException/*private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
- * def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
- * logger.debug(s"($name) add files observation to Dataset")
- * on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
- * }
- *
- * def getFilesProcessed: Seq[String] = {
- * waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
- * .asInstanceOf[Seq[String]]
- * }
- * }*/n with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+ * Note: There is a Spark problem - NullPointerException with TypedImperativeAggregate
+ * (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
+
+/*
+TODO: Replace ExecutionPlanSparkFilenameObservation by ExecutionPlanSparkFilenameObservation
+private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+    logger.debug(s"($name) add files observation to Dataset")
+    on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
+  }
+
+  def getFilesProcessed: Seq[String] = {
+    waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+      .asInstanceOf[Seq[String]]
+  }
+}*/
 
 
 /**
