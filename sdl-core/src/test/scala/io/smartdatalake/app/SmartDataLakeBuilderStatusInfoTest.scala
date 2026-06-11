@@ -44,7 +44,10 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val session: SparkSession = TestUtil.session
   private val sdlb = DefaultSmartDataLakeBuilder
+  private val javaVersion: String = System.getProperty("java.version")
+
   import session.implicits._
+  logger.info(s"Java Version : $javaVersion")
 
   before {
     sdlb.instanceRegistry.clear()
@@ -85,14 +88,18 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
     val client = new WebSocketClient
     client.start()
     val session = client.connect(new UnitTestSocket, URI.create("ws://localhost:4440/ws/")).get
+    logger.debug(s"session = $session")
 
     logger.debug("Verify Rest API context endpoint is reachable and returns correct results")
-    val webserviceDOContext = WebserviceFileDataObject("dummy",
+    val webserviceDOContext: WebserviceFileDataObject = WebserviceFileDataObject("dummy",
       url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
-    val webserviceClientContext = SttpWebserviceClient(webserviceDOContext)
+    val webserviceClientContext: SttpWebserviceClient = SttpWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
-      case Failure(exception) =>
-        throw exception
+      case Failure(e) =>
+        logger.error("webserviceClientContext.get() FAILED!")
+        logger.error(s"webserviceDOContext     = $webserviceDOContext")
+        logger.error(s"webserviceClientContext = $webserviceClientContext")
+        throw e
       case Success(value) =>
         val str = new String(value, StandardCharsets.UTF_8)
         assert(str.contains("\"feedSel\":\"test\""))
