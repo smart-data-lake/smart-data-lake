@@ -103,9 +103,6 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
       s" outputMode=$outputMode , saveModeOptions: $saveModeOptions , options: ${options.mkString(",")}")
     df match {
       case sparkDataFrame: SparkDataFrame =>
-        // TODO: This comment relates to Scala 2.12 which ist not used anymore. Do we still need to create a real function?
-        // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
-        // Note: no partition values supported when writing streaming target
         def microBatchWriter(dfMicrobatch: Dataset[Row], batchId: Long): Unit = {
           logger.debug(s"microBatchWriter(batchId=$batchId):" +
             s" Re-set it here so SparkStageMetricsListener can capture stage metrics for every batch.")
