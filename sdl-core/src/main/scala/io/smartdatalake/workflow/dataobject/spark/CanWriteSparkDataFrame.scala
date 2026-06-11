@@ -31,56 +31,84 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
-import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.reflect.runtime.universe.{typeOf, Type}
 
 trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
 
   /**
    * Configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
    *
-   * @see [[DataFrameReader]]
-   * @see [[DataFrameWriter]]
+   * @see
+   *   [[DataFrameReader]]
+   * @see
+   *   [[DataFrameWriter]]
    */
   def options: Map[String, String] = Map()
 
-  def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = ()
+  def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit
+      context: ActionPipelineContext
+  ): Unit = ()
 
-  def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): MetricsMap
+  def writeSparkDataFrame(
+      df: DataFrame,
+      partitionValues: Seq[PartitionValues] = Seq(),
+      isRecursiveInput: Boolean = false,
+      saveModeOptions: Option[SaveModeOptions] = None
+  )(implicit context: ActionPipelineContext): MetricsMap
 
-  private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = throw new RuntimeException("writeDataFrameToPath not implemented")
+  private[smartdatalake] def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit
+      context: ActionPipelineContext
+  ): MetricsMap = throw new RuntimeException("writeDataFrameToPath not implemented")
 
-  override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
+  override def writeDataFrame(
+      df: GenericDataFrame,
+      partitionValues: Seq[PartitionValues],
+      isRecursiveInput: Boolean,
+      saveModeOptions: Option[SaveModeOptions]
+  )(implicit context: ActionPipelineContext): MetricsMap =
     df match {
       case sparkDf: SparkDataFrame => writeSparkDataFrame(sparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
     }
-  }
 
-  override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit
+      context: ActionPipelineContext
+  ): Unit =
     df match {
       case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
     }
-  }
 
   override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed])
 
-  override private[smartdatalake] def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = {
+  override private[smartdatalake] def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit
+      context: ActionPipelineContext
+  ): Unit =
     df match {
       case sparkDataFrame: SparkDataFrame => writeSparkDataFrameToPath(sparkDataFrame.inner, path, finalSaveMode)
-      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrameToPath")
+      case _                              =>
+        throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrameToPath")
     }
-  }
 
-  override def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): StreamingQuery = {
+  override def writeStreamingDataFrame(
+      df: GenericDataFrame,
+      trigger: Trigger,
+      options: Map[String, String],
+      checkpointLocation: String,
+      queryName: String,
+      outputMode: OutputMode = OutputMode.Append,
+      saveModeOptions: Option[SaveModeOptions] = None
+  )(implicit context: ActionPipelineContext): StreamingQuery = {
+    logger.debug(s"START writeStreamingDataFrame: checkpointLocation=$checkpointLocation , queryName=$queryName ," +
+      s" outputMode=$outputMode , saveModeOptions: $saveModeOptions , options: ${options.mkString(",")}")
     df match {
       case sparkDataFrame: SparkDataFrame =>
+        // TODO: This comment relates to Scala 2.12 which ist not used anymore. Do we still need to create a real function?
         // lambda function is ambiguous with foreachBatch in scala 2.12... we need to create a real function...
         // Note: no partition values supported when writing streaming target
-        def microBatchWriter(dfMicrobatch: Dataset[Row], batchid: Long): Unit = {
-          // Spark's streaming engine overwrites the thread-local job group between batches.
-          // Re-set it here so SparkStageMetricsListener can capture stage metrics for every batch.
+        def microBatchWriter(dfMicrobatch: Dataset[Row], batchId: Long): Unit = {
+          logger.debug(s"microBatchWriter(batchId=$batchId):" +
+            s" Re-set it here so SparkStageMetricsListener can capture stage metrics for every batch.")
           context.currentAction.foreach { action =>
             SparkSubFeed.getSparkSession(context).sparkContext.setJobGroup(
               s"${context.appConfig.appName} ${action.id} runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}",
@@ -88,7 +116,7 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
             )
           }
           val metrics = writeSparkDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
-          val actionMetrics = GenericMetrics(s"streaming-microBatchWriter", System.currentTimeMillis()/1000, metrics)
+          val actionMetrics = GenericMetrics(s"streaming-microBatchWriter", System.currentTimeMillis() / 1000, metrics)
           context.currentAction.get.addAsyncMetrics(None, Some(id), actionMetrics)
         }
         sparkDataFrame.inner
@@ -100,23 +128,23 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
           .options(streamingOptions ++ options) // options override streamingOptions
           .foreachBatch(microBatchWriter _)
           .start()
-      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
+      case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType" +
+          s" ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
     }
   }
 
 }
 
 /**
- * Mapping to Spark SaveMode
- * This is one-to-one except custom modes as OverwritePreserveDirectories
+ * Mapping to Spark SaveMode This is one-to-one except custom modes as OverwritePreserveDirectories
  */
 object SparkSaveMode {
   def from(mode: SDLSaveMode): SaveMode = mode match {
-    case Overwrite => SaveMode.Overwrite
-    case Append => SaveMode.Append
-    case ErrorIfExists => SaveMode.ErrorIfExists
-    case Ignore => SaveMode.Ignore
+    case Overwrite                    => SaveMode.Overwrite
+    case Append                       => SaveMode.Append
+    case ErrorIfExists                => SaveMode.ErrorIfExists
+    case Ignore                       => SaveMode.Ignore
     case OverwritePreserveDirectories => SaveMode.Append // Append with spark, but delete files before with hadoop
-    case OverwriteOptimized => SaveMode.Append // Append with spark, but delete partitions before with hadoop
+    case OverwriteOptimized           => SaveMode.Append // Append with spark, but delete partitions before with hadoop
   }
 }
