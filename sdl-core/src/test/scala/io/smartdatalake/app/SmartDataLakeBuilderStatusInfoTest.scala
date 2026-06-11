@@ -20,6 +20,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -44,10 +45,9 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val session: SparkSession = TestUtil.session
   private val sdlb = DefaultSmartDataLakeBuilder
-  private val javaVersion: String = System.getProperty("java.version")
 
   import session.implicits._
-  logger.info(s"Java Version : $javaVersion")
+  loggEnv
 
   before {
     sdlb.instanceRegistry.clear()
