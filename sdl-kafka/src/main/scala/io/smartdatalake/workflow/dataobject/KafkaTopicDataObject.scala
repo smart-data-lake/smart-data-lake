@@ -39,6 +39,7 @@ import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetA
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
+import org.apache.spark.sql.classic.ColumnConversions._
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.confluent.avro.{AvroSchemaConverter, ConfluentAvroConnector}
 import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
@@ -440,8 +441,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         from_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {
-          case SubjectType.key => keyConfluentConnector.get.from_confluent(dataCol, topicName, subjectType)
-          case SubjectType.value => valueConfluentConnector.get.from_confluent(dataCol, topicName, subjectType)
+          case SubjectType.key => DatasetHelper.toCol(keyConfluentConnector.get.from_confluent(dataCol.expr, topicName, subjectType))
+          case SubjectType.value => DatasetHelper.toCol(valueConfluentConnector.get.from_confluent(dataCol.expr, topicName, subjectType))
         }
     }
   }
@@ -459,8 +460,8 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         to_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {
-          case SubjectType.key => keyConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution)
-          case SubjectType.value => valueConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution)
+          case SubjectType.key => DatasetHelper.toCol(keyConfluentConnector.get.to_confluent(dataCol.expr, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution))
+          case SubjectType.value => DatasetHelper.toCol(valueConfluentConnector.get.to_confluent(dataCol.expr, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution))
         }
     }
   }

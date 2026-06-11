@@ -41,7 +41,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
 
   "countDistinctRows" should "count distinct rows" in {
     val argument = List((0, 0d), (0, 0d), (1, 1d), (1, 1d), (2, 2d), (2, 2d)).toDF("id", "x")
-    argument.createdLog("argument", debug = Some(true))
+    argument.createdLog("argument", debug = Some(true), showRows = true)
     argument.countDistinctRows should be(3)
   }
 

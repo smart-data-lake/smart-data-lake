@@ -25,6 +25,7 @@ import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfo
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.dag.{DAGException, ExceptionSeverity}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc._
@@ -35,6 +36,7 @@ import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInf
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.SparkSession
+import org.slf4j.Logger
 import scopt.{OParser, OParserBuilder}
 
 import java.time.{Duration, LocalDateTime}
@@ -64,12 +66,12 @@ object TestMode extends Enumeration {
 
   /**
    * Test if config is valid. Note that this only parses and validates the configuration. No
-   * attempts are made to check the environment (e.g. connection informations...).
+   * attempts are made to check the environment (e.g. connection information...).
    */
   val Config: app.TestMode.Value = Value("config")
 
   /**
-   * Test the environment if connections can be initalized and spark lineage can be created. Note
+   * Test the environment if connections can be initialized and spark lineage can be created. Note
    * that no changes are made to the environment if possible. The test executes "prepare" and "init"
    * phase, but not the "exec" phase of an SDLB run.
    */
@@ -80,8 +82,10 @@ object TestMode extends Enumeration {
  * Abstract Smart Data Lake Builder Command Line Application.
  */
 abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
+  @transient implicit private lazy val loggImpl: Logger = logger
 
-  val appVersion: String = "appVersion: " + BuildVersionInfo.appVersionInfo.orElse(AppUtil.getManifestVersion.map("version=" + _)).getOrElse("develop") +
+  val appVersion: String = "appVersion: " +
+    BuildVersionInfo.appVersionInfo.orElse(AppUtil.getManifestVersion.map("version=" + _)).getOrElse("develop") +
     ", sdlbVersion: " + BuildVersionInfo.sdlbVersionInfo.getOrElse("unknown")
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
@@ -136,7 +140,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .unbounded()
         .required()
         .text(
-          "One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."
+          "One or multiple configuration files or directories containing configuration files, separated by comma." +
+            " Entries must be valid Hadoop URIs or a special URI with scheme \"cp\" which is treated as classpath entry."
         ),
       opt[String]('o', "config-value-overwrite")
         .action((arg, config) => config.addConfigurationValueOverwrite(parseKeyValue(arg)))
@@ -169,7 +174,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       opt[String]("test")
         .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
         .valueName("<config|dry-run>")
-        .text("Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage"),
+        .text(
+          "Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage"
+        ),
       help("help").text("Display the help text."),
       version("version").text("Display version information.")
     )
@@ -197,9 +204,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   /**
    * Default command line parsing method
    */
-  private[smartdatalake] def parse(args: Seq[String], parserToUse: OParser[_, SmartDataLakeBuilderConfig] = parser): Option[SmartDataLakeBuilderConfig] = {
+  private[smartdatalake] def parse(
+      args: Seq[String],
+      parserToUse: OParser[_, SmartDataLakeBuilderConfig] = parser
+  ): Option[SmartDataLakeBuilderConfig] = {
     val argsPrep =
-      args.filter(_.nonEmpty) // ignore empty arguments for more flexibility when called through templating engines (e.g. optional Databricks job parameters)
+      args.filter(
+        _.nonEmpty
+      ) // ignore empty arguments for more flexibility when called through templating engines (e.g. optional Databricks job parameters)
     OParser.parse(parserToUse, argsPrep, SmartDataLakeBuilderConfig())
   }
 
@@ -222,7 +234,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *   Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
-    require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null, "Env variable HADOOP_HOME needs to be set in local mode on Windows!")
+    require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null,
+      "Env variable HADOOP_HOME needs to be set in local mode on Windows!")
     AppUtil.setSdlbRunLoggerContext(appConfig)
     val stats = try {
       // invoke SDLPlugins if configured
@@ -249,7 +262,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
             recoverRun(appConfig, stateStore, latestRunState)._2
           } else {
             val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
-            startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState, stateStore = Some(stateStore))._2
+            startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState,
+              stateStore = Some(stateStore))._2
           }
         } else {
           startRun(appConfig, stateStore = Some(stateStore))._2
@@ -308,7 +322,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val lastStateId = stateStore.getLatestStateId(Some(runState.runId - 1))
     val lastRunState = lastStateId.map(stateStore.recoverRunState)
     val dataObjectsState =
-      (lastRunState.map(_.getDataObjectsState.map(_.getEntry).toMap).getOrElse(Map()) ++ runState.getDataObjectsState.map(_.getEntry).toMap).values.toSeq
+      (lastRunState.map(_.getDataObjectsState.map(_.getEntry).toMap).getOrElse(Map()) ++
+        runState.getDataObjectsState.map(_.getEntry).toMap).values.toSeq
     // start run, increase attempt counter
     val recoveryExecutionId = SDLExecutionId(runState.runId, runState.attemptId + 1)
     startRun(
@@ -327,7 +342,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * transformed DataFrames. Only the init phase is executed. All data is passed directly in the
    * form of a Spark DataFrame from one SparkSubFeed to the next. No data is fetched from the
    * DataObjects. Good for Unit Testing as it allows to execute your DAG without outside
-   * depedencies. Actions and DataObjects needed have to be provided through implicit
+   * dependencies. Actions and DataObjects needed have to be provided through implicit
    * instanceRegistry parameter. The Actions to execute are selected by appConfig.feedSel attribute.
    *
    * Note: this only works with DataFrameActions of the same SubFeed type, e.g. SparkSubFeed.
@@ -349,7 +364,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       initialSubFeeds: Seq[SparkSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq(),
       failOnMissingInputSubFeeds: Boolean = true
-  )(implicit instanceRegistry: InstanceRegistry, session: SparkSession): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
+  )(implicit instanceRegistry: InstanceRegistry): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
     Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
     val (subFeeds, stats) = exec(
       appConfig,
@@ -377,7 +392,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       dataObjectsState: Seq[DataObjectState] = Seq()
   )(session: SparkSession): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
     loadConfigIntoInstanceRegistry(appConfig, session.sparkContext.hadoopConfiguration)
-    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry, session)
+    startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry)
   }
 
   def loadConfigIntoInstanceRegistry(appConfig: SmartDataLakeBuilderConfig, hadoopConfiguration: Configuration): Unit =
@@ -470,10 +485,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // select actions by feedSel
     val actionsSelected = AppUtil.filterActionList(appConfig.feedSel, instanceRegistry.getActions.toSet).toSeq
-    require(actionsSelected.nonEmpty, s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
+    require(actionsSelected.nonEmpty,
+      s"No action matched the given feed selector: ${appConfig.feedSel}. At least one action needs to be selected.")
     logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
     if (appConfig.test.contains(TestMode.Config)) { // stop here if only config check
-      logger.info(s"${appConfig.test.get}-Test successfull")
+      logger.info(s"${appConfig.test.get}-Test successful")
       return (Seq(), Map())
     }
 
@@ -584,8 +600,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       actionsSkipped = Nil,
       globalConfig = globalConfig
     )
-    val actionDAGRun = ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds,
-      dataObjectsState, stateStore, stateListeners)(context)
+    val actionDAGRun =
+      ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds,
+        dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {
       case Prepare =>
@@ -603,7 +620,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
   /**
    * Execute one action DAG iteration and call recursion if streaming mode Must be implemented with
-   * tail recursion to avoid stack overflow error for long running streaming jobs.
+   * tail recursion to avoid stack overflow error for long-running streaming jobs.
    */
   @tailrec
   final def execActionDAG(
@@ -645,23 +662,37 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         // execute DAG
         val startTime = LocalDateTime.now
         var finalRunState: ActionDAGRunState = null
-        var subFeeds = try
+        try
           actionDAGRun.exec(context)
         finally
           finalRunState = actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context)
 
-        // Iterate execution in streaming mode
+        debugLog(s"execActionDAG: Iterate execution in streaming mode." +
+          s"context.appConfig.streaming = ${context.appConfig.streaming}")
         if (context.appConfig.streaming) {
+          debugLog(s"execActionDAG: actionsSelected.exists(!_.isAsynchronous) = ${actionsSelected.exists(!_.isAsynchronous)}")
           if (actionsSelected.exists(!_.isAsynchronous)) {
-            // if there are synchronous actions, we re-execute the dag
-            if (!Environment.stopStreamingGracefully) {
-              // increment runId only if not all actions are skipped
+            if (Environment.stopStreamingGracefully) {
+              if (actionsSelected.exists(_.isAsynchronous)) {
+                // re-throw exception if any async streaming query terminated with exception
+                // awaitAnyTermination returns immediately since onQueryTerminated already fired (which set stopStreamingGracefully=true)
+                SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination(1)
+                // stop remaining active streaming queries gracefully
+                SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
+              }
+              logger.info("Stopped streaming gracefully")
+              None
+            } else {
+              debugLog("execActionDAG: increment runId only if not all actions are skipped")
+
               val newContext = if (!finalRunState.isSkipped) {
                 context.incrementRunId
               } else {
-                logger.info(s"As all actions of run_id ${context.executionId.runId} are skipped, run_id is not incremented for next execution")
+                logger.info(s"execActionDAG:  As all actions of run_id ${context.executionId.runId} are skipped," +
+                  s"run_id is not incremented for next execution")
                 context
               }
+
               // remove spark caches so that new data is read in next iteration
               // TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
               // TODO: add additional method actionDAGRun.finalizeIteration or similar, which can be used to do some finalization tasks at the end of an iteration, for all connections
@@ -669,41 +700,28 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               // iterate execution
               // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
               Some(actionDAGRun.copy(executionId = newContext.executionId), newContext, Some(startTime))
-            } else {
-              if (actionsSelected.exists(_.isAsynchronous)) {
-                // TODO: add additional method actionDAGRun.stopAsynchronous or similar, which will stop asynchronous actions
-                // if (context.hasSparkSession) {
-                // stop active streaming queries
-                // SparkSubFeed.getSparkSession.streams.active.foreach(_.stop())
-                // if there were exceptions, throw first one
-                // SparkSubFeed.getSparkSession.streams.awaitAnyTermination() // using awaitAnyTermination is the easiest way to throw exception of first streaming query terminated
-                // }
-              }
-              // otherwise everything went smooth
-              logger.info("Stopped streaming gracefully")
-              None
+
             }
           } else {
-            // if there are no synchronous actions, we wait for termination of asynchronous streaming queries (if we don't wait, the main process will end and kill the streaming query threads...)
-            if (!Environment.stopStreamingGracefully) {
-              // TODO: add additional method actionDAGRun.stopAsynchronous(wait=false) or similar, which will stop asynchronous actions
-              // if (context.hasSparkSession) {
-              // SparkSubFeed.getSparkSession.streams.awaitAnyTermination()
-              // SparkSubFeed.getSparkSession.streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
-              // }
-              actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(context) // notify about this asynchronous iteration
-            } else {
-              // TODO: add additional method actionDAGRun.stopAsynchronous(wait=true) or similar, which will stop asynchronous actions
-              // if (context.hasSparkSession) {
-              //  SparkSubFeed.getSparkSession.streams.active.foreach(_.stop())
-              // }
+            debugLog("execActionDAG: if there are no synchronous actions," +
+              " we wait for termination of asynchronous streaming queries" +
+              " (if we don't wait, the main process will end and kill the streaming query threads...)")
+
+            if (Environment.stopStreamingGracefully) {
+              SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
               logger.info("Stopped streaming gracefully")
+            } else {
+              actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(
+                context
+              ) // notify about this asynchronous iteration
+              SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination()
+              SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
             }
             None
           }
         } else None
       }
-    // execute tail recursion
+    debugLog(s"execActionDAG: execute tail recursion. nextExec.isDefined = ${nextExec.isDefined}")
     if (nextExec.isDefined) execActionDAG(nextExec.get._1, actionsSelected, nextExec.get._2, nextExec.get._3)
     else Seq()
   }

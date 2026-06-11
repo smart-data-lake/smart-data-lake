@@ -208,6 +208,18 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <!-- These SDL modules are loaded via reflection for schema generation, not directly referenced in bytecode -->
+                    <ignoredDependencies>
+                        <ignoredDependency>io.smartdatalake:sdl-snowflake_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-deltalake_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-azure_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-kafka_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-iceberg_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-gcp_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-debezium_${scala.minor.version}</ignoredDependency>
+                    </ignoredDependencies>
+                </configuration>
             </plugin>
 
             <!-- check for dependency version conflicts -->
@@ -224,12 +236,16 @@
                     <execution>
                         <id>generate-json-schema</id>
                         <phase>prepare-package</phase>
-                        <goals><goal>java</goal></goals>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
                         <configuration>
                             <mainClass>io.smartdatalake.meta.jsonschema.JsonSchemaExporter</mainClass>
                             <arguments>
-                                <argument>--filename</argument><argument>${project.build.outputDirectory}/sdl-schema.json</argument>
-                                <argument>--version</argument><argument>${project.parent.version}</argument>
+                                <argument>--filename</argument>
+                                <argument>${project.build.outputDirectory}/sdl-schema.json</argument>
+                                <argument>--version</argument>
+                                <argument>${project.parent.version}</argument>
                             </arguments>
                         </configuration>
                     </execution>

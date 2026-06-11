@@ -37,6 +37,7 @@ trait CanHandlePartitions { this: DataObject =>
    *
    * Example: `[dt]`
    */
+  // TODO: Rename to partitionColumns. But this will trigger many changes!
   def partitions: Seq[String]
 
   /**
@@ -86,7 +87,7 @@ trait CanHandlePartitions { this: DataObject =>
   /**
    * Filter list of partition values by expected partitions condition
    */
-  private[smartdatalake] final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
+  private[smartdatalake] final def filterExpectedPartitionValues(partitionValues: Seq[PartitionValues]): Seq[PartitionValues] = {
     expectedPartitionsCondition.map{ condition =>
       // partition values value type is any, we need to convert it to string and keep the hashCode for filtering afterwards
       val partitionsValuesStringWithHashCode = partitionValues.map( pv => (pv.elements.view.mapValues(_.toString).toMap, pv.hashCode))

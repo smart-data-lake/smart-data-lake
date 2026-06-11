@@ -31,7 +31,7 @@ import scala.collection.mutable
  */
 private[smartdatalake] trait RuntimeData {
   // collect execution data
-  protected val executions: mutable.Buffer[ExecutionData[ExecutionId]] = mutable.Buffer()
+  val executions: mutable.Buffer[ExecutionData[ExecutionId]] = mutable.Buffer()
   protected var currentExecution: Option[ExecutionData[ExecutionId]] = None
   protected var lastExecution: Option[ExecutionData[ExecutionId]] = None
   // the number of executions to keep to implement housekeeping
@@ -307,4 +307,6 @@ case class RuntimeInfo(
    */
   def hasCompleted: Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
   override def toString: String = duration.map(d => s"$state $d").getOrElse(state.toString)
+  def debugString: String = s"RuntimeInfo(executionId=$executionId, " +
+    s"${inputIds.length} inputIds: ${inputIds.mkString(",")}, ${outputIds.length} outputIds: ${outputIds.mkString(",")})"
 }

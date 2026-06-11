@@ -108,6 +108,7 @@ case class TestCodeBlocks() {
  *
  * @see [[OverrideTest]] for details
  */
+@annotation.nowarn("cat=deprecation")
 case class TestObject (
                        id: String,
                        @Deprecated javaDeprecated: String,

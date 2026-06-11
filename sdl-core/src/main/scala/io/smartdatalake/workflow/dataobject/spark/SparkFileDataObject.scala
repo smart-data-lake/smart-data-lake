@@ -21,10 +21,10 @@ package io.smartdatalake.workflow.dataobject.spark
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
+import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{EnvironmentUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.CollectSetDeterministic.collect_set_deterministic
-import io.smartdatalake.util.spark.dataset.{ReadWrite, Transform, getEmptyDataFrame}
+import io.smartdatalake.util.spark.dataset.{Quality, ReadWrite, Transform, getEmptyDataFrame}
 import io.smartdatalake.util.spark.{SparkRepartitionDef, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
@@ -37,11 +37,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, Proce
 import org.apache.hadoop.fs.Path
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql._
-import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.execution.datasources.{DataSource, FileScanRDD}
-import org.apache.spark.sql.functions.{col, input_file_name, lit}
+import org.apache.spark.sql.functions.{input_file_name, lit}
 import org.apache.spark.sql.types.{DataType, StringType, StructType}
+import org.slf4j.Logger
 
 import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
@@ -59,7 +59,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
   with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
   with CanWriteSparkDataFrame with CanCreateIncrementalOutput
   with UserDefinedSchema with SchemaValidation with SmartDataLakeLogger
-  with ReadWrite with Transform with ExpectationValidation {
+  with ReadWrite with Transform with Quality with ExpectationValidation {
+  @transient implicit private lazy val loggImpl: Logger = logger
 
   /**
    * The Spark-Format provider to be used
@@ -215,7 +216,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * @see [[DataFrameReader]]
    * @return a new [[DataFrame]] containing the data stored in the file at `path`
    */
-  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Nil)
                                 (implicit context: ActionPipelineContext): DataFrame = {
     implicit val session: SparkSession = getSparkSession
 
@@ -484,8 +485,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
   /**
    * It seems that Hadoop on Windows returns modified date in local timezone, but according to documentation it should be in UTC.
-   * This results in wrong comparison of modified date by Spark, as Spark adds an additional local timezone offset to the files modification date.
-   * To fix this we need to add an additional local timezone offset to the comparison thresholds given to spark.
+   * This results in wrong comparison of modified date by Spark, as Spark adds a local timezone offset to the files modification date.
+   * To fix this we need to add a local timezone offset to the comparison thresholds given to spark.
    */
   private def fixWindowsTimezone(localDateTime: LocalDateTime): LocalDateTime = {
     if (EnvironmentUtil.isWindowsOS) LocalDateTime.ofInstant(localDateTime.atOffset(ZoneOffset.UTC).toInstant, ZoneId.systemDefault())
@@ -549,7 +550,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
       .getOrElse(writeSchema)
   }
 
-  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)
+                                 (implicit context: ActionPipelineContext): Unit = {
     // validate schema
     validateSchemaMin(SparkSchema(df.schema), "write")
     schema.foreach(schemaExpected => validateSchema(SparkSchema(df.schema), schemaExpected, "write"))
@@ -573,8 +575,14 @@ trait SparkFileDataObject extends HadoopFileDataObject
    * @param df the [[DataFrame]] to write to the file system.
    * @param partitionValues The partition layout to write.
    */
-  final override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  final override def writeSparkDataFrame(df: DataFrame,
+                                         partitionValues: Seq[PartitionValues] = Seq(),
+                                         isRecursiveInput: Boolean = false,
+                                         saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
+    val methodCall = s"writeSparkDataFrame(isRecursiveInput=$isRecursiveInput, saveModeOptions=$saveModeOptions," +
+      s" ${partitionValues.length} partitionValues: ${partitionValues.mkString(",")})"
+    debugLog(s"START $methodCall")
     require(!isRecursiveInput, "($id) SparkFileDataObject cannot write dataframe when data object is also used as recursive input ")
 
     // prepare data
@@ -583,28 +591,41 @@ trait SparkFileDataObject extends HadoopFileDataObject
       .getOrElse(dfPrepared)
 
     // apply special save modes
-    var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+    var finalSaveMode: SDLSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
+    debugLog(s"writeSparkDataFrame: finalSaveMode = $finalSaveMode")
     finalSaveMode match {
       case SDLSaveMode.Overwrite =>
-        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions
+        if (partitionValues.nonEmpty) {
+          debugLog(s"writeSparkDataFrame: finalSaveMode = $finalSaveMode ," +
+            " delete concerned partitions if existing, as Spark dynamic partitioning doesn't delete empty partitions")
           deletePartitions(filterPartitionsExisting(partitionValues))
-          // Avoid exception with Spark 4 and dynamic partition override: "IOException: PathOutputCommitProtocol does not support dynamicPartitionOverwrite"
+          debugLog("writeSparkDataFrame: Avoid exception with Spark 4 and dynamic partition override:" +
+            " \"IOException: PathOutputCommitProtocol does not support dynamicPartitionOverwrite\"")
           finalSaveMode = SDLSaveMode.Append
         } else {
-          // SDLSaveMode.Overwrite: Workaround ADLSv2: overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)
+          debugLog("writeSparkDataFrame: SDLSaveMode.Overwrite: Workaround ADLSv2:" +
+            " overwrite unpartitioned data object as it is not deleted by spark csv writer (strangely it works for parquet)")
           if (Environment.enableOverwriteUnpartitionedSparkFileDataObjectAdls) {
             deleteAll
           }
         }
       case SDLSaveMode.OverwriteOptimized =>
-        if (partitionValues.nonEmpty) { // delete concerned partitions if existing, as append mode is used later
+        if (partitionValues.nonEmpty) {
+          debugLog("writeSparkDataFrame: partitionValues non empty. Delete concerned partitions if existing, as append mode is used later")
           deletePartitions(filterPartitionsExisting(partitionValues))
           // Avoid exception with Spark 4 and dynamic partition override: "IOException: PathOutputCommitProtocol does not support dynamicPartitionOverwrite"
           finalSaveMode = SDLSaveMode.Append
-        } else if (partitions.isEmpty || context.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) { // delete all data if existing, as append mode is used later
+        } else if (partitions.isEmpty || context.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.contains(id)) {
+          debugLog("partitions is empty. delete all data if existing, as append mode is used later")
           deleteAll
         } else {
-          throw new ProcessingLogicException(s"($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data.")
+          logger.error(s"$methodCall FAILED!")
+          logger.error(s"${partitions.length} partitions: ${partitions.mkString(",")}")
+          logger.error(s"${context.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.length} allowOverwriteAllPartitionsWithoutPartitionValues:" +
+            s" ${context.globalConfig.allowOverwriteAllPartitionsWithoutPartitionValues.map(_.id).mkString(",")}")
+          df.debLog("df")(logger)
+          throw new ProcessingLogicException(s"writeSparkDataFrame: ($id) OverwriteOptimized without partition values is not allowed on a partitioned DataObject." +
+            s" This is a protection from unintentionally deleting all partition data.")
         }
       case SDLSaveMode.OverwritePreserveDirectories => // only delete files but not directories
         if (partitionValues.nonEmpty) { // delete concerned partitions files if existing, as append mode is used later
@@ -713,21 +734,23 @@ private[smartdatalake] abstract class SparkFilenameObservation[T](name: String) 
 
 
 /**
+ * TODO: Where is ObserverSparkFilenameObservation used?
+ *
  * Get files processed by using Spark observer on filename column
- * Note: There is a Spark problem - NullPointerException with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
+ * Note: There is a Spark problem - NullPointerException/*private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
+ * def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
+ * logger.debug(s"($name) add files observation to Dataset")
+ * on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
+ * }
+ *
+ * def getFilesProcessed: Seq[String] = {
+ * waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
+ * .asInstanceOf[Seq[String]]
+ * }
+ * }*/n with TypedImperativeAggregate (like CollectSetDeterministic) in observe if there is no data, but sometimes also occurs otherwise on prod...
  * see also https://issues.apache.org/jira/browse/SPARK-39044
  */
-private[smartdatalake] class ObserverSparkFilenameObservation[T](name: String) extends SparkFilenameObservation[T](name) {
-  def on(ds: Dataset[T], filenameColumnName: String): Dataset[T] = {
-    logger.debug(s"($name) add files observation to Dataset")
-    on(ds, true, DatasetHelper.toCol(collect_set_deterministic(col(filenameColumnName).expr)).as("filesProcessed"))
-  }
 
-  def getFilesProcessed: Seq[String] = {
-    waitFor().getOrElse("filesProcessed", throw new IllegalStateException(s"($name) Did not receive filesProcessed observation!"))
-      .asInstanceOf[Seq[String]]
-  }
-}
 
 /**
  * Workaround for bug in ObserverSparkFilenameObservation - get files processed from DataFrames execution plan.
@@ -749,4 +772,3 @@ private[smartdatalake] class ExecutionPlanSparkFilenameObservation[T](name: Stri
     files
   }
 }
-

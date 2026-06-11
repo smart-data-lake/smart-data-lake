@@ -20,7 +20,9 @@ package io.smartdatalake.app
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.util.webservice.SttpWebserviceClient
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject._
 import org.apache.spark.sql.SparkSession
@@ -38,13 +40,11 @@ import scala.util.{Failure, Success}
 /**
  * This tests use configuration test/resources/configstatusinfo/application.conf
  */
-class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter {
+class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with BeforeAndAfter {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit val session: SparkSession = TestUtil.session
-
-  import session.implicits._
-
+  private implicit val session: SparkSession = TestUtil.session
   private val sdlb = DefaultSmartDataLakeBuilder
+  import session.implicits._
 
   before {
     sdlb.instanceRegistry.clear()
@@ -52,17 +52,21 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
 
   // Note that this test produces a StackOverflowError in the Log with JDK11. The test succeeds nevertheless. Details see below.
   test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
-
     val feedName = "test"
+    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
+
     logger.debug("setup input DataObject")
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
+    srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
 
-    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(
-      getClass.getResource("/configstatusinfo/application.conf").getPath)
+    val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName,
+      configuration = Seq(
+        getClass.getResource("/configstatusinfo/application.conf").getPath
+      )
     )
-    logger.debug("Run SDLB")
+    logger.debug(s"Run SDLB: sdlConfig = $sdlConfig")
     sdlb.run(sdlConfig)
 
     logger.debug("Create Client Websocket that tries to establish connection with SDLB Job")
@@ -71,9 +75,8 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
     class UnitTestSocket extends WebSocketAdapter with SmartDataLakeLogger {
       override def onWebSocketConnect(sess: Session): Unit = {}
 
-      override def onWebSocketText(message: String): Unit = {
+      override def onWebSocketText(message: String): Unit =
         receivedMessages += message
-      }
 
       override def onWebSocketClose(statusCode: Int, reason: String): Unit = {}
 
@@ -82,7 +85,6 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
     val client = new WebSocketClient
     client.start()
     val session = client.connect(new UnitTestSocket, URI.create("ws://localhost:4440/ws/")).get
-
 
     logger.debug("Verify Rest API context endpoint is reachable and returns correct results")
     val webserviceDOContext = WebserviceFileDataObject("dummy",
@@ -96,9 +98,9 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
         assert(str.contains("\"feedSel\":\"test\""))
     }
 
-    //Verify Rest API state endpoint is reachable and returns correct results
-    //Known Issue: if you run this test with Java 11.0.4, you may see a Stackoverflow error.
-    //The problem arises after the second call to the webservice (no matter what the call is)
+    // Verify Rest API state endpoint is reachable and returns correct results
+    // Known Issue: if you run this test with Java 11.0.4, you may see a Stackoverflow error.
+    // The problem arises after the second call to the webservice (no matter what the call is)
     // If you encounter it, either: Comment out one of the Calls to the webservice, or use a different JDK version to run the test.
     val webserviceDOState = WebserviceFileDataObject("dummy", url = s"http://localhost:4440/api/v1/state/")(sdlb.instanceRegistry)
     val webserviceClientState = SttpWebserviceClient(webserviceDOState)
@@ -109,7 +111,7 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with BeforeAndAfter
         val str = new String(value, StandardCharsets.UTF_8)
         assert(str.contains("\"actionsState\":{\"Action~a\":{\"executionId\":{\"runId\":1,\"attemptId\":1}"))
     }
-    //Verify a client websocket can connect
+    // Verify a client websocket can connect
     assert(receivedMessages.head.contains("Hello from io.smartdatalake.communication.statusinfo.websocket.StatusInfoSocket"))
 
     session.close()

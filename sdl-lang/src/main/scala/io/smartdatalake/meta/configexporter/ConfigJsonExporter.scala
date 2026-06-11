@@ -28,8 +28,8 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
-import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import org.apache.commons.lang.NotImplementedException
@@ -57,7 +57,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('c', "config")
       .required()
-      .action((value, c) => c.copy(configPaths = value.split(',')))
+      .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('f', "filename")
       .action((value, c) => c.copy(targets = Seq(value)))
@@ -78,9 +78,9 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   }
 
   /**
-   * Takes as input an SDL Config and exports it as one json document, everything resolved and with some metadata enrichment's.
+   * Takes as input an SDL Config and exports it as one JSON document, everything resolved and with some metadata enrichment's.
    *
-   * Use the following maven profile to add an additional export step to your build:
+   * Use the following maven profile to add an export step to your build:
    * ```
    *     <profile>
    *         <id>export-config</id>
@@ -134,7 +134,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     parser.parse(args, ConfigJsonExporterConfig()) match {
       case Some(config) =>
 
-        // create json
+        // create JSON
         implicit val hadoopConf: Configuration = new Configuration()
         val configAsJson = exportConfigJson(config)
 
@@ -280,7 +280,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
 
     logger.info(s"Searching DataObject description files in $hadoopPath")
     RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory)
-      .filter(_.getPath.getName.endsWith(".md")).toSeq // only markdown files
+      .filter(_.getPath.getName.endsWith(".md")).toSeq // only Markdown files
       .foreach { p =>
         val dataObjectId = p.getPath.getName.split('.').head
         val dataObjectPath = s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId"
@@ -313,7 +313,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     enrichedConfig
   }
 
-  private def enrichCustomTransformerParameters(config: Config)(implicit hadoopConf: Configuration): Config = {
+  private def enrichCustomTransformerParameters(config: Config): Config = {
     // we are looking for type = ScalaClassSparkDfsTransformer (for now)
     def searchCondition(key: String, value: ConfigValue) = {
       // condition

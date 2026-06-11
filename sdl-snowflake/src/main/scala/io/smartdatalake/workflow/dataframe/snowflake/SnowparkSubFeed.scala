@@ -253,6 +253,12 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
     SnowparkColumn(functions.concat(exprs.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
+  override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.substring(snowparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def regexp_extract(column: GenericColumn, pattern: String, groupIdx: Int): GenericColumn = {
     column match {
       // must be implemented as sql expression, as function regexp_substr doesn't yet exist in snowpark

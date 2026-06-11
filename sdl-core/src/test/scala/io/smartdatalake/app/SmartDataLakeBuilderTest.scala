@@ -339,7 +339,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt")).register
     val tgt3DO = MockSparkDataObject("tgt3", partitions = Seq("dt")).register
     val tgt4DO = MockSparkDataObject("tgt4", partitions = Seq("dt")).register
-    val tgt5DO = MockSparkDataObject("tgt5", partitions = Seq("dt")).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -591,7 +590,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     // setup DataObjects
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
-    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -744,8 +742,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
-    val tgt2Path = tempPath + s"/${tgt2Table.fullName}"
     val tgt2DO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare input DataFrame
@@ -758,7 +754,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)
     val configStart = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName))
-    val (finalSubFeeds, stats) = sdlb.startSimulation(configStart, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc1)), srcDO.id, Seq())))
+    val (finalSubFeeds, stats) = sdlb.startSimulation(appConfig = configStart,
+      initialSubFeeds = Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc1)), srcDO.id, Seq())))
 
     // check results
     assert(finalSubFeeds.size == 1)
@@ -795,7 +792,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     instanceRegistry.register(TestUtil.defaultSparkConnection)
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
@@ -843,7 +839,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     instanceRegistry.register(TestUtil.defaultSparkConnection)
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
@@ -884,7 +879,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     )
 
     // Run SDLB
-    val state = sdlb.run(sdlConfig)
+    sdlb.run(sdlConfig)
 
     // check override of environment setting from global config
     // NOTE: this might fail with parallel test execution, because Environment is shared between all Tests...
@@ -1063,7 +1058,9 @@ class TestStateListener(options: Map[String, StringOrSecret]) extends StateListe
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
 
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
+  override def notifyState(state: ActionDAGRunState,
+                           context: ActionPipelineContext,
+                           changedActionId: Option[ActionId]): Unit = {
     if (TestStateListener.context.isEmpty) TestStateListener.context = Some(context)
     if (firstState.isEmpty) firstState = Some(state)
     finalState = Some(state)

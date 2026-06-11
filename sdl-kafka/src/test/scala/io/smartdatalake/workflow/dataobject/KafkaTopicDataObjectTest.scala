@@ -82,7 +82,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     // stream
     val dfStream1 = dataObject1.getStreamingDataFrame(Map("startingOffsets" -> "earliest"), None)
-    val query = dataObject2.writeStreamingDataFrame(SparkDataFrame(dfStream1), Trigger.Once, Map(), checkpointLocation = tempDir.resolve("state").toString, "test")
+    val query = dataObject2.writeStreamingDataFrame(SparkDataFrame(dfStream1), Trigger.AvailableNow, Map(), checkpointLocation = tempDir.resolve("state").toString, "test")
     query.awaitTermination()
     logger.info(s"streaming query finished, rows processed = ${query.lastProgress.numInputRows}")
 
@@ -133,7 +133,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     // configure DataObject with partition column defined as day and excluding current partition
     instanceRegistry.register(kafkaConnection)
     val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1"
-      , datePartitionCol = Some(DatePartitionColumnDef(colName = "dt", timeUnit = ChronoUnit.DAYS.toString, timeFormat = "yyyyMMdd")))
+      , datePartitionCol = Some(DatePartitionColumnDef(colName = "dt", timeUnit = ChronoUnit.DAYS.toString)))
 
     // list and check partitions
     val partitions1 = dataObject1.listPartitions
@@ -141,7 +141,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     // configure DataObject with partition column defined as day and including current partition
     val dataObject2 = KafkaTopicDataObject("kafka2", topicName = topic1, connectionId = "kafkaCon1"
-      , datePartitionCol = Some(DatePartitionColumnDef(colName = "dt", timeUnit = ChronoUnit.DAYS.toString, timeFormat = "yyyyMMdd", includeCurrentPartition = true)))
+      , datePartitionCol = Some(DatePartitionColumnDef(colName = "dt", timeUnit = ChronoUnit.DAYS.toString, includeCurrentPartition = true)))
 
     // list and check partitions
     val partitions2 = dataObject2.listPartitions
@@ -305,8 +305,6 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     // save current time to test delayedMaxTimestamp feature
     val tstmpBeforeData3 = Timestamp.from(Instant.now())
 
-    // append test data 3
-    val df3 = Seq((6, "C")).toDF("key", "value")
     targetDO.writeSparkDataFrame(df2)
 
     // test 4 - no new data with delayedMaxTimestamp=tstmpBeforeData3

@@ -33,22 +33,37 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 /**
  * Configuration for the LabCatalogGenerator
  *
- * @param configPaths SDLB configuration paths/files
- * @param srcDirectory directory where generated sources will be written
- * @param packageName package name for generated classes, default is io.smartdatalake.generated
- * @param dataObjectCatalogClassName class name for DataObject catalog
- * @param actionCatalogClassName class name for Action catalog
- * @param additionalSrcPath optional path of additional sources to be copied into srcDirectory for 2nd compilation step
+ * @param configPaths
+ *   SDLB configuration paths/files
+ * @param srcDirectory
+ *   directory where generated sources will be written
+ * @param packageName
+ *   package name for generated classes, default is io.smartdatalake.generated
+ * @param dataObjectCatalogClassName
+ *   class name for DataObject catalog
+ * @param actionCatalogClassName
+ *   class name for Action catalog
+ * @param additionalSrcPath
+ *   optional path of additional sources to be copied into srcDirectory for 2nd compilation step
  */
-case class LabCatalogGeneratorConfig(configPaths: Seq[String] = null, srcDirectory: String = null, packageName: String = "io.smartdatalake.generated", dataObjectCatalogClassName: String = "DataObjectCatalog", actionCatalogClassName: String = "ActionCatalog", additionalSrcPath: Option[String] = None)
+case class LabCatalogGeneratorConfig(
+    configPaths: Seq[String] = null,
+    srcDirectory: String = null,
+    packageName: String = "io.smartdatalake.generated",
+    dataObjectCatalogClassName: String = "DataObjectCatalog",
+    actionCatalogClassName: String = "ActionCatalog",
+    additionalSrcPath: Option[String] = None
+)
 
 /**
- * Command line interface to generate a scala files that serve as catalog for SmartDataLakeBuilderLab.
- * For now a catalog for DataObjects is created, but could be extended to Actions in the future.
+ * Command line interface to generate a scala files that serve as catalog for
+ * SmartDataLakeBuilderLab. For now a catalog for DataObjects is created, but could be extended to
+ * Actions in the future.
  *
- * The compilation of the scala file has to be added in the build process of the SDLB application as a second compilation phase
- * because it needs to parse the configuration, incl. potential transformers defined.
- * In Maven this can be done by defining the following additional plugins and adding `sdl-lang` as additional project dependency:
+ * The compilation of the scala file has to be added in the build process of the SDLB application as
+ * a second compilation phase because it needs to parse the configuration, incl. potential
+ * transformers defined. In Maven this can be done by defining the following additional plugins and
+ * adding `sdl-lang` as additional project dependency:
  * ```
  *      <profile>
  *          <id>generate-catalog</id>
@@ -107,7 +122,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('c', "config")
       .required()
-      .action((value, c) => c.copy(configPaths = value.split(',')))
+      .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('s', "srcDirectory")
       .required()
@@ -133,8 +148,9 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
   }
 
   /**
-   * Takes as input a SDL Config and exports it as one json document, everything resolved.
-   * Additionally a separate file with the mapping of first class config objects to source code origin is created.
+   * Takes as input a SDL Config and exports it as one JSON document, everything resolved.
+   * Additionally, a separate file with the mapping of first class config objects to source code
+   * origin is created.
    */
   def main(args: Array[String]): Unit = {
     val config = LabCatalogGeneratorConfig()
@@ -143,7 +159,8 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
       case Some(config) =>
         generateCatalogs(config)
       case None =>
-        logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+        logAndThrowException(s"Aborting $appType after error",
+          new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 
@@ -158,12 +175,12 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     createCatalogScalaFile(config.srcDirectory, config.packageName, config.actionCatalogClassName, actionCatalogClassDef)
 
     // copy additional sources
-    config.additionalSrcPath.foreach{ path =>
+    config.additionalSrcPath.foreach { path =>
       FileUtils.copyDirectory(new File(path), new File(config.srcDirectory))
     }
   }
 
-  def createCatalogScalaFile(srcDir: String, packageName:String, className: String, classDef: String): Unit = {
+  def createCatalogScalaFile(srcDir: String, packageName: String, className: String, classDef: String): Unit = {
     val filename = s"$srcDir/${packageName.split('.').mkString("/")}/$className.scala"
 
     logger.info(s"Writing generated $className java source code to file $filename")
@@ -172,12 +189,16 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     Files.write(path, classDef.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
-  def generateDataObjectCatalogClass(packageName:String, className: String, registry: InstanceRegistry): String = {
+  def generateDataObjectCatalogClass(packageName: String, className: String, registry: InstanceRegistry): String = {
     val entries = registry.getDataObjects.sortBy(_.id.id).flatMap {
       case x: DataObject with CanCreateSparkDataFrame =>
-        Some(s"""lazy val ${strToLowerCamelCase(x.id.id)} = LabSparkDataObjectWrapper(registry.get[${x.getClass.getName}](DataObjectId("${x.id.id}")), context)""")
+        Some(s"""lazy val ${strToLowerCamelCase(
+            x.id.id
+          )} = LabSparkDataObjectWrapper(registry.get[${x.getClass.getName}](DataObjectId("${x.id.id}")), context)""")
       case x =>
-        logger.info(s"No catalog entry created for ${x.id} of type ${x.getClass.getSimpleName}, as it does not implement CanCreateSparkDataFrame")
+        logger.info(
+          s"No catalog entry created for ${x.id} of type ${x.getClass.getSimpleName}, as it does not implement CanCreateSparkDataFrame"
+        )
         None
     }
     s"""
@@ -187,20 +208,25 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     |import io.smartdatalake.workflow.ActionPipelineContext
     |import io.smartdatalake.lab.LabSparkDataObjectWrapper
     |case class $className(registry: InstanceRegistry, context: ActionPipelineContext) {
-    |${entries.map("  "+_).mkString("\n")}
+    |${entries.map("  " + _).mkString("\n")}
     |}
     """.stripMargin
   }
 
-
-  def generateActionCatalogClass(packageName:String, className: String, registry: InstanceRegistry): String = {
+  def generateActionCatalogClass(packageName: String, className: String, registry: InstanceRegistry): String = {
     val entries = registry.getActions.sortBy(_.id.id).flatMap {
       case x: Action with CustomDataFrameAction =>
-        Some(s"""lazy val ${strToLowerCamelCase(x.id.id)} = LabSparkDfsActionWrapper(registry.get[${x.getClass.getName}](ActionId("${x.id.id}")), context)""")
+        Some(s"""lazy val ${strToLowerCamelCase(
+            x.id.id
+          )} = LabSparkDfsActionWrapper(registry.get[${x.getClass.getName}](ActionId("${x.id.id}")), context)""")
       case x: Action with DataFrameOneToOneActionImpl =>
-        Some(s"""lazy val ${strToLowerCamelCase(x.id.id)} = LabSparkDfActionWrapper(registry.get[${x.getClass.getName}](ActionId("${x.id.id}")), context)""")
+        Some(s"""lazy val ${strToLowerCamelCase(
+            x.id.id
+          )} = LabSparkDfActionWrapper(registry.get[${x.getClass.getName}](ActionId("${x.id.id}")), context)""")
       case x =>
-        logger.info(s"No catalog entry created for ${x.id} of type ${x.getClass.getSimpleName}, as it does not implement DataFrameActionImpl")
+        logger.info(
+          s"No catalog entry created for ${x.id} of type ${x.getClass.getSimpleName}, as it does not implement DataFrameActionImpl"
+        )
         None
     }
     s"""
@@ -211,7 +237,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
        |import io.smartdatalake.lab.LabSparkDfsActionWrapper
        |import io.smartdatalake.lab.LabSparkDfActionWrapper
        |case class $className(registry: InstanceRegistry, context: ActionPipelineContext) {
-       |${entries.map("  "+_).mkString("\n")}
+       |${entries.map("  " + _).mkString("\n")}
        |}
     """.stripMargin
   }

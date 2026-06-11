@@ -88,7 +88,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
-                        <version>3.6.0</version>
+                        <version>3.9.12</version>
                         <executions>
                             <execution>
                                 <id>shade-jar-with-dependencies</id>
@@ -151,7 +151,7 @@
                             <dependency>
                                 <groupId>org.apache.logging.log4j</groupId>
                                 <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
-                                <version>0.1.0</version>
+                                <version>0.2.0</version>
                             </dependency>
                         </dependencies>
                     </plugin>
@@ -844,15 +844,16 @@
                                 <version>2.0.6</version>
                             </requireMavenVersion>
                             <requireJavaVersion>
-                                <version>11</version>
+                                <version>17</version>
                             </requireJavaVersion>
                             <dependencyConvergence/>
-                            <requireProperty>
+                            <!--<requireProperty>
+                            TODO: We do not have profiles for Scala 2.11 and 21.12 anymore. Can this be removed?
                                 <property>scala.minor.version</property>
                                 <message>You must setscala.minor.version property by activating profile scala-2.11 or
                                     scala-2.12!
                                 </message>
-                            </requireProperty>
+                            </requireProperty>-->
                         </rules>
                     </configuration>
                 </plugin>
@@ -2412,7 +2413,7 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-             <dependency>
+            <dependency>
                 <groupId>org.apache.orc</groupId>
                 <artifactId>orc-format</artifactId>
                 <version>1.1.1</version>
@@ -2485,7 +2486,7 @@
                         <artifactId>hive-storage-api</artifactId>
                     </exclusion>
                     <exclusion>
-                        <groupId> com.esotericsoftware</groupId>
+                        <groupId>com.esotericsoftware</groupId>
                         <artifactId>kryo-shaded</artifactId>
                     </exclusion>
                 </exclusions>

@@ -18,14 +18,13 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.ConfigsMacroDebug.instanceRegistry
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataobject.DeltaLakeTableDataObject
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.generic.Table
-import io.smartdatalake.workflow.dataobject.{DeltaLakeTableDataObject, DeltaLakeTestUtils}
-import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
@@ -33,7 +32,7 @@ import java.nio.file.Files
 class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
     with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
-  protected implicit val session: SparkSession = DeltaLakeTestUtils.session
+  private implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
   override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
 

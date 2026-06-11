@@ -98,7 +98,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     SnowparkDataFrame(inner.sort(snowparkCols))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().toIndexedSeq.map(SnowparkRow)
   override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
     SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
@@ -175,7 +175,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     else None
   }
   override def columns: Seq[String] = inner.names
-  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def fields: Seq[SnowparkField] = inner.fields.toIndexedSeq.map(SnowparkField)
   override def sql: String = fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
   override def add(colName: String, dataType: GenericDataType): SnowparkSchema = {
     val snowparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SnowparkDataType]
@@ -372,11 +372,11 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
   override def toLowerCase: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).toLowerCase.inner)
   override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
-      case snowparkOther: SnowparkStructDataType => func(inner.fields.map(SnowparkField), snowparkOther.inner.fields.map(SnowparkField))
+      case snowparkOther: SnowparkStructDataType => func(inner.fields.toIndexedSeq.map(SnowparkField), snowparkOther.inner.fields.toIndexedSeq.map(SnowparkField))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
-  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def fields: Seq[SnowparkField] = inner.fields.toIndexedSeq.map(SnowparkField)
 
   override def fieldIndex(fieldName: String): Int = inner.indexWhere(_.name == fieldName)
 }

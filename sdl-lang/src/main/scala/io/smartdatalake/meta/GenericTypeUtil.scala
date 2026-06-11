@@ -173,6 +173,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   /**
    * Find all attributes for a given case class
    */
+  @annotation.nowarn("msg=abstract type pattern")
   def attributesForCaseClass(tpe: Type, paramDescriptions: Map[String,String]): Seq[GenericAttributeDef] = {
     // get case class constructor parameters
     val params = tpe.decls.collectFirst {

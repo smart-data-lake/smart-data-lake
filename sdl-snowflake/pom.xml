@@ -55,19 +55,8 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
 			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
@@ -218,6 +207,14 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<configuration>
+					<ignoredUnusedDeclaredDependencies>
+						<!-- directly imported via net.snowflake.spark.snowflake.Utils, but SNOWFLAKE_SOURCE_NAME is a compile-time constant inlined by the compiler so bytecode analyzer misses the reference -->
+						<ignoredUnusedDeclaredDependency>net.snowflake:spark-snowflake_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- used in source (scala.util.Try, scala.language.*) but not detected by bytecode analyzer -->
+						<ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->
