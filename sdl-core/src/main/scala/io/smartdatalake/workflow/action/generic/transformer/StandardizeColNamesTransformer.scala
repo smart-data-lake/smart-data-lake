@@ -33,10 +33,10 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param camelCaseToLower If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest
- *                         Otherwise converts just to lower case.
- * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily
- * @param removeNonStandardSQLNameChars Remove all chars from a string which don't belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
- * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_". Note: removeNonStandardSQLNameChars needs to be disabled
+ *                         Otherwise converts just to lower case. Default=true
+ * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily. Default: true
+ * @param removeNonStandardSQLNameChars Remove all chars from a string which don't belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc. Default=true
+ * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_". Note: removeNonStandardSQLNameChars needs to be disabled. Default=false
  */
 case class StandardizeColNamesTransformer(override val name: String = "colNamesLowercase",
                                           override val description: Option[String] = None,
