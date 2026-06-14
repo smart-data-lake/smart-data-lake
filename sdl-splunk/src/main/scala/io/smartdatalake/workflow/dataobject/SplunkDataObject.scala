@@ -44,7 +44,7 @@ import scala.jdk.CollectionConverters._
  * [[DataObject]] of type Splunk.
  * Provides details to an action to access Splunk logs.
  */
-@deprecated(since = "2.9.0")
+@deprecated("deprecated", "2.9.0")
 @Deprecated
 case class SplunkDataObject(override val id: DataObjectId,
                              params: SplunkParams,

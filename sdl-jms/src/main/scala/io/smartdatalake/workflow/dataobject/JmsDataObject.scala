@@ -44,7 +44,7 @@ import scala.concurrent.duration.Duration
  * @param connectionFactory JMS Connection Factory
  * @param queue Name of MQ Queue
  */
-@deprecated(since = "2.9.0")
+@deprecated("deprecated", "2.9.0")
 @Deprecated
 case class JmsDataObject(override val id: DataObjectId,
                          jndiContextFactory: String,
