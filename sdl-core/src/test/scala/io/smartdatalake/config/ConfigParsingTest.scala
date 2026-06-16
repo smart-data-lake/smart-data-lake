@@ -668,6 +668,79 @@ class ConfigParsingTest extends AnyFlatSpec with Matchers {
     refinedConfig.getString("postWriteSql") shouldEqual "test10/abc"
     refinedConfig.getString("table.name") shouldEqual "test10/abc"
   }
+
+  "local substitution with snake modifier" should "replace dashes with underscores" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | table {
+        |  name = "~{id|snake}"
+        | }
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "table.name")
+    configSubstituted.getString("table.name") shouldEqual "int_airports"
+  }
+
+  it should "convert camelCase to snake_case" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "intAirports"
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "int_airports"
+  }
+
+  it should "handle acronyms and mixed camelCase with dashes" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "my-HTTPServerData"
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "my_http_server_data"
+  }
+
+  it should "leave a value without dashes unchanged" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = abc
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "abc"
+  }
+
+  it should "support mixing modified and plain tokens in the same value" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | name = "schema.~{id|snake}_~{id}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "schema.int_airports_int-airports"
+  }
+
+  "local substitution with an unknown modifier" should "throw a ConfigurationException" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | name = "~{id|kebab}"
+        |}""".stripMargin
+    )
+
+    intercept[ConfigurationException](ConfigParser.localSubstitution(config, "name"))
+  }
 }
 
 
