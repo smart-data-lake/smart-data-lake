@@ -271,10 +271,25 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   }
 
   /**
+   * Converts a value to snake_case: inserts an underscore at camelCase boundaries (including acronyms),
+   * replaces dashes with underscores and lowercases the result.
+   * Examples: "camelCase" -> "camel_case", "int-airports" -> "int_airports", "myHTTPServer" -> "my_http_server".
+   */
+  private[config] def toSnakeCase(value: String): String = {
+    value
+      .replaceAll("([a-z0-9])([A-Z])", "$1_$2") // camelCase boundary, e.g. camelCase -> camel_Case
+      .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2") // acronym boundary, e.g. HTTPServer -> HTTP_Server
+      .replace('-', '_')
+      .toLowerCase
+  }
+
+  /**
    * Substitutes parts inside values by other paths of the configuration.
    * Token for substitution is "~{replacementPath}".
    * An optional modifier can be appended with a pipe, e.g. "~{replacementPath|snake}", to transform the resolved value:
-   *  - "snake": replaces dashes ('-') with underscores ('_'), e.g. to use an element id like 'int-airports' as table name 'int_airports'.
+   *  - "snake": converts the resolved value to snake_case, i.e. inserts underscores at camelCase boundaries, replaces
+   *    dashes ('-') with underscores ('_') and lowercases, e.g. to use an element id like 'int-airports' or 'intAirports'
+   *    as table name 'int_airports'.
    *
    * @param config configuration object for local substitution
    * @param path   path to search for local substitution tokens and execute substitution
@@ -293,7 +308,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
         } else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' does not exist")
       modifier match {
         case None => value
-        case Some("snake") => value.replace('-', '_')
+        case Some("snake") => toSnakeCase(value)
         case Some(m) => throw ConfigurationException(s"unknown local substitution modifier '$m' for path '$replacementPath' in path '$path'. Supported modifiers: snake")
       }
     }

@@ -683,6 +683,30 @@ class ConfigParsingTest extends AnyFlatSpec with Matchers {
     configSubstituted.getString("table.name") shouldEqual "int_airports"
   }
 
+  it should "convert camelCase to snake_case" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "intAirports"
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "int_airports"
+  }
+
+  it should "handle acronyms and mixed camelCase with dashes" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "my-HTTPServerData"
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "my_http_server_data"
+  }
+
   it should "leave a value without dashes unchanged" in {
     val config = ConfigFactory.parseString(
       """{
