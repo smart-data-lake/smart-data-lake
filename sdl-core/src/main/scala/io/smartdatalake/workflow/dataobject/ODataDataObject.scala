@@ -5,7 +5,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
 import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig, SttpWebserviceClient, WebserviceMethod}
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
@@ -167,12 +167,13 @@ class ODataIOC {
  *               on specifying schemas (https://smartdatalake.ch/docs/reference/schema#specifying-schema).
  * @param baseUrl : Base URL of the OData Service like https://xxx.crm4.dynamics.com/api/data/v9.2/
  * @param tableName : Name of the table which needs to be accessed
- * @param sourceFilters : Optional. OData filter string which will be applied to the access operation like "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
+ * @param sourceFilters : Optional. OData filter string which will be applied to the access operation like "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z".
+ *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[io.smartdatalake.util.spark.DefaultExpressionData]].
  * @param timeouts : Optional. Timeout settings of type [[HttpTimeoutConfig]]
  * @param authMode : Optional configuration of webservice authentication. Supported `AuthMode`s are all HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode.
  * CustomHttpAuthMode can be used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in sdl-azure module.
  * @param authorization : Deprecated, use #authMode instead
- * @param incrementalOutputExpr: Optional. Name of the column which will be used to read incrementally (like "modifiedon"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems.
+ * @param incrementalOutputExpr: Optional. Name of the column which will be used to read incrementally (like "modifiedon"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems. It is then added to the filter as $incrementalOutputExpr gt $previousState
  * @param nRetry: Optional. Number of retries after a failed attempt, default = 1
  * @param responseBufferSetup: Optional. Setup for response buffers of type [[ODataResponseBufferSetup]]
  * @param maxRecordCount: Optional. Maximum number of records to be extracted.
@@ -312,9 +313,12 @@ case class ODataDataObject(override val id: DataObjectId,
     val filters = ArrayBuffer[String]()
 
     //If there are any predefined filters configured, treat these filters as one unit and add them
-    //to the filters list
+    //to the filters list. Tokens with syntax %{<spark sql expression>} are substituted with values
+    //from DefaultExpressionData (see also JdbcTableDataObject.prepareAndExecSql).
     if (sourceFilters.isDefined) {
-      filters.append("(" + sourceFilters.get + ")")
+      val data = DefaultExpressionData.from(context, Seq())
+      val preparedSourceFilters = SparkExpressionUtil.substitute(id, Some("sourceFilters"), sourceFilters.get, data)
+      filters.append("(" + preparedSourceFilters + ")")
     }
 
     //If there is a incrementalOutputExpr and a previousState specified, use this column to filter only the records that
