@@ -2711,7 +2711,7 @@
           },
           "sourceFilters" : {
             "type" : "string",
-            "description" : ": Optional. OData filter string which will be applied to the access operation like \"objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z\""
+            "description" : ": Optional. OData filter string which will be applied to the access operation like \"objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z\".  \nUse tokens with syntax %{<spark sql expression>} to substitute with values from`io.smartdatalake.util.spark.DefaultExpressionData`."
           },
           "timeouts" : {
             "type" : "object",
@@ -2795,7 +2795,7 @@
           },
           "incrementalOutputExpr" : {
             "type" : "string",
-            "description" : ": Optional. Name of the column which will be used to read incrementally (like \"modifiedon\"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems."
+            "description" : ": Optional. Name of the column which will be used to read incrementally (like \"modifiedon\"). The column must be part of the schema. If this column is originally of datatype Timestamp in the source, it should be marked as a string in the schema to prevent casting problems. It is then added to the filter as $incrementalOutputExpr gt $previousState"
           },
           "nRetry" : {
             "type" : "integer",
