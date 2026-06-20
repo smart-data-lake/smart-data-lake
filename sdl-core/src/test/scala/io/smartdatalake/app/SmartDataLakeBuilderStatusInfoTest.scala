@@ -20,7 +20,6 @@ package io.smartdatalake.app
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -47,7 +46,6 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
   private val sdlb = DefaultSmartDataLakeBuilder
 
   import session.implicits._
-  loggEnv
 
   before {
     sdlb.instanceRegistry.clear()
@@ -88,17 +86,11 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
     val client = new WebSocketClient
     client.start()
     val session = client.connect(new UnitTestSocket, URI.create("ws://localhost:4440/ws/")).get
-    logger.debug(s"session = $session")
-
-    logger.debug("Verify Rest API context endpoint is reachable and returns correct results")
     val webserviceDOContext: WebserviceFileDataObject = WebserviceFileDataObject("dummy",
       url = s"http://localhost:4440/api/v1/context/")(sdlb.instanceRegistry)
-    val webserviceClientContext: SttpWebserviceClient = SttpWebserviceClient(webserviceDOContext)
+    val webserviceClientContext = SttpWebserviceClient(webserviceDOContext)
     webserviceClientContext.get() match {
       case Failure(e) =>
-        logger.error("webserviceClientContext.get() FAILED!")
-        logger.error(s"webserviceDOContext     = $webserviceDOContext")
-        logger.error(s"webserviceClientContext = $webserviceClientContext")
         throw e
       case Success(value) =>
         val str = new String(value, StandardCharsets.UTF_8)
@@ -116,7 +108,7 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
         throw exception
       case Success(value) =>
         val str = new String(value, StandardCharsets.UTF_8)
-        assert(str.contains("\"actionsState\":{\"Action~a\":{\"executionId\":{\"runId\":1,\"attemptId\":1}"))
+        assert(str.contains("\"actionsState\":{\"a\":{\"executionId\":{\"runId\":1,\"attemptId\":1}"))
     }
     // Verify a client websocket can connect
     assert(receivedMessages.head.contains("Hello from io.smartdatalake.communication.statusinfo.websocket.StatusInfoSocket"))

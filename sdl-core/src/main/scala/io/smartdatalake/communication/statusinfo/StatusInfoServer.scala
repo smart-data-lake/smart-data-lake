@@ -19,7 +19,7 @@
 package io.smartdatalake.communication.statusinfo
 
 import io.smartdatalake.app.StatusInfoConfig
-import io.smartdatalake.communication.statusinfo.api.{SnapshotStatusInfoListener, StatusInfoServletContext}
+import io.smartdatalake.communication.statusinfo.api.{SnapshotStatusInfoListener, StatusInfoMethods}
 import io.smartdatalake.communication.statusinfo.websocket.{IncrementalStatusInfoListener, StatusInfoSocket}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.util.PortUtils
@@ -27,9 +27,9 @@ import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import org.eclipse.jetty.websocket.server.{JettyServerUpgradeRequest, JettyServerUpgradeResponse, JettyWebSocketCreator}
 import org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerInitializer
-import org.glassfish.jersey.server.ServerProperties
+import org.eclipse.jetty.websocket.server.{JettyServerUpgradeRequest, JettyServerUpgradeResponse, JettyWebSocketCreator}
+import org.glassfish.jersey.server.{ResourceConfig, ServerProperties}
 import org.glassfish.jersey.servlet.ServletContainer
 
 /**
@@ -40,27 +40,34 @@ object StatusInfoServer extends SmartDataLakeLogger {
   private val pool = new QueuedThreadPool(200)
   private val server = new Server(pool)
 
-  def start(snapshotListener: SnapshotStatusInfoListener, incrementalListener: IncrementalStatusInfoListener, config: StatusInfoConfig): Unit = {
+  def start(
+      snapshotListener: SnapshotStatusInfoListener,
+      incrementalListener: IncrementalStatusInfoListener,
+      config: StatusInfoConfig
+  ): Unit = {
     val contextHandler = getServletContextHandler(snapshotListener, incrementalListener)
     PortUtils.startOnPort(startServer(contextHandler), "StatusInfoServer", config.port, config.maxPortRetries, logger)
   }
 
-  def stop(): Unit = {
+  def stop(): Unit =
     server.stop()
-  }
 
-  private def getServletContextHandler(snapshotListener: SnapshotStatusInfoListener, incrementalListener: IncrementalStatusInfoListener): ContextHandlerCollection = {
-    val handlers: ContextHandlerCollection = new ContextHandlerCollection()
+  def getServletContextHandler(
+      snapshotListener: SnapshotStatusInfoListener,
+      incrementalListener: IncrementalStatusInfoListener
+  ): ContextHandlerCollection = {
+    val handlers = new ContextHandlerCollection()
     val jerseyContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
     jerseyContext.setContextPath("/api")
-    val holder: ServletHolder = new ServletHolder(classOf[ServletContainer])
-    holder.setInitParameter(ServerProperties.PROVIDER_PACKAGES, "io.smartdatalake.communication.statusinfo.api")
-    StatusInfoServletContext.setStateListener(jerseyContext, snapshotListener)
+    val holder = new ServletHolder(new ServletContainer(
+        new ResourceConfig()
+          .registerInstances(StatusInfoMethods(snapshotListener))
+          .property(ServerProperties.WADL_FEATURE_DISABLE, true)
+      ))
     jerseyContext.addServlet(holder, "/*")
-    handlers.addHandler(jerseyContext)
-
     val socketHandler = createWebsocketHandler(incrementalListener)
     handlers.addHandler(socketHandler)
+    handlers.addHandler(jerseyContext)
     handlers
   }
 
@@ -71,14 +78,14 @@ object StatusInfoServer extends SmartDataLakeLogger {
       override def createWebSocket(request: JettyServerUpgradeRequest, response: JettyServerUpgradeResponse): Object =
         new StatusInfoSocket(stateListener)
     }
-    JettyWebSocketServletContainerInitializer.configure(contextHandler, (_, container) => {
-      container.addMapping("/", webSocketCreator)
-    })
+    JettyWebSocketServletContainerInitializer.configure(contextHandler,
+      (_, container) =>
+        container.addMapping("/", webSocketCreator)
+    )
     contextHandler
   }
 
-  private def startServer(handlers: ContextHandlerCollection)(port: Int): Int = {
-
+  def startServer(handlers: ContextHandlerCollection)(port: Int): Int = {
     val connector = new ServerConnector(server)
     connector.setPort(port)
     server.setConnectors(Array(connector))

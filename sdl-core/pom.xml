@@ -343,13 +343,6 @@
             <artifactId>jetty-http</artifactId>
             <version>${jetty.version}</version>
         </dependency>
-        <!-- Needed to serialize Requests for StatusInfoRestApi; auto-discovered by Jersey via ServiceLoader -->
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-json-jackson</artifactId>
-            <version>${jersey.version}</version>
-            <scope>runtime</scope>
-        </dependency>
 
         <!--Jetty Websocket server side dependencies start here -->
         <!-- Provides the Jakarta WebSocket container used by Jetty at runtime -->
