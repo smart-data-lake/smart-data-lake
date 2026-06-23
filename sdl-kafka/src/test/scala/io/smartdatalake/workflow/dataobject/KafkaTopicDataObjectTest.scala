@@ -23,11 +23,13 @@ import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWit
 import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.confluent.IncompatibleSchemaException
-import org.apache.spark.sql.functions.{lit, struct}
+import org.apache.spark.sql.avro.{IncompatibleSchemaException => AvroIncompatibleSchemaException}
+  import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
@@ -40,14 +42,20 @@ import java.time.temporal.ChronoUnit
 
 class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with BeforeAndAfter
   with EmbeddedKafkaWithSchemaRegistry with DataObjectTestSuite with SmartDataLakeLogger
-  with io.smartdatalake.util.spark.dataset.Equality {
+  with Equality {
 
   private implicit val loggImp: Logger = logger
   import session.implicits._
 
-  private val kafkaConnection = KafkaConnection("kafkaCon1", brokers = "localhost:6001", schemaRegistry = Some("http://localhost:6002"))
+  private val kafkaConnection = KafkaConnection("kafkaCon1",
+    brokers = "localhost:"+KafkaTestUtil.embeddedKafkaConfig.kafkaPort,
+    schemaRegistry = Some("http://localhost:" + KafkaTestUtil.embeddedKafkaConfig.schemaRegistryPort)
+  )
 
-  KafkaTestUtil.start()
+  override def beforeAll(): Unit = {
+
+    KafkaTestUtil.start()
+  }
 
   test("Can read and write from Kafka") {
     createCustomTopic("topic", Map(), 1, 1)
@@ -348,7 +356,8 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     dataObjectAllowSchemaEvo.initSparkDataFrame(dfExp1, Seq())
     dataObjectAllowSchemaEvo.writeSparkDataFrame(dfExp1)
 
-    assert(dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*").columns.toSeq == Seq("txt", "num", "test"))
+    val dfResult = dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*")
+    assert(dfResult.columns.toSeq == Seq("txt", "num", "test"))
   }
 
   test("avro schema evolution") {
@@ -368,12 +377,23 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
       .select(lit(1).as("key"), struct("*").as("value"))
 
     // check schema evolution disabled
-    intercept[IncompatibleSchemaException](dataObject.initSparkDataFrame(dfExp1, Seq()))
-    intercept[IncompatibleSchemaException](dataObject.writeSparkDataFrame(dfExp1))
+    // avro.IncompatibleSchemaException is private... so we cant use original intercept method here!!
+    interceptWithCheck(() => dataObject.initSparkDataFrame(dfExp1, Seq()), _.getClass.getSimpleName == "IncompatibleSchemaException")
+    interceptWithCheck(() => dataObject.writeSparkDataFrame(dfExp1), _.getClass.getSimpleName == "IncompatibleSchemaException")
 
     dataObjectAllowSchemaEvo.initSparkDataFrame(dfExp1, Seq())
     dataObjectAllowSchemaEvo.writeSparkDataFrame(dfExp1)
 
     assert(dataObjectAllowSchemaEvo.getSparkDataFrame().select($"value.*").columns.toSeq == Seq("txt", "num", "test"))
+  }
+
+  def interceptWithCheck(func: () => Unit, check: Exception => Boolean): Unit = {
+    try {
+      func()
+      throw new IllegalStateException(s"interceptWithCheck: no exception thrown")
+    } catch {
+      case ex: Exception =>  assert(check(ex), s"interceptWithCheck: Unexpected exception '${ex.getClass.getSimpleName}: ${ex.getMessage}' thrown")
+    }
+
   }
 }

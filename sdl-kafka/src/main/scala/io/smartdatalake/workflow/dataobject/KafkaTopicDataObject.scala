@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.SparkStageMetricsListener
-import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.dataset.{Transform, getEmptyDataFrame}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -44,6 +44,7 @@ import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.confluent.avro.{AvroSchemaConverter, ConfluentAvroConnector}
 import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
 import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 import org.apache.spark.sql.types._
@@ -68,20 +69,20 @@ import scala.jdk.CollectionConverters._
  *                                But it might be useful to export all data before a scheduled maintenance.
  */
 case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None, includeCurrentPartition: Boolean = false) {
-  @transient lazy private[smartdatalake] val formatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
-  private[smartdatalake] val chronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
-  private[smartdatalake] val zoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
-  private[smartdatalake] def parse(value: String ): LocalDateTime = {
+  def formatter: DateTimeFormatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
+  def chronoUnit: ChronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
+  def zoneId: ZoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
+  def parse(value: String ): LocalDateTime = {
     formatter.parseBest(value, TemporalQueries.LocalDateTimeQuery, TemporalQueries.LocalDateQuery, TemporalQueries.LocalYearMonthQuery ) match {
       case d: LocalDateTime => d
       case d: LocalDate => d.atStartOfDay()
       case d: YearMonth => d.atDay(1).atStartOfDay()
     }
   }
-  private[smartdatalake] def format( dateTime: LocalDateTime ) = dateTime.format(formatter)
-  private[smartdatalake] def next(dateTime: LocalDateTime, units: Int = 1) = dateTime.plus(units, chronoUnit)
-  private[smartdatalake] def previous(dateTime: LocalDateTime, units: Int = 1) = dateTime.minus(units, chronoUnit)
-  private[smartdatalake] def current = LocalDateTime.now().truncatedTo(chronoUnit)
+  def format( dateTime: LocalDateTime ): String = dateTime.format(formatter)
+  def next(dateTime: LocalDateTime, units: Int = 1): LocalDateTime = dateTime.plus(units, chronoUnit)
+  def previous(dateTime: LocalDateTime, units: Int = 1): LocalDateTime = dateTime.minus(units, chronoUnit)
+  def current: LocalDateTime = LocalDateTime.now().truncatedTo(chronoUnit)
 }
 
 private object TemporalQueries {
@@ -145,13 +146,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                            )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
     with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema
-    with io.smartdatalake.util.spark.dataset.Transform {
+    with Transform {
 
   private implicit val loggImpl: Logger = logger
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
-  private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionCol.get.chronoUnit).format(datePartitionCol.get.formatter))
 
   override def schemaMin: Option[GenericSchema] = None // minimal schema doesn't make sense, as schema is always fully defined.
 
@@ -230,8 +230,14 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
-    dfRaw
-      .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
+    var dfRead = dfRaw
+    if (datePartitionCol.isDefined) {
+      val colDef = datePartitionCol.get
+      val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(colDef.chronoUnit).format(colDef.formatter))
+      dfRead = dfRead
+        .withColumn(colDef.colName, udfFormatPartition(col("timestamp")))
+    }
+    dfRead
       .as("kafka")
       .select(colsToSelect.toIndexedSeq: _*)
   }
@@ -340,10 +346,11 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
    * @return a DataFrame filtered to given offsets.
    */
   def createDataFrameForTopicPartitionOffsets(topicPartitionOffsets: Seq[TopicPartitionOffsets], logInfo: String)(implicit session: SparkSession): DataFrame = {
+    if (topicPartitionOffsets.isEmpty) return createEmptyRawDataFrame
     // split offsets according to maxOffsetsPerTask
     val topicPartitionOffsetsSplitted = topicPartitionOffsets.map( tpo => if (batchReadMaxOffsetsPerTask.isDefined) tpo.split(batchReadMaxOffsetsPerTask.get) else Seq(tpo))
     // ensure that every partition has the same number of tasks by adding empty entries
-    val maxNbOfTasksPerPartition = topicPartitionOffsetsSplitted.map(_.size).max
+    val maxNbOfTasksPerPartition = topicPartitionOffsetsSplitted.map(_.size).maxOption.getOrElse(1)
     val topicPartitionOffsetsBalanced = topicPartitionOffsetsSplitted.map( tpos => tpos ++ tpos.last.getEmptyEndEntries(maxNbOfTasksPerPartition-tpos.size))
     // transpose so that we have a list of tasks for every partition per query
     val topicPartitionOffsetsQueries = topicPartitionOffsetsBalanced.transpose
@@ -515,16 +522,25 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       case sparkWriteSchema: SparkSchema =>
         implicit val session: SparkSession = SparkSubFeed.getSparkSession
         // add additional columns created by kafka source
-        val readSchemaRaw = sparkWriteSchema.inner
-          .add("topic", StringType)
-          .add("partition", IntegerType)
-          .add("offset", LongType)
-          .add("timestamp", TimestampType)
-          .add("timestampType", IntegerType)
+        val readSchemaRaw = addReadFields(sparkWriteSchema.inner)
         // apply selected columns and return schema
         SparkSchema(convertToReadDataFrame(getEmptyDataFrame(readSchemaRaw)).schema)
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${writeSchema.subFeedType.typeSymbol.name} in method createReadSchema")
     }
+  }
+
+  private def addReadFields(schema: StructType): StructType = {
+    schema
+      .add("topic", StringType)
+      .add("partition", IntegerType)
+      .add("offset", LongType)
+      .add("timestamp", TimestampType)
+      .add("timestampType", IntegerType)
+  }
+
+  private def createEmptyRawDataFrame(implicit session: SparkSession): DataFrame = {
+    val rawSchema = addReadFields(StructType(Seq(StructField("key", BinaryType), StructField("value", BinaryType))))
+    getEmptyDataFrame(rawSchema)
   }
 
   // Store incremental output state. This is a list of partitionNb and corresponding offset.

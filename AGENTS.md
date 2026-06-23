@@ -28,7 +28,7 @@ sdl-{connector}/    # Specialized connectors (kafka, deltalake, snowflake, etc.)
 ### Build Commands
 ```bash
 # Fast development build (excludes slow Debezium shaded modules)
-mvn -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded'
+mvn -B clean test -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
 
 # Build specific module
 mvn clean install -pl sdl-core

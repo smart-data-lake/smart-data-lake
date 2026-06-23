@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,24 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.testutil
 
-import io.github.embeddedkafka.schemaregistry.{EmbeddedKafkaConfig, EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
+package io.smartdatalake.kafka;
 
-object KafkaTestUtil {
-
-  implicit val embeddedKafkaConfig: EmbeddedKafkaConfig = EmbeddedKafkaConfig(
-    kafkaPort = 6001,
-    controllerPort = 6002,
-    schemaRegistryPort = 6003
-  )
-
-  private lazy val kafka: Unit = {
-    EmbeddedKafkaWithSchemaRegistry.start()
-    Thread.sleep(2000)
-  }
-
-  def start(): Unit = {
-    kafka // initialize lazy variable
-  }
+/**
+ * This is a dummy object with no purpose for the actual implementation.
+ * It serves only as an object to be compiled by the maven-source-plugin during deployment to maven repo.
+ */
+public class EmbeddedKafkaSchemaRegistryDummy {
 }

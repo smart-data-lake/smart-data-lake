@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- this artifact contains debezium-connector-mariadb with shaded debezium-ddl-parser antlr4-runtime, as there are version conflicts for antlr4 with spark -->
+    <artifactId>embedded-kafka-schema-registry-shaded</artifactId>
+    <groupId>io.smartdatalake</groupId>
+    <version>8.2.0</version><!-- this is the embedded-kafka-schema-registry version to use -->
+    <packaging>jar</packaging>
+    <name>embedded-kafka-schema-registry-shaded</name>
+
+    <licenses>
+        <license>
+            <name>GNU General Public License (GPL) version 3</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+        </license>
+    </licenses>
+
+    <description>Shaded jar file for embedded-kafka-schema-registry because of dependency conflicts with Jetty 11 vs 12.</description>
+    <url>http://www.smartdatalake.io</url>
+    <inceptionYear>2019</inceptionYear>
+    <organization>
+        <name>ELCA Informatique SA</name>
+        <url>https://www.elca.ch</url>
+    </organization>
+
+    <developers>
+        <developer>
+            <name>Smart Data Lake</name>
+            <email>smartdatalake@elca.ch</email>
+            <organization>ELCA Informatik AG</organization>
+            <organizationUrl>http://www.elca.ch</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/smart-data-lake/smart-data-lake.git</connection>
+        <developerConnection>scm:git:ssh://github.com/smart-data-lake/smart-data-lake.git</developerConnection>
+        <url>http://github.com/smart-data-lake/smart-data-lake/tree/master</url>
+    </scm>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>maven-central</id>
+            <name>Maven Central Repository</name>
+            <url>https://repo1.maven.org/maven2/</url>
+        </repository>
+        <repository>
+            <id>confluent</id>
+            <name>Confluent Schema Repository</name>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+    </repositories>
+
+    <profiles>
+        <profile>
+            <id>release-sonatype</id>
+            <distributionManagement>
+                <repository>
+                    <id>central</id>
+                    <name>Maven Central Repository</name>
+                    <url>https://repo1.maven.org/maven2</url>
+                </repository>
+            </distributionManagement>
+            <build>
+                <plugins>
+                    <!-- create javadoc -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.3</version>
+                        <executions>
+                            <execution>
+                                <id>attach-docs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- sign artifacts with gpg -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Prevent `gpg` from using pinentry programs -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- deploy to sonatype central -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.8.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>false</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.embeddedkafka</groupId>
+            <artifactId>embedded-kafka-schema-registry_2.13</artifactId>
+            <version>${pom.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.confluent</groupId>
+                    <artifactId>confluent-log4j</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Transitive dependencies as they are not selected for shading.
+             They must be made explicit again here for a proper dependency-reduced-pom. -->
+        <dependency>
+            <groupId>io.github.embeddedkafka</groupId>
+            <artifactId>embedded-kafka_2.13</artifactId>
+            <version>4.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
+            <version>1.1.10.5</version>
+        </dependency>
+        <dependency>
+            <groupId>io.kcache</groupId>
+            <artifactId>kcache</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>2.9.3</version>
+        </dependency>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>4.7.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.crypto.tink</groupId>
+            <artifactId>tink</artifactId>
+            <version>1.20.0</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
+            <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+            <version>2.19.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-json-schema-provider</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-protobuf-provider</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-json-schema-provider</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+            <version>8.0.2.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.expressly</groupId>
+            <artifactId>expressly</artifactId>
+            <version>5.0.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+
+        <sourceDirectory>src/main/java</sourceDirectory>
+
+        <plugins>
+            <!-- Creates a JAR file with the source files of the project. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>shade-jar-with-antlr-relocated</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <artifactSet>
+                                <includes>
+                                    <include>io.github.embeddedkafka:embedded-kafka-schema-registry_2.13</include>
+                                    <include>io.confluent:*</include>
+                                    <include>org.eclipse.jetty:*</include>
+                                    <include>org.eclipse.jetty.ee10:*</include>
+                                    <include>org.eclipse.jetty.ee10.websocket:*</include>
+                                    <include>org.eclipse.jetty.websocket:*</include>
+                                    <include>org.eclipse.jetty.http2:*</include>
+                                    <include>com.fasterxml.jackson.jakarta.rs:jackson-jakarta-rs-json-provider</include>
+                                    <include>com.fasterxml.jackson.jakarta.rs:jackson-jakarta-rs-base</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-jakarta-xmlbind-annotations</include>
+                                    <include>jakarta.xml.bind:jakarta.xml.bind-api</include>
+                                    <include>jakarta.activation:jakarta.activation-api</include>
+                                    <include>jakarta.servlet:jakarta.servlet-api</include>
+                                    <include>org.glassfish.jersey.core:*</include>
+                                    <include>org.glassfish.jersey.containers:*</include>
+                                    <include>org.glassfish.jersey.inject:*</include>
+                                    <include>org.glassfish.jersey.ext:*</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <!-- relocate jetty to avoid version conflicts -->
+                                    <pattern>org.eclipse.jetty</pattern>
+                                    <shadedPattern>shaded.org.eclipse.jetty</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <!-- relocate jakarta activation to avoid version conflicts -->
+                                    <pattern>javax.activation</pattern>
+                                    <shadedPattern>shaded.javax.activation</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <!-- relocate jakarta servlet to avoid version conflicts -->
+                                    <pattern>jakarta.servlet</pattern>
+                                    <shadedPattern>shaded.jakarta-servlet</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <!-- relocate jersey to avoid version conflicts -->
+                                    <pattern>org.glassfish.jersey</pattern>
+                                    <shadedPattern>shaded.org.glassfish.jersey</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+
+                </executions>
+
+            </plugin>
+        </plugins>
+    </build>
+
+
+</project>
