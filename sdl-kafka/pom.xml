@@ -197,13 +197,13 @@
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>embedded-kafka-schema-registry-shaded</artifactId>
-			<version>${confluent.version}</version>
+			<version>${confluent.version}-SNAPSHOT</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-json-schema-provider</artifactId>
-			<version>8.2.0</version>
+			<version>${confluent.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

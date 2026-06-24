@@ -5,7 +5,7 @@
     <!-- this artifact contains debezium-connector-mariadb with shaded debezium-ddl-parser antlr4-runtime, as there are version conflicts for antlr4 with spark -->
     <artifactId>embedded-kafka-schema-registry-shaded</artifactId>
     <groupId>io.smartdatalake</groupId>
-    <version>8.2.0</version><!-- this is the embedded-kafka-schema-registry version to use -->
+    <version>8.2.0-SNAPSHOT</version><!-- this is the embedded-kafka-schema-registry version to use -->
     <packaging>jar</packaging>
     <name>embedded-kafka-schema-registry-shaded</name>
 
