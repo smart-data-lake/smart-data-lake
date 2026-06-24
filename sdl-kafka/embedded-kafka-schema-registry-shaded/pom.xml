@@ -43,6 +43,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <maven.compiler.release>17</maven.compiler.release>
+        <confluent.version>8.2.0</confluent.version>
     </properties>
 
     <repositories>
@@ -114,7 +115,6 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
-                            <tokenAuth>true</tokenAuth>
                             <autoPublish>false</autoPublish>
                             <ignorePublishedComponents>true</ignorePublishedComponents>
                         </configuration>
@@ -128,7 +128,7 @@
         <dependency>
             <groupId>io.github.embeddedkafka</groupId>
             <artifactId>embedded-kafka-schema-registry_2.13</artifactId>
-            <version>${pom.version}</version>
+            <version>${confluent.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -186,17 +186,17 @@
         <dependency>
             <groupId>io.confluent</groupId>
             <artifactId>kafka-json-schema-provider</artifactId>
-            <version>${project.version}</version>
+            <version>${confluent.version}</version>
         </dependency>
         <dependency>
             <groupId>io.confluent</groupId>
             <artifactId>kafka-protobuf-provider</artifactId>
-            <version>${project.version}</version>
+            <version>${confluent.version}</version>
         </dependency>
         <dependency>
             <groupId>io.confluent</groupId>
             <artifactId>kafka-json-schema-provider</artifactId>
-            <version>${project.version}</version>
+            <version>${confluent.version}</version>
         </dependency>
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
