@@ -272,8 +272,25 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   }
 
   /**
-   * Substitutes parts inside values by other paths of the configuration
-   * Token for substitution is "~{replacementPath}"
+   * Converts a value to snake_case: inserts an underscore at camelCase boundaries (including acronyms),
+   * replaces dashes with underscores and lowercases the result.
+   * Examples: "camelCase" -> "camel_case", "int-airports" -> "int_airports", "myHTTPServer" -> "my_http_server".
+   */
+  private[config] def toSnakeCase(value: String): String = {
+    value
+      .replaceAll("([a-z0-9])([A-Z])", "$1_$2") // camelCase boundary, e.g. camelCase -> camel_Case
+      .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2") // acronym boundary, e.g. HTTPServer -> HTTP_Server
+      .replace('-', '_')
+      .toLowerCase
+  }
+
+  /**
+   * Substitutes parts inside values by other paths of the configuration.
+   * Token for substitution is "~{replacementPath}".
+   * An optional modifier can be appended with a pipe, e.g. "~{replacementPath|snake}", to transform the resolved value:
+   *  - "snake": converts the resolved value to snake_case, i.e. inserts underscores at camelCase boundaries, replaces
+   *    dashes ('-') with underscores ('_') and lowercases, e.g. to use an element id like 'int-airports' or 'intAirports'
+   *    as table name 'int_airports'.
    *
    * @param config configuration object for local substitution
    * @param path   path to search for local substitution tokens and execute substitution
@@ -283,16 +300,23 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
     val localSubstituter = (regMatch: Regex.Match) => {
       val replacementPath = regMatch.group(1)
-      if (config.hasPath(replacementPath)) {
-        if (config.getValue(replacementPath).valueType() == ConfigValueType.STRING
-          || config.getValue(replacementPath).valueType() == ConfigValueType.NUMBER) config.getString(replacementPath)
-        else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' is not a string")
-      } else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' does not exist")
+      val modifier = Option(regMatch.group(2))
+      val value =
+        if (config.hasPath(replacementPath)) {
+          if (config.getValue(replacementPath).valueType() == ConfigValueType.STRING
+            || config.getValue(replacementPath).valueType() == ConfigValueType.NUMBER) config.getString(replacementPath)
+          else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' is not a string")
+        } else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' does not exist")
+      modifier match {
+        case None => value
+        case Some("snake") => toSnakeCase(value)
+        case Some(m) => throw ConfigurationException(s"unknown local substitution modifier '$m' for path '$replacementPath' in path '$path'. Supported modifiers: snake")
+      }
     }
 
     if (config.hasPath(path) && config.getValue(path).valueType() == ConfigValueType.STRING) {
       val value = config.getString(path)
-      val valueSubstituted = """~\{(.*?)}""".r.replaceAllIn(value, localSubstituter)
+      val valueSubstituted = """~\{(.*?)(?:\|(\w+))?}""".r.replaceAllIn(value, localSubstituter)
       config.withValue(path, ConfigValueFactory.fromAnyRef(valueSubstituted))
     } else config
   }
