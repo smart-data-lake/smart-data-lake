@@ -200,21 +200,21 @@ class ODataIOC {
  * [[DataObject]] of type OData.
  *
  * @param schema
- *   : Schema of the expected output. It can be provided as a string in the form of <<array< struct<
+ *   Schema of the expected output. It can be provided as a string in the form of <<array< struct<
  *   columnA:string, columnB: integer ... >>, as ddl-File, caseClass, java Bean, XSD-File,
- *   JSON-Schema-File or Avro-Schema File. For more information, please see the SDLB-docuemntation
+ *   JSON-Schema-File or Avro-Schema File. For more information, please see the SDLB-documentation
  *   on specifying schemas (https://smartdatalake.ch/docs/reference/schema#specifying-schema).
  * @param baseUrl
- *   : Base URL of the OData Service like https://xxx.crm4.dynamics.com/api/data/v9.2/
+ *   Base URL of the OData Service like https://xxx.crm4.dynamics.com/api/data/v9.2/
  * @param tableName
- *   : Name of the table which needs to be accessed
+ *   Name of the table which needs to be accessed
  * @param sourceFilters
- *   : Optional. OData filter string which will be applied to the access operation like
+ *   Optional. OData filter string which will be applied to the access operation like
  *   "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
  * @param timeouts
- *   : Optional. Timeout settings of type [[HttpTimeoutConfig]]
+ *   Optional. Timeout settings of type [[HttpTimeoutConfig]]
  * @param authMode
- *   : Optional configuration of webservice authentication. Supported `AuthMode`s are all
+ *   Optional configuration of webservice authentication. Supported `AuthMode`s are all
  *   HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode. CustomHttpAuthMode can be
  *   used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in
  *   sdl-azure module.
@@ -263,7 +263,7 @@ case class ODataDataObject(
    * @param method:
    *   Either Get or Set
    * @param headers:
-   *   Additional headers to be sent allong with the request
+   *   Additional headers to be sent along with the request
    * @param body:
    *   The body of the message
    * @param mimeType:
@@ -379,11 +379,10 @@ case class ODataDataObject(
   private def getODataURLFilters(context: ActionPipelineContext): Option[String] = {
     val filters = ArrayBuffer[String]()
 
-    // If there are any predefined filters configured, treat these filters as one unit and add them
-    // to the filters list
-    if (sourceFilters.isDefined) {
-      filters.append("(" + sourceFilters.get + ")")
-    }
+    //If there are any predefined filters configured, treat these filters as one unit and add them
+    //to the filters list. Tokens with syntax %{<spark SQL expression>} are substituted with values
+    //from DefaultExpressionData (see also JdbcTableDataObject.prepareAndExecSql).
+    if (sourceFilters.isDefined) filters.append("(" + sourceFilters.get + ")")
 
     // If there is a incrementalOutputExpr and a previousState specified, use this column to filter only the records that
     // were modified since the last run (previousState) and the start of this run.
