@@ -81,13 +81,13 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.iceberg</groupId>
-			<artifactId>iceberg-spark-${spark.minor40.version}_${scala.minor.version}</artifactId>
+			<artifactId>iceberg-spark-${spark.minor.version}_${scala.minor.version}</artifactId>
 			<version>${iceberg.version}</version>
 		</dependency>
 		<!-- Spark catalog extension registered via SPI; no direct import needed -->
 		<dependency>
 			<groupId>org.apache.iceberg</groupId>
-			<artifactId>iceberg-spark-extensions-${spark.minor40.version}_${scala.minor.version}</artifactId>
+			<artifactId>iceberg-spark-extensions-${spark.minor.version}_${scala.minor.version}</artifactId>
 			<version>${iceberg.version}</version>
 			<scope>runtime</scope>
 		</dependency>
