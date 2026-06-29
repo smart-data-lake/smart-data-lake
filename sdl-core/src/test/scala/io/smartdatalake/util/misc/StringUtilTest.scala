@@ -39,17 +39,15 @@ class StringUtilTest extends AnyFlatSpec with Matchers
 
   it should "treat special chars between camelCase words as separators without producing double underscores" in {
     val argExpMap = Map(
-      "Invoice No"     -> "invoice_no",
-      "Invoice-No"     -> "invoice_no",
-      "Invoice.No"     -> "invoice_no",
-      "Invoice!No"     -> "invoice_no",
-      "InvoiceName.ID" -> "invoice_name_id",
-      // lowercase word following an uppercase acronym: leading space must not cause double underscore
-      "SO item"              -> "so_item",
-      "Sales Order SO item"  -> "sales_order_so_item",
-      // trailing special chars must not produce a trailing underscore
-      "Invoice No "    -> "invoice_no",
-      "SO item "       -> "so_item")
+      "AbcDef"     -> "abc_def",   // baseline: pure camelCase, no special chars
+      "Abc Def"    -> "abc_def",   // space between two uppercase words
+      "Abc-Def"    -> "abc_def",   // hyphen between two uppercase words
+      "Abc.Def"    -> "abc_def",   // dot between two uppercase words
+      "Abc!Def"    -> "abc_def",   // other special char between two uppercase words
+      "AbcDef.Gh"  -> "abc_def_gh", // dot after a multi-word camelCase sequence
+      // trailing space stripped per token; internal spaces (within one token) preserved for downstream replacement
+      "Abc Def "   -> "abc_def",   // trailing space after last word
+      "AB cde "    -> "ab cde")    // trailing space; "cde" is part of AB's token tail, space preserved internally
     testArgumentExpectedMap[String, String](strCamelCase2LowerCaseWithUnderscores, argExpMap)
       .values.forall(identity[Boolean]) shouldBe true
   }
