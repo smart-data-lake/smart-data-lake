@@ -33,7 +33,8 @@ object StringUtil {
    * @return transformed [[String]]
    */
   def strCamelCase2LowerCaseWithUnderscores(x: String): String = {
-    val normalized = "([A-Z]+[^A-Z_]*)|[^A-Z_]+".r.findAllMatchIn(x).map(_.group(0).toLowerCase.filter(_ != '_'))
+    val normalized = "([A-Z]+[^A-Z_]*)|[^A-Z_]+".r.findAllMatchIn(x)
+      .map(_.group(0).toLowerCase.replaceAll("^[^a-z0-9]+|[^a-z0-9]+$", ""))
       .filter(_.nonEmpty).mkString("_")
     // preserve leading underscores
     x.takeWhile(_ == '_') + normalized

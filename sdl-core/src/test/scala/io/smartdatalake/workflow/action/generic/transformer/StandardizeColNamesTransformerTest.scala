@@ -44,13 +44,24 @@ class StandardizeColNamesTransformerTest extends AnyFunSuite {
     assert(transformed.schema.columns == Seq("onedot", "twodots"))
   }
 
-  test("blanks in column names are replaces") {
+  test("blanks in column names are replaced") {
     val colNamesTransformer = StandardizeColNamesTransformer(removeNonStandardSQLNameChars=false, replaceNonStandardSQLNameCharsWithUnderscores = true)
     val df = SparkDataFrame(Seq((1, 1, 1), (2, 2,2)).toDF("one dot", "two-do-ts", "value of property!in$$"))
 
     val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
-    assert(transformed.schema.columns == Seq("one_dot", "two_do_ts", "value_of_property_in_"))
+    // trailing special chars ($$) must not produce a trailing underscore
+    assert(transformed.schema.columns == Seq("one_dot", "two_do_ts", "value_of_property_in"))
+  }
+
+  test("mixed-case words separated by spaces or special chars produce single underscores without leading or trailing underscores") {
+    val colNamesTransformer = StandardizeColNamesTransformer(removeNonStandardSQLNameChars=false, replaceNonStandardSQLNameCharsWithUnderscores = true)
+    val df = SparkDataFrame(Seq((1, 1, 1, 1, 1, 1, 1, 1, 1), (2, 2, 2, 2, 2, 2, 2, 2, 2))
+      .toDF("Invoice No", "Sales Order SO", "Description Item", "Unit Price", "Invoice-No", "InvoiceName.ID", "SO item", "Sales Order SO item", "Sales Order (SO items)"))
+
+    val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
+
+    assert(transformed.schema.columns == Seq("invoice_no", "sales_order_so", "description_item", "unit_price", "invoice_no", "invoice_name_id", "so_item", "sales_order_so_item", "sales_order_so_items"))
   }
 
 }
