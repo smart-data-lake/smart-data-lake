@@ -238,6 +238,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     srcDO1.writeSparkDataFrame(l, Seq())
     srcDO2.writeSparkDataFrame(l, Seq())
     val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
+    val tgtSubFeed = action1.exec(srcSubFeeds)(contextExec).head
 
     val r1 = intDO1.getSparkDataFrame()
       .select($"lastname")
