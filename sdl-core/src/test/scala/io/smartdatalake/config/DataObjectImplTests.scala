@@ -316,8 +316,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |    host = localhost
         |    authMode {
         |      type = BasicAuthMode
-        |      userVariable = "CLEAR#foo"
-        |      passwordVariable = "CLEAR#pwd"
+        |      user = "CLEAR#foo"
+        |      password = "CLEAR#pwd"
         |    }
         |    proxy {
         |      host = localhost

@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject._
-import io.smartdatalake.workflow.dataobject.generic.{Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanMergeDataFrame, Table, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.DataFrame
@@ -48,7 +48,7 @@ case class TestDataObject( id: DataObjectId,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
-    with CanReceiveScriptNotification {
+    with CanReceiveScriptNotification with CanMergeDataFrame {
 
   override val options: Map[String, String] = Map()
 
