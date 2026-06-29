@@ -37,6 +37,23 @@ class StringUtilTest extends AnyFlatSpec with Matchers
       .values.forall(identity[Boolean]) shouldBe true
   }
 
+  it should "treat special chars between camelCase words as separators without producing double underscores" in {
+    val argExpMap = Map(
+      "Invoice No"     -> "invoice_no",
+      "Invoice-No"     -> "invoice_no",
+      "Invoice.No"     -> "invoice_no",
+      "Invoice!No"     -> "invoice_no",
+      "InvoiceName.ID" -> "invoice_name_id",
+      // lowercase word following an uppercase acronym: leading space must not cause double underscore
+      "SO item"              -> "so_item",
+      "Sales Order SO item"  -> "sales_order_so_item",
+      // trailing special chars must not produce a trailing underscore
+      "Invoice No "    -> "invoice_no",
+      "SO item "       -> "so_item")
+    testArgumentExpectedMap[String, String](strCamelCase2LowerCaseWithUnderscores, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
+  }
+
   "strToLowerCamelCase" should "transform string to lowerCamelCase" in {
     val argExpMap = Map("abc0" -> "abc0", "aBc_d0" -> "aBcD0", "aBC0" -> "aBC0",
       "Abc-ABc_aBC0" -> "abcABcABC0", "_AbcABc aBC0" -> "abcABcABC0")
