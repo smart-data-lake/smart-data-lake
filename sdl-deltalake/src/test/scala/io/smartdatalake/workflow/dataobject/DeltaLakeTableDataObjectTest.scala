@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
-import io.smartdatalake.testutils.spark.dataset.{Collection, TestToolDataset}
+import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.dataset.Equality
@@ -39,6 +39,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.nio.file
 import java.nio.file.Files
 
 class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll
@@ -49,7 +50,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   protected implicit val session : SparkSession = DeltaLakeTestUtils.session
   import session.implicits._
 
-  val tempDir = Files.createTempDirectory("tempHadoopDO")
+  val tempDir: file.Path = Files.createTempDirectory("tempHadoopDO")
   val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -60,7 +61,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   override def beforeAll(): Unit = {
     val warehousePath = new Path("spark-warehouse/delta.db")
     implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(warehousePath)(session)
-    HdfsUtil.deletePath(warehousePath, false)
+    HdfsUtil.deletePath(path = warehousePath, doWarn = false)
   }
 
   before {
@@ -451,7 +452,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     // - column 'rating2' added -> existing records will get new column rating2 set to null
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating2")
-    // this doesnt work for now, see also https://github.com/delta-io/delta/issues/2300
+    // this does not work for now, see also https://github.com/delta-io/delta/issues/2300
     intercept[AnalysisException](targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
   }
 

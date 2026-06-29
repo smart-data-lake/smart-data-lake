@@ -34,7 +34,7 @@ import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 import org.apache.spark.sql.types.StructType
 
-import java.sql.{DatabaseMetaData, DriverManager, ResultSet, Connection => SqlConnection}
+import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, ResultSet}
 
 /**
  * Connection information for JDBC tables. If authentication is needed, user and password must be
@@ -129,7 +129,7 @@ case class JdbcTableConnection(
         .map(parseUserSpecifiedCreateTableColumnTypes(caseSensitive, _))
         .getOrElse(Map.empty[String, String])
       schema.fields.foreach { field =>
-        // Change is here - dont quote if not case-sensitive and normal characters used:
+        // Change is here - do not quote if not case-sensitive and normal characters used:
         val name = if (caseSensitive || SQLUtil.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
         else field.name
         val typ = userSpecifiedColTypesMap

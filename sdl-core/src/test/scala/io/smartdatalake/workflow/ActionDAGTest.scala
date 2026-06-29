@@ -116,8 +116,10 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   test("action dag with 2 actions in sequence and breakDataframeLineage=true") {
     // Note: if you set breakDataframeLineage=true, SDL doesn't pass the DataFrame to the next action.
-    // Nevertheless the schema should be passed on for early validation in init phase, otherwise SDL reads the DataObject which might not yet have been created.
-    // To support this SDL creates and passes on an empty dummy-DataFrame in init phase, just containing the schema, which is replaced in exec phase by the real fresh DataFrame read from the DataObject which now should be existing.
+    // Nevertheless the schema should be passed on for early validation in init phase,
+    // otherwise SDL reads the DataObject which might not yet have been created.
+    // To support this SDL creates and passes on an empty dummy-DataFrame in init phase, just containing the schema,
+    // which is replaced in exec phase by the real fresh DataFrame read from the DataObject which now should be existing.
     // see also #119
 
     // setup DataObjects
@@ -158,7 +160,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
-    // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
+    // In this case we have to break the lineage und create a dummy DataFrame in init phase.
 
     // setup DataObjects
     val feed = "actionpipeline"
@@ -289,8 +291,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // Action B and C depend on Action A
     // Action D depends on Action B and C (uses CustomDataFrameAction with multiple inputs)
 
-    // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("A").register
 
     instanceRegistry.register(jdbcConnection)
@@ -379,7 +379,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
       assert(r == Seq(5, 3))
     }
 
-    // exec dag 2st run - action A is skipped because of PartitionDiffMode, but Action C should run nevertheless
+    // exec dag 2nd run - action A is skipped because of PartitionDiffMode, but Action C should run nevertheless
     val l1_2 = Seq(("doe", "john", 6)).toDF("lastname", "firstname", "rating")
     srcD1.writeSparkDataFrame(l1_2)
     val l2_2 = Seq(("peter", "pan", 4)).toDF("lastname", "firstname", "rating")
@@ -399,8 +399,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   test("action dag with 2 actions and positive top-level partition values filter, ignoring executionMode=PartitionDiffMode") {
 
-    // setup DataObjects
-    val feed = "actiondag"
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     instanceRegistry.register(jdbcConnection)
@@ -472,7 +470,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // read src/tgt and count
     val dfSrc = srcDO.getSparkDataFrame()
     val srcCount = dfSrc.count()
-    val dfTgt1 = tgt1DO.getSparkDataFrame()
     val dfTgt2 = tgt2DO.getSparkDataFrame()
     val tgtCount = dfTgt2.count()
     assert(srcCount == tgtCount)
@@ -532,8 +529,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode and selectExpression") {
-    // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname")).register
     instanceRegistry.register(jdbcConnection)
     val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
@@ -604,16 +599,13 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val e = intercept[TaskFailedException](dag1.exec(contextExec))
     assert(e.cause.isInstanceOf[AssertionError])
 
-    // doesnt fail for not existing unexpected partition xyz
+    // does not fail for not existing unexpected partition xyz
     val dag2 = ActionDAGRun(actions, partitionValues = Seq(PartitionValues(Map("lastname" -> "xyz"))))
     dag2.prepare(contextPrep)
     dag2.exec(contextExec)
   }
 
   test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode alternativeOutputId") {
-    // setup DataObjects
-    val feed = "actionpipeline"
-    val srcTable = Table(Some("default"), "ap_input")
     val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname")).register
     val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
     val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
@@ -840,7 +832,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
-    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp")
     val srcDO = JsonFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(SparkSchema(schema)))
     instanceRegistry.register(srcDO)
     val tgt1DO = ParquetFileDataObject("tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append)
@@ -938,8 +930,8 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
       .as[(Int, String)].collect().toSet
     assert(r1 == Set((5, "waikiki beach")))
 
-    // second dag run - no data to process in action a
-    // there should be no exception and action b should run with updated data of src2 and existing data of tgt1
+    // second dag run - no data to process in action a.
+    // There should be no exception and action b should run with updated data of src2 and existing data of tgt1
     val df3 = Seq(("doe", "john", "honolulu")).toDF("lastname", "firstname", "address")
     src2DO.writeSparkDataFrame(df3, Seq())
     dag.reset
@@ -973,8 +965,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val tgt2DO = ParquetFileDataObject("tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'))
     instanceRegistry.register(tgt2DO)
 
-    // prepare DAG
-    val refTimestamp1 = LocalDateTime.now()
     val df1 = Seq(("doe", "john", 5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeSparkDataFrame(df1, Seq())
     val df2 = Seq(("doe", "john", "waikiki beach")).toDF("lastname", "firstname", "address")
@@ -1018,10 +1008,10 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
-    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp")
     val srcDO = JsonFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(SparkSchema(schema)))
     instanceRegistry.register(srcDO)
-    val schema2 = StructType.fromDDL("lastname string, firstname string, address string").asInstanceOf[StructType]
+    val schema2 = StructType.fromDDL("lastname string, firstname string, address string")
     val src2DO = JsonFileDataObject("src2", tempDir.resolve("src2").toString.replace('\\', '/'), schema = Some(SparkSchema(schema2)))
     instanceRegistry.register(src2DO)
     val tgt1DO = ParquetFileDataObject("tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append)
@@ -1029,8 +1019,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val tgt2DO = ParquetFileDataObject("tgt2", tempDir.resolve("tgt2").toString.replace('\\', '/'))
     instanceRegistry.register(tgt2DO)
 
-    // prepare DAG
-    val refTimestamp1 = LocalDateTime.now()
     val df1 = Seq(("doe", "john", 5, Timestamp.from(Instant.now))).toDF("lastname", "firstname", "rating", "tstmp")
     srcDO.writeSparkDataFrame(df1, Seq())
     val df2 = Seq(("doe", "john", "waikiki beach")).toDF("lastname", "firstname", "address")
@@ -1077,7 +1065,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
-    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp")
     val srcDO = JsonFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(SparkSchema(schema)))
     instanceRegistry.register(srcDO)
     val tgt1DO = ParquetFileDataObject("tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), saveMode = SDLSaveMode.Append)
@@ -1098,8 +1086,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("action dag with Action skipped because of no-data fails with metricsFailCondition") {
-    // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("src1").register
     val tgt1DO = MockSparkDataObject("tgt1").register
 
@@ -1120,7 +1106,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // setup DataObjects
     val feed = "actionpipeline"
     val tempDir = Files.createTempDirectory(feed)
-    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp").asInstanceOf[StructType]
+    val schema = StructType.fromDDL("lastname string, firstname string, rating int, tstmp timestamp")
     val srcDO = JsonFileDataObject("src1", tempDir.resolve("src1").toString.replace('\\', '/'), schema = Some(SparkSchema(schema)), partitions = Seq("lastname"), saveMode = SDLSaveMode.OverwriteOptimized)
     instanceRegistry.register(srcDO)
     val tgt1DO = ParquetFileDataObject("tgt1", tempDir.resolve("tgt1").toString.replace('\\', '/'), partitions = Seq("lastname"), saveMode = SDLSaveMode.Append)
@@ -1159,9 +1145,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   }
 
-  test("dont throw exception if no output metrics on empty DataFrame") {
-    // setup DataObjects
-    val feed = "actionpipeline"
+  test("do not throw exception if no output metrics on empty DataFrame") {
     val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname")).register
     val tgt1DO = UnpartitionedTestDataObject("tgt1")
     instanceRegistry.register(tgt1DO)
@@ -1184,8 +1168,6 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("action dag with 2 actions in sequence and executionMode=PartitionDiffMode, second action can not handle partitions") {
-    // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname")).register
    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname"))).register
     val tgt2DO = UnpartitionedTestDataObject("tgt2")

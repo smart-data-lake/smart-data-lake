@@ -22,7 +22,7 @@ import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext}
 import jakarta.ws.rs.core.{MediaType, Response}
 import jakarta.ws.rs.{GET, Path, Produces}
-import org.json4s.NoTypeHints
+import org.json4s.{Formats, NoTypeHints}
 
 
 /**
@@ -32,7 +32,7 @@ import org.json4s.NoTypeHints
 @Path("/v1")
 case class StatusInfoMethods(statelistener: SnapshotStatusInfoListener) {
 
-  implicit val formats = JsonUtils.getFormats(NoTypeHints)
+  implicit val formats: Formats = JsonUtils.getFormats(NoTypeHints)
 
   @GET
   @Path("state")

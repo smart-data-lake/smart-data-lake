@@ -119,7 +119,8 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     observation.asInstanceOf[SparkObservation].setOtherObservationsPrefix("test#")
     val metrics = observation.waitFor()
     assert(metrics("count") == 0) // this is the final count
-    assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)
+    // input count 0 is expected (if it fails, filter push down through observation does not work anymore)
+    assert(metrics("count#input") == 0)
   }
 
   test("read parquet files mixed with other files in same directory") {

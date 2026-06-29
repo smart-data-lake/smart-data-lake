@@ -96,7 +96,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
   }
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
-    assert(partitionValues.flatMap(_.keys).distinct.caseSensitiveDiff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
+    assert(partitionValues.flatMap(_.keys).distinct.caseSensitiveDiff(partitions).isEmpty, s"($id) partitionValues keys do not match partition columns") // assert partition keys match
     assert(partitions.caseSensitiveDiff(df.columns.toList).isEmpty, s"($id) partition columns are missing in DataFrame")
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 

@@ -56,7 +56,7 @@ import org.apache.hadoop.conf.Configuration
  *   it as a list of DataObject id's.
  * @param synchronousStreamingTriggerIntervalSec
  *   Trigger interval for synchronous actions in streaming mode in seconds (default = 60 seconds)
- *   The synchronous actions of the DAG will be executed with this interval if possile. Note that
+ *   The synchronous actions of the DAG will be executed with this interval if possible. Note that
  *   for asynchronous actions there are separate settings, e.g. SparkStreamingMode.triggerInterval.
  * @param allowAsRecursiveInput
  *   List of DataObjects for which the validation rules for Action.recursiveInputIds are *not*
@@ -66,7 +66,7 @@ import org.apache.hadoop.conf.Configuration
  *   be used for well thought exceptions, but should be avoided in general. Note that if 1) is true,
  *   also 2) must be fulfilled for Spark to work properly (because Spark can't read/write the same
  *   storage location in the same job), but there might be cases with recursions with different
- *   Actions involved, that dont need to fullfill 2).
+ *   Actions involved, that do not need to fulfill 2).
  * @param environment
  *   Override environment settings defined in Environment object by setting the corresponding key to
  *   the desired value (key in camelcase notation with the first letter in lowercase)
@@ -110,7 +110,7 @@ case class GlobalConfig(
   // start memory logger, else log memory once
   if (memoryLogTimer.isDefined) {
     memoryLogTimer.get.startTimer()
-  } else MemoryUtils.logHeapInfo(false, false, false)
+  } else MemoryUtils.logHeapInfo(logLinuxMem = false, logLinuxCgroupMem = false, logBuffers = false)
 
   // add debug shutdown hook logger
   if (shutdownHookLogger) MemoryUtils.addDebugShutdownHooks()

@@ -92,7 +92,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
 
   /**
    * Runs operations before writing to [[DataObject]]
-   * Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
+   * Note: As the transformed SubFeed does not yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
    */
   private[smartdatalake] def preWrite(implicit context: ActionPipelineContext): Unit = ()
 

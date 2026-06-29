@@ -30,26 +30,43 @@ import java.time.{Duration, Instant, ZoneId}
 /**
  * A parameter object holding the spark metrics for a spark stage.
  *
- * @see [[org.apache.spark.scheduler.StageInfo]] for more details on these metrics.
+ * @see
+ *   [[org.apache.spark.scheduler.StageInfo]] for more details on these metrics.
  */
-private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: Int, stageName: String, numTasks: Int,
-                                                    submissionTimestamp: Long, completionTimeStamp: Long,
-                                                    executorRuntimeInMillis: Long, executorCpuTimeInNanos: Long,
-                                                    executorDeserializeTimeInMillis: Long, executorDeserializeCpuTimeInNanos: Long,
-                                                    resultSerializationTimeInMillis: Long, resultSizeInBytes: Long,
-                                                    jvmGarbageCollectionTimeInMillis: Long,
-                                                    memoryBytesSpilled: Long, diskBytesSpilled: Long,
-                                                    peakExecutionMemoryInBytes: Long,
-                                                    bytesRead: Long, recordsRead: Long,
-                                                    bytesWritten: Long, recordsWritten: Long,
-                                                    shuffleFetchWaitTimeInMillis: Long,
-                                                    shuffleRemoteBlocksFetched: Long, shuffleLocalBlocksFetched: Long, shuffleTotalBlocksFetched: Long,
-                                                    shuffleRemoteBytesRead: Long, shuffleLocalBytesRead: Long, shuffleTotalBytesRead: Long,
-                                                    shuffleRecordsRead: Long,
-                                                    shuffleWriteTimeInNanos: Long, shuffleBytesWritten: Long,
-                                                    shuffleRecordsWritten: Long,
-                                                    accumulables: Seq[AccumulableInfo]
-                                                   ) extends ActionMetrics {
+private[smartdatalake] case class SparkStageMetrics(
+    jobInfo: JobInfo,
+    stageId: Int,
+    stageName: String,
+    numTasks: Int,
+    submissionTimestamp: Long,
+    completionTimeStamp: Long,
+    executorRuntimeInMillis: Long,
+    executorCpuTimeInNanos: Long,
+    executorDeserializeTimeInMillis: Long,
+    executorDeserializeCpuTimeInNanos: Long,
+    resultSerializationTimeInMillis: Long,
+    resultSizeInBytes: Long,
+    jvmGarbageCollectionTimeInMillis: Long,
+    memoryBytesSpilled: Long,
+    diskBytesSpilled: Long,
+    peakExecutionMemoryInBytes: Long,
+    bytesRead: Long,
+    recordsRead: Long,
+    bytesWritten: Long,
+    recordsWritten: Long,
+    shuffleFetchWaitTimeInMillis: Long,
+    shuffleRemoteBlocksFetched: Long,
+    shuffleLocalBlocksFetched: Long,
+    shuffleTotalBlocksFetched: Long,
+    shuffleRemoteBytesRead: Long,
+    shuffleLocalBytesRead: Long,
+    shuffleTotalBytesRead: Long,
+    shuffleRecordsRead: Long,
+    shuffleWriteTimeInNanos: Long,
+    shuffleBytesWritten: Long,
+    shuffleRecordsWritten: Long,
+    accumulables: Seq[AccumulableInfo]
+) extends ActionMetrics {
 
   lazy val stageSubmissionTime: Instant = Instant.ofEpochMilli(submissionTimestamp)
   lazy val stageCompletionTime: Instant = Instant.ofEpochMilli(completionTimeStamp)
@@ -65,11 +82,13 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
 
   // formatters
   private lazy val dateTimeFormat = DateTimeFormatter.ISO_OFFSET_DATE_TIME.withZone(ZoneId.systemDefault)
-  private def durationString(valueSeparator: String)(name: String, duration: Duration): String = s"${keyValueString(valueSeparator)(name, duration.toString)}"
+  private def durationString(valueSeparator: String)(name: String, duration: Duration): String =
+    s"${keyValueString(valueSeparator)(name, duration.toString)}"
   private def keyValueString(valueSeparator: String)(key: String, value: String): String = s"$key$valueSeparator$value"
 
   /**
-   * @return A printable string reporting all metrics.
+   * @return
+   *   A printable string reporting all metrics.
    */
   override def getAsText: String = {
     val valueSeparator: String = "="
@@ -104,7 +123,7 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
        |    ${keyValueStringWithSeparator("shuffle_total_blocks_fetched", shuffleTotalBlocksFetched.toString)}
        |    ${keyValueStringWithSeparator("shuffle_remote_bytes_read", shuffleRemoteBytesRead.toString)} B
        |    ${keyValueStringWithSeparator("shuffle_local_bytes_read", shuffleLocalBytesRead.toString)}  B
-       |    ${keyValueStringWithSeparator("shuffle_total_bytes_read", shuffleTotalBytesRead.toString )} B
+       |    ${keyValueStringWithSeparator("shuffle_total_bytes_read", shuffleTotalBytesRead.toString)} B
        |    ${keyValueStringWithSeparator("shuffle_records_read", shuffleRecordsRead.toString)}
        |    ${durationStringWithSeparator("shuffle_write_time", shuffleWriteTime)}
        |    ${keyValueStringWithSeparator("shuffle_bytes_written", shuffleBytesWritten.toString)} B
@@ -113,14 +132,14 @@ private[smartdatalake] case class SparkStageMetrics(jobInfo: JobInfo, stageId: I
 
   def getId: String = jobInfo.toString
   def getOrder: Long = stageId
-  def getMainInfos: Map[String, Any] = {
+  def getMainInfos: Map[String, Any] =
     Map("records_written" -> recordsWritten, "bytes_written" -> bytesWritten, "num_tasks" -> numTasks.toLong)
-  }
 }
 private[smartdatalake] case class JobInfo(id: Int, group: String, description: String, executionId: Option[SDLExecutionId]) {
-  val dataObjectIdRegex = (s"DataObject~(${SdlConfigObject.idRegexStr})").r.unanchored
-  val dataObjectId = description match {
+  private val dataObjectIdRegex = s"DataObject~(${SdlConfigObject.idRegexStr})".r.unanchored
+  val dataObjectId: Option[DataObjectId] = description match {
     case dataObjectIdRegex(id) => Some(DataObjectId(id))
-    case _ => None // there are some stages which are created by Spark DataFrame operations which dont manipulate Actions target DataObject's, e.g. pivot operator
+    case _                     =>
+      None // there are some stages which are created by Spark DataFrame operations which do not manipulate Actions target DataObject's, e.g. pivot operator
   }
 }

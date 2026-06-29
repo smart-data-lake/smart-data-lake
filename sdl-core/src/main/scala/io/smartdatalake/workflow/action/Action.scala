@@ -61,7 +61,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Recursive Inputs are DataObjects that are used as Output and Input in the same or different action.
    * This is usually prohibited as it creates loops in the DAG.
-   * In special cases this makes sense, i.e. when building a complex comparision/update logic.
+   * In special cases this makes sense, i.e. when building a complex comparison/update logic.
    * Recursive inputs are allowed in the same Action if the DataObject implements TransactionalSparkTableDataObject.
    * For special cases this is too restrictive. To allow special DataObjects for recursive use within two different actions,
    * see also [[GlobalConfig.allowAsRecursiveInput]].

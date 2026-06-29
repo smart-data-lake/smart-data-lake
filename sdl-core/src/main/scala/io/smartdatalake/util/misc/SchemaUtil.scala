@@ -79,7 +79,8 @@ object SchemaUtil {
     }
   }
 
-  def prepareSchemaForDiff(schemaIn: Seq[GenericField], ignoreNullable: Boolean, caseSensitive: Boolean, ignoreMetadata: Boolean = true): Seq[GenericField] = {
+  def prepareSchemaForDiff(schemaIn: Seq[GenericField],
+                           ignoreNullable: Boolean, caseSensitive: Boolean, ignoreMetadata: Boolean = true): Seq[GenericField] = {
     var schema = schemaIn
     if (ignoreNullable) schema = schema.map(_.makeNullable)
     if (!caseSensitive) schema = schema.map(_.toLowerCase)
@@ -96,7 +97,7 @@ object SchemaUtil {
    * @param ignoreNullable whether to ignore differences in nullability.
    * @return The set of fields in `left` that are not contained in `right`.
    *
-   *         TODO #935: probably doesnt work for structs nested in arrays...
+   *         TODO #935: probably does not work for structs nested in arrays...
    */
   private[smartdatalake] def deepPartialMatchDiffFields(left: Seq[GenericField],
                                                         right: Seq[GenericField],
@@ -124,7 +125,7 @@ object SchemaUtil {
    * - For simple types (e.g. String) it checks if the type names are equal.
    * - For array types it checks recursively whether the element types are subsets and optionally the containsNull property.
    * - For map types it checks recursively whether the key types and value types are subsets and optionally the valueContainsNull property.
-   * - For struct types it checks whether all fields is a subset with `deepPartialMatchDiffFields`.
+   * - For struct types it checks whether all fields are a subset with `deepPartialMatchDiffFields`.
    *
    * @param ignoreNullable whether to ignore differences in nullability.
    * @return `true` iff `leftType` is a subset of `rightType`. `false` otherwise.
@@ -180,8 +181,11 @@ object SchemaUtil {
 
 
   /**
-   * Merges the metadata from this schema into another one. This method should only be used if the used schema ("from")
-   * is a subset of the schema it's being merged into ("to"). For this, we should use methods such as the ones defined in the [[io.smartdatalake.workflow.dataobject.SchemaValidation]] trait first.
+   * Merges the metadata from this schema into another one.
+   * This method should only be used if the used schema ("from")
+   * is a subset of the schema it's being merged into ("to").
+   * For this, we should use methods such as the ones defined
+   * in the [[io.smartdatalake.workflow.dataobject.SchemaValidation]] trait first.
    *
    * @param from the schema from which the metadata is read. It should be a subset of "to".
    * @param to   The schema in which the metadata is being merged into. Superset of "from".
@@ -216,7 +220,7 @@ object SchemaUtil {
 
   /**
    * This method compares two Schemas and finds existing columns in schema "to"
-   * that have a different comment than theones in schema "from".
+   * that have a different comment than those in schema "from".
    * It returns these columns with their new comments.
    * Note that only columns that are present in both schemas (and with the same types) are considered.
    *
@@ -306,18 +310,19 @@ object SchemaUtil {
     avro.SchemaConverters.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
   }
 
-  def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)(implicit hadoopConfiguration: Configuration): StructType = {
+  def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)
+                      (implicit hadoopConfiguration: Configuration): StructType = {
     SdlbXsdURIResolver.readXsd(xsdFile, maxRecursion.getOrElse(10)) // default is maxRecursion=10
   }
 
-  def getSchemaFromDdl(ddl: String): StructType = {
-    StructType.fromDDL(ddl)
-  }
+  def getSchemaFromDdl(ddl: String): StructType = StructType.fromDDL(ddl)
 
-  def getSchemaFromOpenApi(specUrl: String, operationId: String, responseContentType: String = "application/json")(implicit hadoopConfiguration: Configuration): StructType = {
+  def getSchemaFromOpenApi(specUrl: String, operationId: String, responseContentType: String = "application/json")
+                          (implicit hadoopConfiguration: Configuration): StructType = {
     OpenApiUtil.queryOperationSchema(specUrl, operationId, responseContentType) match {
-      case (contentType, x: StructType) => x
-      case (contentType, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema for $operationId, but needs StructType ($specUrl)")
+      case (_, x: StructType) => x
+      case (_, dataType) => throw new IllegalStateException(s"Got ${dataType.typeName} as schema" +
+        s" for $operationId, but needs StructType ($specUrl)")
     }
   }
 
@@ -400,10 +405,11 @@ object SchemaUtil {
         val operationId = valueElements(2)
         val responseContentType = if (valueElements.size >= 3) valueElements(3) else defaultResponseContentType
         if (!lazyFileReading) {
-          val (contentType, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
+          val (_, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
           dataType match {
             case schema: StructType => SparkSchema(schema)
-            case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed, but got dataType $dataType for operation $operationId")
+            case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed," +
+              s" but got dataType $dataType for operation $operationId")
           }
         } else LazyGenericSchema(schemaConfig)
     }
@@ -459,7 +465,7 @@ object SchemaUtil {
    *
    * Often if you get an XSD file for JSON data (because the data is published as XML and JSON),
    * the singular name of the array element in the XSD has to be converted to a plural name by adding an 's'.
-   * Thats what this method does.
+   * That is what this method does.
    */
   private def makeXsdJsonCompatible(sparkSchema: SparkSchema): SparkSchema = {
     def renameArrayToPluralForm(field: StructField): StructField = {
@@ -531,18 +537,18 @@ object SchemaProviderType extends Enumeration {
    * Parameters (semicolon separated):
    * - the hadoop path of the XSD file.
    * - row tag to extract a subpart from the schema, see also XML source rowTag option.
-   * Put an emtpy string to use root tag.
+   * Put an empty string to use root tag.
    * To extract a nested row tag, split the elements by slash (/).
    */
   val XsdFile: SchemaProviderType.Value = Value("xsdfile")
 
   /**
-   * Get schema from an Json Schema file, using an adapted verion of zalando-incubator/spark-json-schema library,
+   * Get schema from a JSON Schema file, using an adapted version of zalando-incubator/spark-json-schema library,
    * see also [[JsonSchemaConverter]]
    * Parameters (semicolon separated):
-   * - the hadoop path of the Json schema file.
+   * - the hadoop path of the JSON schema file.
    * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option.
-   * Put an emtpy string to use root tag.
+   * Put an empty string to use root tag.
    * To extract a nested row tag, split the elements by slash (/).
    */
   val JsonSchemaFile: SchemaProviderType.Value = Value("jsonschemafile")
@@ -552,7 +558,7 @@ object SchemaProviderType extends Enumeration {
    * Parameters (semicolon separated):
    * - the hadoop path of the Avro schema file.
    * - row tag to extract a subpart from the schema, this is similar to XML source rowTag option.
-   * Put an emtpy string to use root tag.
+   * Put an empty string to use root tag.
    * To extract a nested row tag, split the elements by slash (/).
    */
   val AvroSchemaFile: SchemaProviderType.Value = Value("avroschemafile")

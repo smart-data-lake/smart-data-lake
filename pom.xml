@@ -119,7 +119,7 @@
                                                 <exclude>LICENSE</exclude>
                                                 <exclude>LICENSE.txt</exclude>
                                                 <exclude>NOTICE.txt</exclude>
-                                                <!-- shading doesnt respect Java Modularisation (>JDK9) -->
+                                                <!-- shading does not respect Java Modularisation (>JDK9) -->
                                                 <exclude>module-info.class</exclude>
                                             </excludes>
                                         </filter>
@@ -197,7 +197,7 @@
                                                 <exclude>LICENSE</exclude>
                                                 <exclude>LICENSE.txt</exclude>
                                                 <exclude>NOTICE.txt</exclude>
-                                                <!-- shading doesnt respect Java Modularisation (>JDK9) -->
+                                                <!-- shading does not respect Java Modularisation (>JDK9) -->
                                                 <exclude>module-info.class</exclude>
                                             </excludes>
                                         </filter>
@@ -898,7 +898,7 @@
         <dependencies>
             <!--
 			  Copy of SPARK-PARENT pom dependency management to cleanup spark dependencies.
-			  Import of spark-parent doesnt work, as it is no longer possible to change version by modifying properties.
+			  Import of spark-parent does not work, as it is no longer possible to change version by modifying properties.
 			-->
             <dependency>
                 <groupId>org.apache.spark</groupId>

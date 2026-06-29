@@ -132,7 +132,7 @@ object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
 }
 
 /**
- * An execution mode which forces processing all data from it's inputs.
+ * An execution mode which forces processing all data from its inputs.
  */
 case class ProcessAllMode() extends ExecutionMode {
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed

@@ -582,7 +582,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     assert(incrementalOutputState.nonEmpty, s"($id) commitIncrementalOutputState called but incrementalOutputState is not defined")
     assert(_kafkaStateIncrementalModeEnabled, s"($id) commitIncrementalOutputState called but enableKafkaStateIncrementalMode is not enabled")
     val offsetsToCommit = incrementalOutputState.get
-      .filter(_._2.nonEmpty) // dont commit empty offset
+      .filter(_._2.nonEmpty) // do not commit empty offset
       .map {
         case (partition, offset) => (new TopicPartition(topicName, partition), new OffsetAndMetadata(offset.get))
       }

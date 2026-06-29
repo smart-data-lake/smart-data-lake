@@ -20,7 +20,7 @@ package io.smartdatalake.util.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.generic.Table
-import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object SparkQueryUtil extends SmartDataLakeLogger {
   /**

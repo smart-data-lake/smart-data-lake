@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.util.dag.DAGHelper.NodeId
-import io.smartdatalake.util.dag.{TaskSkippedDontStopWarning, TaskSkippedWarning}
+import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.workflow.SubFeed
 import org.apache.spark.annotation.DeveloperApi
 

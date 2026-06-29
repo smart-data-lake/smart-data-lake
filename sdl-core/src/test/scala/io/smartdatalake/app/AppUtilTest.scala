@@ -31,7 +31,7 @@ class AppUtilTest extends AnyFunSuite {
     assert(logTxt == "secret.key=...")
   }
 
-  test("dont mask normal values when logging spark conf") {
+  test("do not mask normal values when logging spark conf") {
     val logTxt = AppUtil.createMaskedSecretsKVLog("test", "abc")
     assert(logTxt == "test=abc")
   }

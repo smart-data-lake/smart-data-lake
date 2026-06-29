@@ -21,21 +21,18 @@ package io.smartdatalake.workflow.dataframe.plainScala
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.DataFrameSubFeed.assertCorrectSubFeedType
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.{Type, typeOf}
-import scala.reflect.runtime.universe.TypeTag
-import io.smartdatalake.util.misc.SeqUtil._
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 /**
  * A pure Scala implementation of DataFrames and related classes for testing purposes without Spark dependencies.
- * There are many limitations -> dont use for production!
- * - column names are normally handled case sensitive. It is not configurable.
+ * There are many limitations -> do not use for production!
+ * - column names are normally handled case-sensitive. It is not configurable.
  * - Performance might be limited for large DataFrames, as algorithms are not optimized
  * - only a limited set of DataFrame functions are implemented, for example there is no support for UDFs or window functions
  */
@@ -75,12 +72,12 @@ case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
       case _ =>
         (None, false)
     }
-    var resultSubfeed: ScalaSubFeed = this.copy(dataFrame = dataFrame.asInstanceOf[Option[ScalaDataFrame]]
+    var resultSubfeed: ScalaSubFeed = this.copy(dataFrame = dataFrame
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
     )
-    if (dummy && dataFrame.isDefined) resultSubfeed = this.copy(dataFrame = Some(ScalaDataFrame.returnEmpty(dataFrame.get.asInstanceOf[ScalaDataFrame].schema)), isDummy = true)
+    if (dummy && dataFrame.isDefined) resultSubfeed = this.copy(dataFrame = Some(ScalaDataFrame.returnEmpty(dataFrame.get.schema)), isDummy = true)
     // return
     resultSubfeed
   }
@@ -92,7 +89,7 @@ case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
       .asInstanceOf[ScalaSubFeed]
   }
 
-  def applyExecutionModeResultForOutput(result: ExecutionModeResult)(implicit context: ActionPipelineContext): ScalaSubFeed = {
+  def applyExecutionModeResultForOutput(result: ExecutionModeResult): ScalaSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
   }
 
@@ -198,8 +195,8 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def hash(column: GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
-  override def colsComparisionExpr(cols: Seq[GenericColumn], useHash: Boolean): ScalaAbstractColumn = {
-    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colsComparisionExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+  override def colscomparisonExpr(cols: Seq[GenericColumn], useHash: Boolean): ScalaAbstractColumn = {
+    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colscomparisonExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
     val colNames = cols.map(_.getName.get)
     val scalaCols = cols.map {
       case c: ScalaAbstractColumn => c
@@ -358,5 +355,3 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     ScalaDataFrame.fromData(rows.map(_.productIterator.toSeq), colNames)
   }
 }
-
-

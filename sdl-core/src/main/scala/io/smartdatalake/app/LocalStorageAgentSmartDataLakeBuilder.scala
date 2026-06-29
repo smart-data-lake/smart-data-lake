@@ -46,7 +46,7 @@ object LocalStorageAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .action((arg, config) => config.copy(useOnlyLocalConnectionConfig = arg))
         .text(
           s"""
-             | Dont allow receiving connection configurations from the client, only use local ones.
+             | do not allow receiving connection configurations from the client, only use local ones.
              | This is a security feature to avoid that the client can connect to arbitrary data sources.
              | Default is true.
           """.stripMargin)

@@ -28,7 +28,8 @@ import scala.reflect.runtime.universe.Type
 /**
  * An interface for to be implementated by schema converters.
  * A schema converter can convert schemas from a specific SubFeedType A to a specific SubFeedType B.
- * As SDLB doesnt define an own intermediary schema langauge, a schema conversion must be implemented for every pair of SubFeedType SDLB should be able to convert.
+ * As SDLB does not define an own intermediary schema langauge,
+ * a schema conversion must be implemented for every pair of SubFeedType SDLB should be able to convert.
  */
 private[smartdatalake] trait SchemaConverter {
   def fromSubFeedType: Type

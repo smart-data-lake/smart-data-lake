@@ -262,7 +262,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
   test("throw NoDataToProcessWarning if no new snapshot created (no data)") {
     val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_nodata", query = None)
     val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    // Iceberg doesnt create a new snapshot if no data is written with dynamic partition mode
+    // Iceberg does not create a new snapshot if no data is written with dynamic partition mode
     val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, partitions = Seq("type"))
     targetDO.dropTable
 

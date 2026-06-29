@@ -54,7 +54,8 @@ object SDLSaveMode extends Enumeration {
 
   /**
    * Spark only optimization.
-   * This is like SDLSaveMode.Overwrite but doesnt delete the directory of the DataObject and its partition, but only the files
+   * This is like SDLSaveMode.Overwrite
+   * but does not delete the directory of the DataObject and its partition, but only the files
    * inside. Then it uses Sparks append mode to add the new files.
    * Like that ACLs set on the base directory are preserved.
    *
