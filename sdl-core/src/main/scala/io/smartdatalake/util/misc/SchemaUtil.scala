@@ -20,7 +20,6 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.misc.FileUtil.readFromPath
-import io.smartdatalake.util.spark.SparkProductUtil
 import io.smartdatalake.util.spark.SparkProductUtil.getSchemaFromCaseClass
 import io.smartdatalake.util.webservice.OpenApiUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
@@ -29,16 +28,15 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.Encoders
+import org.apache.spark.sql.avro
 import org.apache.spark.sql.catalyst.JavaTypeInference
-import org.apache.spark.sql.confluent.avro.AvroSchemaConverter
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
 import scaladoc.Tag
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Queue
-import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 // TODO: Merge with package io.smartdatalake.util.spark.dataset
 object SchemaUtil {
@@ -51,7 +49,8 @@ object SchemaUtil {
    * @param ignoreNullable if `true`, columns that only differ in their `nullable` property are considered equal.
    * @return the set of columns contained in `schemaRight` but not in `schemaLeft`.
    */
-  def schemaDiff(schemaLeft: GenericSchema, schemaRight: GenericSchema, ignoreNullable: Boolean = false, caseSensitive: Boolean = false, deep: Boolean = false): Set[GenericField] = {
+  def schemaDiff(schemaLeft: GenericSchema, schemaRight: GenericSchema,
+                 ignoreNullable: Boolean = false, caseSensitive: Boolean = false, deep: Boolean = false): Set[GenericField] = {
     if (deep) {
       deepPartialMatchDiffFields(schemaLeft.fields, schemaRight.fields, ignoreNullable, caseSensitive)
     } else {
@@ -304,7 +303,7 @@ object SchemaUtil {
   }
 
   def getSchemaFromAvroSchema(avroSchemaContent: String): StructType = {
-    AvroSchemaConverter.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
+    avro.SchemaConverters.toSqlType(new Schema.Parser().parse(avroSchemaContent)).dataType.asInstanceOf[StructType]
   }
 
   def getSchemaFromXsd(xsdFile: Path, maxRecursion: Option[Int] = None)(implicit hadoopConfiguration: Configuration): StructType = {
