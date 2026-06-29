@@ -733,13 +733,13 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   }
 
   def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
-    val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
+    val query = f"ALTER TABLE ${table.fullName} SET TBLPROPERTIES ('comment' = '$comment');"
     SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
   }
 
   def updateExistingColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
     comments.foreach( comment => {
-      val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
+      val query = f"ALTER TABLE ${table.fullName} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
       SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
     }
     )
