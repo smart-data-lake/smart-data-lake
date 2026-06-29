@@ -103,7 +103,7 @@ jobs:
           mvn versions:set -B -DnewVersion=${MVN_NEW_VERSION} -f pom.xml
 
       - name: Maven deploy to sonatype for Scala 2.13
-        run: mvn -P release-sonatype -B -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
