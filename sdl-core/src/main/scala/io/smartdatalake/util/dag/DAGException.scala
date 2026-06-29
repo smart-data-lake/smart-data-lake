@@ -61,12 +61,12 @@ private[smartdatalake] case class TaskCancelledException(id: NodeId) extends DAG
 }
 
 // this is no case class as it should be extended by child classes
-private[smartdatalake] class TaskSkippedWarning(id: NodeId, msg: String) extends DAGException(msg) {
+private[smartdatalake] class TaskSkippedWarning(msg: String) extends DAGException(msg) {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.SKIPPED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 
-private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: NodeId, msg: String, results: Option[Seq[R]]) extends TaskSkippedWarning(id, msg) {
+private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: NodeId, msg: String, results: Option[Seq[R]]) extends TaskSkippedWarning(msg) {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.SKIPPED_DONT_STOP
   def getResults: Option[Seq[R]] = results
 }

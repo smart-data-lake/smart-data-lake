@@ -324,7 +324,7 @@ object Historization {
       s"DataFrame must not contain column with name $historizeHashColName if addHashCol is called")
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     val colsToCompare = getCompareColumns(df.columns.diff(colsToIgnore), historizeWhitelist, historizeBlacklist)
-    df.withColumn(historizeHashColName, functions.colsComparisionExpr(colsToCompare.map(functions.col), useHash))
+    df.withColumn(historizeHashColName, functions.colscomparisonExpr(colsToCompare.map(functions.col), useHash))
   }
 
   private def getPreviousTimeAxisEntry(ts: Timestamp, unit: Duration) = Timestamp.from(ts.toInstant.minus(unit))

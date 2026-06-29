@@ -587,7 +587,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       val (oldestSnapshot,_) = dfHistory.head()
       val (createdAt, lastModifiedAt, numDataFilesCurrent, sizeInBytesCurrent, _) = getDetails
         .select("createdAt","lastModified","numFiles","sizeInBytes","properties").as[(Long,Long,Long,Long,Map[String,String])].head()
-      val numRows = deltaTable.toDF.count() // This is actionally calculated by Metadata only :-)
+      val numRows = deltaTable.toDF.count() // This is actually calculated by Metadata only :-)
       val deltaStats = Map(TableStatsType.CreatedAt.toString -> createdAt, TableStatsType.LastModifiedAt.toString -> lastModifiedAt, TableStatsType.LastCommitMsg.toString -> lastCommitMsg, TableStatsType.NumDataFilesCurrent.toString -> numDataFilesCurrent, TableStatsType.SizeInBytesCurrent.toString -> sizeInBytesCurrent, TableStatsType.OldestSnapshotTs.toString -> oldestSnapshot, TableStatsType.NumRows.toString -> numRows)
       val columnStats = getColumnStats(update, Some(lastModifiedAt))
       HdfsUtil.getPathStats(hadoopPath)(filesystem) ++ deltaStats ++ getPartitionStats + (TableStatsType.Columns.toString -> columnStats)

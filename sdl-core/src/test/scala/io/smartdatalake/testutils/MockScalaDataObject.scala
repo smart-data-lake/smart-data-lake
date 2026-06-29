@@ -118,7 +118,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
   override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[ScalaSubFeed])
 
   def writeScalaDataFrame(df: ScalaDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
-    assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys dont match partition columns") // assert partition keys match
+    assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys do not match partition columns") // assert partition keys match
     assert(partitions.diff(df.columns).isEmpty, s"($id) partition columns are missing in DataFrame")
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
     import functions._

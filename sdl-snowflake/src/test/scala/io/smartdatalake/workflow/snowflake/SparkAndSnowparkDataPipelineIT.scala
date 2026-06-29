@@ -39,7 +39,7 @@ import java.nio.file.Files
  * This is an integration test with data pipeline combining Spark and Snowpark
  * The first Action will write with Spark to Snowflake, creating a new table in Snowflake.
  * The second Action will read the new Snowflake table with Snowpark and create another Snowflake table.
- * The SubFeed between Action1 and Action2 will apply schema conversion which is needed in init phase, as the tables in Snowflake dont exist yet.
+ * The SubFeed between Action1 and Action2 will apply schema conversion which is needed in init phase, as the tables in Snowflake do not exist yet.
  * Action2 will also apply two generic transformation, e.g. filter and add runId column.
  * It needs to be run manually because you need to provide a Snowflake environment.
  * Please configure this in SnowflakeConnectionConfig.

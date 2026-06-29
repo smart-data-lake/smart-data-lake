@@ -198,11 +198,11 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     // prepare
     val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id)
 
-    // fail if partition values dont exist
+    // fail if partition values do not exist
     val srcSubFeed = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date" -> "00010101", "town" -> "NYC", "year" -> "2020"))))
     intercept[AssertionError](action1.exec(Seq(srcSubFeed)))
 
-    // fail if partition values dont exist, also if only the first partition value is defined
+    // fail if partition values do not exist, also if only the first partition value is defined
     val srcSubFeedValidInit = FileSubFeed(None, "src1", partitionValues = Seq(PartitionValues(Map("date" -> "00010101"))))
     intercept[AssertionError](action1.exec(Seq(srcSubFeedValidInit)))
   }

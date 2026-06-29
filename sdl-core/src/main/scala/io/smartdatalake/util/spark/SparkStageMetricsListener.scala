@@ -47,9 +47,9 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
   val stageIdToJobInfo: mutable.Map[Int, JobInfo] = mutable.Map.empty
 
   // parses job group
-  private val jobGroupRegex = (s"${Regex.quote(context.appConfig.appName)} $actionId runId=([0-9]+) attemptId=([0-9]+)").r.unanchored
+  private val jobGroupRegex = s"${Regex.quote(context.appConfig.appName)} $actionId runId=([0-9]+) attemptId=([0-9]+)".r.unanchored
   // for spark streaming jobs we cant set the jobGroup, but only the description. They also have no executionId.
-  private val jobDescriptionRegex = (s"${Regex.quote(context.appConfig.appName)} $actionId").r.unanchored
+  private val jobDescriptionRegex = s"${Regex.quote(context.appConfig.appName)} $actionId".r.unanchored
   // store collected metrics
   private val metrics: mutable.Buffer[SparkStageMetrics] = mutable.Buffer.empty
 
@@ -66,7 +66,7 @@ private[smartdatalake] class SparkStageMetricsListener(actionId: ActionId, dataO
       case (_, jobDescriptionRegex()) => Some(JobInfo(jobStart.jobId, jobGroup, jobDescription, None)) // spark streaming job info is read from description, has no executionId information.
       case _ => None
     }
-    jobInfo.foreach { i =>
+    jobInfo.foreach { i: JobInfo =>
       if (dataObjectId.isEmpty || i.dataObjectId.contains(dataObjectId.get)) {
         runningJobs(i.id) = i
         jobStart.stageIds.foreach(stageId => stageIdToJobInfo(stageId) = i)

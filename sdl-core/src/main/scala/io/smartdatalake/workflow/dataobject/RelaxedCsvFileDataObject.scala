@@ -50,7 +50,7 @@ import scala.reflect.runtime.universe.typeOf
 
 /**
  * A [[DataObject]] which allows for more flexible CSV parsing.
- * The standard CsvFileDataObject doesnt support reading multiple CSV-Files with different column order, missing columns
+ * The standard CsvFileDataObject does not support reading multiple CSV-Files with different column order, missing columns
  * or additional columns.
  * RelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file
  * with that schema independently of the column order, adding missing columns and removing superfluous ones.

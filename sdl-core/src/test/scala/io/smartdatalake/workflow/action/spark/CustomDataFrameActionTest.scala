@@ -153,7 +153,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     // prepare & start first load
     val l1 = Seq(("A", "doe", "john", 5)).toDF("type", "lastname", "firstname", "rating")
     val l1PartitionValues = Seq(PartitionValues(Map("type" -> "A")))
-    srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare testdata
+    srcDO.writeSparkDataFrame(l1, l1PartitionValues) // prepare test data
     action.init(Seq(srcSubFeed))
     val tgtSubFeed1 = action.exec(Seq(srcSubFeed))(contextExec).head
 
@@ -167,7 +167,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     action.reset
     val l2 = Seq(("B", "pan", "peter", 11)).toDF("type", "lastname", "firstname", "rating")
     val l2PartitionValues = Seq(PartitionValues(Map("type" -> "B")))
-    srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare testdata
+    srcDO.writeSparkDataFrame(l2, l2PartitionValues) // prepare test data
     assert(srcDO.getSparkDataFrame().count() == 2) // note: this needs spark.sql.sources.partitionOverwriteMode=dynamic, otherwise the whole table is overwritten
     action.init(Seq(srcSubFeed))
     val tgtSubFeed2 = action.exec(Seq(srcSubFeed))(contextExec).head
@@ -238,7 +238,6 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     srcDO1.writeSparkDataFrame(l, Seq())
     srcDO2.writeSparkDataFrame(l, Seq())
     val srcSubFeeds = Seq(SparkSubFeed(None, "src1", Seq()), SparkSubFeed(None, "src2", Seq()))
-    val tgtSubFeed = action1.exec(srcSubFeeds)(contextExec).head
 
     val r1 = intDO1.getSparkDataFrame()
       .select($"lastname")
@@ -343,12 +342,12 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
     intercept[TaskSkippedDontStopWarning[_]](action1.preExec(Seq(srcSubFeed1, srcSubFeed2))(contextExec))
     action1.postExec(Seq(srcSubFeed1, srcSubFeed2), Seq(tgtSubFeed1))(contextExec)
 
-    // dont skip if one subfeed skipped
+    // do not skip if one subfeed skipped
     val action2 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id),
       transformers = Seq(customTransformerConfig), executionCondition = executionCondition)
     instanceRegistry.register(action2)
     val srcSubFeed3 = SparkSubFeed(None, "src1", Seq(), isSkipped = true)
-    val srcSubFeed4 = SparkSubFeed(None, "src2", Seq(), isSkipped = false)
+    val srcSubFeed4 = SparkSubFeed(None, "src2", Seq())
     action2.preInit(Seq(srcSubFeed3, srcSubFeed4), Seq()) // no exception
     action2.preExec(Seq(srcSubFeed3, srcSubFeed4)) // no exception
   }
@@ -373,7 +372,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
     val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id), transformers = Seq(customTransformerConfig), executionCondition = executionCondition)
     instanceRegistry.register(action1)
-    val srcSubFeed1 = SparkSubFeed(None, "src1", Seq(), isSkipped = false)
+    val srcSubFeed1 = SparkSubFeed(None, "src1", Seq())
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq(), isSkipped = true)
     action1.preInit(Seq(srcSubFeed1, srcSubFeed2), Seq())
     action1.preExec(Seq(srcSubFeed1, srcSubFeed2))(contextExec)
@@ -488,10 +487,10 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val srcDO1 = MockSparkDataObject("src1", expectations = Seq(
-      CountExpectation(name = "count", expectation = Some(">= 1"))
+      CountExpectation(expectation = Some(">= 1"))
     )).register
     val srcDO2 = MockSparkDataObject("src2", expectations = Seq(
-      CountExpectation(name = "count", expectation = Some("= 0")),
+      CountExpectation(expectation = Some("= 0")),
       CountExpectation(name = "countAll", expectation = Some("= 0"), scope = ExpectationScope.All)
     )).register
     val tgtDO1 = MockSparkDataObject("tgt1", expectations = Seq(
@@ -532,10 +531,10 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // setup DataObjects
     val srcDO1 = MockSparkDataObject("src1", expectations = Seq(
-      CountExpectation(name = "count", expectation = Some("= 0"))
+      CountExpectation(expectation = Some("= 0"))
     )).register
     val srcDO2 = MockSparkDataObject("src2", expectations = Seq(
-      CountExpectation(name = "count", expectation = Some("= 2")),
+      CountExpectation(expectation = Some("= 2")),
       CountExpectation(name = "countAll", expectation = Some("= 2"), scope = ExpectationScope.All)
     )).register
     val tgtDO1 = MockSparkDataObject("tgt1", expectations = Seq(

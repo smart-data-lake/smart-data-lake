@@ -63,7 +63,7 @@ class ODataResponseMemoryBufferTest extends DataObjectTestSuite with BeforeAndAf
     assert(sut.getStoredCharacterCount == 10)
   }
 
-  // TODO: dont know how to fix
+  // TODO: do not know how to fix
   ignore("ODataResponseMemoryBuffer - getDataFrame") {
     val sut = init_sut()
 

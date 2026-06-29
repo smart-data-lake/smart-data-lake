@@ -208,7 +208,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
           code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)",
           scope = ExpectationScope.All
         ),
-        SQLExpectation("resultNull", Some("dont fail if result is null"), "null", Some("> 1")),
+        SQLExpectation("resultNull", Some("do not fail if result is null"), "null", Some("> 1")),
         UniqueKeyExpectation("primaryKey", approximate = approximateUniqueConstraint)
       )
     ).register
@@ -218,7 +218,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val customTransformerConfig2 = SQLDfTransformer(
       name = "sql2",
       code = Some("select * from %{inputViewName} where rating = 5")
-    ) // test multiple transformers - it doesnt matter if they do the same.
+    ) // test multiple transformers - it does not matter if they do the same.
     val action1 = CopyAction(
       "ca",
       srcDO.id,
@@ -549,15 +549,15 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
 
-    // dont fail if partition exists
+    // do not fail if partition exists
     val srcSubFeedOk = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe", "firstname" -> "bob"))))
     action1.exec(Seq(srcSubFeedOk))(contextExec)
 
-    // fail if partition doesnt exist
+    // fail if partition does not exist
     val srcSubFeedNok = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "joe", "firstname" -> "bob"))))
     intercept[AssertionError](action1.exec(Seq(srcSubFeedNok))(contextExec))
 
-    // dont fail if partition information is an init of partition columns, and partition does exist
+    // do not fail if partition information is an init of partition columns, and partition does exist
     val srcSubFeedInitOk = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "doe"))))
     action1.exec(Seq(srcSubFeedInitOk))(contextExec)
 
@@ -565,7 +565,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val srcSubFeedInitNok = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("lastname" -> "joe"))))
     intercept[AssertionError](action1.exec(Seq(srcSubFeedInitNok))(contextExec))
 
-    // dont fail if partition values is not an init of partition columns (lastname is not defined)
+    // do not fail if partition values is not an init of partition columns (lastname is not defined)
     val srcSubFeedNoInit = SparkSubFeed(None, "src1", Seq(PartitionValues(Map("firstname" -> "bob"))))
     action1.exec(Seq(srcSubFeedNoInit))(contextExec)
 

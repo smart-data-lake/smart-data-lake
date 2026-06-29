@@ -305,9 +305,6 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
     dag.sortedNodes.collect { case n: Action => n }.foreach(_.reset)
   }
 
-  // Helper methods rename thread so that it includes phase and action id for logging
-  private var previousThreadName: Option[String] = None
-
   private def getActionThreadName(id: ActionId)(implicit context: ActionPipelineContext) = {
     s"${context.phase.toString.toLowerCase()}-${id.id}"
   }

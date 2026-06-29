@@ -55,7 +55,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
     val secondsPolled = (System.currentTimeMillis() / 1000 - startTime).toInt
     if (agentConfig.stopAfterSec.exists(secondsPolled > _)) {
       logger.info(s"Agent is going to stop now, as it has been running for $secondsPolled seconds")
-      return false // dont poll again
+      return false // do not poll again
     }
     WaitUtil.sleepUntil(timeoutSec = agentConfig.stopAfterSec.map(_ - secondsPolled), pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
       () => getInstructionFileIterator(hadoopPath).nonEmpty

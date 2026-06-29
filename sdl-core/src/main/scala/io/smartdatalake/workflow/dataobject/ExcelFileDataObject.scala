@@ -77,7 +77,7 @@ case class ExcelFileDataObject(override val id: DataObjectId,
 
   override val fileName: String = "*.xls*"
 
-  // spark excel data source doesnt support reading all files in a directory. Each file must be read one by one.
+  // spark excel data source does not support reading all files in a directory. Each file must be read one by one.
   override val handleFilesOneByOne: Boolean = true
 
   override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ excelOptions.toMap(schema).filter {

@@ -167,7 +167,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
-    // Some Spark data sources dont execute observations, e.g. jdbc. The generic observation can be forced for these cases.
+    // Some Spark data sources do not execute observations, e.g. jdbc. The generic observation can be forced for these cases.
     if (forceGenericObservation) {
       val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
       // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.

@@ -32,7 +32,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Wrapper to use Json4s with JsonPath library.
  *
- * Note Json4s uses immutable objects, but some part of the JsonPath API needs modifying json object.
+ * Note Json4s uses immutable objects, but some part of the JsonPath API needs modifying JSON object.
  * A workaround is using reflection to set `val`s.
  */
 class Json4sJsonPathProvider extends JsonProvider {
@@ -123,7 +123,7 @@ class Json4sJsonPathProvider extends JsonProvider {
 }
 
 /**
- * Dummy mapping provider for JsonPath, as we dont need it.
+ * Dummy mapping provider for JsonPath, as we do not need it.
  */
 class DummyMappingProvider extends MappingProvider {
   override def map[T](source: Any, targetType: Class[T], configuration: Configuration): T = throw new NotImplementedError()

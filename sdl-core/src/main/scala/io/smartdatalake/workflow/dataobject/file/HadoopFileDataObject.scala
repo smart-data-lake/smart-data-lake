@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject.file
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.definitions.{Environment, SDLSaveMode, TableStatsType}
+import io.smartdatalake.definitions.{SDLSaveMode, TableStatsType}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -156,7 +156,8 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   def getConcreteInitPaths(pv: PartitionValues)(implicit context: ActionPipelineContext): Seq[Path] = {
     assert(partitions.nonEmpty)
-    // check if valid init of partitions -> then we can read all at once, otherwise we need to search with globs as DataFrameReader.load doesnt support wildcards
+    // check if valid init of partitions -> then we can read all at once,
+    // otherwise we need to search with globs as DataFrameReader.load does not support wildcards
     if (pv.isInitOf(partitions)) {
       val partitionLayout = HdfsUtil.getHadoopPartitionLayout(partitions.filter(pv.isDefinedAt))
       Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout)))
@@ -176,12 +177,14 @@ private[smartdatalake] trait HadoopFileDataObject extends FileRefDataObject with
    */
   def getConcreteFullPaths(pv: PartitionValues, returnFiles: Boolean = false)(implicit context: ActionPipelineContext): Seq[Path] = {
     assert(partitions.nonEmpty)
-    // check partitions completely defined -> then we can read all at once, otherwise we need to search with globs as DataFrameReader.load doesnt support wildcards
+    // check partitions completely defined -> then we can read all at once,
+    // otherwise we need to search with globs as DataFrameReader.load does not support wildcards
     if (pv.isComplete(partitions)) {
       if (returnFiles) listDataFiles(pv).toSeq
       else Seq(new Path(hadoopPath, pv.getPartitionString(partitionLayout().get)))
     } else {
-      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")} does not define all partition columns ${partitions.mkString(",")}")
+      logger.info(s"($id) getConcretePaths with globs needed because ${pv.keys.mkString(",")}" +
+        s" does not define all partition columns ${partitions.mkString(",")}")
       if (returnFiles) listDataFiles(pv).toSeq
       else listPartitionPaths(pv)
     }

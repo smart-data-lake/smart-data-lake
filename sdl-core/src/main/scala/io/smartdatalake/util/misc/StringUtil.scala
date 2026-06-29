@@ -39,7 +39,7 @@ object StringUtil {
   }
 
   /**
-   * Transforms name with dashs and underscores to CamelCase.
+   * Transforms name with dashes and underscores to CamelCase.
    */
   def strToCamelCase(x: String): String = {
     val parts = x.split("[_\\- ]")
@@ -47,7 +47,7 @@ object StringUtil {
   }
 
   /**
-   * Transforms name with dashs and underscores to LowerCamelCase.
+   * Transforms name with dashes and underscores to LowerCamelCase.
    */
   def strToLowerCamelCase(x: String): String = {
     val camelCase = strToCamelCase(x)
@@ -81,7 +81,7 @@ object StringUtil {
   }
 
   /**
-   * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
+   * Remove all chars from a string which do not belong to lowercase SQL standard naming characters
    */
   def removeNonStandardSQLNameChars(x: String): String = {
     x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")

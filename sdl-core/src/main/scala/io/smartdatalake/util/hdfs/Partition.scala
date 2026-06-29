@@ -79,7 +79,7 @@ object PartitionValues {
   /**
    * Defines an Ordering for sorting PartitionValues.
    * Sorting a list of partition values is only possible, if the partition columns to be considered are defined.
-   * As PartitionValues is a generic structure, the type of a value needs to be inferred for comparision.
+   * As PartitionValues is a generic structure, the type of a value needs to be inferred for comparison.
    * @param partitions partition columns to use for sorting
    * @return Ordering to be used e.g. with Seq.sort|sortBy
    */

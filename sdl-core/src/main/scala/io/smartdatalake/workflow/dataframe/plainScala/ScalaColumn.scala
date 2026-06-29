@@ -53,9 +53,11 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var da
   private var needsDataReset: Boolean = false
 
   override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
-    // reset input data if we get new data for this column - this might be needed in joins where we have to update the input data for the resolved columns after left/right data have been combined.
+    // reset input data if we get new data for this column -
+    // this might be needed in joins where we have to update
+    // the input data for the resolved columns after left/right data have been combined.
     // note that data delivery is triggered through markForDataReset() and inputColumns method.
-    // if we get no data, we dont need to update.
+    // if we get no data, we do not need to update.
     inputData.get(definition.getFullName())
       .foreach(col => data = col.data.asInstanceOf[IndexedSeq[Option[A]]])
   }
@@ -88,7 +90,7 @@ object ScalaColumn {
 
   def nextColName = s"col${colCounter.incrementAndGet()}"
 
-  def optionalizeUnaryFunc[T](func: (Any) => T): (Option[Any] => Option[T]) = {
+  def optionalizeUnaryFunc[T](func: Any => T): Option[Any] => Option[T] = {
     a => if (a.isEmpty) None else Some(func(a.get))
   }
 

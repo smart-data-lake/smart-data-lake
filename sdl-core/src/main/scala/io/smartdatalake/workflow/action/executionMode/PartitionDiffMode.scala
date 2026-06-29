@@ -34,7 +34,7 @@ import java.sql.Timestamp
 
 /**
  * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
- * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+ * Partition columns to be used for comparison need to be a common 'init' of input and output partition columns.
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
  * Partition values are passed to following actions for partition columns which they have in common.
  *

@@ -96,10 +96,10 @@ case class ActionsExporterDataObject(id: DataObjectId,
           // metadata tags
           metadata.map(_.tags).map(_.mkString(listElementsSeparator)),
           // inputId
-          getFieldData[Any](action, "inputId").map(getIdFromConfigObjectIdOrString) // dont know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
+          getFieldData[Any](action, "inputId").map(getIdFromConfigObjectIdOrString) // do not know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
             .orElse( getFieldData[Seq[Any]](action, "inputIds").map(_.map(getIdFromConfigObjectIdOrString).mkString(listElementsSeparator))),
           // outputId
-          getFieldData[Any](action, "outputId").map(getIdFromConfigObjectIdOrString) // dont know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
+          getFieldData[Any](action, "outputId").map(getIdFromConfigObjectIdOrString) // do not know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
             .orElse( getFieldData[Seq[Any]](action, "outputIds").map(_.map(getIdFromConfigObjectIdOrString).mkString(listElementsSeparator))),
           // transformer
           getEventuallyOptionalFieldData[Any](action, "transformer").map(_.toString),
