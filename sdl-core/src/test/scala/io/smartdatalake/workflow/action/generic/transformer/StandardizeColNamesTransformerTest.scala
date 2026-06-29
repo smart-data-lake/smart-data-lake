@@ -56,12 +56,12 @@ class StandardizeColNamesTransformerTest extends AnyFunSuite {
 
   test("mixed-case words separated by spaces or special chars produce single underscores without leading or trailing underscores") {
     val colNamesTransformer = StandardizeColNamesTransformer(removeNonStandardSQLNameChars=false, replaceNonStandardSQLNameCharsWithUnderscores = true)
-    val df = SparkDataFrame(Seq((1, 1, 1, 1, 1, 1, 1, 1), (2, 2, 2, 2, 2, 2, 2, 2))
-      .toDF("Invoice No", "Sales Order SO", "Description Item", "Unit Price", "Invoice-No", "InvoiceName.ID", "SO item", "Sales Order SO item"))
+    val df = SparkDataFrame(Seq((1, 1, 1, 1, 1, 1, 1, 1, 1), (2, 2, 2, 2, 2, 2, 2, 2, 2))
+      .toDF("Invoice No", "Sales Order SO", "Description Item", "Unit Price", "Invoice-No", "InvoiceName.ID", "SO item", "Sales Order SO item", "Sales Order (SO items)"))
 
     val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
 
-    assert(transformed.schema.columns == Seq("invoice_no", "sales_order_so", "description_item", "unit_price", "invoice_no", "invoice_name_id", "so_item", "sales_order_so_item"))
+    assert(transformed.schema.columns == Seq("invoice_no", "sales_order_so", "description_item", "unit_price", "invoice_no", "invoice_name_id", "so_item", "sales_order_so_item", "sales_order_so_items"))
   }
 
 }
