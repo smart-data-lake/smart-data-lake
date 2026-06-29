@@ -39,9 +39,10 @@ import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetA
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
+import org.apache.spark.sql.avro.SchemaConverters
 import org.apache.spark.sql.classic.ColumnConversions._
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
-import org.apache.spark.sql.confluent.avro.ConfluentAvroConnector
+import org.apache.spark.sql.confluent.avro.{AvroHelper, ConfluentAvroConnector}
 import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
 import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
 import org.apache.spark.sql.functions._
@@ -445,7 +446,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         // reading is done with the specified schema. It needs to be converted to an avro schema for from_avro.
         val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka"))
           .convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
-        val avroSchema = avro.SchemaConverters.toAvroType(sparkSchema)
+        val avroSchema = AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(sparkSchema))
         from_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {
@@ -464,7 +465,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         import org.apache.spark.sql.avro.functions.to_avro
         // writing is done with the specified schema. It needs to be converted to an avro schema for to_avro.
         val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
-        val avroSchema = avro.SchemaConverters.toAvroType(sparkSchema)
+        val avroSchema = AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(sparkSchema))
         to_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {

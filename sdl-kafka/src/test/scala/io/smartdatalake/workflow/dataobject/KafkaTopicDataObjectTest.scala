@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.avro.{IncompatibleSchemaException => AvroIncompatibleSchemaException}
-  import org.apache.spark.sql.functions.{lit, struct}
+import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
@@ -58,16 +58,17 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("Can read and write from Kafka") {
-    createCustomTopic("topic", Map(), 1, 1)
-    publishStringMessageToKafka("topic", "message")
-    assert(consumeFirstStringMessageFrom("topic") == "message", "Whoops - couldn't read message")
+    val topic = "readWriteTopic1"
+    createCustomTopic(topic, Map(), 1, 1)
+    publishStringMessageToKafka(topic, "message")
+    assert(consumeFirstStringMessageFrom(topic) == "message", "Whoops - couldn't read message")
   }
 
   test("DataObject can write and read kafka topic") {
-    val topic = "testTopic"
+    val topic = "readWriteTopic2"
     createCustomTopic(topic, Map(), 1, 1)
     instanceRegistry.register(kafkaConnection)
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = topic, connectionId = "kafkaCon1")
+    val dataObject = KafkaTopicDataObject("kafkaReadWrite1", topicName = topic, connectionId = "kafkaCon1")
     val df = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
     dataObject.writeSparkDataFrame(df)
     val dfRead = dataObject.getSparkDataFrame(Seq())
@@ -75,14 +76,14 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("DataObject can write and stream once kafka topic") {
-    val topic1 = "testTopic1"
-    val topic2 = "testTopic2"
+    val topic1 = "readWriteTopicOnce1"
+    val topic2 = "readWriteTopicOnce2"
     val tempDir = Files.createTempDirectory("streamTest")
     createCustomTopic(topic1, Map(), 1, 1)
     createCustomTopic(topic2, Map(), 1, 1)
     instanceRegistry.register(kafkaConnection)
-    val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1")
-    val dataObject2 = KafkaTopicDataObject("kafka1", topicName = topic2, connectionId = "kafkaCon1")
+    val dataObject1 = KafkaTopicDataObject("kafkaReadWriteOnce1", topicName = topic1, connectionId = "kafkaCon1")
+    val dataObject2 = KafkaTopicDataObject("kafkaReadWriteOnce2", topicName = topic2, connectionId = "kafkaCon1")
 
     // prepare data
     val df1 = Seq(("john doe", "5"), ("peter smith", "3"), ("emma brown", "7")).toDF("key", "value")
@@ -115,7 +116,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     // configure DataObject with partition column defined as seconds
     instanceRegistry.register(kafkaConnection)
-    val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1"
+    val dataObject1 = KafkaTopicDataObject("kafkaTestPartition1", topicName = topic1, connectionId = "kafkaCon1"
       , datePartitionCol = Some(DatePartitionColumnDef(colName = "sec", timeUnit = ChronoUnit.SECONDS.toString, timeFormat = "yyyyMMddHHmmss")))
 
     // list and check partitions
@@ -140,7 +141,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     // configure DataObject with partition column defined as day and excluding current partition
     instanceRegistry.register(kafkaConnection)
-    val dataObject1 = KafkaTopicDataObject("kafka1", topicName = topic1, connectionId = "kafkaCon1"
+    val dataObject1 = KafkaTopicDataObject("kafkaTestPartition2", topicName = topic1, connectionId = "kafkaCon1"
       , datePartitionCol = Some(DatePartitionColumnDef(colName = "dt", timeUnit = ChronoUnit.DAYS.toString)))
 
     // list and check partitions
@@ -148,7 +149,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     assert(partitions1.isEmpty) // only current partition holds data, but it is excluded
 
     // configure DataObject with partition column defined as day and including current partition
-    val dataObject2 = KafkaTopicDataObject("kafka2", topicName = topic1, connectionId = "kafkaCon1"
+    val dataObject2 = KafkaTopicDataObject("kafkaTestPartition22", topicName = topic1, connectionId = "kafkaCon1"
       , datePartitionCol = Some(DatePartitionColumnDef(colName = "dt", timeUnit = ChronoUnit.DAYS.toString, includeCurrentPartition = true)))
 
     // list and check partitions
@@ -157,7 +158,8 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("Can read and write Json from Kafka") {
-    createCustomTopic("topic", Map(), 1, 1)
+    val topic = "readWriteJson1"
+    createCustomTopic(topic, Map(), 1, 1)
 
     // write json record using KafkaJsonSerializer
     implicit val jsonSerializer: KafkaJsonSerializer[User] = new KafkaJsonSerializer[User]
@@ -165,19 +167,20 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     val test = new User
     test.setUserId(1)
     test.setLastName("hello")
-    publishToKafka("topic", test)
+    publishToKafka(topic, test)
 
     // read json record using KafkaJsonDeserializer
     implicit val jsonDeserializer: KafkaJsonDeserializer[User] = new KafkaJsonDeserializer[User]
     val deserializerConfig = new java.util.HashMap[String, Any]
     deserializerConfig.put(KafkaJsonDeserializerConfig.JSON_VALUE_TYPE, classOf[User])
     jsonDeserializer.configure(deserializerConfig, false)
-    val t = consumeFirstMessageFrom("topic")
+    val t = consumeFirstMessageFrom(topic)
     logger.info("Message read: " + t)
   }
 
-  test("SDL can parse messages written with KafkaJsonSerializer") {
-    createCustomTopic("topicJsonRead", Map(), 1, 1)
+  test("SDLB can parse messages written with KafkaJsonSerializer") {
+    val topic = "sdlbReadWriteJson1"
+    createCustomTopic(topic, Map(), 1, 1)
 
     // write json record using KafkaJsonSerializer
     implicit val jsonSerializer: KafkaJsonSerializer[User] = new KafkaJsonSerializer[User]
@@ -185,12 +188,12 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
     val expected = new User
     expected.setUserId(1)
     expected.setLastName("hello")
-    publishToKafka("topicJsonRead", expected)
+    publishToKafka(topic, expected)
 
     // parse json record with spark
     instanceRegistry.register(kafkaConnection)
     val userSchema = SchemaUtil.getSchemaFromJavaBean(classOf[User])
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJsonRead", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(userSchema)))
+    val dataObject = KafkaTopicDataObject("kafkaReadWriteJson1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(userSchema)))
     val df = dataObject.getSparkDataFrame()
       .select($"value.*")
     val (actFirstName, actLastName, actUserId) = df.as[(String, String, Long)].head()
@@ -198,10 +201,12 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("read and write json with schema registry") {
-    createCustomTopic("topicJson", Map(), 1, 1)
+    val topic = "sdlbReadWriteJsonRegistry1"
+    logger.info("START "+topic)
+    createCustomTopic(topic, Map(), 1, 1)
 
     instanceRegistry.register(kafkaConnection)
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
+    val dataObject = KafkaTopicDataObject("kafkaReadWriteJsonRegistry1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
     val expected = Seq(("hello", 1L))
 
     // write json message incl. schema
@@ -215,13 +220,16 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     val actual = dfAct.as[(String, Long)].collect()
     assert(actual.toSeq == expected)
+    logger.info("END "+topic)
   }
 
   test("read and write avro with schema registry") {
+    val topic = "sdlbReadWriteAvroRegistry1"
+    logger.info("START "+topic)
     createCustomTopic("topicAvro", Map(), 1, 1)
 
     instanceRegistry.register(kafkaConnection)
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicAvro", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val dataObject = KafkaTopicDataObject("kafkaReadWriteAvroRegistry1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
     val expected = Seq(("hello", 1L))
 
     // write json message incl. schema
@@ -235,14 +243,15 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     val actual = dfAct.as[(String, Long)].collect()
     assert(actual.toSeq == expected)
+    logger.info("END "+topic)
   }
 
 
   test("incremental output mode with schema registry") {
-
+    val topic = "sdlbIncrementalReadWriteAvroRegistry1"
     // create data object
     instanceRegistry.register(kafkaConnection)
-    val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicIncremental", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val targetDO = KafkaTopicDataObject("kafkaIncrementalReadWriteAvroRegistry1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
 
     // write test data 1
     val df1 = Seq((1, ("A", 1)), (2, ("A", 2)), (3, ("B", 3)), (4, ("B", 4))).toDF("key", "value")
@@ -274,10 +283,10 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("kafka incremental mode") {
-
+    val topic = "sdlbIncrementalReadWriteString1"
     // create data object
     instanceRegistry.register(kafkaConnection)
-    val targetDO = KafkaTopicDataObject("kafka1", topicName = "topicKafkaIncremental", connectionId = "kafkaCon1",
+    val targetDO = KafkaTopicDataObject("kafkaIncrementalReadWriteString1", topicName = topic, connectionId = "kafkaCon1",
       valueType = KafkaColumnType.String, options = Map("groupIdPrefix" -> "sdlb-testIncMode"))
 
     // test 0a - read empty topic with delayedMaxTimestamp=now
@@ -334,10 +343,10 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("json schema evolution") {
-
+    val topic = "sdlbJsonEvolutionRegistry1"
     // create data object
     instanceRegistry.register(kafkaConnection)
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicJson", connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
+    val dataObject = KafkaTopicDataObject("kafkaJsonEvolutionRegistry1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.JsonSchemaRegistry)
     val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
 
     // write json message incl. schema
@@ -361,10 +370,10 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
   }
 
   test("avro schema evolution") {
-
+    val topic = "sdlbAvroEvolutionRegistry1"
     // create data object
     instanceRegistry.register(kafkaConnection)
-    val dataObject = KafkaTopicDataObject("kafka1", topicName = "topicKafka", connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
+    val dataObject = KafkaTopicDataObject("kafkaAvroEvolutionRegistry1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.AvroSchemaRegistry)
     val dataObjectAllowSchemaEvo = dataObject.copy(allowSchemaEvolution = true)
 
     // write json message incl. schema
