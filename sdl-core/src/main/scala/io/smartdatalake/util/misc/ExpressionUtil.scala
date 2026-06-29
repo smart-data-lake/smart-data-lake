@@ -30,7 +30,7 @@ import scala.reflect.runtime.universe.TypeTag
 import scala.util.matching.Regex
 
 /**
- * Utils to misuse spark sql expressions as expression language to substitute tokens with values
+ * Utils to misuse spark SQL expressions as expression language to substitute tokens with values
  * from case class instances. This works also without Spark libraries: the expression evaluator
  * factory dynamically creates an instance using Spark, or if absent a reduce implementation of
  * Spark expressions.
@@ -82,9 +82,7 @@ private[smartdatalake] object ExpressionUtil {
       id: ConfigObjectId,
       configName: Option[String],
       expression: String,
-      data: T,
-      syntaxCheckOnly: Boolean = false
-  ): Boolean =
+      data: T): Boolean =
     evaluate[T, Boolean](id, configName, expression, data)
       .getOrElse(false)
 
