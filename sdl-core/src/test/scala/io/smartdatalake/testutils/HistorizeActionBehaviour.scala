@@ -24,6 +24,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode
 import io.smartdatalake.workflow.action.{CopyAction, HistorizeAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
@@ -41,7 +42,7 @@ import java.time.LocalDateTime
  * This trait defines tests for the behaviour of HistorizeAction. They can be used with various
  * output DataObject types to ensure consistent behaviour for e.g. Jdbc, DeltaLake, ...
  */
-trait HistorizeActionBehaviour {
+trait HistorizeActionBehaviour extends Quality {
   this: AnyFunSuite with Matchers with SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
@@ -51,10 +52,11 @@ trait HistorizeActionBehaviour {
   def defaultEngineConnection: Connection with EngineConnection
 
   def historizeWithMergeMode(
-      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
-  ): Unit = {
+                              createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+                              createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
+                              tgtConnection: Option[Connection] = None
+                            ): Unit = {
+    logger.debug(s"historizeWithMergeMode START: tgtConnection=$tgtConnection")
 
     test("historize load using merge") {
 
@@ -111,7 +113,7 @@ trait HistorizeActionBehaviour {
 
       {
         val expected = Seq(
-          ("doe", "john", 5,  Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
           ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
         val actual = tgtDO.getDataFrame()
@@ -133,12 +135,13 @@ trait HistorizeActionBehaviour {
       action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
       action3.preInit(Seq(srcSubFeed3), Seq())(context3.copy(phase = ExecutionPhase.Init))
       action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
+      logger.debug(s"exec action3: $action3")
       action3.exec(Seq(srcSubFeed3))(context3)
 
       {
         val expected = Seq(
-          ("doe", "john", 5,  null,   Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-          ("doe", "john", 10, null,   Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
+          ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+          ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
           ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
         val actual = tgtDO.getDataFrame()
@@ -181,7 +184,7 @@ trait HistorizeActionBehaviour {
 
       {
         val expected = Seq(
-          ("doe", "john",  5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp),
+          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp),
           ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
         val actual = tgtDO.getDataFrame()
@@ -208,9 +211,9 @@ trait HistorizeActionBehaviour {
 
       {
         val expected = Seq(
-          ("doe", "john",  5,  Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-          ("doe", "john",  10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp),
-          ("pan", "peter", 5,  Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
+          ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+          ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp),
+          ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
         ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeDummyColName)
@@ -236,10 +239,10 @@ trait HistorizeActionBehaviour {
 
       {
         val expected = Seq(
-          ("doe", "john",  5,  null,   Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
-          ("doe", "john",  10, null,   Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
-          ("doe", "john",  10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp),
-          ("pan", "peter", 5,  null,   Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
+          ("doe", "john", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+          ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
+          ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp),
+          ("pan", "peter", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
         ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeDummyColName)

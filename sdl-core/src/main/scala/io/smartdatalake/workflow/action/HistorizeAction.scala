@@ -87,7 +87,7 @@ import scala.reflect.runtime.universe.Type
  *   select existing data to be used in transformation as Spark SQL expression. Use table alias
  *   'existing' to reference columns of the existing table data.
  * @param mergeModeCDCColumn
- *   Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information
+ *   Optional column holding the CDC operation to replay to enable mergeModeCDC. If CDC information
  *   is available from the source incremental historization can be further optimized, as the join
  *   with existing data can be omitted. Note that this should be enabled only, if input data
  *   contains just inserted, updated and deleted records. HistorizeAction in mergeModeCDC will make
