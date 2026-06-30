@@ -150,6 +150,7 @@
             <groupId>dev.mauch</groupId>
             <artifactId>spark-excel_${scala.minor.version}</artifactId>
             <version>${spark.excel.version}</version>
+            <classifier>thin</classifier>
         </dependency>
 
         <dependency>
