@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
@@ -104,6 +104,28 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
     }
   }
 
+  def createForeignKeyConstraint(tableName: String, constraintName: String, localCols: Seq[String],
+      refTableFullName: String, refCols: Seq[String], logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt = s"ALTER TABLE $tableName ADD CONSTRAINT $constraintName FOREIGN KEY (${localCols.mkString(",")}) REFERENCES $refTableFullName (${refCols.mkString(",")})"
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
+  def dropForeignKeyConstraint(tableName: String, constraintName: String, logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt = s"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
+  def ensureColumnNotNull(tableName: String, colName: String, logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt = getAlterColumnNullableSql(tableName, colName, isNullable = false)
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
   def isTableExisting(tableName: String): Boolean = {
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
     try {
@@ -139,6 +161,35 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
       case (_, pk) if pk.size > 1 => throw new SQLException(f"The JDBC-Connection more than one Primary Key!")
       case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
     }
+  }
+
+  def handleForeignKeyResultSet(resultSet: ResultSet): Seq[ForeignKeyDefinition] = {
+    case class FKRow(fkName: String, localCol: String, keySeq: Short, refCatalog: Option[String], refSchema: Option[String], refTable: String, refCol: String)
+    val rows = scala.collection.mutable.Buffer[FKRow]()
+    while (resultSet.next()) {
+      rows += FKRow(
+        fkName    = resultSet.getString("FK_NAME"),
+        localCol  = resultSet.getString("FKCOLUMN_NAME"),
+        keySeq    = resultSet.getShort("KEY_SEQ"),
+        refCatalog = Option(resultSet.getString("PKTABLE_CAT")).filter(_.nonEmpty),
+        refSchema  = Option(resultSet.getString("PKTABLE_SCHEM")).filter(_.nonEmpty),
+        refTable   = resultSet.getString("PKTABLE_NAME"),
+        refCol     = resultSet.getString("PKCOLUMN_NAME")
+      )
+    }
+    rows.groupBy(_.fkName)
+      .filter(_._1 != null)
+      .map { case (fkName, fkRows) =>
+        val ordered = fkRows.sortBy(_.keySeq)
+        ForeignKeyDefinition(
+          constraintName = fkName,
+          localColumns   = ordered.map(_.localCol).toSeq,
+          refCatalog     = ordered.head.refCatalog,
+          refSchema      = ordered.head.refSchema,
+          refTable       = ordered.head.refTable,
+          refColumns     = ordered.map(_.refCol).toSeq
+        )
+      }.toSeq
   }
 }
 private[smartdatalake] object JdbcCatalog {

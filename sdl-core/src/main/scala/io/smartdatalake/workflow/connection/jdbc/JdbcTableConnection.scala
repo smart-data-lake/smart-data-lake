@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
-import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
@@ -160,6 +160,25 @@ case class JdbcTableConnection(override val id: ConnectionId,
     val (catalog, schema) = (catalogOption.getOrElse(""), schemaOption.getOrElse(""))
     var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
     this.catalog.handlePrimaryKeyResultSet(resultSet)
+  }
+
+  def getJdbcForeignKeys(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
+    val (catalog, schema) = (catalogOption.orNull, schemaOption.orNull)
+    val resultSet: ResultSet = connectionMetadata.getImportedKeys(catalog, schema, tableName)
+    this.catalog.handleForeignKeyResultSet(resultSet)
+  }
+
+  def getColumnNullability(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Map[String, Boolean] = {
+    val (catalog, schema) = (catalogOption.orNull, schemaOption.orNull)
+    val rs = connectionMetadata.getColumns(catalog, schema, tableName, "%")
+    val buf = scala.collection.mutable.Map[String, Boolean]()
+    while (rs.next()) {
+      import java.sql.DatabaseMetaData
+      val colName = rs.getString("COLUMN_NAME")
+      val nullable = rs.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls
+      buf += (colName -> nullable)
+    }
+    buf.toMap
   }
 
   override def factory: FromConfigFactory[Connection] = JdbcTableConnection

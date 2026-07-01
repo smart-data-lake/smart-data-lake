@@ -100,7 +100,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
-    with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
+    with CanHandlePartitions with ExpectationValidation with CanHandleReferentialKeys {
 
   val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
 
@@ -354,22 +354,48 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     else column
   }
 
-  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
-    connection.catalog.getPrimaryKey(catalog, schema, tableName)
-
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
-    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
-
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit =
-    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
-
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
+    if (table.createAndReplaceReferentialKeys) createOrReplaceReferentialKeys
     if (syncComments) {
       columnComments.foreach(columnComment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${columnComment._1} is '${columnComment._2}';"))
     }
   }
+
+  // ── CanHandleReferentialKeys implementations ──────────────────────────
+
+  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)
+      (implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
+    connection.catalog.getPrimaryKey(catalog, schema, tableName)
+
+  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)
+      (implicit context: ActionPipelineContext): Unit =
+    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
+
+  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])
+      (implicit context: ActionPipelineContext): Unit =
+    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
+
+  def ensureColumnsNotNull(tableName: String, columns: Seq[String])
+      (implicit context: ActionPipelineContext): Unit = {
+    val nullability = connection.getColumnNullability(table.catalog, table.db, table.name)
+    columns.filter(col => nullability.getOrElse(col, true)).foreach { col =>
+      connection.catalog.ensureColumnNotNull(tableName, col)
+    }
+  }
+
+  def getExistingFKConstraints(catalog: Option[String], schema: Option[String], tableName: String)
+      (implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] =
+    connection.getJdbcForeignKeys(catalog, schema, tableName)
+
+  def dropForeignKeyConstraint(tableName: String, constraintName: String)
+      (implicit context: ActionPipelineContext): Unit =
+    connection.catalog.dropForeignKeyConstraint(tableName, constraintName)
+
+  def createForeignKeyConstraint(tableName: String, constraintName: String,
+      localColumns: Seq[String], refFullTableName: String, refColumns: Seq[String])
+      (implicit context: ActionPipelineContext): Unit =
+    connection.catalog.createForeignKeyConstraint(tableName, constraintName, localColumns, refFullTableName, refColumns)
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {
