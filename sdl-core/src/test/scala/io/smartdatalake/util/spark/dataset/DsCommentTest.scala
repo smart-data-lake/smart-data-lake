@@ -21,6 +21,7 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.GetSession.loggEnv
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -62,6 +63,24 @@ class DsCommentTest extends AnyFlatSpec with Matchers
     val expected = Set("desc_id", "desc_x", "desc_y")
     actual shouldBe expected
     dfCommented.columns shouldBe df.columns
+  }
+
+  "DsColComment.withComment" should "add a comment fluently on a Column" in {
+    val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
+    val dfCommented = df.select(col("id").withComment("desc_id"))
+    dfCommented.getColumnComments.select("comment").as[String].collect().toSet shouldBe Set("desc_id")
+  }
+
+  "DsColComment.makeNotNullable" should "mark the column as not-nullable in the schema" in {
+    val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
+    val dfNotNullable = df.select(col("id").makeNotNullable)
+    dfNotNullable.schema("id").nullable shouldBe false
+  }
+
+  it should "throw at runtime if the column actually contains a null value" in {
+    val df = List(Some(1), None).toDF("id")
+    val dfNotNullable = df.select(col("id").makeNotNullable)
+    a[Exception] should be thrownBy dfNotNullable.collect()
   }
 
 }
