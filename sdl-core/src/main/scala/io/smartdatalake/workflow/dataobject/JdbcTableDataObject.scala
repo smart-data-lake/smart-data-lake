@@ -111,7 +111,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
-    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleReferentialKeys {
+    with CanCreateIncrementalOutput with ExpectationValidation with JdbcCatalogReferentialKeys {
 
   /**
    * Connection defines driver, url and db in central location
@@ -563,40 +563,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (table.createAndReplaceReferentialKeys) createOrReplaceReferentialKeys
   }
 
-  // ── CanHandleReferentialKeys implementations ──────────────────────────
+  // ── JdbcCatalogReferentialKeys hooks ──────────────────────────────────
 
-  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)
-      (implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
-    connection.getJdbcPrimaryKey(catalog, schema, tableName)
-
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)
-      (implicit context: ActionPipelineContext): Unit =
-    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
-
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])
-      (implicit context: ActionPipelineContext): Unit =
-    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
-
-  def ensureColumnsNotNull(tableName: String, columns: Seq[String])
-      (implicit context: ActionPipelineContext): Unit = {
-    val nullability = connection.getColumnNullability(table.catalog, table.db, table.name)
-    columns.filter(col => nullability.getOrElse(col, true)).foreach { col =>
-      connection.catalog.ensureColumnNotNull(tableName, col)
-    }
-  }
-
-  def getExistingFKConstraints(catalog: Option[String], schema: Option[String], tableName: String)
-      (implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] =
-    connection.getJdbcForeignKeys(catalog, schema, tableName)
-
-  def dropForeignKeyConstraint(tableName: String, constraintName: String)
-      (implicit context: ActionPipelineContext): Unit =
-    connection.catalog.dropForeignKeyConstraint(tableName, constraintName)
-
-  def createForeignKeyConstraint(tableName: String, constraintName: String,
-      localColumns: Seq[String], refFullTableName: String, refColumns: Seq[String])
-      (implicit context: ActionPipelineContext): Unit =
-    connection.catalog.createForeignKeyConstraint(tableName, constraintName, localColumns, refFullTableName, refColumns)
+  override protected def jCatalog = connection.catalog
+  override protected def fetchPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String) = connection.getJdbcPrimaryKey(catalog, schema, tableName)
+  override protected def fetchForeignKeys(catalog: Option[String], schema: Option[String], tableName: String) = connection.getJdbcForeignKeys(catalog, schema, tableName)
+  override protected def fetchColumnNullability(catalog: Option[String], schema: Option[String], tableName: String) = connection.getColumnNullability(catalog, schema, tableName)
 }
 
 private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {

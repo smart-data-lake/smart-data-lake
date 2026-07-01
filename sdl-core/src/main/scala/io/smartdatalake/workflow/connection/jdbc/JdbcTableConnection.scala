@@ -157,20 +157,22 @@ case class JdbcTableConnection(override val id: ConnectionId,
   //The implementation to get the PK is not in the Catalog in order to use the JDBC standard method getPrimaryKeys
   // and not having to adapt the Query for different DBs.
   def getJdbcPrimaryKey(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
-    val (catalog, schema) = (catalogOption.getOrElse(""), schemaOption.getOrElse(""))
-    var resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
-    this.catalog.handlePrimaryKeyResultSet(resultSet)
+    // Use a fresh connection from the pool so we always see the latest committed DDL changes.
+    // null for catalog/schema means "any" — avoids case-sensitivity issues (e.g. HSQLDB normalises to uppercase).
+    execWithJdbcConnection { con =>
+      this.catalog.handlePrimaryKeyResultSet(con.getMetaData.getPrimaryKeys(null, null, tableName))
+    }
   }
 
   def getJdbcForeignKeys(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
-    val (catalog, schema) = (catalogOption.orNull, schemaOption.orNull)
-    val resultSet: ResultSet = connectionMetadata.getImportedKeys(catalog, schema, tableName)
-    this.catalog.handleForeignKeyResultSet(resultSet)
+    // Use a fresh connection from the pool so we always see the latest committed DDL changes.
+    execWithJdbcConnection { con =>
+      this.catalog.handleForeignKeyResultSet(con.getMetaData.getImportedKeys(null, null, tableName))
+    }
   }
 
   def getColumnNullability(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Map[String, Boolean] = {
-    val (catalog, schema) = (catalogOption.orNull, schemaOption.orNull)
-    val rs = connectionMetadata.getColumns(catalog, schema, tableName, "%")
+    val rs = execWithJdbcConnection(_.getMetaData.getColumns(null, null, tableName, "%"))
     val buf = scala.collection.mutable.Map[String, Boolean]()
     while (rs.next()) {
       import java.sql.DatabaseMetaData

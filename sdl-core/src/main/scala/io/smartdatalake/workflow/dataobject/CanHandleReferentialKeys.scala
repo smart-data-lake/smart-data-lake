@@ -146,7 +146,7 @@ trait CanHandleReferentialKeys extends SmartDataLakeLogger { self: Transactional
 
     // Drop FKs that are absent or have changed
     existingFKs.foreach { existing =>
-      val stillDefined = definedFKs.find(fk => fkConstraintName(fk) == existing.constraintName)
+      val stillDefined = definedFKs.find(fk => fkConstraintName(fk).equalsIgnoreCase(existing.constraintName))
       val changed = stillDefined.exists(fk => !fkMatchesDefinition(existing, fk))
       if (stillDefined.isEmpty || changed) {
         logger.info(s"$id: Dropping FK constraint '${existing.constraintName}' (removed or changed)")
@@ -157,7 +157,7 @@ trait CanHandleReferentialKeys extends SmartDataLakeLogger { self: Transactional
     // Create FKs that are missing or were just dropped
     definedFKs.foreach { fk =>
       val alreadyExists = existingFKs.exists { existing =>
-        fkConstraintName(fk) == existing.constraintName && fkMatchesDefinition(existing, fk)
+        fkConstraintName(fk).equalsIgnoreCase(existing.constraintName) && fkMatchesDefinition(existing, fk)
       }
       if (!alreadyExists) {
         val name = fkConstraintName(fk)
