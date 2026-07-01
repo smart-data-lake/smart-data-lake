@@ -65,10 +65,8 @@ trait SparkCatalogReferentialKeys extends CanHandleReferentialKeys { self: Trans
   }
 
   override def dropPrimaryKeyConstraint(tableName: String, constraintName: String)
-      (implicit context: ActionPipelineContext): Unit = {
-    val query = s"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
-    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
-  }
+      (implicit context: ActionPipelineContext): Unit =
+    dropConstraint(tableName, constraintName)
 
   override def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])
       (implicit context: ActionPipelineContext): Unit = {
@@ -113,6 +111,10 @@ trait SparkCatalogReferentialKeys extends CanHandleReferentialKeys { self: Trans
   }
 
   override def dropForeignKeyConstraint(tableName: String, constraintName: String)
+      (implicit context: ActionPipelineContext): Unit =
+    dropConstraint(tableName, constraintName)
+
+  private def dropConstraint(tableName: String, constraintName: String)
       (implicit context: ActionPipelineContext): Unit = {
     val query = s"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
     SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
