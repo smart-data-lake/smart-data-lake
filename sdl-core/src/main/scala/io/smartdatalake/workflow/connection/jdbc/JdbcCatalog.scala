@@ -191,6 +191,27 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
         )
       }.toSeq
   }
+
+  /**
+   * Returns the primary key constraint for the given table.
+   * Override in database-specific subclasses if INFORMATION_SCHEMA is not available.
+   */
+  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition] =
+    throw new UnsupportedOperationException(s"getPrimaryKey is not implemented for ${getClass.getSimpleName}. Override this method for database-specific support.")
+
+  /**
+   * Returns all foreign key constraints defined on the given table.
+   * Override in database-specific subclasses if INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE is not available.
+   */
+  def getForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition] =
+    throw new UnsupportedOperationException(s"getForeignKeys is not implemented for ${getClass.getSimpleName}. Override this method for database-specific support.")
+
+  /**
+   * Returns a map of column name → is-nullable for all columns of the given table.
+   * Override in database-specific subclasses if INFORMATION_SCHEMA.COLUMNS is not available.
+   */
+  def getColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean] =
+    throw new UnsupportedOperationException(s"getColumnNullability is not implemented for ${getClass.getSimpleName}. Override this method for database-specific support.")
 }
 private[smartdatalake] object JdbcCatalog {
   def fromJdbcDriver(driver: String, connection: JdbcTableConnection): JdbcCatalog = {
@@ -216,14 +237,67 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
 
-  //This method is not used in JdbcTableDataObject, but in other DataObjects.
-  // For this reason, it is not implemented in Oracle and SAP-HANA.
-  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String) = {
-    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '${catalog.get}'"
-    val schemaConstraint =  if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '${schema.get}'"
-    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
-    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString
+  override def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
+    val schemaFilter  = schema.map(s => s" AND UPPER(TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
+    val catalogFilter = catalog.map(c => s" AND UPPER(TABLE_CATALOG) = UPPER('$c')").getOrElse("")
+    val query = s"SELECT COLUMN_NAME, CONSTRAINT_NAME AS PK_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE UPPER(TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter"
     connection.execJdbcQuery(query, handlePrimaryKeyResultSet)
+  }
+
+  override def getForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
+    val schemaFilter  = schema.map(s => s" AND UPPER(tc.TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
+    val catalogFilter = catalog.map(c => s" AND UPPER(tc.TABLE_CATALOG) = UPPER('$c')").getOrElse("")
+    val query =
+      s"""SELECT tc.CONSTRAINT_NAME, kcu.COLUMN_NAME AS LOCAL_COLUMN, kcu.ORDINAL_POSITION,
+         |       ccu.TABLE_CATALOG AS REF_CATALOG, ccu.TABLE_SCHEMA AS REF_SCHEMA,
+         |       ccu.TABLE_NAME AS REF_TABLE, ccu.COLUMN_NAME AS REF_COLUMN
+         |FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+         |JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+         |  ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+         |  AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA AND tc.TABLE_NAME = kcu.TABLE_NAME
+         |JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE ccu
+         |  ON tc.CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
+         |WHERE tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+         |  AND UPPER(tc.TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter""".stripMargin
+    connection.execJdbcQuery(query, evalFKResultSet)
+  }
+
+  private def evalFKResultSet(rs: ResultSet): Seq[ForeignKeyDefinition] = {
+    case class Row(name: String, localCol: String, pos: Int, refCatalog: Option[String], refSchema: Option[String], refTable: String, refCol: String)
+    val rows = scala.collection.mutable.Buffer[Row]()
+    while (rs.next()) {
+      rows += Row(
+        name      = rs.getString("CONSTRAINT_NAME"),
+        localCol  = rs.getString("LOCAL_COLUMN"),
+        pos       = rs.getInt("ORDINAL_POSITION"),
+        refCatalog = Option(rs.getString("REF_CATALOG")).filter(_.nonEmpty),
+        refSchema  = Option(rs.getString("REF_SCHEMA")).filter(_.nonEmpty),
+        refTable   = rs.getString("REF_TABLE"),
+        refCol     = rs.getString("REF_COLUMN")
+      )
+    }
+    rows.groupBy(_.name).map { case (constraintName, grp) =>
+      val ordered = grp.sortBy(_.pos)
+      ForeignKeyDefinition(
+        constraintName = constraintName,
+        localColumns   = ordered.map(_.localCol).toSeq,
+        refCatalog     = ordered.head.refCatalog,
+        refSchema      = ordered.head.refSchema,
+        refTable       = ordered.head.refTable,
+        refColumns     = ordered.map(_.refCol).toSeq
+      )
+    }.toSeq
+  }
+
+  override def getColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean] = {
+    val schemaFilter  = schema.map(s => s" AND UPPER(TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
+    val catalogFilter = catalog.map(c => s" AND UPPER(TABLE_CATALOG) = UPPER('$c')").getOrElse("")
+    val query = s"SELECT COLUMN_NAME, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter"
+    connection.execJdbcQuery(query, rs => {
+      val buf = scala.collection.mutable.Map[String, Boolean]()
+      while (rs.next()) buf += (rs.getString("COLUMN_NAME") -> (rs.getString("IS_NULLABLE") == "YES"))
+      buf.toMap
+    })
   }
 }
 

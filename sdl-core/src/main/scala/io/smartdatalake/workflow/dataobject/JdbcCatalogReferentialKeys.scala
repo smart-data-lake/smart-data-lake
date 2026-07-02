@@ -20,7 +20,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.jdbc.JdbcCatalog
+import io.smartdatalake.workflow.connection.jdbc.{JdbcCatalog}
 
 /**
  * Concrete implementation of [[CanHandleReferentialKeys]] for JDBC-backed DataObjects.
@@ -39,19 +39,14 @@ import io.smartdatalake.workflow.connection.jdbc.JdbcCatalog
  */
 trait JdbcCatalogReferentialKeys extends CanHandleReferentialKeys { self: TransactionalTableDataObject =>
 
+  /** The catalog instance to delegate all operations to. */
   protected def jCatalog: JdbcCatalog
-
-  protected def fetchPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition]
-
-  protected def fetchForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition]
-
-  protected def fetchColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean]
 
   // ── CanHandleReferentialKeys — concrete implementations ───────────────
 
   override def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)
       (implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
-    fetchPrimaryKey(catalog, schema, tableName)
+    jCatalog.getPrimaryKey(catalog, schema, tableName)
 
   override def dropPrimaryKeyConstraint(tableName: String, constraintName: String)
       (implicit context: ActionPipelineContext): Unit =
@@ -63,7 +58,7 @@ trait JdbcCatalogReferentialKeys extends CanHandleReferentialKeys { self: Transa
 
   override def ensureColumnsNotNull(tableName: String, columns: Seq[String])
       (implicit context: ActionPipelineContext): Unit = {
-    val nullability = fetchColumnNullability(table.catalog, table.db, table.name)
+    val nullability = jCatalog.getColumnNullability(table.catalog, table.db, table.name)
     columns.filter(col => nullability.getOrElse(col, true)).foreach { col =>
       jCatalog.ensureColumnNotNull(tableName, col)
     }
@@ -71,7 +66,7 @@ trait JdbcCatalogReferentialKeys extends CanHandleReferentialKeys { self: Transa
 
   override def getExistingFKConstraints(catalog: Option[String], schema: Option[String], tableName: String)
       (implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] =
-    fetchForeignKeys(catalog, schema, tableName)
+    jCatalog.getForeignKeys(catalog, schema, tableName)
 
   override def dropForeignKeyConstraint(tableName: String, constraintName: String)
       (implicit context: ActionPipelineContext): Unit =

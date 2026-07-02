@@ -362,12 +362,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     }
   }
 
-  // ── JdbcCatalogReferentialKeys hooks ──────────────────────────────────
+  // ── JdbcCatalogReferentialKeys hook ──────────────────────────────────
 
   override protected def jCatalog = connection.catalog
-  override protected def fetchPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String) = connection.catalog.getPrimaryKey(catalog, schema, tableName)
-  override protected def fetchForeignKeys(catalog: Option[String], schema: Option[String], tableName: String) = connection.getJdbcForeignKeys(catalog, schema, tableName)
-  override protected def fetchColumnNullability(catalog: Option[String], schema: Option[String], tableName: String) = connection.getColumnNullability(catalog, schema, tableName)
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {

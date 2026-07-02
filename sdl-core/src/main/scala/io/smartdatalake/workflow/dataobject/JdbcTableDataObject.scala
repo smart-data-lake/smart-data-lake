@@ -563,12 +563,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     if (table.createAndReplaceReferentialKeys) createOrReplaceReferentialKeys
   }
 
-  // ── JdbcCatalogReferentialKeys hooks ──────────────────────────────────
+  // ── JdbcCatalogReferentialKeys hook ──────────────────────────────────
 
   override protected def jCatalog = connection.catalog
-  override protected def fetchPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String) = connection.getJdbcPrimaryKey(catalog, schema, tableName)
-  override protected def fetchForeignKeys(catalog: Option[String], schema: Option[String], tableName: String) = connection.getJdbcForeignKeys(catalog, schema, tableName)
-  override protected def fetchColumnNullability(catalog: Option[String], schema: Option[String], tableName: String) = connection.getColumnNullability(catalog, schema, tableName)
 }
 
 private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {

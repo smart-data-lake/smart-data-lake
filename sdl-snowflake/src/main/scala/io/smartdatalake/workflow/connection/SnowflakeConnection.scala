@@ -30,9 +30,7 @@ import net.snowflake.spark.snowflake.Utils
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
-import io.smartdatalake.workflow.dataobject.{ForeignKeyDefinition, PrimaryKeyDefinition}
-
-import java.sql.{DatabaseMetaData, Connection => SqlConnection}
+import java.sql.{Connection => SqlConnection}
 
 /**
  * Connection information for Snowflake databases.
@@ -130,24 +128,6 @@ case class SnowflakeConnection(override val id: ConnectionId,
       case _ => throw new IllegalArgumentException(s"($id) No supported authMode given for Snowflake connection.")
     }
     Session.builder.configs(commonOptions ++ authOptions ++ getProxyOptions).create
-  }
-
-  def getJdbcForeignKeys(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
-    val (cat, schema) = (catalogOption.orNull, schemaOption.orNull)
-    val resultSet = execWithJdbcConnection(_.getMetaData.getImportedKeys(cat, schema, tableName))
-    catalog.handleForeignKeyResultSet(resultSet)
-  }
-
-  def getColumnNullability(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Map[String, Boolean] = {
-    val (cat, schema) = (catalogOption.orNull, schemaOption.orNull)
-    val rs = execWithJdbcConnection(_.getMetaData.getColumns(cat, schema, tableName, "%"))
-    val buf = scala.collection.mutable.Map[String, Boolean]()
-    while (rs.next()) {
-      val colName = rs.getString("COLUMN_NAME")
-      val nullable = rs.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls
-      buf += (colName -> nullable)
-    }
-    buf.toMap
   }
 
   override def factory: FromConfigFactory[Connection] = SnowflakeConnection
