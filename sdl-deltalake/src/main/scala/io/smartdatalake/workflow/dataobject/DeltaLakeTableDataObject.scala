@@ -430,58 +430,55 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
-    val saveModeExpr = saveModeOptions.getExpressions(SparkSubFeed.subFeedType)
+    val tableName = table.name
+    val saveModeExpr = saveModeOptions.getExpressions(SparkSubFeed.subFeedType, existingAliasReplacement = Some(tableName))
     def toSpark(expr: GenericColumn): Column = expr.asInstanceOf[SparkColumn].inner
+    val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
+    val existingCols = session.table(table.fullName).columns
+    val additionalCols = insertCols.diff(existingCols)
 
-    // set schema evolution support
-    // this is done in a synchronized block because DataObjects with or without autoMerge enabled can be mixed and executed in parallel in a DAG
-    DeltaLakeTableDataObject.synchronized { // note that this is synchronizing on the object (singleton)
-      // create missing columns to support schema evolution
-      val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
-      if (saveModeOptions.updateColumnsOpt.isDefined || saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
-        val existingCols = session.table(table.fullName).schema.fieldNames
-        insertCols.diff(existingCols).foreach { col =>
-          val sqlType = df.schema(col).dataType.sql
-          logger.info(s"($id) Manually creating col $col for working around schema evolution limitations with merge statement")
-          session.sql(s"ALTER TABLE ${table.fullName} ADD COLUMN $col $sqlType")
-        }
-      }
-      session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", allowSchemaEvolution)
-      val existingDeltaTable = deltaTable.as("existing")
-      // prepare join condition
-      val joinCondition = table.primaryKey.get.map(colName => col(s"new.$colName") === col(s"existing.$colName")).reduce(_ and _)
-      var mergeStmt = existingDeltaTable.merge(df.as("new"), joinCondition and saveModeExpr.additionalMergePredicateExpr.map(toSpark).getOrElse(lit(true)))
-      // add delete clause if configured
-      saveModeExpr.deleteConditionExpr.map(toSpark).foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
-      // add update clause - updateExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and updateAll otherwise
-      // see also https://github.com/delta-io/delta/issues/2300
-      mergeStmt = if (saveModeOptions.updateColumnsOpt.isDefined) {
-        val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
-        mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
-      } else {
-        mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).updateAll()
-      }
+    // prepare join condition
+    val joinCondition = table.primaryKey.get.map(colName => col(s"new.$colName") === col(s"$tableName.$colName")).reduce(_ and _)
+    var mergeStmt = df.as("new")
+      .mergeInto(table.fullName, joinCondition and saveModeExpr.additionalMergePredicateExpr.map(toSpark).getOrElse(lit(true)))
 
-      mergeStmt = if(saveModeOptions.updateExistingCondition.isDefined) {
-        val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName))
-        mergeStmt.whenMatched(saveModeExpr.updateExistingConditionExpr.map(toSpark).getOrElse(lit(true))).updateExpr(updateCols.map(c => c -> s"new.$c").toMap)
-      }
-        else mergeStmt
-
-      // add insert clause - insertExpr does not support referring new columns in existing table on schema evolution, that's why we use it only when needed, and insertAll otherwise
-      mergeStmt = if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
-        // create merge statement
-        mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true)))
-          .insertExpr(insertCols.map(c => c -> saveModeOptions.insertValuesOverride.getOrElse(c, s"new.$c")).toMap)
-      } else {
-        mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true))).insertAll()
-      }
-      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
-      // execute delta lake statement
-      SparkStageMetricsListener.execWithMetrics(this.id,
-        mergeStmt.execute()
-      )
+    // enable schema evolution
+    if (allowSchemaEvolution) {
+      mergeStmt = mergeStmt.withSchemaEvolution() // doesnt work in Spark 4.1
+      // workaround: set this globally and check same schema before (in writeSparkDataFrame)
+      session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", true)
     }
+    // delete clause if configured
+    saveModeExpr.deleteConditionExpr.map(toSpark).foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
+
+    // update clause
+    if (saveModeOptions.updateColumnsOpt.isDefined) {
+      val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
+      mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
+    } else {
+      mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).updateAll()
+    }
+
+    // update existing clause if configured
+    if(saveModeOptions.updateExistingCondition.isDefined) {
+      val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName)).diff(additionalCols)
+      mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateExistingConditionExpr.map(toSpark).getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
+    }
+
+    // insert clause
+    if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
+      // create merge statement
+      mergeStmt = mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true)))
+        .insert(insertCols.map(c => c -> saveModeOptions.insertValuesOverride.get(c).map(lit).getOrElse(col(s"new.$c"))).toMap)
+    } else {
+      mergeStmt = mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true))).insertAll()
+    }
+
+    // execute merge statement
+    logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
+    SparkStageMetricsListener.execWithMetrics(this.id,
+      mergeStmt.merge()
+    )
   }
 
   def vacuum(implicit context: ActionPipelineContext): Unit = {

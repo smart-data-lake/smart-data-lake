@@ -139,7 +139,7 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
                                ) extends SaveModeOptions {
   override val saveMode: SDLSaveMode = SDLSaveMode.Merge
 
-  def getExpressions(subFeedType: Type): SaveModeMergeExpressions = SaveModeMergeExpressions(this, subFeedType)
+  def getExpressions(subFeedType: Type, existingAliasReplacement: Option[String] = None): SaveModeMergeExpressions = SaveModeMergeExpressions(this, subFeedType, existingAliasReplacement)
 
   val updateColumnsOpt: Option[Seq[String]] = if (updateColumns.nonEmpty) Some(updateColumns) else None
 
@@ -155,13 +155,16 @@ object SaveModeMergeOptions {
   }
 }
 
-case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType: Type) {
+case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType: Type, existingAliasReplacement: Option[String] = None) {
   private val functions = DataFrameSubFeed.getFunctions(subFeedType)
+  def replaceExistingAlias(s: String): String = {
+    existingAliasReplacement.map(replacement => s.replaceAll("existing\\.", replacement + ".")).getOrElse(s)
+  }
   import functions._
-  val deleteConditionExpr: Option[GenericColumn] = saveMode.deleteCondition.map(expr)
-  val updateConditionExpr: Option[GenericColumn] = saveMode.updateCondition.map(expr)
-  val updateExistingConditionExpr: Option[GenericColumn] = saveMode.updateExistingCondition.map(expr)
-  val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(expr)
+  val deleteConditionExpr: Option[GenericColumn] = saveMode.deleteCondition.map(c => expr(replaceExistingAlias(c)))
+  val updateConditionExpr: Option[GenericColumn] = saveMode.updateCondition.map(c => expr(replaceExistingAlias(c)))
+  val updateExistingConditionExpr: Option[GenericColumn] = saveMode.updateExistingCondition.map(c => expr(replaceExistingAlias(c)))
+  val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(c => expr(replaceExistingAlias(c)))
   val insertValuesOverrideExpr: Map[String, GenericColumn] = saveMode.insertValuesOverride.view.mapValues(expr).toMap
-  val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(expr)
+  val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(c => expr(replaceExistingAlias(c)))
 }
